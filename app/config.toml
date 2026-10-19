@@ -16,6 +16,7 @@ open_browser = true         # ./app.sh opens a browser tab (the desktop app open
 dir = "app_data"            # one folder per transcription: 16 kHz audio, transcript, log (git-ignored)
 keep_original = false       # also keep the uploaded file (a video can be 100x the size of the audio)
 max_upload_gb = 4
+courses = "courses"         # transcripts of YouTube videos and playlists as Markdown and SRT files (git-ignored)
 
 [defaults]
 model = "whisper-medium"
@@ -74,6 +75,54 @@ path = "models/nvidia-cuda/nvidia_cuda_nvrtc_cu12-12.9.86-py3-none-manylinux2010
 size = 89568129
 sha256 = "210cf05005a447e29214e9ce50851e83fc5f4358df8b453155d5e1918094dcb4"
 unpack = { "nvidia/cuda_nvrtc/lib/libnvrtc.so.12" = 106244480, "nvidia/cuda_nvrtc/lib/libnvrtc-builtins.so.12.9" = 7202760 }
+
+# Deno, the JavaScript runtime yt-dlp uses to answer YouTube's challenge for YouTube links (app/youtube.py),
+# taken from the deno package on PyPI for this system and processor. The new transcription page offers the
+# download when no Deno, Node.js or QuickJS is found on the computer.
+[[local.deno_files]]
+platform = "win32"
+arch = "x86_64"
+url = "https://files.pythonhosted.org/packages/7e/0b/3ca6468ec928d817ce6ef062ddfa11e71a3c68035c3401057d7cb33845f6/deno-2.9.5-py3-none-win_amd64.whl"
+path = "models/deno/deno-2.9.5-py3-none-win_amd64.whl"
+size = 41615800
+sha256 = "570d4ee6f1ddb16d14848d36dac6cd2f586d8a0c94cf9c3e6b5da130da2597d5"
+unpack = { "deno-2.9.5.data/scripts/deno.exe" = 97408288 }
+
+[[local.deno_files]]
+platform = "linux"
+arch = "x86_64"
+url = "https://files.pythonhosted.org/packages/60/54/c6e0fb4b5e96dd7611bc75c8137046d7436666bd2e278f686e36d6a805af/deno-2.9.5-py3-none-manylinux_2_27_x86_64.whl"
+path = "models/deno/deno-2.9.5-py3-none-manylinux_2_27_x86_64.whl"
+size = 41642333
+sha256 = "e5aec0419739fd0359663a78765d4feda19d1d0b60a682d25add9b78e19f95b4"
+unpack = { "deno-2.9.5.data/scripts/deno" = 95582008 }
+
+[[local.deno_files]]
+platform = "linux"
+arch = "arm64"
+url = "https://files.pythonhosted.org/packages/a4/b4/5d462bc738b2172043a470ab97d7b6f3e7a287fa1916065e777e034ef1b1/deno-2.9.5-py3-none-manylinux_2_27_aarch64.whl"
+path = "models/deno/deno-2.9.5-py3-none-manylinux_2_27_aarch64.whl"
+size = 39908447
+sha256 = "bccec0965917b6daa323f9ce6ad8e884e0854506b0cdaec9de41bdac7620109a"
+unpack = { "deno-2.9.5.data/scripts/deno" = 84842080 }
+
+[[local.deno_files]]
+platform = "darwin"
+arch = "arm64"
+url = "https://files.pythonhosted.org/packages/ce/3a/d60dac70124d045dfc6f01bbd181e2865904ecca5710b2d319869ff59727/deno-2.9.5-py3-none-macosx_11_0_arm64.whl"
+path = "models/deno/deno-2.9.5-py3-none-macosx_11_0_arm64.whl"
+size = 38520058
+sha256 = "696dffb666d6336a3527857b2f9b665db33b07883bb6adc3595dbb3b78748cf1"
+unpack = { "deno-2.9.5.data/scripts/deno" = 80900512 }
+
+[[local.deno_files]]
+platform = "darwin"
+arch = "x86_64"
+url = "https://files.pythonhosted.org/packages/a8/99/1a1ff9e40e82d857b426a86d2159e3560000c2f98edb0f63170256582067/deno-2.9.5-py3-none-macosx_10_12_x86_64.whl"
+path = "models/deno/deno-2.9.5-py3-none-macosx_10_12_x86_64.whl"
+size = 42353187
+sha256 = "d321f54f82cb535904a108afd970c1c3e1db23716db1ab0cda5e0ca993dbf824"
+unpack = { "deno-2.9.5.data/scripts/deno" = 97740224 }
 
 # ---------------------------------------------------------------------------------------------
 # Models. kind = "local" runs on this computer through transcribe.py; kind = "hosted" uploads the

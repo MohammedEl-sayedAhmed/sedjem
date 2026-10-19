@@ -4,12 +4,13 @@ Every file in the config has a pinned URL (a fixed Hugging Face revision or rele
 its SHA-256. A download goes to <file>.part, resumes with an HTTP Range request after a dropped
 connection, and becomes the real file only once size and checksum match. A file with `unpack` is a
 package (a wheel): the listed members are copied out next to it, checked by size, and the package is
-deleted. Small files from Hugging Face have no SHA-256 in its listing, only their git blob id, so
+deleted (a member marked executable in the package stays executable: Deno, app/youtube.py). Small files from Hugging Face have no SHA-256 in its listing, only their git blob id, so
 those are checked by `git_sha1` instead. An item with `convert` (a Whisper checkpoint in Transformers
 format, added from Hugging Face) is converted for faster-whisper once downloaded (app/hub.py), and
 counts as installed when the converted model is there.
 """
 import hashlib
+import os
 import shutil
 import threading
 import time
@@ -218,6 +219,8 @@ class Downloads:
                             out.write(block)
                     if tmp.stat().st_size != f["unpack"][member]:
                         raise RuntimeError(f"{dest.name}: not the expected size in {package.name}")
+                    if os.name != "nt" and z.getinfo(member).external_attr >> 16 & 0o111:
+                        os.chmod(tmp, 0o755)
                 except BaseException:
                     tmp.unlink(missing_ok=True)
                     raise
