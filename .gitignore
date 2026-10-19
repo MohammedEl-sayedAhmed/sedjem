@@ -2,6 +2,8 @@
 audio-test/
 data/
 app_data/
+# the transcripts of YouTube videos and courses, written by the app (app/courses.py)
+courses/
 
 # results/ holds only public test-set outputs; everything else there (results/poc/, results/meetings/,
 # runs on private sets) stays local

@@ -4,6 +4,12 @@ A job folder holds job.json (settings and status), audio.flac (16 kHz mono, used
 and for playback), transcript.json once done, and the engine's own output and log. Jobs go
 through prepare (convert the recording) → queued → running → done / failed / cancelled. Local and
 hosted jobs have separate queues, so an upload doesn't wait for a long local run.
+
+A job made from a YouTube link (source_url, app/youtube.py) is downloaded first, one at a time in the
+order the jobs were added (a playlist's in playlist order): video.mp4, or only the sound as source.<ext>,
+and captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
+recording, and a job with captions takes them as its transcript instead of going to a model. A finished
+YouTube job writes its files to the courses folder (app/courses.py).
 """
 import json
 import os
@@ -20,7 +26,7 @@ import soundfile as sf
 
 import sysinfo
 
-from . import engines, report
+from . import courses, engines, report, youtube
 from .config import power_profile, replace_file, set_power_profile
 
 ACTIVE = ("preparing", "queued", "running")
@@ -162,21 +168,29 @@ class Runner:
     def __init__(self, store, cfg, gpus=None):
         self.store, self.cfg = store, cfg
         self.gpus = gpus or (lambda: None)  # the graphics cards the app found, for the job details
-        self.queues = {"prepare": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
+        self.queues = {"download": queue.Queue(), "prepare": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
         self.cancelled = set()
         self.procs = {}  # job id -> running transcribe.py process
         self.saved_profile = None
-        for name, fn in (("prepare", self.prepare), ("local", self.work), ("hosted", self.work)):
+        for name, fn in (("download", self.download), ("prepare", self.prepare), ("local", self.work), ("hosted", self.work)):
             threading.Thread(target=self.loop, args=(name, fn), daemon=True, name=f"sedjem-{name}").start()
 
     # ---- queueing -----------------------------------------------------------------------------
     def submit(self, jid):
+        job, folder = self.store.get(jid), self.store.dir(jid)
+        if job and job.get("source_url") and not any((folder / n).exists() for n in ("audio.flac", "video.mp4")) \
+                and next(folder.glob("source.*"), None) is None:  # a YouTube job not downloaded yet
+            self.store.update(jid, status="preparing", stage="waiting-download", error=None)
+            self.queues["download"].put(jid)
+            return
         self.store.update(jid, status="preparing", stage="waiting")
         self.queues["prepare"].put(jid)
 
     def recover(self):
-        """After a restart: requeue jobs that were waiting; mark the ones that were running."""
-        for job in reversed(self.store.list()):
+        """After a restart: requeue jobs that were waiting (a playlist's in playlist order); mark the ones that
+        were running."""
+        order = lambda j: (j["created"], (j.get("course") or {}).get("index") or 0, j["id"])
+        for job in sorted(self.store.list(), key=order):
             if job["status"] in ("preparing", "queued"):
                 self.submit(job["id"])
             elif job["status"] == "running":
@@ -204,6 +218,32 @@ class Runner:
                 self.store.update(jid, status="failed", stage=None, error=f"{type(e).__name__}: {e}", finished=now())
 
     # ---- steps ----------------------------------------------------------------------------------
+    def download(self, jid, _):
+        """Download a YouTube job's video (app/youtube.py), then hand it to prepare."""
+        job = self.store.get(jid)
+        if not job or job["status"] == "cancelled" or jid in self.cancelled:
+            return
+        self.store.update(jid, status="preparing", stage="downloading", done=0, total=None, error=None)
+        last = [0.0]
+
+        def progress(done, total):
+            if time.time() - last[0] > 0.5:
+                last[0] = time.time()
+                self.store.update(jid, done=done, total=total)
+
+        try:
+            got = youtube.download(self.cfg, job, self.store.dir(jid), progress, lambda: jid in self.cancelled)
+        except engines.Cancelled:
+            return
+        except youtube.YouTubeError as e:
+            self.store.update(jid, status="failed", stage=None, done=None, total=None, error=f"YouTube: {e}",
+                              finished=now())
+            return
+        if jid in self.cancelled or self.store.get(jid) is None:  # cancelled or deleted meanwhile
+            return
+        self.store.update(jid, stage="waiting", done=None, total=None, **got)
+        self.queues["prepare"].put(jid)
+
     def prepare(self, jid, _):
         """Convert the recording to 16 kHz mono FLAC (used by every model and for playback)."""
         job = self.store.get(jid)
@@ -212,7 +252,8 @@ class Runner:
         folder = self.store.dir(jid)
         audio = folder / "audio.flac"
         if not audio.exists():
-            source = Path(job["source_path"]) if job.get("source_path") else next(folder.glob("source.*"), None)
+            source = Path(job["source_path"]) if job.get("source_path") else next(folder.glob("source.*"), None) \
+                or (folder / "video.mp4" if (folder / "video.mp4").exists() else None)  # e.g. a YouTube video
             if not source or not source.exists():
                 raise engines.EngineError("the recording is missing")
             total = probe_seconds(source)
@@ -226,16 +267,33 @@ class Runner:
                 raise
             except Exception as e:
                 raise engines.EngineError(f"could not read the recording: {e}")
-            if not job.get("source_path") and not self.cfg.keep_original:
-                source.unlink(missing_ok=True)
+            if not job.get("source_path") and source.name.startswith("source.") and not self.cfg.keep_original:
+                source.unlink(missing_ok=True)  # an upload (video.mp4 stays: it is played beside the transcript)
         info = sf.info(str(audio))
         model = self.cfg.models.get(job["model"])
-        if model is None:
+        if model is None and not job.get("captions"):
             raise engines.EngineError(f"unknown model {job['model']}")
         from .compare import try_fingerprint  # the same recording added again joins this one's group
-        self.store.update(jid, status="queued", stage=None, done=None, total=None, audio_s=round(info.duration, 2),
-                          queued=now(), fingerprint=job.get("fingerprint") or try_fingerprint(audio))
+        ready = {"done": None, "total": None, "audio_s": round(info.duration, 2), "queued": now(),
+                 "fingerprint": job.get("fingerprint") or try_fingerprint(audio)}
+        if job.get("captions"):  # captions made by people: they are the transcript, and no model runs
+            return self.finish_captions(jid, ready)
+        self.store.update(jid, status="queued", stage=None, **ready)
         self.queues[model["kind"]].put(jid)
+
+    def finish_captions(self, jid, fields):
+        """A YouTube job with captions made by people: its transcript is the captions, with one speaker."""
+        try:
+            lines = youtube.captions_transcript(self.store.dir(jid))
+        except (OSError, ValueError) as e:
+            raise engines.EngineError(f"could not read the captions: {e}")
+        self.store.save_transcript(jid, {"lines": lines, "edited": False, "model": youtube.CAPTIONS_MODEL})
+        self.store.update(jid, status="done", stage=None, started=now(), finished=now(), error=None,
+                          model=youtube.CAPTIONS_MODEL, model_title=youtube.CAPTIONS_TITLE, kind="captions",
+                          engine=None, app_version=report.__version__, **fields)
+        from . import history  # imported here because it uses this module's helpers
+        history.current(self.store, jid, self.cfg)  # version 0: the captions as YouTube has them
+        courses.try_refresh(self.store, self.cfg, self.store.get(jid))
 
     def work(self, jid, kind):
         job = self.store.get(jid)
@@ -272,6 +330,7 @@ class Runner:
                               **result.get("meta", {}))
             from . import history  # imported here because it uses this module's helpers
             history.current(self.store, jid, self.cfg)  # starts the history: version 0 is the model's output
+            courses.try_refresh(self.store, self.cfg, self.store.get(jid))  # a YouTube job's files
         except engines.Cancelled:
             self.store.update(jid, status="cancelled", stage=None, finished=now())
         except Exception as e:
@@ -297,9 +356,10 @@ class Runner:
     def rerun(self, jid, model_id, options):
         """A new job on the same audio with another model or other options."""
         old = self.store.get(jid)
+        youtube_fields = {k: old[k] for k in ("source_url", "youtube_id", "course") if old.get(k)}  # still the lecture
         new = self.new_job(title=old["title"], source_name=old.get("source_name"), model_id=model_id,
                            options=options, rerun_of=jid, source=old.get("source"),  # the same recording
-                           fingerprint=old.get("fingerprint"))
+                           fingerprint=old.get("fingerprint"), **youtube_fields)
         src, dst = self.store.dir(jid) / "audio.flac", self.store.dir(new["id"]) / "audio.flac"
         try:
             os.link(src, dst)  # same file on disk, no extra space
@@ -310,7 +370,12 @@ class Runner:
 
     def new_job(self, title, source_name, model_id, options, **extra):
         model = self.cfg.models[model_id]
-        meta = {"id": self.store.new_id(), "title": title, "source_name": source_name, "created": now(),
-                "model": model_id, "model_title": model["title"], "kind": model["kind"], "options": options,
-                "status": "preparing", "stage": "waiting", "speaker_names": {}, **extra}
-        return self.store.create(meta)
+        for _ in range(50):  # a playlist adds many jobs in the same second: an id that is taken is drawn again
+            meta = {"id": self.store.new_id(), "title": title, "source_name": source_name, "created": now(),
+                    "model": model_id, "model_title": model["title"], "kind": model["kind"], "options": options,
+                    "status": "preparing", "stage": "waiting", "speaker_names": {}, **extra}
+            try:
+                return self.store.create(meta)
+            except FileExistsError:
+                continue
+        raise RuntimeError("no free id for a new job")

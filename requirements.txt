@@ -6,3 +6,5 @@ jiwer==4.0.0
 soundfile==0.14.0
 numpy==2.5.3
 requests==2.34.2
+yt-dlp==2026.8.19  # YouTube links (app/youtube.py)
+yt-dlp-ejs==0.8.0  # its scripts for YouTube's JavaScript challenge, run in Deno or Node.js

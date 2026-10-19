@@ -31,7 +31,7 @@ def check_imports():
     import importlib
     out = {}
     for mod in ("numpy", "av", "soundfile", "ctranslate2", "faster_whisper", "sherpa_onnx", "transcribe_cpp",
-                "speakers", "transcribe"):
+                "speakers", "transcribe", "yt_dlp", "yt_dlp_ejs"):
         try:
             m = importlib.import_module(mod)
             out[mod] = getattr(m, "__version__", "ok")

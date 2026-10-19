@@ -82,6 +82,9 @@ def model_output(store, jid, job, cfg=None):
     folder = store.dir(jid)
     if any(not p.name.endswith((".words.json", ".meta.json")) for p in (folder / "engine").glob("*.json")):
         return engines.partial_lines(folder)
+    if job.get("captions") and (folder / "captions.vtt").exists():  # YouTube captions made by people
+        from .youtube import captions_transcript
+        return captions_transcript(folder)
     model = (cfg.models.get(job.get("model")) if cfg else None) or {}
     parse = getattr(engines, f"{model.get('engine') or job.get('model')}_lines", None)  # e.g. elevenlabs_lines
     reply = read_json(folder / "hosted.json") if (folder / "hosted.json").exists() else None
