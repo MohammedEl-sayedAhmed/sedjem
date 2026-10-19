@@ -14,6 +14,8 @@
   <img alt="Windows and Linux" src="https://img.shields.io/badge/runs_on-Windows%20%7C%20Linux-0b7f7d">
   <img alt="GPU optional" src="https://img.shields.io/badge/GPU-optional-0b7f7d">
   <img alt="AGPL-3.0 licence" src="https://img.shields.io/badge/licence-AGPL--3.0-0b7f7d">
+  <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme"><img alt="Downloads of the app" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FMohammedEl-sayedAhmed%2Fsedjem%2Fstats%2Fbadges%2Fdownloads.json"></a>
+  <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme"><img alt="Clones of the repository" src="https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FMohammedEl-sayedAhmed%2Fsedjem%2Fstats%2Fbadges%2Fclones.json"></a>
 </p>
 
 <p align="center">

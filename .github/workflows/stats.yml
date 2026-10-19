@@ -1,0 +1,37 @@
+# Repository statistics: release downloads, clones, page views, referrers, stars and forks, added each day to
+# the history on the `stats` branch by .github/scripts/repo_stats.py (its docstring explains the files and
+# tokens). Runs daily and by hand (Actions → Repository stats → Run workflow, or `gh workflow run stats.yml`).
+#
+# The job doesn't check out the repository: GitHub counts a checkout as a clone, which would add one a day.
+# It fetches the script and writes the branch through the API instead.
+#
+# Clones and views need the STATS_TOKEN secret: a fine-grained token for this repository with
+# "Administration: Read-only" permission. Without it only downloads, stars and forks are recorded.
+name: Repository stats
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: repository-stats
+  cancel-in-progress: false
+
+jobs:
+  stats:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Update the stats branch
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          STATS_TOKEN: ${{ secrets.STATS_TOKEN }}
+        run: |
+          curl -sSfL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/.github/scripts/repo_stats.py?ref=$GITHUB_SHA" \
+            -o "$RUNNER_TEMP/repo_stats.py"
+          python3 "$RUNNER_TEMP/repo_stats.py" --repo "$GITHUB_REPOSITORY"
