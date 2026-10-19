@@ -136,12 +136,13 @@ const api = {
 // ---------------------------------------------------------------------------------------------
 const S = {
   status: null, jobs: [], route: { name: "new" },
-  job: null, lines: [], edited: false, partial: false, hasAudio: false, log: "",
+  job: null, lines: [], edited: false, partial: false, hasAudio: false, hasVideo: false, log: "",
   editing: false, dirty: false, search: "", matchIndex: -1, follow: true,
   form: { file: null, path: null, seconds: null, model: null, speakers: null, language: null, prompt: "", title: "", confirm: false },
   uploading: null, uploadXhr: null, lastUserScroll: 0, currentLine: -1, jobPoll: null, lineSig: "",
 };
 const ACTIVE = new Set(["preparing", "queued", "running"]);
+const canPlay = () => S.hasAudio || S.hasVideo;
 const model = (id) => (S.status?.models || []).find((m) => m.id === id);
 const spkColor = (sid) => (sid ? `var(--s${((parseInt(sid, 10) - 1) % 8 + 8) % 8 + 1})` : "var(--faint)");
 const spkName = (sid) => (sid == null ? "" : shownNames()[sid] || `Speaker ${sid}`);
@@ -599,6 +600,7 @@ function renderJob() {
   const exportMenu = ["txt", "srt", "vtt", "md", "json"].map((fmt) => `<a href="/api/jobs/${j.id}/export/${fmt}" data-fmt="${fmt}" download>${ICON.download} ${{ txt: "Text (.txt)", srt: "Subtitles (.srt)", vtt: "Web subtitles (.vtt)", md: "Markdown (.md)", json: "JSON (.json)" }[fmt]}</a>`).join("");
   const rerunMenu = otherModels.map((x) => `<button data-rerun="${esc(x.id)}">${x.kind === "hosted" ? ICON.cloud : ICON.laptop} ${esc(x.title)}<span class="sub">${x.id === j.model ? "same" : x.kind === "hosted" ? "uploads" : "local"}</span></button>`).join("");
   const hasLines = S.lines.length > 0;
+  const slot = videoSlot();  // the video, or its progress while it is being made
 
   let statusCard = "";
   if (active) {
@@ -639,27 +641,29 @@ function renderJob() {
     </div>
   </div>
   ${statusCard}
-  ${hasLines || !active ? `
-  <div class="job-body">
+  ${hasLines || !active || slot ? `
+  <div class="job-body${slot ? " has-video" : ""}">
     <div>
       <div class="tools">
         <div class="search-wrap">${ICON.search}<input type="search" id="lineSearch" placeholder="Search the transcript" value="${esc(S.search)}" aria-label="Search the transcript"></div>
         <span class="count" id="matchCount"></span>
         <button class="icon-btn" id="prevMatch" title="Previous match" aria-label="Previous match">${ICON.up}</button>
         <button class="icon-btn" id="nextMatch" title="Next match" aria-label="Next match">${ICON.down}</button>
-        ${S.hasAudio ? `<label class="toggle"><input type="checkbox" id="followToggle" ${S.follow ? "checked" : ""}> Follow playback</label>` : ""}
+        ${canPlay() ? `<label class="toggle"><input type="checkbox" id="followToggle" ${S.follow ? "checked" : ""}> Follow playback</label>` : ""}
       </div>
       <div class="transcript" id="transcript">${renderLines()}</div>
       ${S.dirty ? EDITBAR : ""}
     </div>
     <div class="side-col">
+      ${slot}
       ${stats.ids.length ? `<div class="panel"><h3>Speakers</h3>${stats.ids.map((sid) => speakerRow(sid, stats)).join("")}</div>` : ""}
       ${detailsPanel()}
     </div>
   </div>` : ""}`;
+  placeVideo();
   bindJob();
   updateMatches();
-  if (S.hasAudio) showPlayer(j); else hidePlayer();
+  if (canPlay()) showPlayer(j, S.hasVideo); else hidePlayer();
 }
 
 function speakerRow(sid, stats) {
@@ -810,7 +814,7 @@ function renderLines() {
       who = `<div class="who">${esc(spkName(x.speaker))}</div>`;
     }
     return `<div class="line${first ? " first" : ""}" data-i="${i}" style="--c:${spkColor(x.speaker)}">
-      <button class="ts" data-t="${x.start}" title="Play from here" ${S.hasAudio ? "" : "disabled"}>${clock(x.start)}</button>
+      <button class="ts" data-t="${x.start}" title="Play from here" ${canPlay() ? "" : "disabled"}>${clock(x.start)}</button>
       ${who}<p class="text" dir="${mixDir(x.text)}" data-mixdir${S.editing ? ' contenteditable="plaintext-only"' : ""}>${S.editing ? esc(x.text) : highlight(x.text)}</p>
     </div>`;
   }).join("");
@@ -886,7 +890,7 @@ function bindTranscript() {
   if (!tr) return;
   tr.onclick = (e) => {
     const ts = e.target.closest(".ts");
-    if (ts && S.hasAudio) { const a = $("#audio"); a.currentTime = parseFloat(ts.dataset.t); a.play(); }
+    if (ts && canPlay()) { media.currentTime = parseFloat(ts.dataset.t); media.play().catch(() => {}); }
   };
   if (S.editing) {
     tr.oninput = () => markDirty();
@@ -961,6 +965,7 @@ function applyJob(r) {
   S.edited = r.edited;
   S.partial = r.partial;
   S.hasAudio = r.has_audio;
+  S.hasVideo = !!r.has_video;  // video.mp4, played instead of the audio (app/video.py)
   S.log = r.log || "";
   S.detailGroups = r.detail_groups || [];
   S.details = r.details || null;
@@ -971,22 +976,24 @@ async function loadJob(id) {
   try {
     const r = await api.get(`/api/jobs/${id}`);
     if (S.route.name !== "job" || S.route.id !== id) return;
-    const wasActive = S.job && S.job.id === id && ACTIVE.has(S.job.status);
-    const sig = `${r.lines.length}|${r.edited}|${r.job.status}`;
     const sameJob = S.job && S.job.id === id;
+    const wasActive = sameJob && ACTIVE.has(S.job.status), wasMaking = sameJob && !!S.job.video_prep;
+    const sig = `${r.lines.length}|${r.edited}|${r.job.status}|${r.has_video}|${!!r.job.video_prep}`;
     applyJob(r);
-    if (sameJob && wasActive && ACTIVE.has(r.job.status) && sig === S.lineSig) {
-      updateProgress();  // only the progress moved: keep scroll position and focus
+    if (sameJob && (wasActive || wasMaking) && sig === S.lineSig) {
+      if (ACTIVE.has(r.job.status)) updateProgress();  // only the progress moved: keep scroll position and focus
+      updateVideoPrep();
     } else if (!S.editing || !sameJob) {
       S.lineSig = sig;
       renderJob();
     }
     S.lineSig = sig;
-    if (ACTIVE.has(r.job.status)) startJobPoll(id); else stopJobPoll();
+    if (ACTIVE.has(r.job.status) || r.job.video_prep) startJobPoll(id); else stopJobPoll();
     if (wasActive && !ACTIVE.has(r.job.status)) {
       refreshJobs();
       if (r.job.status === "done") toast("Transcription finished");
     }
+    if (wasMaking && r.has_video) toast("The video is ready");
   } catch (e) {
     stopJobPoll();
     view.innerHTML = `<div class="welcome"><h1>Not found</h1><p>${esc(e.message)}</p><p><a href="#/new">New transcription</a></p></div>`;
@@ -1343,24 +1350,42 @@ async function restoreVersion(n) {
 }
 
 // ---------------------------------------------------------------------------------------------
-// Player
+// Player: the bar at the bottom plays the job's video when the recording has one (shown in the job
+// page's video panel), else the hidden <audio>. Everything that follows playback uses `media`.
 // ---------------------------------------------------------------------------------------------
-const audio = $("#audio");
+const audio = $("#audio"), video = $("#video"), videoPanel = $("#videoPanel");
+let media = audio;
 
-function showPlayer(j) {
-  const src = `/api/jobs/${j.id}/audio`;
-  if (!audio.src.endsWith(src)) { audio.src = src; S.currentLine = -1; }
+function showPlayer(j, withVideo = false) {
+  const el = withVideo ? video : audio, src = `/api/jobs/${j.id}/${withVideo ? "video" : "audio"}`;
+  if (media !== el) {  // e.g. the video became ready while the audio played: go on from the same moment
+    const was = media, same = was.src.includes(`/api/jobs/${j.id}/`), t = was.currentTime, playing = !was.paused;
+    media = el;
+    was.pause();
+    was.removeAttribute("src");
+    was.load();
+    if (!el.src.endsWith(src)) el.src = src;
+    el.playbackRate = el.defaultPlaybackRate = parseFloat($("#rate").value);
+    if (same && t) el.currentTime = t;
+    if (same && playing) el.play().catch(() => {});
+    S.currentLine = -1;
+    setPlayIcon();
+    $("#durTime").textContent = clock(isFinite(el.duration) ? el.duration : 0);
+  } else if (!el.src.endsWith(src)) { el.src = src; S.currentLine = -1; }
   $("#nowTitle").textContent = j.title || "";
   $("#player").hidden = false;
 }
 function hidePlayer() {
-  if (!audio.paused) audio.pause();
+  if (!media.paused) media.pause();
   $("#player").hidden = true;
 }
 function setPlayIcon() {
-  $("#playIcon").innerHTML = audio.paused ? ICON.play : ICON.pause;
-  $("#playBtn").setAttribute("aria-label", audio.paused ? "Play" : "Pause");
+  $("#playIcon").innerHTML = media.paused ? ICON.play : ICON.pause;
+  $("#playBtn").setAttribute("aria-label", media.paused ? "Play" : "Pause");
+  videoPanel.classList.toggle("paused", video.paused);
 }
+const playPause = () => (media.paused ? media.play().catch(() => {}) : media.pause());
+const skip = (s) => (media.currentTime = Math.min(media.duration || 0, Math.max(0, media.currentTime + s)));
 
 function lineAt(t) {
   let lo = 0, hi = S.lines.length - 1, best = -1;
@@ -1372,7 +1397,7 @@ function lineAt(t) {
 }
 
 function syncCurrentLine(force = false) {
-  const i = lineAt(audio.currentTime);
+  const i = lineAt(media.currentTime);
   if (i === S.currentLine && !force) return;
   $$("#transcript .line.current").forEach((el) => el.classList.remove("current"));
   S.currentLine = i;
@@ -1380,21 +1405,93 @@ function syncCurrentLine(force = false) {
   const el = $(`#transcript .line[data-i="${i}"]`);
   if (!el) return;
   el.classList.add("current");
-  if (S.follow && !audio.paused && Date.now() - S.lastUserScroll > 4000 && !S.editing) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  if (S.follow && !media.paused && Date.now() - S.lastUserScroll > 4000 && !S.editing) el.scrollIntoView({ block: "center", behavior: "smooth" });
 }
 
-audio.ontimeupdate = () => {
-  $("#curTime").textContent = clock(audio.currentTime);
-  if (isFinite(audio.duration) && document.activeElement !== $("#seek")) $("#seek").value = Math.round(audio.currentTime / audio.duration * 1000);
+// the same handlers on both elements; only the one in use is heard
+const onMedia = (type, fn) => [audio, video].forEach((el) => el.addEventListener(type, (e) => el === media && fn(e)));
+onMedia("timeupdate", () => {
+  $("#curTime").textContent = clock(media.currentTime);
+  if (isFinite(media.duration) && document.activeElement !== $("#seek")) $("#seek").value = Math.round(media.currentTime / media.duration * 1000);
   syncCurrentLine();
+});
+onMedia("loadedmetadata", () => ($("#durTime").textContent = clock(media.duration)));
+onMedia("play", setPlayIcon);
+onMedia("pause", setPlayIcon);
+$("#playBtn").onclick = playPause;
+$("#backBtn").onclick = () => skip(-5);
+$("#fwdBtn").onclick = () => skip(5);
+$("#seek").oninput = (e) => { if (isFinite(media.duration)) media.currentTime = e.target.value / 1000 * media.duration; };
+$("#rate").onchange = (e) => { media.playbackRate = media.defaultPlaybackRate = parseFloat(e.target.value); };
+
+// The video panel: a click plays or pauses, a double click (or its button) fills the screen, where the
+// browser's own controls show. It can be made larger (remembered) or float in picture-in-picture.
+const VIDEO_ICON = {
+  larger: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>',
+  smaller: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14h6v6M20 10h-6V4M14 10l7-7M3 21l7-7"/></svg>',
+  pip: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><rect x="12" y="12" width="7" height="5" rx="1" fill="currentColor"/></svg>',
+  full: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/></svg>',
 };
-audio.onloadedmetadata = () => ($("#durTime").textContent = clock(audio.duration));
-audio.onplay = audio.onpause = setPlayIcon;
-$("#playBtn").onclick = () => (audio.paused ? audio.play() : audio.pause());
-$("#backBtn").onclick = () => (audio.currentTime = Math.max(0, audio.currentTime - 5));
-$("#fwdBtn").onclick = () => (audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5));
-$("#seek").oninput = (e) => { if (isFinite(audio.duration)) audio.currentTime = e.target.value / 1000 * audio.duration; };
-$("#rate").onchange = (e) => (audio.playbackRate = parseFloat(e.target.value));
+const videoLarge = () => { try { return localStorage.getItem("sedjem-video-large") === "1"; } catch { return false; } };
+function setVideoLarge(on) {
+  try { localStorage.setItem("sedjem-video-large", on ? "1" : "0"); } catch { /* private mode */ }
+  const body = $(".job-body");
+  if (body) body.classList.toggle("video-large", on);
+  const b = $("#videoSize");
+  b.innerHTML = on ? VIDEO_ICON.smaller : VIDEO_ICON.larger;
+  b.setAttribute("aria-pressed", String(on));
+  b.setAttribute("aria-label", on ? "Smaller video" : "Larger video");
+  b.title = on ? "Smaller video" : "Larger video";
+}
+function fullScreen() {
+  if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  else if (video.requestFullscreen) video.requestFullscreen().catch((e) => toast(`Can't fill the screen: ${e.message}`, "error"));
+}
+function pictureInPicture() {
+  (document.pictureInPictureElement === video ? document.exitPictureInPicture() : video.requestPictureInPicture())
+    .catch((e) => toast(`Can't show it in its own window: ${e.message}`, "error"));
+}
+$("#videoSize").onclick = () => setVideoLarge(!videoLarge());
+$("#videoFull").innerHTML = VIDEO_ICON.full;
+$("#videoFull").onclick = fullScreen;
+$("#videoPip").innerHTML = VIDEO_ICON.pip;
+$("#videoPip").hidden = !document.pictureInPictureEnabled;
+$("#videoPip").onclick = pictureInPicture;
+video.onclick = () => video.controls || playPause();  // (with its own controls, full screen, the browser does it)
+video.ondblclick = () => video.controls || fullScreen();
+document.addEventListener("fullscreenchange", () => (video.controls = document.fullscreenElement === video));
+setVideoLarge(videoLarge());
+
+// The job page's slot for the video panel or, while the video is still being made, a box of the same
+// shape with its progress. The panel is one element kept across renders, so the video plays on when the
+// page is drawn again (placeVideo moves it into the new slot).
+function videoSlot() {
+  const v = S.job?.video, prep = S.job?.video_prep;
+  const ar = (v && v.width && v.height ? v.width / v.height : 16 / 9).toFixed(4);
+  if (S.hasVideo) return `<div id="videoSlot" data-ar="${ar}"></div>`;
+  if (!prep) return "";
+  const busy = prep.done == null || !prep.total;
+  return `<div class="video-panel video-prep" style="--ar:${ar}">
+    <div class="video-frame"><div class="video-prep-text"><b>Preparing the video</b><span id="videoPrepText">${videoPrepText(prep)}</span>
+      <div class="progress${busy ? " indeterminate" : ""}" id="videoPrepBar"><i style="width:${videoPrepPct(prep).toFixed(1)}%"></i></div></div></div></div>`;
+}
+const videoPrepPct = (p) => (p.done != null && p.total ? Math.min(100, p.done / p.total * 100) : 0);
+const videoPrepText = (p) => `${p.done == null ? "Waiting to start" : `${Math.round(videoPrepPct(p))}%`} · the transcript doesn't wait for it`;
+function placeVideo() {
+  const slot = $("#videoSlot");
+  if (!slot) return;
+  videoPanel.style.setProperty("--ar", slot.dataset.ar);
+  slot.replaceWith(videoPanel);
+  videoPanel.hidden = false;
+  $(".job-body").classList.toggle("video-large", videoLarge());
+}
+function updateVideoPrep() {
+  const prep = S.job?.video_prep, text = $("#videoPrepText"), bar = $("#videoPrepBar");
+  if (!prep || !text) return;
+  text.textContent = videoPrepText(prep);
+  bar.classList.toggle("indeterminate", prep.done == null || !prep.total);
+  bar.firstElementChild.style.width = `${videoPrepPct(prep).toFixed(1)}%`;
+}
 ["wheel", "touchmove", "keydown"].forEach((ev) => $("#main").addEventListener(ev, () => (S.lastUserScroll = Date.now()), { passive: true }));
 
 // ---------------------------------------------------------------------------------------------
@@ -1986,12 +2083,12 @@ document.addEventListener("input", (e) => {
   if (el) el.dir = mixDir(el.value ?? el.textContent);
 });
 document.addEventListener("keydown", (e) => {
-  const typing = e.target.closest("input, textarea, select, button, [contenteditable]");
+  const typing = e.target.closest("input, textarea, select, button, [contenteditable], video[controls]");
   if (e.key === "Escape") closeMenus();
   if (typing || $("#player").hidden || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (e.key === " ") { e.preventDefault(); audio.paused ? audio.play() : audio.pause(); }
-  if (e.key === "ArrowLeft") audio.currentTime = Math.max(0, audio.currentTime - 5);
-  if (e.key === "ArrowRight") audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
+  if (e.key === " ") { e.preventDefault(); playPause(); }
+  if (e.key === "ArrowLeft") skip(-5);
+  if (e.key === "ArrowRight") skip(5);
 });
 
 window.addEventListener("beforeunload", (e) => {
