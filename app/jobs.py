@@ -1,15 +1,17 @@
 """Transcription jobs: one folder each under <storage>/jobs, and the background runner.
 
 A job folder holds job.json (settings and status), audio.flac (16 kHz mono, used for every model
-and for playback), transcript.json once done, and the engine's own output and log. Jobs go
-through prepare (convert the recording) → queued → running → done / failed / cancelled. Local and
-hosted jobs have separate queues, so an upload doesn't wait for a long local run.
+and for playback), transcript.json once done, and the engine's own output and log. A recording with
+a picture also gets video.mp4 for the job page (app/video.py). Jobs go through prepare (convert the
+recording) → queued → running → done / failed / cancelled. Local and hosted jobs have separate queues,
+so an upload doesn't wait for a long local run; the video is made on its own thread meanwhile.
 """
 import json
 import os
 import queue
 import re
 import shutil
+import sys
 import threading
 import time
 import uuid
@@ -20,7 +22,7 @@ import soundfile as sf
 
 import sysinfo
 
-from . import engines, report
+from . import engines, report, video
 from .config import power_profile, replace_file, set_power_profile
 
 ACTIVE = ("preparing", "queued", "running")
@@ -158,15 +160,44 @@ def convert(source, dest, on_progress, cancelled):
     replace_file(tmp, dest)
 
 
+def link_or_copy(src, dst):
+    try:
+        os.link(src, dst)  # same file on disk, no extra space
+    except OSError:
+        shutil.copy2(src, dst)
+
+
+def note(folder, text):
+    """A line in the job's log (log.txt)."""
+    try:
+        with open(Path(folder) / "log.txt", "a", encoding="utf-8") as f:
+            f.write(f"{now()} {text}\n")
+    except OSError:  # the job was deleted meanwhile
+        pass
+
+
+def lower_priority():
+    """Let the transcription have the processor first: the calling thread, and the encoder's threads it
+    starts, run at a lower priority (Linux, where a thread's niceness is its own; elsewhere unchanged)."""
+    if sys.platform.startswith("linux"):
+        try:
+            os.setpriority(os.PRIO_PROCESS, threading.get_native_id(), 10)
+        except (AttributeError, OSError):
+            pass
+
+
 class Runner:
     def __init__(self, store, cfg, gpus=None):
         self.store, self.cfg = store, cfg
         self.gpus = gpus or (lambda: None)  # the graphics cards the app found, for the job details
-        self.queues = {"prepare": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
+        self.queues = {"prepare": queue.Queue(), "video": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
         self.cancelled = set()
         self.procs = {}  # job id -> running transcribe.py process
+        self.videos = set()  # jobs whose video.mp4 is waiting or being made
+        self.making = None  # the one being made
+        self.unwanted = set()  # jobs whose video should stop (the job is being deleted)
         self.saved_profile = None
-        for name, fn in (("prepare", self.prepare), ("local", self.work), ("hosted", self.work)):
+        for name, fn in (("prepare", self.prepare), ("video", self.make_video), ("local", self.work), ("hosted", self.work)):
             threading.Thread(target=self.loop, args=(name, fn), daemon=True, name=f"sedjem-{name}").start()
 
     # ---- queueing -----------------------------------------------------------------------------
@@ -178,10 +209,13 @@ class Runner:
         """After a restart: requeue jobs that were waiting; mark the ones that were running."""
         for job in reversed(self.store.list()):
             if job["status"] in ("preparing", "queued"):
-                self.submit(job["id"])
-            elif job["status"] == "running":
+                self.submit(job["id"])  # and prepare queues its video again if it wasn't finished
+                continue
+            if job["status"] == "running":
                 self.store.update(job["id"], status="interrupted", stage=None,
                                   error="The app was closed while this was running.")
+            if job.get("video_prep"):
+                self.queue_video(job["id"])
 
     def cancel(self, jid):
         self.cancelled.add(jid)
@@ -201,19 +235,35 @@ class Runner:
             try:
                 fn(jid, name)
             except Exception as e:  # never let one job kill the worker
-                self.store.update(jid, status="failed", stage=None, error=f"{type(e).__name__}: {e}", finished=now())
+                if name != "video":  # (the video is extra: make_video says why it has none)
+                    self.store.update(jid, status="failed", stage=None, error=f"{type(e).__name__}: {e}", finished=now())
 
     # ---- steps ----------------------------------------------------------------------------------
+    def source(self, job, folder):
+        """The recording a job is made from: a file used in place, an upload (source.*), or a video.mp4
+        put in the folder before (a download); None once an upload has been deleted."""
+        if job.get("source_path"):
+            found = Path(job["source_path"])
+        else:
+            found = next(folder.glob("source.*"), None) or folder / video.NAME
+        return found if found.is_file() else None
+
+    def drop_upload(self, job, source):
+        """Delete an uploaded recording once audio.flac (and the video) are made from it, unless kept."""
+        if source and not job.get("source_path") and source.name != video.NAME and not self.cfg.keep_original:
+            source.unlink(missing_ok=True)
+
     def prepare(self, jid, _):
-        """Convert the recording to 16 kHz mono FLAC (used by every model and for playback)."""
+        """Convert the recording to 16 kHz mono FLAC (used by every model and for playback), and queue the
+        making of video.mp4 when it has a picture."""
         job = self.store.get(jid)
         if not job or job["status"] == "cancelled" or jid in self.cancelled:
             return
         folder = self.store.dir(jid)
-        audio = folder / "audio.flac"
+        audio, movie = folder / "audio.flac", folder / video.NAME
+        source = self.source(job, folder)
         if not audio.exists():
-            source = Path(job["source_path"]) if job.get("source_path") else next(folder.glob("source.*"), None)
-            if not source or not source.exists():
+            if not source:
                 raise engines.EngineError("the recording is missing")
             total = probe_seconds(source)
             self.store.update(jid, status="preparing", stage="converting", done=0, total=total,
@@ -226,8 +276,13 @@ class Runner:
                 raise
             except Exception as e:
                 raise engines.EngineError(f"could not read the recording: {e}")
-            if not job.get("source_path") and not self.cfg.keep_original:
-                source.unlink(missing_ok=True)
+        if movie.exists():  # made before, or downloaded with the recording
+            if not job.get("video"):
+                self.store.update(jid, video=video.size(movie))
+        elif source and not job.get("video_skipped") and video.has_picture(source):
+            self.queue_video(jid)  # made next to the transcription; the upload is deleted after it
+        if jid not in self.videos:
+            self.drop_upload(job, source)
         info = sf.info(str(audio))
         model = self.cfg.models.get(job["model"])
         if model is None:
@@ -293,18 +348,81 @@ class Runner:
             set_power_profile(self.saved_profile)
             self.saved_profile = None
 
+    # ---- the video on the job page (app/video.py) --------------------------------------------------
+    def queue_video(self, jid):
+        if jid not in self.videos:
+            self.videos.add(jid)
+            seconds = ((self.store.get(jid) or {}).get("source") or {}).get("duration")
+            self.store.update(jid, video_prep={"done": None, "total": seconds})
+            self.queues["video"].put(jid)
+
+    def make_video(self, jid, _):
+        """Make video.mp4 while the transcription goes on (at a lower priority, so it isn't slowed much).
+        The job never fails over it: without a video, video_skipped says why."""
+        lower_priority()
+        source, self.making = None, jid
+        try:
+            job = self.store.get(jid)
+            if not job or jid in self.unwanted:
+                return
+            folder = self.store.dir(jid)
+            source = self.source(job, folder)
+            total = (job.get("video_prep") or {}).get("total")
+            result = {"video": None, "video_skipped": "the recording was no longer there to make the video from"}
+            if source:
+                try:
+                    shown = video.make(source, folder / video.NAME,
+                                       lambda t: self.store.update(jid, video_prep={"done": round(t, 1), "total": total}),
+                                       lambda: jid in self.unwanted)
+                    result = {"video": shown, "video_skipped": None if shown else "the recording has no picture"}
+                except video.Skipped as e:
+                    result["video_skipped"] = str(e)
+                except engines.Cancelled:
+                    return
+                except Exception as e:  # noqa: BLE001 — a damaged or unusual file: the transcript is still made
+                    result["video_skipped"] = f"the video could not be converted ({type(e).__name__}: {e})"
+            if result["video_skipped"]:
+                note(folder, f"No video on the job page: {result['video_skipped']}.")
+            self.store.update(jid, video_prep=None, **result)
+            if result["video"]:
+                self.share_video(jid)
+        finally:
+            job = None if jid in self.unwanted else self.store.get(jid)
+            if job:
+                self.drop_upload(job, source)
+            self.videos.discard(jid)
+            self.unwanted.discard(jid)
+            self.making = None
+
+    def share_video(self, jid):
+        """Give the new video to the jobs run again on this recording while it was being made."""
+        for job in self.store.list():
+            dst = self.store.dir(job["id"]) / video.NAME
+            if job.get("rerun_of") == jid and not dst.exists() and not job.get("video"):
+                link_or_copy(self.store.dir(jid) / video.NAME, dst)
+                self.store.update(job["id"], video=self.store.get(jid).get("video"), video_prep=None)
+                self.share_video(job["id"])
+
+    def stop_video(self, jid, wait=15):
+        """Stop making a job's video, before the job is deleted (a video still waiting is skipped)."""
+        if jid in self.videos:
+            self.unwanted.add(jid)
+        end = time.time() + wait
+        while self.making == jid and time.time() < end:
+            time.sleep(0.05)
+
     # ---- new jobs ---------------------------------------------------------------------------------
     def rerun(self, jid, model_id, options):
-        """A new job on the same audio with another model or other options."""
+        """A new job on the same audio (and video) with another model or other options."""
         old = self.store.get(jid)
+        folder = self.store.dir(jid)
+        shown = old.get("video") if (folder / video.NAME).exists() else None
         new = self.new_job(title=old["title"], source_name=old.get("source_name"), model_id=model_id,
                            options=options, rerun_of=jid, source=old.get("source"),  # the same recording
-                           fingerprint=old.get("fingerprint"))
-        src, dst = self.store.dir(jid) / "audio.flac", self.store.dir(new["id"]) / "audio.flac"
-        try:
-            os.link(src, dst)  # same file on disk, no extra space
-        except OSError:
-            shutil.copy2(src, dst)
+                           fingerprint=old.get("fingerprint"), **({"video": shown} if shown else {}))
+        for name in ("audio.flac", video.NAME):
+            if name == "audio.flac" or shown:
+                link_or_copy(folder / name, self.store.dir(new["id"]) / name)
         self.submit(new["id"])
         return self.store.get(new["id"])
 
