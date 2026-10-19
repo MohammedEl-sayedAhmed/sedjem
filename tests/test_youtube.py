@@ -513,10 +513,10 @@ class Api(unittest.TestCase):
         self.assertEqual((job["job"]["status"], job["job"]["kind"], job["job"].get("course")), ("done", "captions", None))
         md = self.tmp / "courses" / "Videos" / "درس منفرد [vid00000004].md"
         self.assertIn("‏[00:00] أهلاً بكم في الدرس الأول اليوم نتكلم عن ال variables.", md.read_text(encoding="utf-8"))
-        with mock.patch.object(server.subprocess, "Popen") as popen, mock.patch.object(server.os, "startfile", create=True) as start:
+        with mock.patch.object(server, "show_folder") as shown:
             status, opened = self.call("POST", "/api/open-folder", {"job": job["job"]["id"]})
         self.assertEqual((status, opened["opened"]), (200, str(md.parent)))
-        self.assertTrue(popen.called or start.called)
+        shown.assert_called_once_with(str(md.parent))
 
     def test_4_cancel_fail_and_try_again(self):
         self.fake.hold.clear()

@@ -20,7 +20,7 @@ const CMP = {
   lastKeep: null, playFrom: 0, playTo: null, current: -1, loading: 0, bar: "",
 };
 
-const jobIcon = (j) => (j.kind === "hosted" ? ICON.cloud : ICON.laptop);
+const jobIcon = (j) => kindIcon(j);  // youtube.js: a laptop, a cloud, or captions from YouTube
 const joinWords = (items) => (items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}`);
 const STATUS_WORD = { done: "Done", failed: "Failed", cancelled: "Cancelled", interrupted: "Interrupted", queued: "Queued" };
 

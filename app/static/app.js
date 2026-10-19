@@ -138,7 +138,7 @@ const S = {
   status: null, jobs: [], route: { name: "new" },
   job: null, lines: [], edited: false, partial: false, hasAudio: false, log: "",
   editing: false, dirty: false, search: "", matchIndex: -1, follow: true,
-  form: { file: null, path: null, seconds: null, model: null, speakers: null, language: null, prompt: "", title: "", confirm: false },
+  form: { file: null, path: null, seconds: null, model: null, speakers: null, language: null, prompt: "", title: "", confirm: false, source: "file" },
   uploading: null, uploadXhr: null, lastUserScroll: 0, currentLine: -1, jobPoll: null, lineSig: "",
 };
 const ACTIVE = new Set(["preparing", "queued", "running"]);
@@ -167,7 +167,7 @@ const EXPORT_TYPES = { txt: ["Text", "text/plain"], srt: ["Subtitles", "applicat
 const fileSlug = (t) => (t || "").replace(/[^\p{L}\p{N}_\s-]/gu, "").trim().replace(/\s+/g, "-").slice(0, 80) || "transcript";
 const DL_ACTIVE = new Set(["queued", "downloading", "verifying", "unpacking", "converting"]);
 const downloading = () => (S.status?.models || []).some((m) => m.download && DL_ACTIVE.has(m.download.state))
-  || [S.status?.voiceprints, S.status?.cuda].some((d) => d && DL_ACTIVE.has(d.state));
+  || [S.status?.voiceprints, S.status?.cuda, S.status?.deno].some((d) => d && DL_ACTIVE.has(d.state));
 // "Intel(R) Iris(R) Xe Graphics (ADL GT2)" -> "Intel Iris Xe Graphics"; short: "Iris Xe"
 const gpuName = (n) => (n || "").replace(/\((R|TM)\)/gi, "").replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
 const gpuShort = (n) => gpuName(n).replace(/\b(Intel|NVIDIA|AMD|Radeon\(TM\)|Graphics|Laptop|GPU)\b/gi, "").replace(/\s+/g, " ").trim() || gpuName(n);
@@ -204,7 +204,7 @@ async function cancelDownload(id) {
   try { S.status = await api.post(`/api/downloads/${id}/cancel`); refreshDownloadViews(); } catch (e) { toast(e.message, "error"); }
 }
 function refreshDownloadViews() {
-  if (S.route.name === "new") renderModelGrid();
+  if (S.route.name === "new") { renderModelGrid(); ytRefreshNote(); }
   if ($("#settings").open) renderSettings();
 }
 
@@ -240,7 +240,7 @@ function statusLabel(j) {
 }
 
 function jobPercent(j) {
-  if (j.status === "preparing" && j.total) return (j.done || 0) / j.total * 30;
+  if (j.status === "preparing" && j.total) return Math.min(1, (j.done || 0) / j.total) * 30;  // downloading or converting
   if (j.status === "running" && j.stage === "transcribing" && j.total) return 5 + (j.done || 0) / j.total * 95;
   if (j.status === "running" && j.stage === "uploading" && j.total) return (j.done || 0) / j.total * 50;
   if (j.status === "running") return 5;
@@ -249,26 +249,32 @@ function jobPercent(j) {
 
 function renderSidebar() {
   const q = $("#jobSearch").value.trim().toLowerCase();
-  const hit = (j) => !q || (j.title || "").toLowerCase().includes(q) || (j.model_title || "").toLowerCase().includes(q);
-  const recordings = jobGroups(S.jobs).filter((r) => r.jobs.some(hit));  // a recording once, with its transcripts (compare.js)
-  if (!recordings.length) {
+  const hit = (j) => !q || (j.title || "").toLowerCase().includes(q) || (j.model_title || "").toLowerCase().includes(q)
+    || (j.course?.title || "").toLowerCase().includes(q);
+  // a recording once, with its transcripts (compare.js); a course once, with its lectures (youtube.js)
+  const recordings = jobGroups(S.jobs.filter((j) => !j.course)).filter((r) => r.jobs.some(hit));
+  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit)).map((c) => ({ ...c, main: c.jobs[0] }))]
+    .sort((a, b) => b.main.created.localeCompare(a.main.created) || b.main.id.localeCompare(a.main.id));
+  if (!items.length) {
     $("#jobList").innerHTML = `<div class="empty-list">${S.jobs.length ? "No matches" : "Your transcriptions will appear here."}</div>`;
     return;
   }
   const today = new Date().toDateString();
   let group = null;
-  $("#jobList").innerHTML = recordings.map((r) => {
+  $("#jobList").innerHTML = items.map((r) => {
     const j = r.main;
     const g = new Date(j.created).toDateString() === today ? "Today" : "Earlier";
     const head = g !== group ? `<div class="job-group">${(group = g)}</div>` : "";
+    if (r.course) return head + courseItem(r);
     if (r.jobs.length > 1) return head + groupItem(r);
     const activeCls = S.route.name === "job" && S.route.id === j.id ? " active" : "";
     const bar = ACTIVE.has(j.status) ? `<div class="bar"><i style="width:${jobPercent(j).toFixed(1)}%"></i></div>` : "";
     return `${head}<a class="job-item${activeCls}" href="#/job/${j.id}">
       <span class="t" dir="${mixDir(j.title || "Untitled")}">${esc(j.title || "Untitled")}</span>${statusLabel(j)}
-      <span class="d">${j.kind === "hosted" ? ICON.cloud.replace("<svg", '<svg style="width:13px;height:13px"') : ""}${esc(j.model_title || j.model)}${j.audio_s ? ` · ${clock(j.audio_s)}` : ""}</span>
+      <span class="d">${listIcon(j).replace("<svg", '<svg style="width:13px;height:13px"')}${esc(j.model_title || j.model)}${j.audio_s ? ` · ${clock(j.audio_s)}` : ""}</span>
       ${bar}</a>`;
   }).join("");
+  bindCourses();
   refreshGroupBar();
 }
 
@@ -284,6 +290,9 @@ function formDefaults() {
   if (f.speakers == null) f.speakers = String(d.speakers ?? "auto");
   if (f.language == null) f.language = d.language || "ar";
 }
+
+// The length the model will transcribe: the recording's, or the picked YouTube videos' without captions.
+const formSeconds = () => (S.form.source === "youtube" ? ytSeconds() : S.form.seconds);
 
 function estimateText(m, seconds, short = false) {
   if (!m) return "";
@@ -317,7 +326,7 @@ function modelCard(m) {
     state = `<span class="mc-missing">${unconverted ? "Downloaded, not converted yet" : "Not downloaded yet"}</span>${downloadBlock(m.id, m.download)}`;
   }
   else if (!m.ready) state = `<span class="mc-missing">${esc(m.reason)}</span>`;
-  const foot = m.ready ? `<div class="mc-foot">${estimateText(m, f.seconds, true)}</div>` : `<div class="mc-foot">${state}</div>`;
+  const foot = m.ready ? `<div class="mc-foot">${estimateText(m, formSeconds(), true)}</div>` : `<div class="mc-foot">${state}</div>`;
   return `<div class="model-card${m.ready ? "" : " unavailable"}" role="radio" tabindex="0" aria-checked="${sel && m.ready}" data-model="${esc(m.id)}">
     <div class="mc-badges">${badges}</div>
     <div class="mc-head">${modelTile(m)}<div class="mc-title">${esc(m.title)}</div></div>
@@ -336,14 +345,20 @@ function renderNew() {
   const speakerOpts = [["none", "No labels"], ["auto", "Auto-detect"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
   const custom = !speakerOpts.some(([v]) => v === f.speakers);
   const hosted = m && m.kind === "hosted";
-  const ok = src && m && m.ready && (!hosted || f.confirm) && !S.uploading;
+  const yt = f.source === "youtube", picked = yt ? ytPicked().length : 0;
+  const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : src && !S.uploading) && m && m.ready && (!hosted || f.confirm);
+  const startLabel = yt ? (YT.adding ? "Adding…" : picked > 1 ? `Start ${picked} transcriptions` : "Start transcription")
+    : S.uploading ? "Uploading…" : "Start transcription";
   view.innerHTML = `
   <h1>New transcription</h1>
-  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms. Local models keep everything on this computer.</p>
+  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a YouTube video or course. Local models keep everything on this computer.</p>
 
   <div class="card">
-    <div class="step-head"><span class="step-num">1</span> Recording</div>
-    ${src ? `
+    <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Video or playlist" : "Recording"}
+      <div class="segmented src-kind" role="group" aria-label="Where the recording comes from">
+        <button type="button" data-src="file" aria-pressed="${!yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.upload} A file</button>
+        <button type="button" data-src="youtube" aria-pressed="${yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${YT_ICON.video} YouTube link</button></div></div>
+    ${yt ? ytCard() : src ? `
       <div class="chosen">
         <div class="ico">${ICON.wave}</div>
         <div class="grow">
@@ -383,10 +398,10 @@ function renderNew() {
         <div class="segmented" id="lang">${[["ar", "Arabic + English"], ["en", "English"], ["auto", "Auto-detect"]].map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
         <p class="hint">${m?.id === "cohere" && f.language === "auto" ? "Cohere can't detect the language, so it will use Arabic." : "Arabic + English is right for code-switched meetings."}</p>
       </div>
-      <div class="field">
+      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">Each transcription is named after its video; you can rename it later.</p></div>` : `<div class="field">
         <label for="titleInput">Title</label>
         <input type="text" id="titleInput" dir="${mixDir(f.title)}" data-mixdir value="${esc(f.title)}" placeholder="${esc(src ? src.name.replace(/\.[^.]+$/, "") : "Meeting title")}">
-      </div>
+      </div>`}
     </div>
     ${m?.prompt ? `<div class="field">
       <label for="promptInput">Vocabulary <span class="opt">optional</span></label>
@@ -399,14 +414,14 @@ function renderNew() {
   ${hosted && m.ready ? `<div class="card consent">
     ${ICON.cloud}
     <div>
-      <p><b>This model uploads the recording to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
-      <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload this recording to ${esc(m.service)}</label>
+      <p><b>This model uploads ${yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
+      <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : "this recording"} to ${esc(m.service)}</label>
     </div>
   </div>` : ""}
 
   <div class="start-row">
-    <div class="estimate">${m?.ready ? estimateText(m, f.seconds) : ""}</div>
-    <button class="btn btn-primary btn-lg" id="startBtn" ${ok ? "" : "disabled"}>${S.uploading ? "Uploading…" : "Start transcription"}</button>
+    <div class="estimate">${m?.ready ? (yt && picked && !ytForModel().length ? "No model needs to run: every picked video has captions made by people" : estimateText(m, formSeconds())) : ""}</div>
+    <button class="btn btn-primary btn-lg" id="startBtn" ${ok ? "" : "disabled"}>${startLabel}</button>
   </div>
   ${S.uploading ? `<div class="card" style="margin-top:14px"><div class="row" style="display:flex;justify-content:space-between;margin-bottom:8px"><b>Uploading to the app</b><span class="hint" id="uploadText" style="margin:0">${bytes(S.uploading.loaded)} of ${bytes(S.uploading.total)}</span></div><div class="progress"><i style="width:${(S.uploading.loaded / S.uploading.total * 100).toFixed(1)}%"></i></div><p class="hint">Copying the file into the app's folder on this computer — nothing is sent anywhere else yet.</p></div>` : ""}
   `;
@@ -487,7 +502,15 @@ function bindNew() {
   const spkN = $("#spkN");
   spkN.oninput = () => { const n = parseInt(spkN.value, 10); if (n >= 1 && n <= 20) { f.speakers = String(n); $$("#spk button").forEach((b) => b.setAttribute("aria-pressed", "false")); } };
   $$("#lang button").forEach((b) => (b.onclick = () => { f.language = b.dataset.v; renderNew(); }));
-  $("#titleInput").oninput = (e) => (f.title = e.target.value);
+  const title = $("#titleInput");
+  if (title) title.oninput = (e) => (f.title = e.target.value);
+  $$("[data-src]").forEach((b) => (b.onclick = () => {
+    if (f.source === b.dataset.src || (!f.source && b.dataset.src === "file")) return;
+    f.source = b.dataset.src;
+    renderNew();
+    if (f.source === "youtube") $("#ytUrl")?.focus();
+  }));
+  bindYoutube();
   const pr = $("#promptInput");
   if (pr) pr.oninput = (e) => (f.prompt = e.target.value);
   const cu = $("#confirmUpload");
@@ -499,6 +522,7 @@ async function start() {
   const f = S.form, m = model(f.model);
   const params = { model: m.id, speakers: f.speakers, language: f.language, prompt: m.prompt ? f.prompt : "",
     title: f.title.trim(), confirm_upload: m.kind === "hosted" && f.confirm ? "1" : "0" };
+  if (f.source === "youtube") return ytStart(params);  // youtube.js
   try {
     let job;
     if (f.path) {
@@ -515,7 +539,7 @@ async function start() {
     }
     S.uploading = null;
     if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
-    S.form = { file: null, path: null, seconds: null, model: f.model, speakers: f.speakers, language: f.language, prompt: f.prompt, title: "", confirm: false };
+    S.form = { file: null, path: null, seconds: null, model: f.model, speakers: f.speakers, language: f.language, prompt: f.prompt, title: "", confirm: false, source: f.source };
     await refreshJobs();
     location.hash = `#/job/${job.id}`;
   } catch (e) {
@@ -529,6 +553,8 @@ async function start() {
 // Job view
 // ---------------------------------------------------------------------------------------------
 const STAGES = {
+  "waiting-download": "Waiting to download from YouTube",
+  downloading: "Downloading from YouTube",
   waiting: "Waiting to prepare the audio",
   converting: "Preparing the audio",
   starting: "Starting",
@@ -544,6 +570,10 @@ function stageInfo(j) {
   const m = model(j.model);
   if (j.status === "queued") return { label: j.kind === "local" ? "Waiting for the previous local job" : "Waiting to start", pct: null };
   if (j.status === "preparing") {
+    if (j.stage === "downloading") {  // bytes, from YouTube (app/youtube.py)
+      const pct = j.total ? Math.min(100, (j.done || 0) / j.total * 100) : null;
+      return { label: STAGES.downloading, pct, detail: j.total ? `${bytes(j.done || 0)} of ${bytes(j.total)}` : j.done ? bytes(j.done) : "" };
+    }
     const pct = j.stage === "converting" && j.total ? (j.done || 0) / j.total * 100 : null;
     return { label: STAGES[j.stage] || "Preparing", pct, detail: pct != null ? `${Math.round(pct)}%` : "" };
   }
@@ -589,7 +619,8 @@ function renderJob() {
   const opts = j.options || {};
   const stats = speakerStats();
   const meta = [
-    `<span>${j.kind === "hosted" ? ICON.cloud : ICON.laptop} ${esc(j.model_title || j.model)}</span>`,
+    `<span>${kindIcon(j)} ${esc(j.model_title || j.model)}</span>`,
+    ytHref(j.source_url) ? `<a class="yt-link" href="${esc(ytHref(j.source_url))}" target="_blank" rel="noopener noreferrer" title="${esc(j.source_url)}">${YT_ICON.video} On YouTube</a>` : "",
     j.audio_s ? `<span>${ICON.clock} ${clock(j.audio_s)}</span>` : "",
     stats.ids.length ? `<span>${ICON.users} ${stats.ids.length} speaker${stats.ids.length === 1 ? "" : "s"}</span>` : "",
     j.seconds ? `<span>${ICON.cpu} took ${human(j.seconds)}${j.rtf ? ` (${Number(j.rtf).toFixed(2)}× real time)` : ""}</span>` : "",
@@ -606,7 +637,8 @@ function renderJob() {
     statusCard = `<div class="card progress-card" id="progressCard">
       <div class="row"><span class="stage" id="stageLabel">${esc(si.label)}</span><span class="hint" id="stageDetail" style="margin:0">${esc(si.detail || "")}</span><span class="times" id="stageTimes">${etaText(j)}</span></div>
       <div class="progress${si.pct == null ? " indeterminate" : ""}" id="stageBar"><i style="width:${(si.pct || 0).toFixed(1)}%"></i></div>
-      <p class="note">${j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open." : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
+      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The video is downloaded first (up to 720p, to play beside the transcript), then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
+        : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open." : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
       <div style="margin-top:12px"><button class="btn btn-sm btn-danger" id="cancelBtn">${ICON.stop} Cancel</button></div>
     </div>`;
   } else if (["failed", "interrupted", "cancelled"].includes(j.status)) {
@@ -627,6 +659,7 @@ function renderJob() {
       ${S.version != null ? `<button class="pill accent ver-pill" id="versionPill" title="The current version. Show the history">v${S.version}</button>` : ""}
     </div>
     <div class="meta">${meta}</div>
+    ${courseBar(j)}
     ${groupBar(j)}
     <div class="actions">
       <div class="menu-wrap"><button class="btn" data-menu="exportMenu" ${hasLines ? "" : "disabled"}>${ICON.download} Export ${ICON.chevron}</button><div class="menu" id="exportMenu">${exportMenu}</div></div>
@@ -639,6 +672,7 @@ function renderJob() {
     </div>
   </div>
   ${statusCard}
+  ${j.download_note ? `<div class="card yt-notice">${ICON.info}<span>${esc(j.download_note)}.</span></div>` : ""}
   ${hasLines || !active ? `
   <div class="job-body">
     <div>
@@ -698,7 +732,8 @@ function detailsPanel() {
   const value = (label) => { for (const g of groups) for (const r of g.rows) if (r.label === label) return r.value; return ""; };
   const [kind, ...rest] = String(run.device || "").split(":");
   let device, where, fallback;
-  if (mod.kind === "hosted") { device = mod.service || mod.title; where = "Hosted service"; fallback = ICON.cloud; }
+  if (mod.kind === "captions") { device = "YouTube captions"; where = `Made by people${mod.captions ? `, ${mod.captions}` : ""}; no model ran`; fallback = YT_ICON.captions; }
+  else if (mod.kind === "hosted") { device = mod.service || mod.title; where = "Hosted service"; fallback = ICON.cloud; }
   else if (rest.length) {
     device = gpuName(rest.join(":").replace(/\s*\((int8_float16|float16)\)\s*$/, ""));
     where = `Graphics card · ${{ vulkan: "Vulkan", cuda: "CUDA", metal: "Metal", rocm: "ROCm" }[kind] || kind}`;
@@ -752,6 +787,7 @@ function modelBrand(m) {
   return brandsFor([m.service, m.title, org].filter(Boolean).join(" · "))[0] || (m.kind === "hosted" ? null : "huggingface");
 }
 function modelTile(m, small = true) {
+  if (m?.kind === "captions") return brandTile(null, YT_ICON.captions, small);  // YouTube captions: no model
   const slug = modelBrand(m);
   if (slug || m?.kind !== "hosted") return brandTile(slug, ICON.layers, small);
   const name = m.title || m.service || "?";
@@ -877,6 +913,7 @@ function bindJob() {
   }
   const follow = $("#followToggle");
   if (follow) follow.onchange = () => (S.follow = follow.checked);
+  bindCourseBar(j);  // youtube.js
   bindTranscript();
   bindEditbar();
 }
@@ -1561,7 +1598,9 @@ function renderSettings(focus) {
   const hosted = st.models.filter((m) => m.kind === "hosted");
   const local = st.models.filter((m) => m.kind === "local" && m.download);
   const items = [...local.map((m) => ({ id: m.id, title: m.title, d: m.download, hub: m.hub, m })),
-    ...(st.voiceprints ? [{ id: "voiceprints", title: "Voiceprint model", d: st.voiceprints, note: "Tells the speakers apart by voice" }] : [])];
+    ...(st.voiceprints ? [{ id: "voiceprints", title: "Voiceprint model", d: st.voiceprints, note: "Tells the speakers apart by voice" }] : []),
+    ...(st.deno ? [{ id: "deno", title: "Deno", d: st.deno, icon: YT_ICON.video,
+      note: st.youtube?.runtime && !st.deno.installed ? `For YouTube links; ${st.youtube.runtime.name} is used for now` : "Answers YouTube's check, for YouTube links" }] : [])];
   const readyLocal = items.filter((x) => x.d.installed || model(x.id)?.ready).length;
   const keys = hosted.filter((m) => m.key_source).length;
   const counts = { models: `${readyLocal} of ${items.length}`, hosted: `${keys} of ${hosted.length}` };
@@ -1579,7 +1618,7 @@ function renderSettings(focus) {
 // Models on this computer: one row each, with a status that says what is there, a line of key facts, and
 // everything known about the model when the row is opened
 function modelsPanel(items) {
-  const rows = items.map(({ id, title, d, hub, m, note }) => {
+  const rows = items.map(({ id, title, d, hub, m, note, icon }) => {
     const cached = !d.installed && model(id)?.ready;  // found elsewhere, e.g. the Hugging Face cache
     const busy = DL_ACTIVE.has(d.state);
     let status, sub, actions = "";
@@ -1601,7 +1640,7 @@ function modelsPanel(items) {
     const forget = hub && !busy ? `<button type="button" class="btn btn-sm btn-ghost" data-forget-model="${esc(id)}">Remove from the app</button>` : "";
     const open = m && SET.details.models === id;
     return `<div class="set-item${open ? " expanded" : ""}">
-      <div class="set-item-row"${m ? ` data-row="${esc(id)}"` : ""}>${m ? modelTile(m) : brandTile(null, ICON.users, true)}
+      <div class="set-item-row"${m ? ` data-row="${esc(id)}"` : ""}>${m ? modelTile(m) : brandTile(null, icon || ICON.users, true)}
         <div class="set-item-text"><b>${esc(title)}</b><span>${esc(sub)}${from}</span></div>
         ${status}<div class="set-item-actions">${actions}${forget}${m ? detailsButton("models", id, title) : ""}</div>
         ${m ? factsLine(localFacts(m)) : ""}</div>
@@ -1718,7 +1757,7 @@ function aboutPanel() {
           <button type="button" class="btn btn-sm" id="openFolder">${ICON.folder} Open folder</button>
         </div>
       </div>
-      <p class="hint">Models are kept in <code class="mono">${esc(st.home)}/models</code>. The port, defaults and model list are set in <code class="mono">app/config.toml</code>; your own changes can go in <code class="mono">${esc(st.storage.dir)}/config.toml</code>.</p>`;
+      <p class="hint">Models are kept in <code class="mono">${esc(st.home)}/models</code>. The transcripts of YouTube videos and courses are saved as files in <code class="mono">${esc(st.youtube?.courses || "")}</code>. The port, defaults and model list are set in <code class="mono">app/config.toml</code>; your own changes can go in <code class="mono">${esc(st.storage.dir)}/config.toml</code>.</p>`;
 }
 
 function bindSettings(focus) {

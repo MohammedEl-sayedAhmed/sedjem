@@ -707,11 +707,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             folder = str(self.app.cfg.storage)
         try:
-            if os.name == "nt":
-                os.startfile(folder)  # noqa: S606 — our own folder
-            else:
-                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", folder],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            show_folder(folder)
         except OSError as e:
             raise ApiError(500, f"could not open the folder: {e}")
         self.json({"opened": folder})
@@ -776,6 +772,15 @@ class Handler(BaseHTTPRequestHandler):
         self.json({"bye": True})
         target = self.app.on_quit or self.app.server.shutdown
         threading.Thread(target=target, daemon=True).start()
+
+
+def show_folder(folder):
+    """Open one of the app's own folders in the file manager."""
+    if os.name == "nt":
+        os.startfile(folder)  # noqa: S606 — our own folder
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", folder],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def clean_lines(lines):
