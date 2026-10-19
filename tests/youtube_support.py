@@ -73,9 +73,9 @@ def vtt(*cues):
 def formats(vid, h264=True, size=40000):
     """A YouTube-like list of formats: sound in AAC (and its "drc" copy) and Opus, H.264 video at 720p30,
     720p60 and 1080p, VP9 at 720p, and the 360p MP4 with both. Without h264: only VP9 and Opus."""
-    f = lambda fid, ext, vcodec, acodec, **kw: {"format_id": fid, "ext": ext, "vcodec": vcodec, "acodec": acodec,
-                                                 "protocol": "https", "url": f"https://fake.test/{vid}/{fid}",
-                                                 "filesize": size, **kw}
+    f = lambda fid, ext, vcodec, acodec, **kw: {
+        "format_id": fid, "ext": ext, "vcodec": vcodec, "acodec": acodec, "protocol": "https", "filesize": size,
+        "url": f"https://rr1---sn-test.googlevideo.com/videoplayback?id={vid}&itag={fid}", **kw}
     out = [f("251", "webm", "none", "opus", abr=130), f("247", "webm", "vp9", "none", height=720, width=1280, fps=30)]
     if h264:
         out += [f("140-drc", "m4a", "none", "mp4a.40.2", abr=129), f("140", "m4a", "none", "mp4a.40.2", abr=129),
@@ -94,6 +94,8 @@ class FakeYouTube:
     def __init__(self):
         self.videos, self.playlists, self.subs = {}, {}, {}
         self.fail = {}             # video id -> the error yt-dlp would raise for it
+        self.foreign = set()       # video ids read by another extractor than YouTube's (a page elsewhere)
+        self.redirects = {}        # video id -> the link yt-dlp answers with instead of the video
         self.hold = threading.Event()
         self.hold.set()            # clear it to keep downloads running until it is set again
         self.downloads = []        # (video id, format id), in the order they were downloaded
@@ -102,20 +104,23 @@ class FakeYouTube:
     def video(self, vid, title, seconds=3, captions=None, auto=None, language=None, h264=True, live="not_live"):
         """captions: {language code: WebVTT text} made by people; auto: YouTube's automatic ones."""
         subs = {}
+        timedtext = "https://www.youtube.com/api/timedtext"
         for code, text in (captions or {}).items():
-            url = f"https://fake.test/{vid}/subs/{code}.vtt"
+            url = f"{timedtext}?v={vid}&lang={code}&fmt=vtt"
             self.subs[url] = text
-            subs[code] = [{"ext": "json3", "url": url + ".json"}, {"ext": "vtt", "url": url, "name": code.upper()}]
+            subs[code] = [{"ext": "json3", "url": f"{timedtext}?v={vid}&lang={code}&fmt=json3"},
+                          {"ext": "vtt", "url": url, "name": code.upper()}]
         self.videos[vid] = {"id": vid, "title": title, "duration": seconds, "language": language, "uploader": "Teacher",
                             "live_status": live, "formats": formats(vid, h264), "subtitles": subs,
-                            "automatic_captions": {c: [{"ext": "vtt", "url": f"https://fake.test/{vid}/auto/{c}"}]
+                            "automatic_captions": {c: [{"ext": "vtt", "url": f"{timedtext}?v={vid}&lang={c}&kind=asr"}]
                                                    for c in (auto or [])},
                             "seconds": seconds}
         return vid
 
-    def playlist(self, pid, title, ids, gone=()):
-        """gone: titles of entries YouTube lists without a video ("[Private video]")."""
-        self.playlists[pid] = {"id": pid, "title": title, "ids": list(ids), "gone": list(gone)}
+    def playlist(self, pid, title, ids, gone=(), extra=()):
+        """gone: titles of entries YouTube lists without a video ("[Private video]"); extra: entries as they
+        are given (one from another extractor, say)."""
+        self.playlists[pid] = {"id": pid, "title": title, "ids": list(ids), "gone": list(gone), "extra": list(extra)}
         return pid
 
     def ydl(self, cfg, **extra):  # what app.youtube._ydl returns
@@ -142,17 +147,19 @@ class FakeYDL:
                        for vid in p["ids"]]
             entries += [{"_type": "url", "ie_key": "Youtube", "id": f"gone{i:07d}", "title": t, "duration": None,
                          "url": f"https://www.youtube.com/watch?v=gone{i:07d}"} for i, t in enumerate(p["gone"])]
-            return {"_type": "playlist", "id": p["id"], "title": p["title"], "uploader": "Teacher", "entries": iter(entries)}
-        if "/@" in url:
-            return {"_type": "playlist", "id": "UCchannel", "title": "A channel",
-                    "entries": iter([{"_type": "url", "ie_key": "YoutubeTab", "id": "UCchannel", "title": "Videos"}])}
+            return {"_type": "playlist", "id": p["id"], "title": p["title"], "uploader": "Teacher",
+                    "entries": iter(entries + [dict(e) for e in p["extra"]]), "extractor_key": "YoutubeTab", "webpage_url": url}
         vid = q.get("v", [urllib.parse.urlsplit(url).path.rsplit("/", 1)[-1]])[0]
+        if vid in self.fake.redirects:
+            return {"_type": "url", "url": self.fake.redirects[vid], "extractor_key": "Youtube", "webpage_url": url}
         if vid in self.fake.fail:
             raise Exception(self.fake.fail[vid])
         if vid not in self.fake.videos:
             raise Exception(f"ERROR: [youtube] {vid}: Video unavailable")
         info = {k: v for k, v in self.fake.videos[vid].items() if k != "seconds"}
-        return {**info, "formats": [dict(f) for f in info["formats"]]}
+        where = ({"extractor_key": "Generic", "webpage_url": "https://evil.example/page"} if vid in self.fake.foreign
+                 else {"extractor_key": "Youtube", "webpage_url": f"https://www.youtube.com/watch?v={vid}"})
+        return {**info, **where, "formats": [dict(f) for f in info["formats"]]}
 
     def add_progress_hook(self, fn):
         self.hooks.append(fn)

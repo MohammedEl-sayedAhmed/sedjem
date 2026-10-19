@@ -13,6 +13,7 @@ the files follow the transcription that finished last. Only files of these names
 import re
 import threading
 import unicodedata
+from pathlib import Path
 
 from . import transcript as T
 
@@ -46,20 +47,32 @@ def folder_name(store, course):
 
 
 def folder_of(cfg, job):
-    """Where a YouTube job's files go."""
+    """Where a YouTube job's files go: a folder directly in the courses folder, whatever job.json says."""
     course = job.get("course") or {}
-    return cfg.courses / (course.get("folder") or safe_name(course.get("title"))) if course else cfg.courses / VIDEOS
+    folder = cfg.courses / (safe_name(course.get("folder") or course.get("title")) if course else VIDEOS)
+    return inside(cfg.courses, folder)
+
+
+def inside(root, path):
+    """path, if it resolves to a file or folder directly in root (no way out through .., a drive or a
+    link); else ValueError."""
+    root, real = Path(root).resolve(), Path(path).resolve()
+    if real.parent != root or real.name in ("", ".", ".."):
+        raise ValueError(f"{path} is not in {root}")
+    return Path(path)
 
 
 def number(course):
     """A lecture's number, padded to the width of the last one: 01 ... 12, 001 ... 120."""
-    return str(course["index"]).zfill(max(2, len(str(course.get("count") or course["index"]))))
+    index, count = int(course["index"]), int(course.get("count") or course["index"])
+    return str(index).zfill(max(2, len(str(count))))
 
 
 def lecture_name(job):
+    """A lecture's file name without its extension; every part made safe (safe_name)."""
     course = job.get("course")
     title = safe_name(job.get("title"), 90)
-    return f"{number(course)} - {title}" if course else f"{title} [{job.get('youtube_id')}]"
+    return f"{number(course)} - {title}" if course else f"{title} [{safe_name(job.get('youtube_id'), 64)}]"
 
 
 def _named(job, lines):
@@ -138,12 +151,12 @@ def _lectures(store, match):
 def _sync(folder, wanted, pattern):
     """Write the wanted files {name: text} and remove the other files of the same lectures (an old title)."""
     for path in folder.glob(pattern) if folder.exists() else []:
-        if path.name not in wanted and path.suffix in (".md", ".srt") and path.name != "course.md":
-            path.unlink(missing_ok=True)
+        if path.name not in wanted and path.suffix in (".md", ".srt") and path.name != "course.md" and path.is_file():
+            inside(folder, path).unlink(missing_ok=True)
     if wanted:
         folder.mkdir(parents=True, exist_ok=True)
     for name, text in wanted.items():
-        _write(folder / name, text)
+        _write(inside(folder, folder / name), text)
 
 
 def refresh(store, cfg, job):
@@ -167,7 +180,8 @@ def refresh(store, cfg, job):
                 _sync(folder, wanted, f"{glob_escape(prefix)} - *")
             ordered = [lectures[i] for i in sorted(lectures)]
             if ordered:
-                _write(folder / "course.md", course_md({**course, **ordered[-1][0]["course"]}, ordered))
+                folder.mkdir(parents=True, exist_ok=True)
+                _write(inside(folder, folder / "course.md"), course_md({**course, **ordered[-1][0]["course"]}, ordered))
             else:
                 (folder / "course.md").unlink(missing_ok=True)
         else:
@@ -177,7 +191,7 @@ def refresh(store, cfg, job):
             if hit:
                 name = lecture_name(hit[0])
                 wanted = {f"{name}.md": lecture_md(*hit), f"{name}.srt": T.to_srt(*hit)}
-            _sync(folder, wanted, f"* [[]{glob_escape(vid)}[]].*")
+            _sync(folder, wanted, f"* [[]{glob_escape(safe_name(vid, 64))}[]].*")
         try:
             folder.rmdir()  # only if nothing is left in it
         except OSError:

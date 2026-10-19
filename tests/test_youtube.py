@@ -25,9 +25,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app import courses, engines, server, youtube  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.engines import Cancelled  # noqa: E402
+from app.jobs import Store  # noqa: E402
 from app.server import make_server  # noqa: E402
 from youtube_support import FakeYouTube, formats, vtt, write_media  # noqa: E402
 
+TT = "https://www.youtube.com/api/timedtext?v=jNQXAC9IVRw&fmt=vtt"
 DENO = {"name": "Deno", "version": "2.9.5", "downloaded": True}
 VTT_EN = vtt((1.2, 3.36, "All right, so here we are, in front of the"), (3.36, 4.0, "elephants."),
              (5.3, 7.9, "the cool thing about these guys"), (7.9, 9.0, "is that they have long trunks"),
@@ -36,13 +38,39 @@ VTT_AR = vtt((0.5, 2.0, "أهلاً بكم في الدرس الأول"), (2.0, 4
 
 
 class Links(unittest.TestCase):
-    def test_only_youtube_links(self):
-        for url in ("https://www.youtube.com/watch?v=jNQXAC9IVRw", "youtu.be/jNQXAC9IVRw", "https://m.youtube.com/shorts/x",
-                    "https://www.youtube.com/playlist?list=PL123", "http://music.youtube.com/watch?v=a"):
-            self.assertTrue(youtube.check_url(url).startswith("http"), url)
-        for url in ("", "https://vimeo.com/1", "https://youtube.com.evil.example/watch?v=1", "file:///etc/passwd"):
+    def test_links_are_rebuilt_from_their_parts(self):
+        watch = "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+        for url, want in (
+                (watch, watch), ("youtu.be/jNQXAC9IVRw?t=10", watch), ("https://m.youtube.com/shorts/jNQXAC9IVRw", watch),
+                ("http://music.youtube.com/watch?v=jNQXAC9IVRw&feature=share#t=3", watch),
+                ("https://www.youtube-nocookie.com/embed/jNQXAC9IVRw", watch), ("HTTPS://WWW.YOUTUBE.COM:443/watch?v=jNQXAC9IVRw", watch),
+                ("https://www.youtube.com/watch?v=jNQXAC9IVRw&list=PL123abc&index=3", f"{watch}&list=PL123abc"),
+                ("https://www.youtube.com/playlist?list=PL123abc&si=x", "https://www.youtube.com/playlist?list=PL123abc")):
+            self.assertEqual(youtube.check_url(url), want, url)
+
+    def test_only_youtube_itself(self):
+        for url in ("", "https://vimeo.com/1", "file:///etc/passwd", "javascript:alert(1)", "ftp://www.youtube.com/watch?v=jNQXAC9IVRw",
+                    "https://www.youtube.com@evil.example/watch?v=jNQXAC9IVRw",      # the host is evil.example
+                    "https://user:pw@www.youtube.com/watch?v=jNQXAC9IVRw",           # a user name in the address
+                    "https://youtube.com.evil.example/watch?v=jNQXAC9IVRw", "https://wwwyoutube.com/watch?v=jNQXAC9IVRw",
+                    "https://www.youtube.co/watch?v=jNQXAC9IVRw", "https://evil.example/?u=https://www.youtube.com/",
+                    "https://www.youtube.com:8080/watch?v=jNQXAC9IVRw", "https://www.youtube.com:99999/watch?v=jNQXAC9IVRw",
+                    "https://www.youtube.com/redirect?q=https://evil.example/", "https://www.youtube.com/attribution_link?u=/x",
+                    "https://www.youtube.com/watch?v=../../etc/x", "https://www.youtube.com/watch?v=jNQXAC9IVRw&list=../x",
+                    "https://youtu.be/", "https://www.youtube.com/"):
             with self.assertRaises(youtube.YouTubeError, msg=url):
                 youtube.check_url(url)
+        with self.assertRaisesRegex(youtube.YouTubeError, "channel"):
+            youtube.check_url("https://www.youtube.com/@teacher/videos")
+
+    def test_only_youtube_extractors(self):
+        """The real yt-dlp, offline: with the app's settings it has no other extractor, so a page elsewhere
+        can't even be tried."""
+        with youtube._ydl(Config(home=tempfile.gettempdir())) as ydl:
+            names = {ie.IE_NAME for ie in ydl._ies.values()}
+            self.assertEqual(names, {"youtube", "youtube:tab", "youtube:playlist"})
+            with self.assertRaises(Exception):
+                ydl.extract_info("https://evil.example/page.html", download=False, process=False)
 
     def test_errors_read_well(self):
         self.assertEqual(youtube.clean_error(Exception("ERROR: [youtube] jNQXAC9IVRw: Video unavailable. This video is private")),
@@ -65,6 +93,12 @@ class Formats(unittest.TestCase):
         own = dict(formats("x")[3], format_id="140-0", language_preference=10, abr=100)
         self.assertEqual(youtube.pick_formats([dub, own])[1]["format_id"], "140-0")
 
+    def test_only_streams_from_youtube(self):
+        elsewhere = dict(formats("x")[5], format_id="136-x", tbr=9999, url="https://evil.example/v.mp4")
+        tricky = dict(formats("x")[5], format_id="136-y", tbr=9998, url="https://googlevideo.com.evil.example/v.mp4")
+        self.assertEqual(youtube.pick_formats([elsewhere, tricky, *formats("x")])[0]["format_id"], "136")
+        self.assertEqual(youtube.human_captions({"subtitles": {"en": [{"ext": "vtt", "url": "https://evil.example/s.vtt"}]}}), {})
+
     def test_without_h264_only_the_sound(self):
         video, audio, both, sound = youtube.pick_formats(formats("x", h264=False))
         self.assertEqual((video, audio, both), (None, None, None))
@@ -74,14 +108,14 @@ class Formats(unittest.TestCase):
 
 class Captions(unittest.TestCase):
     def test_only_captions_made_by_people(self):
-        info = {"subtitles": {"en": [{"ext": "vtt", "url": "u", "name": "English"}], "de": [{"ext": "vtt", "url": "u"}],
-                              "live_chat": [{"ext": "json", "url": "u"}], "ar-EG": [{"ext": "srv3", "url": "u"}]},
-                "automatic_captions": {"ar": [{"ext": "vtt", "url": "u"}]}}
+        info = {"subtitles": {"en": [{"ext": "vtt", "url": TT, "name": "English"}], "de": [{"ext": "vtt", "url": TT}],
+                              "live_chat": [{"ext": "json", "url": TT}], "ar-EG": [{"ext": "srv3", "url": TT}]},
+                "automatic_captions": {"ar": [{"ext": "vtt", "url": TT}]}}
         self.assertEqual(youtube.human_captions(info), {"en": "English"}, "German, a chat and no WebVTT are left out")
         self.assertEqual(youtube.pick_captions(info, "ar"), "en", "the automatic Arabic ones are never used")
 
     def test_in_the_video_language(self):
-        track = [{"ext": "vtt", "url": "u"}]
+        track = [{"ext": "vtt", "url": TT}]
         both = {"subtitles": {"en-GB": track, "en": track, "ar": track}}
         self.assertEqual(youtube.pick_captions({**both, "language": "en"}, "ar"), "en")
         self.assertEqual(youtube.pick_captions({**both, "language": "ar"}, "en"), "ar")
@@ -168,7 +202,11 @@ class InspectAndDownload(unittest.TestCase):
         self.assertEqual((found["kind"], found["title"], found["count"], found["duration"]), ("playlist", "Python: a course", 3, 6))
         self.assertEqual([(e["index"], e["title"], e["available"], e["captions"]) for e in found["entries"]],
                          [(1, "Intro", True, ["en"]), (2, "Loops", True, []), (3, "[Private video]", False, None)])
+        self.assertEqual([e["use"] for e in found["entries"]], ["en", None, None], "the captions a job would take")
         self.assertEqual(found["runtime"], DENO)
+        self.fake.video("vid00000009", "شرح بالعربي", captions={"en": VTT_EN}, language="ar")
+        alone = youtube.inspect(self.cfg, "https://www.youtube.com/watch?v=vid00000009")["entries"][0]
+        self.assertEqual((alone["captions"], alone["use"]), (["en"], None), "English captions of an Arabic video: a translation")
         quick = youtube.inspect(self.cfg, "https://www.youtube.com/playlist?list=PLcourse", check_captions=False)
         self.assertEqual([e["captions"] for e in quick["entries"]], [None, None, None], "not looked up")
 
@@ -182,6 +220,31 @@ class InspectAndDownload(unittest.TestCase):
             youtube.inspect(self.cfg, "https://www.youtube.com/watch?v=vidlive0001")
         with self.assertRaisesRegex(youtube.YouTubeError, "Video unavailable"):
             youtube.inspect(self.cfg, "https://www.youtube.com/watch?v=nosuchvideo")
+
+    def test_what_does_not_come_from_youtube_is_refused(self):
+        self.fake.video("vidforeign1", "Elsewhere")
+        self.fake.foreign.add("vidforeign1")
+        with self.assertRaisesRegex(youtube.YouTubeError, "did not lead to a YouTube"):
+            youtube.inspect(self.cfg, "https://youtu.be/vidforeign1")
+        self.fake.redirects["vidredirect"] = "https://evil.example/next"
+        with self.assertRaisesRegex(youtube.YouTubeError, "paste the link"):
+            youtube.inspect(self.cfg, "https://youtu.be/vidredirect")
+        self.fake.redirects["vidredirec2"] = "https://www.youtube.com/watch?v=vid00000001"
+        self.assertEqual(youtube.inspect(self.cfg, "https://youtu.be/vidredirec2")["entries"][0]["id"], "vid00000001",
+                         "a link to another YouTube page is followed")
+        self.fake.playlist("PLmixed", "Mixed", ["vid00000001"], extra=[
+            {"_type": "url", "ie_key": "Generic", "id": "abcdefghijk", "url": "https://evil.example/a", "title": "Another extractor"},
+            {"_type": "url", "ie_key": "Youtube", "id": "../../etc/x", "url": "https://www.youtube.com/watch?v=../../etc/x", "title": "Odd id"},
+            {"_type": "url", "ie_key": "Youtube", "id": "abcdefghij2", "url": "https://evil.example/watch?v=abcdefghij2", "title": "Away"}])
+        found = youtube.inspect(self.cfg, "https://www.youtube.com/playlist?list=PLmixed")
+        self.assertEqual([(e["title"], e["available"], e["url"]) for e in found["entries"]], [
+            ("Intro", True, "https://www.youtube.com/watch?v=vid00000001"), ("Another extractor", False, None),
+            ("Odd id", False, None), ("Away", False, None)])
+        for job in ({"source_url": "https://evil.example/v.mp4", "title": "changed in job.json"},
+                    {"source_url": youtube.watch_url("vid00000001"), "youtube_id": "vid00000002", "title": "another id"}):
+            with self.assertRaises(youtube.YouTubeError, msg=job["title"]):
+                youtube.download(self.cfg, job, self.tmp, lambda *a: None, lambda: False)
+        self.assertEqual(self.fake.downloads, [], "nothing was downloaded")
 
     def test_download_with_captions(self):
         seen = []
@@ -244,6 +307,64 @@ class CourseFiles(unittest.TestCase):
         self.assertEqual(courses.paragraphs({}, lines), ["[00:00] One. Two.", "[00:09] After a pause."])
         two = lines + [{"start": 10, "end": 11, "speaker": "2", "text": "A question."}]
         self.assertEqual(courses.paragraphs({"speaker_names": {"2": "Omar"}}, two)[-1], "[00:10] Omar: A question.")
+
+
+class CourseFilesStayInside(unittest.TestCase):
+    """Titles and ids are parts of file and folder names: whatever they hold (.., slashes, a drive, a name
+    Windows reserves, a job.json changed by hand), every file lands in a folder directly in the courses folder."""
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-courses-"))
+        self.cfg = Config(home=self.tmp)
+        self.store = Store(self.cfg.storage)
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def lecture(self, n, title, youtube_id, course=None):
+        job = {"id": f"20261019-100000-{n:04x}", "title": title, "youtube_id": youtube_id, "status": "done",
+               "source_url": "https://www.youtube.com/watch?v=jNQXAC9IVRw", "created": "2026-10-19T10:00:00+03:00",
+               "finished": "2026-10-19T10:01:00+03:00", "model_title": "A model", "audio_s": 3, "speaker_names": {},
+               **({"course": course} if course else {})}
+        self.store.create(job)
+        self.store.save_transcript(job["id"], {"lines": [{"start": 0, "end": 1, "speaker": "1", "text": "hello"}]})
+        courses.try_refresh(self.store, self.cfg, job)
+
+    def test_names_cannot_leave_the_courses_folder(self):
+        bad = {"id": "PLbad", "title": "../../outside", "folder": "../../escape", "url": "u", "count": 3}
+        self.lecture(1, "../../../etc/passwd", "abcdefghijk", {**bad, "index": 1})
+        self.lecture(2, "C:\\Windows\\System32\\drivers", "abcdefghij2", {**bad, "index": 2})
+        self.lecture(3, "..", "abcdefghij3", {**bad, "index": 3})
+        self.lecture(4, "CON", "..\\..\\x", None)
+        self.lecture(5, "a/b\\c:d", "/etc/passwd", None)
+        self.lecture(6, "NUL", "abcdefghij5", {"id": "PLdrive", "title": "D:", "folder": "C:\\", "url": "u", "count": 1, "index": 1})
+        self.lecture(7, "Odd index", "abcdefghij7", {"id": "PLidx", "title": "Index", "folder": "Index", "url": "u", "count": 1,
+                                                       "index": "../../x"})
+        root = (self.tmp / "courses").resolve()
+        written = [p for p in self.tmp.rglob("*") if p.is_file() and "app_data" not in p.relative_to(self.tmp).parts]
+        for p in written:
+            self.assertEqual(p.resolve().parent.parent, root, p)
+        self.assertEqual(sorted(p.name for p in root.iterdir()), [".. .. escape", "C", "Videos"])
+        self.assertEqual(sorted(p.name for p in (root / ".. .. escape").iterdir()), [
+            "01 - .. .. .. etc passwd.md", "01 - .. .. .. etc passwd.srt", "02 - C Windows System32 drivers.md",
+            "02 - C Windows System32 drivers.srt", "03 - Untitled.md", "03 - Untitled.srt", "course.md"])
+        self.assertEqual(sorted(p.name for p in (root / "Videos").iterdir()), [
+            "CON_ [.. .. x].md", "CON_ [.. .. x].srt", "a b c d [etc passwd].md", "a b c d [etc passwd].srt"])
+        self.assertEqual(sorted(p.name for p in (root / "C").iterdir()), ["01 - NUL_.md", "01 - NUL_.srt", "course.md"])
+
+    def test_inside(self):
+        root = self.tmp / "courses"
+        root.mkdir()
+        self.assertEqual(courses.inside(root, root / "Course"), root / "Course")
+        for path in (root / "..", root / "a" / "b", root, self.tmp / "elsewhere", root / ".." / "courses2"):
+            with self.assertRaises(ValueError, msg=path):
+                courses.inside(root, path)
+        try:
+            (root / "link").symlink_to(self.tmp, target_is_directory=True)
+        except OSError:
+            self.skipTest("no symbolic links here")
+        with self.assertRaises(ValueError):
+            courses.inside(root, root / "link")
 
 
 class Api(unittest.TestCase):
@@ -434,6 +555,12 @@ class Api(unittest.TestCase):
         status, r = self.add("https://www.youtube.com/playlist?list=PLcourse", entries=["gone0000000"])
         self.assertEqual(status, 400, "a private video can't be picked")
         self.assertEqual(self.call("POST", "/api/open-folder", {"job": "20200101-000000-0000"})[0], 404)
+        forged = "https://www.youtube.com/playlist?list=PLforged"  # an id that isn't YouTube's never becomes a job
+        self.app.inspected[forged] = (time.time(), {"kind": "playlist", "id": "PLforged", "title": "Forged", "url": forged,
+                                                    "count": 1, "entries": [{"id": "../../etc", "title": "x", "index": 1,
+                                                                             "available": True, "url": "https://evil.example/"}]})
+        status, r = self.add(forged)
+        self.assertEqual((status, r["error"]), (400, "a video has an id YouTube doesn't use"))
 
 
 if __name__ == "__main__":

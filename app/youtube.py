@@ -32,6 +32,13 @@ from .transcript import MAX_LINE
 
 HOSTS = {"youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com", "youtu.be",
          "youtube-nocookie.com", "www.youtube-nocookie.com"}
+STREAM_HOSTS = (".googlevideo.com", ".youtube.com")  # where YouTube's streams and captions are served from
+EXTRACTORS = ("youtube", "youtube:tab", "youtube:playlist")  # yt-dlp's only: its generic one never runs
+EXTRACTOR_KEYS = {"Youtube", "YoutubeTab", "YoutubePlaylist"}
+VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+LIST_ID = re.compile(r"[A-Za-z0-9_-]{2,64}")
+SAFE_ID = re.compile(r"[A-Za-z0-9_-]{6,64}")  # what a job's youtube_id must look like (it names files)
+NOT_YOUTUBE = "paste the link of a YouTube video or playlist"
 MAX_HEIGHT = 720
 LANGS = {"ar": "Arabic", "en": "English"}
 CAPTIONS_MODEL, CAPTIONS_TITLE = "youtube-captions", "YouTube captions (made by people)"
@@ -49,14 +56,56 @@ def watch_url(video_id):
 
 
 def check_url(url):
-    """The link as given, if it points to YouTube (a video, a short or a playlist); else YouTubeError."""
+    """A YouTube link rebuilt from its parts, so nothing else of it reaches yt-dlp: the video's
+    https://www.youtube.com/watch?v=<id> (with &list=<id> when it names a playlist too), or the playlist's
+    https://www.youtube.com/playlist?list=<id>. Raises YouTubeError for anything else: another site, a host
+    that only looks like YouTube's, a user name, password or odd port in the address, a channel."""
     url = str(url or "").strip()
-    if url and not re.match(r"(?i)https?://", url):
+    if url and not re.match(r"(?i)[a-z][a-z0-9+.-]*://", url):
         url = "https://" + url
-    host = (urllib.parse.urlsplit(url).hostname or "").lower() if url else ""
-    if host not in HOSTS:
-        raise YouTubeError("paste the link of a YouTube video or playlist")
-    return url
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port
+    except ValueError:
+        raise YouTubeError(NOT_YOUTUBE)
+    host = (p.hostname or "").lower()
+    if p.scheme.lower() not in ("http", "https") or host not in HOSTS or "@" in p.netloc or port not in (None, 80, 443):
+        raise YouTubeError(NOT_YOUTUBE)
+    query = urllib.parse.parse_qs(p.query)
+    first = lambda key: (query.get(key) or [""])[0]
+    parts = [x for x in p.path.split("/") if x]
+    video, playlist = None, first("list") or None
+    if host == "youtu.be":
+        video = parts[0] if len(parts) == 1 else ""
+    elif parts == ["watch"]:
+        video = first("v")
+    elif len(parts) == 2 and parts[0] in ("shorts", "live", "embed", "v", "e"):
+        video = parts[1]
+    elif parts and (parts[0].startswith("@") or parts[0] in ("channel", "c", "user")):
+        raise YouTubeError("this is a channel; paste the link of one of its playlists or videos")
+    elif parts != ["playlist"]:
+        raise YouTubeError(NOT_YOUTUBE)
+    if video is not None and not VIDEO_ID.fullmatch(video) or playlist and not LIST_ID.fullmatch(playlist):
+        raise YouTubeError(NOT_YOUTUBE)
+    if video and playlist:
+        return f"https://www.youtube.com/watch?v={video}&list={playlist}"
+    if video:
+        return watch_url(video)
+    if playlist:
+        return f"https://www.youtube.com/playlist?list={playlist}"
+    raise YouTubeError(NOT_YOUTUBE)
+
+
+def on_youtube(url, hosts=HOSTS):
+    """Whether an address yt-dlp gave back is still YouTube's (hosts, or names ending in one of them)."""
+    try:
+        p = urllib.parse.urlsplit(str(url or ""))
+        host = (p.hostname or "").lower()
+        ok_port = p.port in (None, 80, 443)
+    except ValueError:
+        return False
+    named = host in hosts if isinstance(hosts, set) else host.endswith(hosts)
+    return p.scheme in ("http", "https") and named and "@" not in p.netloc and ok_port
 
 
 def clean_error(e):
@@ -145,16 +194,24 @@ def _ydl(cfg, **extra):
     import yt_dlp
     return yt_dlp.YoutubeDL({"quiet": True, "no_warnings": True, "noprogress": True, "logger": _Log(),
                              "js_runtimes": js_runtimes(cfg), "socket_timeout": 30, "retries": 10,
-                             "extract_flat": "in_playlist", **extra})
+                             "extract_flat": "in_playlist", "allowed_extractors": [re.escape(x) for x in EXTRACTORS],
+                             **extra})
 
 
-def _extract(ydl, url):
+def _extract(ydl, url, hops=3):
+    """What yt-dlp reads from a checked link (check_url), refused unless one of YouTube's own extractors read
+    it from a YouTube page. A link it answers with another link is followed only if that is YouTube's too."""
     try:
-        return ydl.extract_info(url, download=False, process=False)
-    except Cancelled:
+        info = ydl.extract_info(check_url(url), download=False, process=False)
+    except (Cancelled, YouTubeError):
         raise
     except Exception as e:  # yt-dlp's DownloadError and ExtractorError carry a message worth showing
         raise YouTubeError(clean_error(e))
+    if info.get("_type") in ("url", "url_transparent") and hops:
+        return _extract(ydl, info.get("url"), hops - 1)
+    if info.get("extractor_key") not in EXTRACTOR_KEYS or not on_youtube(info.get("webpage_url")):
+        raise YouTubeError("the link did not lead to a YouTube video or playlist")
+    return info
 
 
 # ---- reading a link ---------------------------------------------------------------------------------
@@ -164,7 +221,8 @@ def human_captions(info):
     automatic ones), with a WebVTT version."""
     out = {}
     for code, tracks in (info.get("subtitles") or {}).items():
-        if code.split("-")[0].lower() in LANGS and any(t.get("ext") == "vtt" and t.get("url") for t in tracks or []):
+        if code.split("-")[0].lower() in LANGS and any(t.get("ext") == "vtt" and on_youtube(t.get("url"), STREAM_HOSTS)
+                                                       for t in tracks or []):
             out[code] = next((t.get("name") for t in tracks if t.get("name")), None) or LANGS[code.split("-")[0].lower()]
     return out
 
@@ -183,16 +241,33 @@ def pick_captions(info, language="ar"):
     return None
 
 
+def _captions_facts(info):
+    """captions: the languages of the captions people made (Arabic or English); use: the ones a job would
+    take as its transcript (pick_captions), or None."""
+    return {"captions": sorted(human_captions(info)), "use": pick_captions(info), "language": info.get("language")}
+
+
+def _youtube_entry(e):
+    """Whether a playlist's entry is a YouTube video: YouTube's own extractor, a video id, and an address
+    (if it has one) on YouTube. Its address is always made again from the id (watch_url)."""
+    return e.get("ie_key") in (None, "Youtube") and bool(VIDEO_ID.fullmatch(str(e.get("id") or ""))) \
+        and (not e.get("url") or on_youtube(e["url"]))
+
+
 def _entry(info, index):
-    """What the preview shows about one video."""
-    vid = info.get("id")
-    title = info.get("title") or vid
+    """What the preview shows about one video. captions and use stay None until the video itself is read
+    (a playlist's listing doesn't say)."""
+    vid = str(info.get("id") or "")
+    title = str(info.get("title") or vid)
     live = info.get("live_status") in ("is_live", "is_upcoming", "post_live")
+    ok = _youtube_entry(info)
     out = {"id": vid, "title": title, "duration": info.get("duration"), "index": index,
-           "url": watch_url(vid), "available": bool(vid) and title not in GONE and not live, "live": live,
-           "captions": None, "language": info.get("language")}
+           "url": watch_url(vid) if ok else None, "available": ok and title not in GONE and not live, "live": live,
+           "captions": None, "use": None, "language": info.get("language")}
+    if not ok:
+        out["problem"] = "Not a YouTube video"
     if "subtitles" in info or "formats" in info:  # a full extraction, not a playlist's listing
-        out["captions"] = sorted(human_captions(info))
+        out.update(_captions_facts(info))
     return out
 
 
@@ -207,10 +282,14 @@ def inspect(cfg, url, check_captions=True):
         info = _extract(ydl, url)
         kind = "playlist" if info.get("_type") in ("playlist", "multi_video") or "entries" in info else "video"
         if kind == "video":
-            entries = [_entry(info, 1)]
+            entries = [_entry({**info, "ie_key": "Youtube", "url": None}, 1)]
             if entries[0]["live"]:
                 raise YouTubeError("this is a live stream; it can be transcribed once it has ended")
+            if not entries[0]["url"]:
+                raise YouTubeError(NOT_YOUTUBE)
         else:
+            if not LIST_ID.fullmatch(str(info.get("id") or "")):
+                raise YouTubeError(NOT_YOUTUBE)
             raw = list(islice(info.get("entries") or [], MAX_ENTRIES))
             if any(e.get("_type") == "playlist" or e.get("ie_key") == "YoutubeTab" for e in raw if isinstance(e, dict)):
                 raise YouTubeError("this is a channel; paste the link of one of its playlists or videos")
@@ -222,7 +301,7 @@ def inspect(cfg, url, check_captions=True):
     pid = info.get("id")
     return {"kind": kind, "id": pid, "title": info.get("title") or pid,
             "uploader": info.get("uploader") or info.get("channel"),
-            "url": url if kind == "video" else f"https://www.youtube.com/playlist?list={pid}",
+            "url": entries[0]["url"] if kind == "video" else f"https://www.youtube.com/playlist?list={pid}",
             "count": len(entries), "duration": sum(e["duration"] or 0 for e in entries if e["available"]),
             "entries": entries, "checked": sum(1 for e in entries if e["captions"] is not None),
             "cut": kind == "playlist" and len(entries) >= MAX_ENTRIES,
@@ -238,8 +317,7 @@ def _check_captions(cfg, entries):
         try:
             with _ydl(cfg) as ydl:
                 info = _extract(ydl, e["url"])
-            e.update(captions=sorted(human_captions(info)), language=info.get("language"),
-                     duration=e["duration"] or info.get("duration"))
+            e.update(_captions_facts(info), duration=e["duration"] or info.get("duration"))
         except YouTubeError as err:  # private, members only, removed...: shown, and not picked
             e.update(available=False, problem=str(err))
 
@@ -257,7 +335,7 @@ def pick_formats(formats):
     """(video, audio, both, sound): the best H.264 video-only MP4 stream up to MAX_HEIGHT, the best AAC
     sound-only stream (the original language first, not the "drc" one), the best single MP4 with both, and
     the best sound in any codec (for when there is no H.264 version). Direct downloads come before HLS."""
-    ok = [f for f in formats or [] if f.get("url") and not f.get("has_drm")
+    ok = [f for f in formats or [] if f.get("url") and not f.get("has_drm") and on_youtube(f["url"], STREAM_HOSTS)
           and str(f.get("protocol") or "https") in ("https", "http", "m3u8_native")]
     h264 = lambda f: str(f.get("vcodec") or "").startswith(("avc1", "h264"))
     aac = lambda f: str(f.get("acodec") or "").startswith(("mp4a", "aac"))
@@ -283,6 +361,8 @@ def download(cfg, job, folder, on_progress, cancelled):
     folder = Path(folder)
     with _ydl(cfg) as ydl:
         info = _extract(ydl, job["source_url"])
+        if job.get("youtube_id") and info.get("id") != job["youtube_id"]:
+            raise YouTubeError("the link led to another video than the one added")
         if info.get("live_status") in ("is_live", "is_upcoming", "post_live"):
             raise YouTubeError("this is a live stream; it can be transcribed once it has ended")
         video, audio, both, sound = pick_formats(info.get("formats"))
@@ -353,7 +433,7 @@ def save_captions(ydl, info, folder, language):
     code = pick_captions(info, language)
     if not code:
         return None
-    track = next(t for t in info["subtitles"][code] if t.get("ext") == "vtt" and t.get("url"))
+    track = next(t for t in info["subtitles"][code] if t.get("ext") == "vtt" and on_youtube(t.get("url"), STREAM_HOSTS))
     try:
         text = ydl.urlopen(track["url"]).read().decode("utf-8", errors="replace")
     except Exception:  # noqa: BLE001 — then the speech model makes the transcript

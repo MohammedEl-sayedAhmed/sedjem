@@ -396,6 +396,8 @@ class Handler(BaseHTTPRequestHandler):
         entries = [e for e in found["entries"] if e["available"] and (picked is None or e["id"] in picked)]
         if not entries:
             raise ApiError(400, "choose at least one video that can be downloaded")
+        if any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files (app/courses.py)
+            raise ApiError(400, "a video has an id YouTube doesn't use")
         cfg.storage.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(cfg.storage).free < 2e9:
             raise ApiError(507, "not enough free disk space to download videos")
@@ -407,7 +409,7 @@ class Handler(BaseHTTPRequestHandler):
         for e in entries:
             extra = {"course": {**course, "index": e["index"]}} if course else {}
             jobs.append(runner.new_job(title=e["title"], source_name=f"{e['title']}.mp4", model_id=model["id"],
-                                       options=options, source_url=e["url"], youtube_id=e["id"],
+                                       options=options, source_url=youtube.watch_url(e["id"]), youtube_id=e["id"],
                                        use_captions=str(p.get("captions", True)).lower() not in ("0", "false"), **extra))
         for job in jobs:  # in playlist order: downloads run one at a time, in the order they were queued
             runner.submit(job["id"])
@@ -695,7 +697,10 @@ class Handler(BaseHTTPRequestHandler):
             job = self.job(str(jid))
             if not job.get("youtube_id"):
                 raise ApiError(400, "only a YouTube video's transcript has a course folder")
-            path = courses.folder_of(self.app.cfg, job)
+            try:
+                path = courses.folder_of(self.app.cfg, job)
+            except ValueError:
+                raise ApiError(400, "this transcription's course folder is not in the courses folder")
             path = path if path.is_dir() else self.app.cfg.courses  # nothing finished yet: the courses folder
             path.mkdir(parents=True, exist_ok=True)
             folder = str(path)
