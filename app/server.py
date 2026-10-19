@@ -19,7 +19,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, compare, engines, hub, report
+from . import __version__, compare, engines, hub, report, video
 from . import transcript as T
 from . import history
 from .config import FROZEN, power_profile, set_power_profile
@@ -364,7 +364,8 @@ class Handler(BaseHTTPRequestHandler):
         data = self.app.store.transcript(jid)
         out = {"job": job, "lines": data["lines"] if data else engines.partial_lines(folder),
                "edited": bool(data and data.get("edited")), "partial": data is None,
-               "has_audio": (folder / "audio.flac").exists()}
+               "has_audio": (folder / "audio.flac").exists(),
+               "has_video": bool(job.get("video")) and (folder / video.NAME).exists()}
         out["details"] = report.details(job, out["lines"], out["edited"])
         out["detail_groups"] = report.groups(out["details"])  # the same, as the lines the job page shows
         out["version"] = history.current(self.app.store, jid, self.app.cfg)  # None while it runs
@@ -431,6 +432,7 @@ class Handler(BaseHTTPRequestHandler):
                 if (self.app.store.get(jid) or {}).get("status") not in ACTIVE:
                     break
                 threading.Event().wait(0.25)
+        self.app.runner.stop_video(jid)  # its files are closed before the folder goes
         self.app.store.delete(jid)
         self.json({"deleted": jid})
 
@@ -455,11 +457,8 @@ class Handler(BaseHTTPRequestHandler):
         options = parse_options({**(job.get("options") or {}), **p}, self.app.cfg, model)
         self.json(summary(self.app.runner.rerun(jid, model["id"], options)), 201)
 
-    def audio(self, _params, jid):
-        self.job(jid)
-        f = self.app.store.dir(jid) / "audio.flac"
-        if not f.exists():
-            raise ApiError(404, "audio not ready")
+    def send_file(self, f, ctype):
+        """A file, or the part of it a Range header asks for (206; 416 outside the file), so players can seek."""
         size = f.stat().st_size
         start, end, status = 0, size - 1, 200
         m = re.fullmatch(r"bytes=(\d*)-(\d*)", self.headers.get("Range", ""))
@@ -474,7 +473,7 @@ class Handler(BaseHTTPRequestHandler):
                 return
             status = 206
         self.send_response(status)
-        self.send_header("Content-Type", "audio/flac")
+        self.send_header("Content-Type", ctype)
         self.send_header("Accept-Ranges", "bytes")
         self.send_header("Content-Length", str(end - start + 1))
         if status == 206:
@@ -491,6 +490,21 @@ class Handler(BaseHTTPRequestHandler):
                     break
                 self.wfile.write(chunk)
                 left -= len(chunk)
+
+    def audio(self, _params, jid):
+        self.job(jid)
+        f = self.app.store.dir(jid) / "audio.flac"
+        if not f.exists():
+            raise ApiError(404, "audio not ready")
+        self.send_file(f, "audio/flac")
+
+    def video(self, _params, jid):
+        """The recording's picture for the job page (app/video.py), when it has one."""
+        self.job(jid)
+        f = self.app.store.dir(jid) / video.NAME
+        if not f.exists():
+            raise ApiError(404, "this transcription has no video")
+        self.send_file(f, "video/mp4")
 
     def export(self, params, jid, fmt):
         job = self.job(jid)
@@ -716,6 +730,7 @@ ROUTES = [
     ("POST", rf"/api/jobs/{ID}/cancel", Handler.cancel_job),
     ("POST", rf"/api/jobs/{ID}/rerun", Handler.rerun_job),
     ("GET", rf"/api/jobs/{ID}/audio", Handler.audio),
+    ("GET", rf"/api/jobs/{ID}/video", Handler.video),
     ("GET", rf"/api/jobs/{ID}/export/(\w+)", Handler.export),
     ("GET", rf"/api/jobs/{ID}/group", Handler.job_group),
     ("GET", r"/api/compare", Handler.compare_jobs),
@@ -744,6 +759,11 @@ ROUTES = [
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], ConnectionError):  # the browser dropped a connection it kept open (a player)
+            return
+        super().handle_error(request, client_address)
 
 
 def make_server(cfg, host=None, port=None):

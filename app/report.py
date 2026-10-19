@@ -73,7 +73,8 @@ def details(job, lines=None, edited=None):
     return {
         "recording": {**{k: source.get(k) for k in sysinfo.RECORDING_KEYS}, "name": name,
                       "extension": source.get("extension") or _extension(name),
-                      "duration": source.get("duration") or job.get("audio_s")},  # older jobs: the converted audio
+                      "duration": source.get("duration") or job.get("audio_s"),  # older jobs: the converted audio
+                      "video_shown": _dict(job.get("video")) or None, "video_note": job.get("video_skipped")},
         "model": {"id": job.get("model"), "title": job.get("model_title"), "kind": job.get("kind"),
                   "engine": job.get("engine"), "file": job.get("model_file"), "service": job.get("service"),
                   "api_model": job.get("api_model")},
@@ -178,6 +179,14 @@ def audio_text(rec):
                   channels and {1: "mono", 2: "stereo"}.get(channels, f"{channels} channels")])
 
 
+def video_text(rec):
+    """H.264, on the job page at 1280×720; or why the job page has no video."""
+    shown, note = _dict(rec.get("video_shown")), rec.get("video_note")
+    on_page = (shown.get("width") and f"on the job page at {shown['width']}×{shown.get('height')}"
+               or note and f"not on the job page: {note}")
+    return _join([VIDEO.get(rec.get("video"), str(rec.get("video")).upper()), on_page])
+
+
 NOT_DETECTED = "Not detected"
 
 
@@ -270,7 +279,7 @@ def groups(d):
           ("Bit rate", _num(rec.get("bit_rate")) and f"{round(rec['bit_rate'] / 1000)} kb/s", True),
           ("Size", size(rec.get("size")), True),
           ("Length", clock(rec.get("duration")), True),
-          ("Video", video and VIDEO.get(video, str(video).upper()), True))
+          ("Video", video and video_text(rec), True))
     group("Model",
           ("Name", model_name(model), False),
           ("Service", hosted and model.get("service"), False),

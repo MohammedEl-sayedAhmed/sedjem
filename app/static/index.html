@@ -71,6 +71,19 @@
   <audio id="audio" preload="metadata"></audio>
 </div>
 
+<!-- The job page's video, when the recording has one: moved into the page by app.js and played by the bar above -->
+<div class="video-panel" id="videoPanel" hidden>
+  <div class="video-frame">
+    <video id="video" preload="metadata" playsinline aria-label="The recording's video"></video>
+    <svg class="video-play" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5z"/></svg>
+  </div>
+  <div class="video-tools">
+    <button type="button" class="icon-btn" id="videoPip" title="Picture in picture" aria-label="Show the video in its own window"></button>
+    <button type="button" class="icon-btn" id="videoSize" aria-pressed="false"></button>
+    <button type="button" class="icon-btn" id="videoFull" title="Full screen (or double-click the video)" aria-label="Full screen"></button>
+  </div>
+</div>
+
 <dialog id="settings" aria-labelledby="settingsTitle">
   <div class="dlg-head">
     <h2 id="settingsTitle">Settings</h2>

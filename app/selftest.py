@@ -4,8 +4,9 @@
 2. server    the interface and the API answer
 3. job       a generated tone is uploaded, converted to 16 kHz FLAC and "transcribed" by a stand-in
              for the ElevenLabs API on 127.0.0.1 (nothing leaves the computer)
-4. window    (--window) a native window opens, loads the app and closes
-5. models    (--models, downloads about 820 MB) whisper-medium and the voiceprint model are
+4. video     a generated MPEG-4 clip is converted to the job page's H.264 video (app/video.py)
+5. window    (--window) a native window opens, loads the app and closes
+6. models    (--models, downloads about 820 MB) whisper-medium and the voiceprint model are
              downloaded with the app's own downloader, and a public 11 s speech sample (JFK, from
              the openai/whisper repository) is transcribed with speaker labels through the app
 
@@ -118,6 +119,27 @@ def check_server_and_job(tmp, results, window):
         mock.server_close()
 
 
+def check_video(tmp):
+    """The H.264 encoder that the job page's video is made with, tried on a clip made with FFmpeg's own
+    MPEG-4 encoder (in every build)."""
+    import av
+
+    from . import video
+    clip, out = Path(tmp) / "clip.avi", Path(tmp) / "video.mp4"
+    with av.open(str(clip), "w") as c:
+        s = c.add_stream("mpeg4", rate=10)
+        s.width, s.height, s.pix_fmt = 64, 48, "yuv420p"
+        for i in range(10):
+            frame = av.VideoFrame.from_ndarray(np.full((48, 64, 3), i * 20, np.uint8), format="rgb24")
+            frame.pts = i
+            c.mux(s.encode(frame))
+        c.mux(s.encode(None))
+    shown = video.make(clip, out, lambda t: None, lambda: False)
+    with av.open(str(out)) as c:
+        codec = c.streams.video[0].codec_context.name
+    return {"ok": shown == {"width": 64, "height": 48} and codec == "h264", "encoder": video.encoder(), "codec": codec}
+
+
 def check_window(url):
     import webview
     outcome = {"ok": False}
@@ -193,7 +215,8 @@ def run(window=False, report=None, models=False):
     results = {"python": sys.version.split()[0], "platform": sys.platform, "frozen": bool(getattr(sys, "frozen", False))}
     with tempfile.TemporaryDirectory(prefix="sedjem-selftest-") as tmp:
         checks = [("worker", lambda: results.__setitem__("worker", check_worker(tmp))),
-                  ("server", lambda: check_server_and_job(tmp, results, window))]
+                  ("server", lambda: check_server_and_job(tmp, results, window)),
+                  ("video", lambda: results.__setitem__("video", check_video(tmp)))]
         if models:
             checks.append(("models", lambda: results.__setitem__("models", check_models(tmp))))
         for name, fn in checks:

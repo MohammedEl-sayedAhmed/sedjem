@@ -25,9 +25,11 @@ import soundfile as sf
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app import engines  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.server import make_server  # noqa: E402
+from media import make_clip  # noqa: E402
 
 try:
     from playwright.sync_api import Error as PlaywrightError
@@ -55,14 +57,19 @@ LINES = [
 ]
 
 
-def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, **fields):
+def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, video=None, **fields):
     """A finished local job as the app stores it: job.json, transcript.json and a 16 kHz FLAC (a quiet tone,
-    a different one for each job: jobs with the same audio count as one recording, see app/compare.py)."""
+    a different one for each job: jobs with the same audio count as one recording, see app/compare.py).
+    video=(width, height): the recording had a picture, so the folder has a small video.mp4 (made here, H.264
+    and AAC at 10 frames a second, as long as the audio)."""
     folder = Path(home) / "app_data" / "jobs" / jid
     folder.mkdir(parents=True)
     t = np.arange(int(seconds * 16000)) / 16000
     freq = 180 + zlib.crc32(jid.encode()) % 200
     sf.write(folder / "audio.flac", (0.05 * np.sin(2 * np.pi * freq * t)).astype(np.float32), 16000)
+    if video:
+        make_clip(folder / "video.mp4", *video, seconds=seconds)
+        fields = {"video": {"width": video[0], "height": video[1]}, **fields}
     job = {"id": jid, "title": title, "source_name": "planning.m4a", "created": "2026-09-25T22:00:00+03:00",
            "model": "cohere", "model_title": "Cohere Transcribe Arabic", "kind": "local", "engine": "cohere",
            "model_file": "cohere-transcribe-arabic-07-2026-Q4_K_M.gguf", "status": "done", "stage": None,
@@ -72,7 +79,8 @@ def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, **fiel
            "started": "2026-09-25T22:00:01+03:00", "finished": "2026-09-25T22:00:04+03:00", "app_version": "0.1.0",
            "source": {"name": "planning.m4a", "extension": "m4a", "format": "mov,mp4,m4a,3gp,3g2,mj2",
                       "codec": "aac", "codec_name": "AAC (Advanced Audio Coding)", "sample_rate": 44100,
-                      "channels": 2, "bit_rate": 128000, "size": 812000, "duration": seconds, "video": None},
+                      "channels": 2, "bit_rate": 128000, "size": 812000, "duration": seconds,
+                      "video": "h264" if video else None},
            "machine": MACHINE, **fields}
     (folder / "job.json").write_text(json.dumps(job, ensure_ascii=False), encoding="utf-8")
     (folder / "transcript.json").write_text(json.dumps({"lines": lines, "edited": False, "model": "cohere"},
