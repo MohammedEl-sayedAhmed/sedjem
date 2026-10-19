@@ -81,7 +81,7 @@ Speechmatics) need no download, only an API key.
 pip install -r requirements.txt -r requirements-desktop.txt
 python desktop/build.py              # dist/Sedjem/ (Sedjem.exe on Windows); --console to debug
 dist/Sedjem/Sedjem --self-test     # on Windows add --report selftest.json (a windowed app has no console)
-iscc desktop/installer.iss           # Windows only (Inno Setup 6): dist/Sedjem-0.1.0-setup.exe
+iscc desktop/installer.iss           # Windows only (Inno Setup 6): dist/Sedjem-<version>-setup.exe
 ```
 
 Build on the system you are building for, since PyInstaller doesn't cross-compile. The build is one

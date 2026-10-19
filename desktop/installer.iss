@@ -1,12 +1,12 @@
 ; Windows installer for Sedjem (Inno Setup 6): run after `python desktop\build.py`
 ;   iscc desktop\installer.iss                 -> dist\Sedjem-<version>-setup.exe
-;   set SEDJEM_VERSION=0.2.0 before, to stamp another version
+;   set SEDJEM_VERSION=0.3.0 before, to stamp another version
 ; Installs for the current user (no admin rights needed). Transcriptions, keys and downloaded models live
 ; in %LOCALAPPDATA%\Sedjem and are kept when the app is uninstalled.
 
 #define AppVersion GetEnv("SEDJEM_VERSION")
 #if AppVersion == ""
-  #define AppVersion "0.1.0"
+  #define AppVersion "0.2.0"
 #endif
 
 [Setup]
