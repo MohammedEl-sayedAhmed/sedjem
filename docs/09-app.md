@@ -53,6 +53,26 @@ merge two speakers that the model split, edit the text, change a line's speaker,
 audio again with another model to compare (the runs share one audio file, so this takes no extra
 space).
 
+A recording with a picture also gets a video on its page, at the top of the side column (above the
+transcript, and kept in view, in a narrow window). The bar at the bottom then plays the video instead
+of the audio, so the transcript follows it the same way: the line being played is highlighted,
+clicking a timestamp moves the video there, and the keys work as before. Clicking the picture plays
+or pauses it and a double click fills the screen. Its buttons make it larger (the choice is
+remembered), show it in a picture-in-picture window, or fill the screen.
+
+The video is `video.mp4` in the job's folder: H.264 and AAC in MP4, at most 720 pixels high, with its
+index at the start so the browser can seek at once. A recording that already is H.264 up to 720p and
+30 frames a second, as many meeting recordings are, is copied as it is, which takes seconds. Anything
+else is converted with the libx264 encoder in PyAV's FFmpeg, keeping a phone video's rotation and
+thinning more than 30 frames a second to 30 or fewer. A 1080p test clip converted at about 9 times
+real time on a Core i5-12450H in balanced mode, so an hour of such video takes about 7 minutes. The
+video is made on its own thread once the audio is ready, at a lower priority on Linux, so the
+transcript doesn't wait for it; the page shows its progress meanwhile. An uploaded original is deleted after the video is made, and
+a run with another model shares the file as it shares the audio. When the video can't be made (no
+H.264 encoder in the FFmpeg build, not enough disk space, a file it can't convert), the transcription
+goes on without it, and the job's log and the Video line under *More details* say why. Audio files,
+including mp3 and m4a files with an album cover, get no video.
+
 Exports are plain text, SRT and WebVTT subtitles, Markdown and JSON, with your names and edits
 applied, or you can copy the text. Arabic lines are laid out right to left automatically. There are
 light and dark themes, the layout works in a narrow window, and the page loads nothing from outside
@@ -493,6 +513,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/config.toml` | settings and model definitions |
 | `app/server.py` | web server and JSON API (Python standard library) |
 | `app/jobs.py` | job folders; the prepare (PyAV conversion), queue and run steps; cancel; re-run |
+| `app/video.py` | the job page's `video.mp4`: copied or converted to H.264 and AAC, or skipped with the reason |
 | `app/engines.py` | local runs (`app/worker.py` running `transcribe.py --progress-file`), and the ElevenLabs and Speechmatics clients |
 | `app/hosted_more.py` | the Gemini, Deepgram, AssemblyAI and Azure Speech clients, and cutting long recordings at pauses |
 | `app/downloads.py` | model downloads, resumable and checked against the pinned size and SHA-256 |
@@ -504,7 +525,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
 | `sysinfo.py` | this computer and a recording's format (PyAV), for the details and `transcribe.py`'s `.meta.json` |
 | `app/static/` | the interface (HTML, CSS and JavaScript, no build step) |
-| `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the details, and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
+| `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the details, the video (on short clips made by `tests/media.py`), and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
 
 Run the tests with `.venv/bin/python -m unittest discover -s tests -v`.
 
@@ -521,6 +542,7 @@ Every change needs the header `X-Sedjem: 1`.
 | `PATCH /api/jobs/<id>` | `title`, `speaker_names`, `lines`, or `merge: {from, into}` |
 | `POST /api/jobs/<id>/cancel`, `POST /api/jobs/<id>/rerun`, `DELETE /api/jobs/<id>` | |
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
+| `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
 
 ## Limits
 

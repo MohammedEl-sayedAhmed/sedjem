@@ -102,9 +102,10 @@ the installer, which it uploads and keeps for 7 days. It only runs when started 
 `Sedjem --self-test [--window] [--models] [--report file.json]` checks an installation without
 touching your data. It starts the model process and has it import everything a local run needs,
 checks that the interface and API answer, then uploads a generated tone, converts it to 16 kHz FLAC
-and has it "transcribed" by a stand-in for the ElevenLabs API on 127.0.0.1. With `--window`, a native
-window opens, loads the app and closes. With `--models` (about 820 MB of downloads into a temporary
-folder), whisper-medium and the voiceprint model are fetched with the app's own downloader, and a
+and has it "transcribed" by a stand-in for the ElevenLabs API on 127.0.0.1. It also converts a
+generated MPEG-4 clip to the H.264 video the job page shows, which fails if the build's FFmpeg has no
+H.264 encoder. With `--window`, a native window opens, loads the app and closes. With `--models`
+(about 820 MB of downloads into a temporary folder), whisper-medium and the voiceprint model are fetched with the app's own downloader, and a
 public 11-second speech sample (JFK, from the openai/whisper repository) is transcribed with speaker
 labels. On the test laptop that gave *"and so my fellow americans, ask not what your country can do
 for you…"* in 16 s.
