@@ -74,10 +74,11 @@ def details(job, lines=None, edited=None):
         "recording": {**{k: source.get(k) for k in sysinfo.RECORDING_KEYS}, "name": name,
                       "extension": source.get("extension") or _extension(name),
                       "duration": source.get("duration") or job.get("audio_s"),  # older jobs: the converted audio
-                      "video_shown": _dict(job.get("video")) or None, "video_note": job.get("video_skipped")},
+                      "video_shown": _dict(job.get("video")) or None, "video_note": job.get("video_skipped"),
+                      "link": job.get("source_url")},  # a YouTube video (app/youtube.py)
         "model": {"id": job.get("model"), "title": job.get("model_title"), "kind": job.get("kind"),
                   "engine": job.get("engine"), "file": job.get("model_file"), "service": job.get("service"),
-                  "api_model": job.get("api_model")},
+                  "api_model": job.get("api_model"), "captions": _dict(job.get("captions")).get("name")},
         "run": {"status": job.get("status"), "device": job.get("device"), "power": job.get("power"),
                 "threads": job.get("threads"), "gpu_setting": job.get("gpu_setting"),
                 "created": job.get("created"), "queued": job.get("queued"), "started": job.get("started"),
@@ -274,6 +275,7 @@ def groups(d):
     video, version = rec.get("video"), run.get("app_version")
     group("Recording",
           ("File", rec.get("name"), False),
+          ("YouTube", rec.get("link"), False),
           ("Audio", audio_text(rec), False),
           ("Container", CONTAINERS.get(rec.get("format")) or rec.get("format_name") or rec.get("format"), True),
           ("Bit rate", _num(rec.get("bit_rate")) and f"{round(rec['bit_rate'] / 1000)} kb/s", True),
@@ -283,6 +285,7 @@ def groups(d):
     group("Model",
           ("Name", model_name(model), False),
           ("Service", hosted and model.get("service"), False),
+          ("Captions", model.get("captions"), False),
           ("ID", model.get("id"), True),
           ("Engine", not hosted and ENGINES.get(model.get("engine"), model.get("engine")), True),
           ("File", model.get("file"), True))

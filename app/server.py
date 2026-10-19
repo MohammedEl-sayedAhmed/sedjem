@@ -19,7 +19,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, compare, engines, hub, report, video
+from . import __version__, compare, courses, engines, hub, report, video, youtube
 from . import transcript as T
 from . import history
 from .config import FROZEN, power_profile, set_power_profile
@@ -54,6 +54,7 @@ class App:
         self.gpu = None         # what transcribe.py can use here; found in the background at start
         self.gpu_probing = False
         self.used = (0.0, None)  # (time, bytes) of the last count of the transcriptions' size
+        self.inspected = {}      # YouTube link -> (time, what youtube.inspect found), for adding it right after
         self.probe_gpu()
 
     def probe_gpu(self):
@@ -143,6 +144,8 @@ class App:
             "catalog": hub.catalog(self.cfg),  # recommended models (app/catalog.toml)
             "voiceprints": self.downloads.status("voiceprints") if "voiceprints" in items else None,
             "cuda": self.downloads.status("cuda") if "cuda" in items else None,
+            "deno": self.downloads.status("deno") if "deno" in items else None,  # for YouTube links
+            "youtube": {"runtime": youtube.runtime(self.cfg), "courses": str(self.cfg.courses)},
             "gpu": self.gpu, "gpu_probing": self.gpu_probing,
             "defaults": self.cfg.defaults,
             "settings": self.cfg.settings(),
@@ -163,7 +166,7 @@ def device_class(device):
 
 def summary(job):
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
-            "audio_s", "seconds", "rtf", "elapsed", "source_name")
+            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course")
     return {k: job.get(k) for k in keys}
 
 
@@ -302,12 +305,11 @@ class Handler(BaseHTTPRequestHandler):
         groups = compare.group_ids(jobs)
         self.json({"jobs": [{**summary(j), "group": groups[j["id"]]} for j in jobs]})
 
-    def create_job(self, params):
-        cfg, runner = self.app.cfg, self.app.runner
-        ctype = self.headers.get("Content-Type", "")
-        is_json = ctype.startswith("application/json")
-        p = self.body_json() if is_json else params
-        model = cfg.models.get(p.get("model") or cfg.defaults["model"])
+    def ready_model(self, p, default=None):
+        """The model a request names (else the default), if it can run now; a hosted one only with the
+        user's consent to upload the recording."""
+        cfg = self.app.cfg
+        model = cfg.models.get(p.get("model") or default or cfg.defaults["model"])
         if model is None:
             raise ApiError(400, "unknown model")
         ready, reason = cfg.availability(model)
@@ -315,6 +317,14 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, f"{model['title']} is not ready: {reason}")
         if model["kind"] == "hosted" and str(p.get("confirm_upload")).lower() not in ("1", "true"):
             raise ApiError(400, f"confirm that the recording may be uploaded to {model['service']}")
+        return model
+
+    def create_job(self, params):
+        cfg, runner = self.app.cfg, self.app.runner
+        ctype = self.headers.get("Content-Type", "")
+        is_json = ctype.startswith("application/json")
+        p = self.body_json() if is_json else params
+        model = self.ready_model(p)
         options = parse_options(p, cfg, model)
         if is_json:  # a file already on this computer: read it in place, no copy
             source = Path(str(p.get("path") or "")).expanduser()
@@ -351,6 +361,59 @@ class Handler(BaseHTTPRequestHandler):
                 raise
         runner.submit(job["id"])
         self.json(summary(self.app.store.get(job["id"])), 201)
+
+    # YouTube links (app/youtube.py): a video, or a playlist made into one job per video
+    def youtube_inspect(self, _params):
+        """{url}: the video or playlist, its videos in order and which have captions made by people."""
+        url = str(self.body_json().get("url") or "").strip()
+        try:
+            found = youtube.inspect(self.app.cfg, url)
+        except youtube.YouTubeError as e:
+            raise ApiError(400, str(e))
+        self.app.inspected = {k: v for k, v in self.app.inspected.items() if time.time() - v[0] < 1800}
+        self.app.inspected[url] = self.app.inspected[found["url"]] = (time.time(), found)
+        self.json(found)
+
+    def youtube_add(self, _params):
+        """{url, model, speakers, language, prompt, confirm_upload, captions (use captions made by people,
+        default true), entries (the video ids to transcribe; default all)}: one job per video, queued in
+        playlist order, with the playlist as their course. Answers {"jobs": [...]}."""
+        cfg, runner, store = self.app.cfg, self.app.runner, self.app.store
+        p = self.body_json()
+        model = self.ready_model(p)
+        options = parse_options(p, cfg, model)
+        url = str(p.get("url") or "").strip()
+        at, found = self.app.inspected.get(url, (0, None))
+        if found is None or time.time() - at > 1800:
+            try:
+                found = youtube.inspect(cfg, url, check_captions=False)
+            except youtube.YouTubeError as e:
+                raise ApiError(400, str(e))
+        wanted = p.get("entries")
+        if wanted is not None and not isinstance(wanted, list):
+            raise ApiError(400, "entries must be a list of video ids")
+        picked = None if wanted is None else {str(x) for x in wanted}
+        entries = [e for e in found["entries"] if e["available"] and (picked is None or e["id"] in picked)]
+        if not entries:
+            raise ApiError(400, "choose at least one video that can be downloaded")
+        if any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files (app/courses.py)
+            raise ApiError(400, "a video has an id YouTube doesn't use")
+        cfg.storage.mkdir(parents=True, exist_ok=True)
+        if shutil.disk_usage(cfg.storage).free < 2e9:
+            raise ApiError(507, "not enough free disk space to download videos")
+        course = None
+        if found["kind"] == "playlist":
+            course = {"id": found["id"], "title": found["title"], "url": found["url"], "count": found["count"]}
+            course["folder"] = courses.folder_name(store, course)
+        jobs = []
+        for e in entries:
+            extra = {"course": {**course, "index": e["index"]}} if course else {}
+            jobs.append(runner.new_job(title=e["title"], source_name=f"{e['title']}.mp4", model_id=model["id"],
+                                       options=options, source_url=youtube.watch_url(e["id"]), youtube_id=e["id"],
+                                       use_captions=str(p.get("captions", True)).lower() not in ("0", "false"), **extra))
+        for job in jobs:  # in playlist order: downloads run one at a time, in the order they were queued
+            runner.submit(job["id"])
+        self.json({"jobs": [summary(store.get(j["id"])) for j in jobs]}, 201)
 
     def job(self, jid):
         job = self.app.store.get(jid)
@@ -414,7 +477,13 @@ class Handler(BaseHTTPRequestHandler):
         with store.lock:  # one change at a time, so versions are numbered in the order they are saved
             change, kind, merge = self.change_from(self.job(jid), p)
             history.save(store, jid, change, kind, p.get("message"), cfg=self.app.cfg, merge=merge)
+        self.changed(jid)
         self.get_job({}, jid)
+
+    def changed(self, jid, job=None):
+        """After a transcript, its title or its speaker names changed (or it was deleted): a YouTube job's
+        files in the courses folder follow (app/courses.py)."""
+        courses.try_refresh(self.app.store, self.app.cfg, job or self.app.store.get(jid))
 
     def diff_job(self, _params, jid):
         """What a PATCH with the same body would change, without saving it: edits are reviewed first."""
@@ -434,6 +503,7 @@ class Handler(BaseHTTPRequestHandler):
                 threading.Event().wait(0.25)
         self.app.runner.stop_video(jid)  # its files are closed before the folder goes
         self.app.store.delete(jid)
+        self.changed(jid, job)  # a deleted lecture leaves its course's files
         self.json({"deleted": jid})
 
     def cancel_job(self, _params, jid):
@@ -443,19 +513,24 @@ class Handler(BaseHTTPRequestHandler):
 
     def rerun_job(self, _params, jid):
         job = self.job(jid)
-        if not (self.app.store.dir(jid) / "audio.flac").exists():
-            raise ApiError(409, "this transcription has no prepared audio yet")
         p = self.body_json()
-        model = self.app.cfg.models.get(p.get("model") or job["model"])
-        if model is None:
-            raise ApiError(400, "unknown model")
-        ready, reason = self.app.cfg.availability(model)
-        if not ready:
-            raise ApiError(400, f"{model['title']} is not ready: {reason}")
-        if model["kind"] == "hosted" and str(p.get("confirm_upload")).lower() not in ("1", "true"):
-            raise ApiError(400, f"confirm that the recording may be uploaded to {model['service']}")
+        if not (self.app.store.dir(jid) / "audio.flac").exists():
+            if job.get("source_url") and job["status"] not in ACTIVE:  # a YouTube download that failed: again
+                return self.retry_download(job, p)
+            raise ApiError(409, "this transcription has no prepared audio yet")
+        model = self.ready_model(p, job["model"])
         options = parse_options({**(job.get("options") or {}), **p}, self.app.cfg, model)
         self.json(summary(self.app.runner.rerun(jid, model["id"], options)), 201)
+
+    def retry_download(self, job, p):
+        """The same job, downloaded again (a part already downloaded is resumed), with the model asked for."""
+        model = self.ready_model(p, job["model"] if job["model"] in self.app.cfg.models else None)
+        options = parse_options({**(job.get("options") or {}), **p}, self.app.cfg, model)
+        self.app.runner.cancelled.discard(job["id"])
+        self.app.store.update(job["id"], model=model["id"], model_title=model["title"], kind=model["kind"],
+                              options=options, error=None, finished=None)
+        self.app.runner.submit(job["id"])
+        self.json(summary(self.app.store.get(job["id"])), 201)
 
     def send_file(self, f, ctype):
         """A file, or the part of it a Range header asks for (206; 416 outside the file), so players can seek."""
@@ -536,6 +611,7 @@ class Handler(BaseHTTPRequestHandler):
     def combine_jobs(self, _params):
         """The picked parts saved as a new version of the base transcript; answers like GET /api/jobs/<id>."""
         base, _ = compare.save_combined(self.app.store, self.body_json(), self.app.cfg)
+        self.changed(base)
         self.get_job({}, base)
 
     def combine_preview(self, _params):
@@ -586,6 +662,7 @@ class Handler(BaseHTTPRequestHandler):
             history.restore(self.app.store, jid, int(n), message, self.app.cfg)
         except KeyError:
             raise ApiError(404, "no such version")
+        self.changed(jid)
         self.get_job({}, jid)
 
     def save_key(self, _params):
@@ -627,14 +704,24 @@ class Handler(BaseHTTPRequestHandler):
         self.json(self.app.status())
 
     def open_folder(self, _params):
-        """Show the data folder in the file manager (only that folder; the path isn't taken from the request)."""
-        folder = str(self.app.cfg.storage)
+        """Show the data folder in the file manager, or with {"job": id} the courses folder a YouTube job's
+        files are in (app/courses.py). Only these folders: the path isn't taken from the request."""
+        jid = self.body_json().get("job")
+        if jid:
+            job = self.job(str(jid))
+            if not job.get("youtube_id"):
+                raise ApiError(400, "only a YouTube video's transcript has a course folder")
+            try:
+                path = courses.folder_of(self.app.cfg, job)
+            except ValueError:
+                raise ApiError(400, "this transcription's course folder is not in the courses folder")
+            path = path if path.is_dir() else self.app.cfg.courses  # nothing finished yet: the courses folder
+            path.mkdir(parents=True, exist_ok=True)
+            folder = str(path)
+        else:
+            folder = str(self.app.cfg.storage)
         try:
-            if os.name == "nt":
-                os.startfile(folder)  # noqa: S606 — our own folder
-            else:
-                subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", folder],
-                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            show_folder(folder)
         except OSError as e:
             raise ApiError(500, f"could not open the folder: {e}")
         self.json({"opened": folder})
@@ -660,7 +747,7 @@ class Handler(BaseHTTPRequestHandler):
         if item_id not in self.app.cfg.download_items():
             raise ApiError(404, "nothing to remove with that name")
         if any(j["status"] in ACTIVE and (j["model"] == item_id or item_id in ("voiceprints", "cuda")) and j["kind"] == "local"
-               for j in self.app.store.list()):
+               or item_id == "deno" and j.get("stage") == "downloading" for j in self.app.store.list()):
             raise ApiError(409, "a transcription is using it; wait until it has finished")
         try:
             self.app.downloads.remove(item_id)
@@ -699,6 +786,15 @@ class Handler(BaseHTTPRequestHandler):
         self.json({"bye": True})
         target = self.app.on_quit or self.app.server.shutdown
         threading.Thread(target=target, daemon=True).start()
+
+
+def show_folder(folder):
+    """Open one of the app's own folders in the file manager."""
+    if os.name == "nt":
+        os.startfile(folder)  # noqa: S606 — our own folder
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", folder],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def clean_lines(lines):
@@ -749,6 +845,8 @@ ROUTES = [
     ("POST", r"/api/downloads/([\w-]+)", Handler.download),
     ("POST", r"/api/downloads/([\w-]+)/cancel", Handler.cancel_download),
     ("DELETE", r"/api/downloads/([\w-]+)", Handler.remove_download),
+    ("POST", r"/api/youtube/inspect", Handler.youtube_inspect),
+    ("POST", r"/api/youtube", Handler.youtube_add),
     ("POST", r"/api/hub/inspect", Handler.hub_inspect),
     ("POST", r"/api/hub/add", Handler.hub_add),
     ("DELETE", r"/api/models/(hf-[\w-]+)", Handler.forget_model),

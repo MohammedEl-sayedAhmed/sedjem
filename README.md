@@ -55,6 +55,10 @@ recording on your machine unless you choose a hosted service.
 - Uses a graphics card when one works: Cohere through Vulkan on any GPU, Whisper through CUDA on
   NVIDIA cards. Without one it runs on the processor.
 - Shows the transcript as it is written, with the time left, and can be cancelled at any time.
+- Takes a YouTube link to a video or a playlist: each video is downloaded (up to 720p, to play beside
+  its transcript) and transcribed, or takes the captions people made for it. A playlist becomes a
+  course, saved as files to paste into a chat assistant for study notes. Downloading is for personal
+  use, within YouTube's terms.
 
 ### Read, correct and export
 
@@ -84,8 +88,8 @@ recording on your machine unless you choose a hosted service.
   evidence, size, licence and graphics cards for each.
 - Settings has tabs for Models, Add models, Hosted services, Speed and About.
 - Downloads resume if the connection drops and are checked against pinned checksums.
-- Has a dark theme, and contacts nothing on the internet except the model downloads and the hosted
-  services you choose.
+- Has a dark theme, and contacts nothing on the internet except the model downloads, YouTube for the
+  links you add, and the hosted services you choose.
 
 ## Models
 

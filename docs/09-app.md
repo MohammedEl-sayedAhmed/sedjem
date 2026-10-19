@@ -90,6 +90,75 @@ made before this was added show fewer details. In the text, subtitle and Markdow
 that is mostly Arabic starts with a right-to-left mark, so players and editors show it right to
 left even when it begins with an English word.
 
+## YouTube videos and courses
+
+On the new transcription page, *YouTube link* next to the file picker takes a link to a video or a
+playlist. *Check* reads it and shows the title, the uploader, the number of videos, their total length,
+and which of them have captions made by people. A playlist lists its videos in order, and any of them can
+be left out; private, deleted and live videos are listed but can't be picked. The model and the options
+are chosen as for a file, and *Start* adds one transcription per video, named after the video.
+
+Each video is downloaded first, one at a time in playlist order, and is then prepared and transcribed
+like any recording. The downloading stage shows its progress and can be cancelled, and a download that
+fails says why and can be tried again from its page. The app takes the best H.264 video stream up to 720
+pixels high and the best AAC sound, and joins them into one MP4 file with PyAV without re-encoding them,
+so the video can play next to its transcript. No ffmpeg program is needed. When YouTube has no such pair,
+the app takes a single MP4 file that has both. When a video has no H.264 version at all, only its sound is
+downloaded and its page says so.
+
+### Captions made by people
+
+When a video has captions made by people in its own language, Arabic or English, they become its
+transcript and no model runs. The transcript is marked "YouTube captions (made by people)", has one
+speaker, and has the caption cues joined into lines of about a sentence. YouTube's automatic captions are
+never used. Captions in another language than the video's are a translation, so the model transcribes
+that video instead. When YouTube doesn't know a video's language, Arabic or English captions are taken,
+the language chosen in the options first. Using captions can be turned off for a link, and every other
+video goes to the chosen model, with speaker labels as usual. A captions transcript can be edited and run
+again with a model like any other.
+
+### Courses and the courses folder
+
+A playlist becomes a course. The sidebar shows it once, with how many of its lectures are done and the
+lectures in order, and a lecture's page has its YouTube link, the lectures before and after it, and *Open
+course folder*.
+
+Each finished lecture is also saved as files, to read or to paste into a chat assistant such as Claude,
+ChatGPT or NotebookLM to make study notes; the app itself doesn't summarise. The files go in `courses/`,
+next to `app_data/` and `models/` in the data folder: the project folder when run from source (git ignores
+`courses/`), and `~/.local/share/sedjem` or `%LOCALAPPDATA%\Sedjem` in the desktop build. `courses` under
+`[storage]` in the config moves it.
+
+```
+courses/
+  Python for beginners/        one folder per playlist, named after it
+    01 - Introduction.md       the lecture's title, link and transcript with its times
+    01 - Introduction.srt      the same as subtitles
+    02 - Variables.md
+    ...
+    course.md                  all finished lectures in playlist order, as plain text
+  Videos/
+    A talk [jNQXAC9IVRw].md    a video added on its own, with its id
+```
+
+`course.md` has a short heading for each lecture, its length and link, and then its text in paragraphs,
+each starting with its time. Speaker names are written when a transcript has more than one speaker or a
+speaker has a name. The files are written again when a lecture's transcript, title or speaker names
+change, and a lecture whose transcriptions are all deleted loses its files. When a video was transcribed
+more than once, the files follow the transcription that finished last. Titles are made safe for file
+names on every system, and nothing is written outside the courses folder.
+
+### The JavaScript runtime
+
+YouTube hides the addresses of its streams behind a small JavaScript challenge, which yt-dlp answers with
+its yt-dlp-ejs scripts in a JavaScript runtime. The app uses Deno, Node.js 22 or later, or QuickJS when
+one is installed. When none is found, the YouTube panel says so and offers to download Deno, pinned by
+size and checksum like the models (about 40 MB, unpacked under `models/deno/`); *Settings → Models* lists
+it too. Without a runtime yt-dlp still gets many videos, but YouTube may hold some formats back.
+
+Downloading from YouTube is meant for personal use, and keeping to YouTube's terms of service and the
+rights of the people who made the videos is up to you.
+
 ## Version history
 
 Every transcript keeps its versions, as version control does. Version 0 is what the model wrote and
@@ -488,6 +557,11 @@ the voiceprint step with a stand-in model process).
 - With local models, nothing leaves the computer.
 - Checking or adding a model from Hugging Face asks huggingface.co for that model's details and
   files, and nothing else.
+- Checking or adding a YouTube link asks YouTube, through yt-dlp, for that video or playlist and its
+  streams and captions, and nothing else. A link is rebuilt from the video or playlist id before it is
+  read, and only YouTube's own pages are read. The videos and their transcripts stay on the computer;
+  with a hosted model, the sound of each video without captions is uploaded after the same
+  confirmation as a recording.
 - With hosted models, the recording is uploaded only when you pick one and also tick "Upload this
   recording to …". The server checks this again, including for re-runs. Keys go only to their own
   service.
@@ -519,6 +593,8 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/downloads.py` | model downloads, resumable and checked against the pinned size and SHA-256 |
 | `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from voiceprints |
 | `app/hub.py` | models added from Hugging Face: links, the API, GGUF headers, conversion, `models.json` |
+| `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams, joining them into `video.mp4` with PyAV, captions made by people as transcripts |
+| `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/transcript.py` | lines from words, and the exports |
 | `app/compare.py` | transcriptions of one recording: grouping them, lining them up by time, and combining them into a new version |
@@ -543,6 +619,9 @@ Every change needs the header `X-Sedjem: 1`.
 | `POST /api/jobs/<id>/cancel`, `POST /api/jobs/<id>/rerun`, `DELETE /api/jobs/<id>` | |
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
+| `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
+| `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, …}` | one transcription per video (all of them without `entries`), queued in playlist order |
+| `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
 
 ## Limits
 

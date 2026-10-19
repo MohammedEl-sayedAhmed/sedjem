@@ -9,6 +9,7 @@ Two base folders:
 """
 import json
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -39,6 +40,12 @@ def home_dir():
         except OSError:
             return base / old  # in use or not allowed: keep using the old folder
     return base / name
+
+
+def arch():
+    """The processor family, as the config's download lists name it: "x86_64" or "arm64"."""
+    machine = platform.machine().lower()
+    return {"amd64": "x86_64", "x64": "x86_64", "aarch64": "arm64", "armv8": "arm64"}.get(machine, machine)
 
 
 def replace_file(src, dst, tries=40):
@@ -87,6 +94,7 @@ class Config:
         self.local = data["local"]
         self.keep_original = data["storage"].get("keep_original", False)
         self.max_upload = int(data["storage"].get("max_upload_gb", 4) * 1024 ** 3)
+        self.courses = self.path(data["storage"].get("courses", "courses"))  # transcripts of YouTube links (app/courses.py)
         self.models = {m["id"]: m for m in data["models"] if not m.get("disabled")}
         # Models added from Hugging Face in the app (app/hub.py); they never replace a model of the config.
         self.added_models_path = self.storage / "models.json"
@@ -207,6 +215,9 @@ class Config:
         cuda = [f for f in self.local.get("cuda_files", []) if f.get("platform") == platform]
         if cuda:
             items["cuda"] = {"title": "NVIDIA GPU libraries (for Whisper)", "files": cuda}
+        deno = [f for f in self.local.get("deno_files", []) if f.get("platform") == platform and f.get("arch") == arch()]
+        if deno:
+            items["deno"] = {"title": "Deno (for YouTube links)", "files": deno[:1]}
         return items
 
     def cuda_dir(self):
