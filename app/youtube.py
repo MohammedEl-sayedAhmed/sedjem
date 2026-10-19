@@ -113,6 +113,9 @@ def clean_error(e):
     msg = re.sub(r"\x1b\[[0-9;]*m", "", str(getattr(e, "msg", None) or e)).strip()
     msg = re.sub(r"^(ERROR:\s*)?(\[[\w:]+\]\s*)?([\w-]{6,}:\s+)?", "", msg)
     msg = re.split(r"\.?\s+(Use --|See https://github\.com/yt-dlp)", msg)[0].strip()
+    msg = re.sub(r"\s*\(caused by <.*>\)$", "", msg)
+    if re.search(r"HTTP Error (400|404)\b|does not exist", msg):  # often a link pasted only in part
+        return "YouTube doesn't know this video or playlist; check that the whole link was pasted"
     return msg or type(e).__name__
 
 

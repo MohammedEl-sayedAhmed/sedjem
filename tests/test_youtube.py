@@ -78,6 +78,12 @@ class Links(unittest.TestCase):
         self.assertEqual(youtube.clean_error(Exception("ERROR: [youtube] abcdefghijk: Sign in to confirm you're not a bot. "
                                                        "Use --cookies-from-browser or --cookies for the authentication.")),
                          "Sign in to confirm you're not a bot")
+        # a playlist id pasted only in part: YouTube answers 400, which says nothing to a reader
+        unknown = "YouTube doesn't know this video or playlist; check that the whole link was pasted"
+        self.assertEqual(youtube.clean_error(Exception(
+            "ERROR: [youtube:tab] PLvLvlVqNQGHDNUshN7VL: Unable to download API page: HTTP Error 400: Bad Request "
+            "(caused by <HTTPError 400: Bad Request>)")), unknown)
+        self.assertEqual(youtube.clean_error(Exception("ERROR: [youtube:tab] PLabcdefgh: The playlist does not exist.")), unknown)
 
 
 class Formats(unittest.TestCase):
