@@ -205,7 +205,11 @@ async function cancelDownload(id) {
 }
 function refreshDownloadViews() {
   if (S.route.name === "new") renderModelGrid();
-  if ($("#settings").open) renderSettings();
+  // A redraw rebuilds Settings and would wipe what is being typed there (a key, a link); the progress
+  // shows at the next status check after the field is left.
+  const typing = document.activeElement?.closest("#settings")
+    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea");
+  if ($("#settings").open && !typing) renderSettings();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1571,8 +1575,11 @@ function renderSettings(focus) {
     `<button type="button" role="tab" id="tab-${t}" data-set-tab="${t}" aria-selected="${SET.tab === t}" aria-controls="set-panel" tabindex="${SET.tab === t ? 0 : -1}">
       ${ICON[icon]}<span>${label}</span>${counts[t] ? `<small>${counts[t]}</small>` : ""}</button>`).join("")}</nav>`;
   const panel = { models: modelsPanel, add: addPanel, hosted: hostedPanel, speed: speedPanel, about: aboutPanel }[SET.tab](items, hosted);
+  // Redrawing the same tab (download progress every 1.5 s, a row opened) keeps the panel where it was scrolled
+  const old = $("#set-panel"), top = old?.getAttribute("aria-labelledby") === `tab-${SET.tab}` ? old.scrollTop : 0;
   $("#settingsBody").innerHTML = `<div class="set-layout">${nav}
     <div class="set-panel" id="set-panel" role="tabpanel" aria-labelledby="tab-${SET.tab}">${panel}</div></div>`;
+  if (top) $("#set-panel").scrollTop = top;
   bindSettings(focus);
 }
 
