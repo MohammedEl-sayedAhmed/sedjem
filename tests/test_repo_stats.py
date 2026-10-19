@@ -1,11 +1,16 @@
 """Tests for the repository statistics (.github/scripts/repo_stats.py): the daily history grows past
 GitHub's 14 days, a day reported again replaces the old numbers, snapshots keep one set of rows a day,
 the checksum list isn't counted as a download, the badges and summary show the totals, and a run without
-access to the traffic keeps the old traffic files and says so. Offline: the GitHub calls are replaced.
+access to the traffic keeps the old traffic files and says so. The workflow never clones the repository (a
+clone would count itself) and the script needs only the standard library; the README's badges read the files
+the script writes. Offline: the GitHub calls are replaced.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
+import ast
 import importlib.util
 import json
+import re
+import sys
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -123,6 +128,32 @@ class Fetch(unittest.TestCase):
             got = stats.fetch(REPO, "actions-token", None)
         self.assertIsNone(got["clones"])
         self.assertIn("STATS_TOKEN", out.call_args[0][0])
+
+
+class Wiring(unittest.TestCase):
+    def test_the_workflow_never_clones_and_runs_this_script(self):
+        flow = (ROOT / ".github" / "workflows" / "stats.yml").read_text(encoding="utf-8")
+        self.assertNotIn("actions/checkout", flow)
+        self.assertNotRegex(flow, r"\bgit (clone|fetch|pull)\b")
+        fetched = re.search(r"contents/(\S+?)\?ref=", flow).group(1)
+        self.assertEqual(fetched, ".github/scripts/repo_stats.py")
+        self.assertTrue((ROOT / fetched).is_file())
+        self.assertIn("secrets.STATS_TOKEN", flow)
+        self.assertIn("contents: write", flow)
+
+    def test_the_script_needs_only_the_standard_library(self):
+        tree = ast.parse((ROOT / ".github" / "scripts" / "repo_stats.py").read_text(encoding="utf-8"))
+        names = {a.name.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.Import) for a in n.names}
+        names |= {n.module.split(".")[0] for n in ast.walk(tree) if isinstance(n, ast.ImportFrom) and n.module}
+        self.assertEqual(names - set(sys.stdlib_module_names), set(), "the runner has no packages installed")
+
+    def test_the_readme_badges_read_the_files_the_script_writes(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        for name in ("downloads", "clones"):
+            path = f"badges/{name}.json"
+            self.assertIn(path, stats.FILES)
+            self.assertIn(f"%2F{stats.BRANCH}%2F{path.replace('/', '%2F')}", readme, f"the {name} badge")
+        self.assertIn(f"/tree/{stats.BRANCH}#readme", readme, "the badges link to the summary")
 
 
 if __name__ == "__main__":

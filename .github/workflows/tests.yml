@@ -1,0 +1,50 @@
+# The test suite on Linux and Windows, for every push to main and every pull request. The Desktop build
+# workflow runs the same tests before building, but only by hand or for a version tag; this catches
+# problems when they are made, not on release day.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            requirements-desktop.txt
+            requirements-dev.txt
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -r requirements-desktop.txt -r requirements-dev.txt
+
+      - name: Tests (the hosted services are local stand-ins; no models needed)
+        run: python -m unittest discover -s tests -v
+        env:
+          # the browser tests (tests/test_ui*.py) run in the runner's Chrome; fail rather than skip without it
+          SEDJEM_UI_REQUIRED: "1"
