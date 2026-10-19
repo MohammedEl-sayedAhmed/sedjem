@@ -1,4 +1,5 @@
 faster-whisper==1.2.1
+av>=11,<19  # faster-whisper 1.2.1 opens audio with metadata_errors=, which PyAV 19 removed
 sherpa-onnx==1.13.8
 transcribe-cpp==0.2.3
 jiwer==4.0.0
