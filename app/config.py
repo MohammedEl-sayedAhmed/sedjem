@@ -119,7 +119,8 @@ class Config:
 
     # Settings changed in the app (Settings → Speed) are saved to <storage>/settings.json and win over
     # the same keys in [local].
-    SETTINGS = {"performance_while_running": False, "device": "auto", "threads": 10}
+    SETTINGS = {"performance_while_running": False, "device": "auto", "threads": 10,
+                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": []}  # assistants (app/assistants.py)
 
     def saved_settings(self):
         return _read_json(self.settings_path)
@@ -140,6 +141,12 @@ class Config:
             if key == "threads" and isinstance(value, int) and not isinstance(value, bool) \
                     and 1 <= value <= max(1, os.cpu_count() or 1):
                 continue
+            if key in ("mcp_courses", "mcp_recordings") and isinstance(value, bool):
+                continue
+            if key == "mcp_hidden":
+                from .assistants import check_hidden  # (it imports this module)
+                if check_hidden(value):
+                    continue
             raise ValueError(f"bad value for {key}: {value!r}")
         saved = {**self.saved_settings(), **values}
         self.storage.mkdir(parents=True, exist_ok=True)

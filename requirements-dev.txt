@@ -1,3 +1,5 @@
 # For the tests only (not needed to run Sedjem): the browser tests in tests/test_ui*.py drive Chromium
 # with Playwright. They use the installed Chrome or Edge, or run `playwright install chromium` first.
 playwright==1.63.0
+# The MCP server (app/mcp.py) is tested with the official MCP SDK as its client; the app itself does not use it.
+mcp==2.3.0
