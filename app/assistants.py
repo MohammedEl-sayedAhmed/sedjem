@@ -50,7 +50,8 @@ def visible(cfg, job, settings=None):
     s = settings if settings is not None else cfg.settings()
     if not s["mcp_courses" if kind(job) == "course" else "mcp_recordings"]:
         return False
-    hidden = set(s.get("mcp_hidden") or ())
+    hidden = s.get("mcp_hidden")
+    hidden = {k for k in hidden if isinstance(k, str)} if isinstance(hidden, list) else set()  # a hand edit can break it
     return not any(k in hidden for k in keys(job))
 
 

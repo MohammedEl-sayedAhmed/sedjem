@@ -19,10 +19,12 @@ Local models that aren't on the computer yet can be downloaded from the app, fro
 or from *Settings → Models*. Downloads resume after a dropped connection and are checked against a
 pinned checksum.
 
-*Settings* has five tabs. *Models* lists the models on the computer, with their downloads and
+*Settings* has six tabs. *Models* lists the models on the computer, with their downloads and
 removal. *Add models* has two views: *Recommended* and *From Hugging Face*. *Hosted services* holds
-the API keys, *Speed* the graphics card, power mode and processor threads, and *About* the version,
-the licence and the folder where the app keeps its data.
+the API keys, *Speed* the graphics card, power mode and processor threads, *Assistants* what
+assistants connected over MCP may see, how to connect them and what they asked
+([assistants](11-assistants.md)), and *About* the version, the licence and the folder where the app
+keeps its data.
 
 Each model or service in *Models*, *Recommended* and *Hosted services* has a line of key facts under
 its name: who made it, the engine, the licence and which graphics cards it can use, or for a service
@@ -124,7 +126,8 @@ lectures in order, and a lecture's page has its YouTube link, the lectures befor
 course folder*.
 
 Each finished lecture is also saved as files, to read or to paste into a chat assistant such as Claude,
-ChatGPT or NotebookLM to make study notes; the app itself doesn't summarise. The files go in `courses/`,
+ChatGPT or NotebookLM to make study notes; the app itself doesn't summarise. An assistant connected over
+MCP reads the same text without any copying ([assistants](11-assistants.md)). The files go in `courses/`,
 next to `app_data/` and `models/` in the data folder: the project folder when run from source (git ignores
 `courses/`), and `~/.local/share/sedjem` or `%LOCALAPPDATA%\Sedjem` in the desktop build. `courses` under
 `[storage]` in the config moves it.
@@ -565,6 +568,9 @@ the voiceprint step with a stand-in model process).
 - With hosted models, the recording is uploaded only when you pick one and also tick "Upload this
   recording to …". The server checks this again, including for re-runs. Keys go only to their own
   service.
+- An assistant connected over MCP reads the transcripts that *Settings → Assistants* lets it see, and
+  what it reads goes to the assistant's model, usually on its maker's servers. It never gets the
+  audio, the keys or the settings ([assistants](11-assistants.md)).
 - Everything the app stores (audio, transcripts, logs, keys) is in `app_data/`, which git ignores.
   Deleting a transcription in the app removes its folder, and deleting `app_data/` removes
   everything.

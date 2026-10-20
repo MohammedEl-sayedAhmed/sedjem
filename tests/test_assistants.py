@@ -61,6 +61,12 @@ class Visibility(unittest.TestCase):
         assistants.set_hidden(self.cfg, "course:PLcourse", True)
         self.assertEqual(self.cfg.setting("mcp_hidden"), ["course:PLcourse"])
 
+    def test_a_broken_hidden_setting_hides_nothing_instead_of_failing(self):
+        for broken in (7, "job:x", {"job": 1}, [None, 3]):
+            self.cfg.settings_path.parent.mkdir(parents=True, exist_ok=True)
+            self.cfg.settings_path.write_text(json.dumps({"mcp_hidden": broken}), encoding="utf-8")
+            self.assertEqual(self.seen(), ["Sprint planning", "Intro", "A talk"], broken)
+
     def test_one_settings_read_for_many_jobs(self):
         s = self.cfg.settings()
         with mock.patch.object(self.cfg, "settings", side_effect=AssertionError("read again")):
@@ -77,6 +83,15 @@ class Visibility(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.cfg.save_settings(**{key: "yes"})
         self.assertEqual(self.cfg.settings()["mcp_hidden"], [])
+
+    def test_an_entry_changed_by_hand_does_not_block_hiding(self):
+        for bad in (["job:../../etc", 5, f"job:{MEETING['id']}"], "job:x", 7):
+            saved = json.loads(self.cfg.settings_path.read_text(encoding="utf-8")) if self.cfg.settings_path.exists() else {}
+            self.cfg.settings_path.parent.mkdir(parents=True, exist_ok=True)
+            self.cfg.settings_path.write_text(json.dumps({**saved, "mcp_hidden": bad}), encoding="utf-8")
+            assistants.set_hidden(self.cfg, "course:PLcourse", True)
+            kept = [f"job:{MEETING['id']}"] if isinstance(bad, list) else []
+            self.assertEqual(self.cfg.setting("mcp_hidden"), kept + ["course:PLcourse"], bad)
 
 
 class Log(unittest.TestCase):
