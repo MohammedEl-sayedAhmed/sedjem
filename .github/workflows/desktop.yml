@@ -104,6 +104,85 @@ jobs:
           $env:SEDJEM_VERSION = "${{ steps.version.outputs.version }}"
           & $iscc desktop\installer.iss
 
+      - name: Installer update mode (Windows)
+        # The installer into a temporary folder, then again over itself the way Sedjem's own updates run it. The
+        # update must replace the program (leaving none of the old files), keep the data folder, start the new
+        # Sedjem from the installed folder, and leave an uninstaller that works.
+        if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
+        timeout-minutes: 15
+        shell: pwsh
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          $setup = (Resolve-Path "dist\Sedjem-${env:VERSION}-setup.exe").Path
+          $dir = Join-Path $env:RUNNER_TEMP "Sedjem install"
+          $exe = Join-Path $dir "Sedjem.exe"
+          $data = Join-Path $env:LOCALAPPDATA "Sedjem"
+          $portFile = Join-Path $data "app_data\port"
+          $entry = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3C2E9A-4B71-4D5C-9A2E-8B1F0C7D3E45}_is1"
+          function Invoke-Setup([string]$file, [string[]]$arguments) {
+            # not Start-Process -Wait, which would also wait for the Sedjem that setup starts
+            $p = Start-Process -FilePath $file -ArgumentList $arguments -PassThru
+            $null = $p.Handle  # keeps the exit code readable once it has exited
+            $p.WaitForExit()
+            if ($p.ExitCode -ne 0) { throw "$file $arguments exited with $($p.ExitCode)" }
+          }
+          function Get-Installed { Get-Process -Name Sedjem -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }
+
+          # the data folder, which neither the update nor the uninstaller may touch
+          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          Set-Content -Path (Join-Path $data "keep.txt") -Value "kept"
+          Remove-Item -Force -ErrorAction SilentlyContinue $portFile
+
+          "1. A silent installation into $dir"
+          Invoke-Setup $setup @("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=`"$dir`"")
+          if (-not (Test-Path $exe)) { throw "no Sedjem.exe after the installation" }
+          Start-Sleep -Seconds 3
+          if (@(Get-Installed).Count -gt 0) { throw "a silent installation without /UPDATE=1 started Sedjem" }
+          Set-Content -Path (Join-Path $dir "_internal\left-by-the-old-version.txt") -Value "old"
+
+          "2. The update, as Sedjem runs it (no /DIR: setup finds the installation itself)"
+          Invoke-Setup $setup @("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/UPDATE=1")
+          if (Test-Path (Join-Path $dir "_internal\left-by-the-old-version.txt")) { throw "the old version's files were left" }
+          $stamp = Get-Content -Raw (Join-Path $dir "_internal\app\_build.json") | ConvertFrom-Json
+          if ($stamp.version -ne $env:VERSION) { throw "the installed build says $($stamp.version), not $env:VERSION" }
+          if ((Get-ItemProperty -Path $entry).DisplayVersion -ne $env:VERSION) { throw "the uninstall entry doesn't say $env:VERSION" }
+          if ((Get-Content -Raw (Join-Path $data "keep.txt")).Trim() -ne "kept") { throw "the data folder was changed" }
+
+          "3. The new Sedjem started from $dir"
+          $url = $null
+          foreach ($i in 1..120) {
+            try {  # the port file may not be there yet, or be half written
+              $port = "$(Get-Content -Raw -ErrorAction Stop $portFile)".Trim()
+              $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" -TimeoutSec 5
+              if ($status.app -eq "sedjem") { $url = "http://127.0.0.1:$port"; break }
+            } catch { }
+            Start-Sleep -Seconds 1
+          }
+          if (-not $url) {
+            $log = Join-Path $data "app_data\sedjem.log"
+            if (Test-Path $log) { Get-Content $log -Tail 40 }
+            throw "Sedjem didn't start after the update: nothing answered at the port in $portFile"
+          }
+          $running = @(Get-Installed)
+          if ($running.Count -eq 0) { throw "what answers at $url is not $exe" }
+          "Sedjem $($status.version) answered at $url (process $($running.Id -join ', '))"
+          Invoke-RestMethod -Method Post "$url/api/quit" -Headers @{ "X-Sedjem" = "1" } | Out-Null
+          foreach ($p in $running) {
+            if (-not $p.WaitForExit(30000)) {
+              "::warning::Sedjem was still running 30 s after /api/quit; stopping it"
+              Stop-Process -Id $p.Id -Force
+            }
+          }
+
+          "4. The uninstaller"
+          Invoke-Setup (Join-Path $dir "unins000.exe") @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
+          foreach ($i in 1..60) { if (-not (Test-Path $exe) -and -not (Test-Path $entry)) { break }; Start-Sleep -Seconds 1 }
+          if (Test-Path $exe) { throw "the uninstaller left Sedjem.exe" }
+          if (Test-Path $entry) { throw "the uninstaller left the entry in Installed apps" }
+          if (-not (Test-Path (Join-Path $data "keep.txt"))) { throw "the uninstaller removed the data folder" }
+          "The update installed $env:VERSION over itself, kept the data and started Sedjem; the uninstaller works"
+
       - name: Self-test reports
         if: always()
         run: cat selftest-*.json || true
