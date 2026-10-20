@@ -1,6 +1,7 @@
 # Repository statistics: release downloads, clones, page views, referrers, stars and forks, added each day to
-# the history on the `stats` branch by .github/scripts/repo_stats.py (its docstring explains the files and
-# tokens). Runs daily and by hand (Actions → Repository stats → Run workflow, or `gh workflow run stats.yml`).
+# the history on the `stats` branch by .github/scripts/repo_stats.py, which also redraws the charts of them
+# that the README shows (its docstring explains the files and tokens). Runs daily and by hand (Actions →
+# Repository stats → Run workflow, or `gh workflow run stats.yml`).
 #
 # The job doesn't check out the repository: GitHub counts a checkout as a clone, which would add one a day.
 # It fetches the script and writes the branch through the API instead.
