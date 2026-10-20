@@ -9,6 +9,7 @@ import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
@@ -83,6 +84,28 @@ class DownloadTests(unittest.TestCase):
                 return dl.jobs[item_id]
             time.sleep(0.05)
         self.fail(f"download still {dl.jobs.get(item_id)}")
+
+    def test_a_download_that_ends_while_its_status_is_read_is_never_done_without_its_files(self):
+        # the worker puts the files in place and says "done" after; the status reads the state first, so it may
+        # say "downloading" with the files there, but never "done" without them
+        f = self.item()
+        dl = Downloads(self.cfg)
+        dl.jobs["t"] = {"state": "downloading", "done": 0, "total": f["size"], "error": None}
+        real = dl.installed
+
+        def ends_now(file):  # the download ends while its files are looked at
+            seen = real(file)
+            target = self.home / f["path"]
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_bytes(PAYLOAD)
+            dl.jobs["t"]["state"] = "done"
+            return seen
+
+        with mock.patch.object(dl, "installed", side_effect=ends_now):
+            st = dl.status("t")
+        self.assertEqual((st["state"], st["installed"]), ("downloading", False))
+        st = dl.status("t")
+        self.assertEqual((st["state"], st["installed"]), ("done", True))
 
     def test_download_and_verify(self):
         self.item()

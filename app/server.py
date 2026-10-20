@@ -114,10 +114,13 @@ class App:
         return {"rtf": rtf, "measured": False, "runs_on": where}
 
     def model_info(self, model, jobs=None):
+        # the download before the files (Downloads.status says why): a download that ends meanwhile shows as
+        # still running, never as done with the model not ready, which left its card greyed out until the next check
+        items = self.cfg.download_items()
+        download = self.downloads.status(model["id"]) if model["id"] in items else None
         ready, reason = self.cfg.availability(model)
         keys = ("id", "kind", "engine", "title", "tagline", "facts", "service", "key_url", "rtf", "rtf_gpu", "prompt", "hub",
                 "privacy", "prompt_hint", "speakers_hint", "maker")
-        items = self.cfg.download_items()
         if model["kind"] == "local":  # for the details in Settings
             try:
                 file = (model.get("hub") or {}).get("file") or report.model_file(self.cfg, model) \
@@ -131,7 +134,7 @@ class App:
         return {**{k: model.get(k) for k in keys}, "about": extra, "ready": ready, "reason": reason,
                 "speed": self.speed(model, self.store.list() if jobs is None else jobs) if model["kind"] == "local" else None,
                 "key_source": self.cfg.key_source(model) if model["kind"] == "hosted" else None,
-                "download": self.downloads.status(model["id"]) if model["id"] in items else None,
+                "download": download,
                 "region": self.cfg.region(model) if "region" in model else None}
 
     def used_bytes(self):

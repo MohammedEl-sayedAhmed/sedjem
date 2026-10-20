@@ -56,9 +56,11 @@ class Downloads:
 
     def status(self, item_id):
         item = self.cfg.download_items()[item_id]
+        # the state before the files: a download puts its files in place and says "done" after, so one that
+        # ends meanwhile shows as still running, never as done with its files missing
+        job = dict(self.jobs.get(item_id) or {})
         files, converted = item["files"], self.converted(item)
         missing = [] if converted else [f for f in files if not self.installed(f)]
-        job = dict(self.jobs.get(item_id) or {})
         partial = sum(self.part_size(f) for f in missing)
         if converted:
             on_disk = sum(p.stat().st_size for p in converted.iterdir() if p.is_file())

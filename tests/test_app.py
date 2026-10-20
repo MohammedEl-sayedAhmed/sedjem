@@ -18,6 +18,7 @@ import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from unittest import mock
 
 import numpy as np
 import soundfile as sf
@@ -346,6 +347,33 @@ class Api(unittest.TestCase):
         r = self.wait(job["id"], timeout=600)
         self.assertEqual(r["job"]["status"], "done", r.get("log"))
         self.assertTrue(r["lines"] and r["lines"][0]["text"])
+
+
+class StatusSnapshot(unittest.TestCase):
+    """A model's download is read before its files: a download that ends meanwhile shows as still running (and
+    the page keeps checking), never as done with the model not ready, which left its card greyed out until the
+    next check, 20 s later. (A browser test waiting for the card after Download failed in CI this way.)"""
+
+    def test_a_download_that_ends_meanwhile_is_never_done_with_the_model_not_ready(self):
+        home = Path(tempfile.mkdtemp(prefix="sedjem-snapshot-"))
+        server, app = make_server(Config(home=home), port=0)
+        try:
+            items = app.cfg.download_items()
+            model = next(m for m in app.cfg.models.values() if m["kind"] == "local" and m["id"] in items)
+            app.downloads.jobs[model["id"]] = {"state": "downloading", "done": 0, "total": 1, "error": None}
+            real = app.cfg.availability
+
+            def ends_now(m):  # the download ends while the model's files are looked at
+                seen = real(m)
+                app.downloads.jobs[model["id"]]["state"] = "done"
+                return seen
+
+            with mock.patch.object(app.cfg, "availability", side_effect=ends_now):
+                info = app.model_info(model)
+            self.assertEqual((info["download"]["state"], info["ready"]), ("downloading", False))
+        finally:
+            server.server_close()
+            shutil.rmtree(home, ignore_errors=True)
 
 
 class Backlog(unittest.TestCase):

@@ -2195,13 +2195,18 @@ async function refreshStatus() {
   try { S.status = await api.get("/api/status"); renderTop(); updStatus(); } catch (e) { /* server restarting */ }
 }
 
+// What the model cards and Settings show of each model: whether it is ready, and how its download stands
+const modelsShown = () => JSON.stringify((S.status?.models || []).map((m) => [m.id, m.ready, m.download?.state, m.download?.installed]));
+
 let statusTimer = null;
 function scheduleStatus() {
   clearTimeout(statusTimer);
   statusTimer = setTimeout(async () => {
-    const was = downloading();
+    const was = downloading(), before = modelsShown();
     await refreshStatus();
-    if (was || downloading()) refreshDownloadViews();
+    // drawn again while a download runs, and whenever a model changed between two checks (a download that
+    // started and ended in another window, say)
+    if (was || downloading() || modelsShown() !== before) refreshDownloadViews();
     if (was && !downloading() && S.route.name === "new") renderNew();
     scheduleStatus();
   }, downloading() ? 1500 : 20000);
