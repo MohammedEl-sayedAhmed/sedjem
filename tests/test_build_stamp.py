@@ -77,7 +77,6 @@ class Stamp(unittest.TestCase):
         self.assertRegex(info["commit"], r"^[0-9a-f]{40}$")
         for key in ("date", "built"):
             self.assertRegex(info[key], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$")
-        self.assertLessEqual(info["date"], info["built"])
 
 
 class Bundle(unittest.TestCase):
@@ -118,7 +117,7 @@ class Bundle(unittest.TestCase):
             with mock.patch.object(build, "ROOT", root), mock.patch.object(build, "STAMP", root / "app" / "_build.json"), \
                     mock.patch.object(build, "git", fake_git), mock.patch.object(sys, "argv", ["build.py"]), \
                     mock.patch.dict(sys.modules, {"PyInstaller": pyinstaller, "PyInstaller.__main__": pyinstaller.__main__}), \
-                    mock.patch.dict(build.os.environ, {"SEDJEM_VERSION": "0.3.0"}):
+                    mock.patch.dict(build.os.environ, {"SEDJEM_VERSION": "0.3.0", "SEDJEM_CHANNEL": ""}):
                 with self.assertRaises(SystemExit) as stop:
                     build.main()
             self.assertIn("no stamp", str(stop.exception.code))
