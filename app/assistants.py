@@ -150,7 +150,7 @@ def console_python(exe):
     path = Path(exe)
     if path.name.lower() == "pythonw.exe" and (path.parent / "python.exe").is_file():
         return str(path.parent / "python.exe")
-    return str(path)
+    return exe  # as given (Path would turn its slashes around on Windows)
 
 
 def snippets(cfg, name="sedjem"):
