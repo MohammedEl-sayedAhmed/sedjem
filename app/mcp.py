@@ -1024,10 +1024,15 @@ class Server:
         """One line from the client (bytes) → the line to answer with (bytes, without the newline) or None."""
         try:
             message = json.loads(line)
-        except ValueError:  # also bytes that aren't UTF-8
+        except (ValueError, RecursionError):  # also bytes that aren't UTF-8, and [[[[... too deep to read
             return encode(error(None, PARSE_ERROR, "Parse error"))
         answer = self.handle(message)
-        return None if answer is None else encode(answer)
+        try:
+            return None if answer is None else encode(answer)
+        except (TypeError, ValueError):  # a bug: an answer that isn't JSON fails that request, not the server
+            say(traceback.format_exc())
+            rid = message.get("id") if isinstance(message, dict) and good_id(message.get("id")) else None
+            return encode(error(rid, INTERNAL_ERROR, "Internal error"))
 
     def handle(self, message):
         if isinstance(message, list):  # a batch (2025-03-26): the answers in one array

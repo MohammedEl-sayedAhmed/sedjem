@@ -205,6 +205,7 @@ class Protocol(Case):
         handle = self.server.handle_line
         self.assertEqual(json.loads(handle(b"{not json")), {"jsonrpc": "2.0", "id": None, "error": {"code": -32700, "message": "Parse error"}})
         self.assertEqual(json.loads(handle(b'{"a": "\xc3\x28"}'))["error"]["code"], -32700, "not UTF-8")
+        self.assertEqual(json.loads(handle(b"[" * 100_000))["error"]["code"], -32700, "too deep to read")
         for bad in ({"id": 1, "method": "ping"}, {"jsonrpc": "1.0", "id": 1, "method": "ping"}, {"jsonrpc": "2.0", "id": 1, "method": 5},
                     {"jsonrpc": "2.0", "id": None, "method": "ping"}, {"jsonrpc": "2.0", "id": True, "method": "ping"},
                     {"jsonrpc": "2.0", "id": 1.5, "method": "ping"}, "ping", 7):
@@ -224,6 +225,12 @@ class Protocol(Case):
             answer = self.modern("tools/call", {"name": "list_courses"})
         self.assertEqual(answer["error"], {"code": -32603, "message": "Internal error"}, "no details reach the client")
         self.assertIn("a bug", said.call_args.args[0], "they go to stderr")
+        with mock.patch.object(sedjem_mcp, "PROMPTS", [{"name": object()}]), mock.patch.object(sedjem_mcp, "say"):
+            line = self.server.handle_line(json.dumps({"jsonrpc": "2.0", "id": 7, "method": "ping"}).encode())
+            self.assertEqual(json.loads(line), {"jsonrpc": "2.0", "id": 7, "result": {}})
+            line = self.server.handle_line(json.dumps({"jsonrpc": "2.0", "id": 8, "method": "prompts/list", "params": {
+                "_meta": {sedjem_mcp.VERSION_KEY: "2026-07-28", sedjem_mcp.CAPABILITIES_KEY: {}}}}).encode())
+        self.assertEqual(json.loads(line)["error"], {"code": -32603, "message": "Internal error"}, "an answer that isn't JSON")
 
     def test_notifications_get_no_answer(self):
         for method in ("notifications/initialized", "notifications/cancelled", "notifications/whatever", "tools/list"):
