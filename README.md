@@ -2,11 +2,16 @@
 
 Updated on 2026-10-20 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="charts/activity-dark.svg">
+  <img src="charts/activity-light.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day">
+</picture>
+
 ## Totals
 
 | | |
 |---|---|
-| Downloads of the app, all releases | 12 |
+| Downloads of the app, all releases | 13 |
 | Clones since 2026-10-05 | 63 (35 unique per day, added up) |
 | Page views since 2026-10-05 | 85 (35 unique per day, added up) |
 | Stars, forks, watchers | 4, 0, 0 |
@@ -16,7 +21,7 @@ Updated on 2026-10-20 by the Repository stats workflow on main (`.github/workflo
 | Release | File | Downloads |
 |---|---|---|
 | v0.2.0 | Sedjem-0.2.0-linux-x64.tar.gz | 0 |
-| v0.2.0 | Sedjem-0.2.0-setup.exe | 0 |
+| v0.2.0 | Sedjem-0.2.0-setup.exe | 1 |
 | v0.2.0 | SHA256SUMS.txt | 0 |
 | v0.1.0 | Sedjem-0.1.0-linux-x64.tar.gz | 3 |
 | v0.1.0 | Sedjem-0.1.0-setup.exe | 9 |
@@ -56,4 +61,6 @@ A unique cloner or visitor is counted once a day, so someone who clones on three
 
 Clones include those by build machines: every run of the Desktop build workflow clones the repository. The stats workflow does not, so it adds nothing to the counts.
 
-The CSV files beside this summary hold every number by day. The download, referrer and repository tables are snapshots: one set of rows per day, with GitHub's running totals at the time.
+Stars and forks come from GitHub's lists of the current stargazers and forks, which give the day of each star and fork, so their history reaches back to the first star. A star that is taken back leaves the history altogether. stars.csv holds the running totals for each day on which they grew.
+
+The CSV files beside this summary hold every number by day. The download, referrer and repository tables are snapshots: one set of rows per day, with GitHub's running totals at the time. The charts are drawn from these files on every run, in a light and a dark version (charts/).
