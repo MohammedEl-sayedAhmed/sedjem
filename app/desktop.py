@@ -25,7 +25,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-from . import engines, report
+from . import engines, report, updates
 from . import transcript as T
 from . import history
 from .config import FROZEN, ROOT, Config
@@ -293,7 +293,8 @@ def main(argv=None):
     if sys.stderr is None:  # a windowed build has no console: keep messages in a log file
         cfg.storage.mkdir(parents=True, exist_ok=True)
         sys.stdout = sys.stderr = open(cfg.storage / "sedjem.log", "a", encoding="utf-8", buffering=1)
-    preferred = args.port or cfg.server["port"]
+    restarted = updates.restarted()  # started again by an update (app/updates.py): take the same port back
+    preferred = restarted or args.port or cfg.server["port"]
     running = running_port(cfg, preferred)
     if running:  # already running (e.g. started twice): just show it
         url = f"http://127.0.0.1:{running}/"
@@ -306,6 +307,7 @@ def main(argv=None):
     app.desktop = True
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     threading.Thread(target=server.serve_forever, daemon=True, name="sedjem-server").start()
+    app.updates.start()  # checks for updates in the background, if the user agreed to it
     port_file = cfg.storage / "port"  # so that starting it again finds this one, whichever port it has
     try:
         port_file.write_text(str(server.server_address[1]), encoding="utf-8")
@@ -331,7 +333,7 @@ def main(argv=None):
             if time.time() - t0 > 5:  # the window was closed by the user
                 return
             # the browser handed the window to an instance that was already running: wait for Quit
-        elif not webbrowser.open(url):
+        elif not (restarted or webbrowser.open(url)):  # after an update the open tab reloads itself
             show_address(url)
         print(f"Sedjem is running at {url} (close with Settings → Quit or Ctrl+C)", flush=True)
         app.on_quit = stopped.set
@@ -344,7 +346,8 @@ def main(argv=None):
         server.shutdown()
         server.server_close()
         try:
-            port_file.unlink(missing_ok=True)
+            if not app.restarting:  # after an update the new process has the same port and keeps the file
+                port_file.unlink(missing_ok=True)
         except OSError:
             pass
 
