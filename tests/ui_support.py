@@ -150,7 +150,16 @@ class UiTestCase(unittest.TestCase):
         self.page.set_default_timeout(10_000)
         self.errors = []
         self.page.on("pageerror", lambda e: self.errors.append(str(e)))
-        self.page.on("console", lambda m: m.type == "error" and self.errors.append(m.text))
+        self.page.on("console", lambda m: m.type == "error" and self.console_error(m.text))
+
+    def console_error(self, text):
+        """An error the page logged: it fails the test. Except one: Windows on a CI machine sometimes runs out of
+        socket buffers (WSAENOBUFS, which Chrome shows as net::ERR_NO_BUFFER_SPACE). That is the machine's trouble,
+        not the page's, so it is noted in the log instead; the app asks again, and the test's own checks still run."""
+        if "net::ERR_NO_BUFFER_SPACE" in text:
+            print(f"\n(the machine ran out of socket buffers: {text})", file=sys.stderr, flush=True)
+        else:
+            self.errors.append(text)
 
     def tearDown(self):
         self.context.close()

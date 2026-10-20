@@ -4,6 +4,7 @@ Run: .venv/bin/python -m unittest discover -s tests -p "test_ui*.py" -v
 """
 import os
 import unittest
+from unittest import mock
 
 from ui_support import LINES, UiTestCase
 
@@ -238,6 +239,21 @@ class SettingsDialog(UiTestCase):
         self.open()
         self.assertIn("GPU: Iris Xe", self.page.locator("#topStatus").inner_text())
 
+
+
+class PageErrors(unittest.TestCase):
+    """What the browser tests count as the page's errors (no browser needed)."""
+
+    def test_only_the_machine_running_out_of_socket_buffers_is_let_through(self):
+        page = type("Page", (), {"errors": []})()
+        for text in ("Failed to load resource: net::ERR_NO_BUFFER_SPACE",
+                     "Failed to load resource: the server responded with a status of 404 (Not Found)",
+                     "Failed to load resource: net::ERR_CONNECTION_REFUSED", "Uncaught TypeError: x is undefined"):
+            with mock.patch("sys.stderr"):
+                UiTestCase.console_error(page, text)
+        self.assertEqual(page.errors, ["Failed to load resource: the server responded with a status of 404 (Not Found)",
+                                       "Failed to load resource: net::ERR_CONNECTION_REFUSED",
+                                       "Uncaught TypeError: x is undefined"])
 
 if __name__ == "__main__":
     unittest.main()
