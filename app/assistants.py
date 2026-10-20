@@ -58,7 +58,9 @@ def set_hidden(cfg, key, hide):
     """Hide ("job:<id>" or "course:<playlist id>") from assistants, or show again; returns the settings."""
     if not HIDDEN_KEY.match(str(key or "")):
         raise ValueError(f"not a transcription or a course: {key!r}")
-    hidden = [k for k in cfg.setting("mcp_hidden") or [] if k != key]
+    saved = cfg.setting("mcp_hidden")
+    # entries that aren't valid (a settings.json edited by hand) are dropped, or no change could ever be saved
+    hidden = [k for k in saved if k != key and isinstance(k, str) and HIDDEN_KEY.match(k)] if isinstance(saved, list) else []
     if hide:
         hidden.append(key)
     return cfg.save_settings(mcp_hidden=hidden)

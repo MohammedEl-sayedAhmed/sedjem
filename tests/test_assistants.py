@@ -52,6 +52,15 @@ class Visibility(unittest.TestCase):
         self.assertEqual(self.seen(), ["Sprint planning", "A talk"])
         self.assertEqual(self.cfg.setting("mcp_hidden"), ["course:PLcourse"])
 
+    def test_a_bad_entry_saved_by_hand_does_not_block_changes(self):
+        self.cfg.settings_path.parent.mkdir(parents=True, exist_ok=True)
+        self.cfg.settings_path.write_text(json.dumps({"mcp_hidden": ["job:../x", 7, "course:PLcourse"]}), encoding="utf-8")
+        assistants.set_hidden(self.cfg, f"job:{MEETING['id']}", True)
+        self.assertEqual(self.cfg.setting("mcp_hidden"), ["course:PLcourse", f"job:{MEETING['id']}"])
+        self.cfg.settings_path.write_text(json.dumps({"mcp_hidden": "not a list"}), encoding="utf-8")
+        assistants.set_hidden(self.cfg, "course:PLcourse", True)
+        self.assertEqual(self.cfg.setting("mcp_hidden"), ["course:PLcourse"])
+
     def test_one_settings_read_for_many_jobs(self):
         s = self.cfg.settings()
         with mock.patch.object(self.cfg, "settings", side_effect=AssertionError("read again")):
