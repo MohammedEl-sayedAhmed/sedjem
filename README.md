@@ -197,14 +197,25 @@ The transcripts in the screenshots are made up, and so are the names.
 
 ### Windows
 
-There is no signed release yet. The installer (per user, no admin rights, 77 MB) is built by this
-repository's [Desktop build workflow](https://github.com/MohammedEl-sayedAhmed/sedjem/actions/workflows/desktop.yml):
-open the latest successful run and download `Sedjem-windows-setup`. GitHub asks you to sign in
-for this, and keeps each build for 7 days. Windows SmartScreen will warn about an unknown publisher;
-choose *More info*, then *Run anyway*. To build the installer yourself, see
+Download `Sedjem-<version>-setup.exe` from the [latest release](https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest).
+It installs for your user, without admin rights (about 80 MB). It isn't signed yet, so Windows
+SmartScreen warns about an unknown publisher; choose *More info*, then *Run anyway*.
+
+From source, install Python 3.12 and [Git](https://git-scm.com/), then in a terminal:
+
+```bat
+git clone https://github.com/MohammedEl-sayedAhmed/sedjem.git
+cd sedjem
+py -3.12 -m venv .venv
+.venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt
+app.cmd
+```
+
+`app.cmd` opens Sedjem in a window of its own (Edge WebView2), without a console. If nothing opens,
+`.venv\Scripts\python -m app.desktop` shows why. To build the installer yourself, see
 [the desktop notes](docs/10-desktop.md#build-it).
 
-### Linux, or from source
+### Linux
 
 You need Python 3.12 and [uv](https://docs.astral.sh/uv/).
 
@@ -217,7 +228,8 @@ VIRTUAL_ENV=.venv uv pip install -r requirements.txt
 ./app.sh --desktop    # or in a window of its own
 ```
 
-On Windows, run `app.cmd` after the setup in [the desktop notes](docs/10-desktop.md#run-it).
+The [latest release](https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest) also has a Linux
+build (`Sedjem-<version>-linux-x64.tar.gz`): unpack it and run `Sedjem/Sedjem`.
 
 On first start, open *Settings → Models* and download whisper-medium (778 MB) or
 Cohere (1.6 GB). The voiceprint model for speaker labels (40 MB) comes with the first one.

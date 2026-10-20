@@ -144,6 +144,21 @@ class Snippets(unittest.TestCase):
             self.assertEqual(args, ["-P", "-m", "app.mcp"])
             self.assertEqual(env["PYTHONPATH"], str(ROOT))
 
+    def test_from_source_on_windows_the_console_python(self):
+        folder = Path(tempfile.mkdtemp(prefix="sedjem-assistants-"))
+        try:
+            for name in ("python.exe", "pythonw.exe"):
+                (folder / name).write_bytes(b"")
+            # app.cmd starts Sedjem with pythonw.exe; the MCP server needs the streams of python.exe
+            self.assertEqual(assistants.console_python(str(folder / "pythonw.exe")), str(folder / "python.exe"))
+            self.assertEqual(assistants.console_python(str(folder / "python.exe")), str(folder / "python.exe"))
+            (folder / "python.exe").unlink()
+            self.assertEqual(assistants.console_python(str(folder / "pythonw.exe")), str(folder / "pythonw.exe"),
+                             "kept when there is no python.exe beside it")
+            self.assertEqual(assistants.console_python("/usr/bin/python3"), "/usr/bin/python3")
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
     def test_another_data_folder_is_passed_on(self):
         home = Path(tempfile.mkdtemp(prefix="sedjem-assistants-"))
         try:

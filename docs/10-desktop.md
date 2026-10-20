@@ -17,6 +17,8 @@ auto-update and Linux packages are not done yet (see the end of this page).
 
 To set up on Windows from source, once: install Python 3.12, then in the project folder run
 `py -3.12 -m venv .venv` and `.venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt`.
+`app.cmd` starts Sedjem without a console, so when nothing opens, `.venv\Scripts\python -m app.desktop`
+shows the reason.
 
 Sedjem picks the first of these that works:
 
@@ -35,7 +37,10 @@ Sedjem picks the first of these that works:
 
 On Linux the desktop app keeps `~/.local/share/applications/sedjem.desktop` current, so Sedjem is
 in the application menu and its window shows the Sedjem icon: the browser window gets the window class
-`Sedjem` (`--class`), which the entry names. On Windows the built `Sedjem.exe` carries the icon.
+`Sedjem` (`--class`), which the entry names. Only X11 keeps that class, so on a Wayland desktop the
+browser window is drawn through XWayland; otherwise the taskbar would show the browser's icon. On
+Windows the built `Sedjem.exe` carries the icon, and from source the window takes it from
+`desktop/sedjem.ico`.
 
 Closing the window quits the app, and so does *Quit Sedjem* in *Settings*. `--browser` skips the native window,
 `--server` (or `--no-window`) runs only the server, and `--port N` picks the port (the default is
@@ -92,6 +97,10 @@ transcribe.cpp with its CPU and Vulkan backends, numpy); models and NVIDIA's CUD
 included, and the app downloads them when asked. The same executable
 runs the model worker (`Sedjem --transcribe …`), so each transcription still gets its own process,
 and the assistants' MCP server (`Sedjem --mcp`).
+
+The Tests workflow ([`.github/workflows/tests.yml`](../.github/workflows/tests.yml)) runs the tests on
+Windows and Linux for every push and pull request, and on Windows also sets Sedjem up from source
+exactly as above (`py -3.12 -m venv .venv`, `pip install`, then `app.cmd`) and checks that it starts.
 
 The GitHub Actions workflow [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml)
 builds and checks the app on Windows and Linux. It runs the unit tests, a self-test from source, the

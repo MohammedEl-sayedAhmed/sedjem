@@ -48,3 +48,42 @@ jobs:
         env:
           # the browser tests (tests/test_ui*.py) run in the runner's Chrome; fail rather than skip without it
           SEDJEM_UI_REQUIRED: "1"
+
+  # Windows from source, as README.md and docs/10-desktop.md say: a .venv made with `py -3.12`, the two
+  # requirement files, then app.cmd, which must start Sedjem (here its server only, as there is no desktop).
+  windows-source:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up as the docs say
+        shell: cmd
+        run: |
+          py -3.12 -m venv .venv || python -m venv .venv
+          .venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt
+
+      - name: app.cmd starts Sedjem
+        shell: pwsh
+        run: |
+          cmd /c app.cmd --server --port 8799
+          $status = $null
+          foreach ($i in 1..90) {
+            try { $status = Invoke-RestMethod http://127.0.0.1:8799/api/status; break } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $status -or $status.app -ne "sedjem") { throw "app.cmd did not start Sedjem" }
+          "Sedjem $($status.version) answered, reading $($status.home)"
+          Invoke-RestMethod -Method Post http://127.0.0.1:8799/api/quit -Headers @{ "X-Sedjem" = "1" } | Out-Null
+
+      - name: Self-test from the venv
+        shell: cmd
+        run: .venv\Scripts\python -m app.desktop --self-test --report selftest-venv.json
+
+      - name: Self-test report
+        if: always()
+        shell: bash
+        run: cat selftest-venv.json || true

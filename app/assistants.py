@@ -18,6 +18,7 @@ import re
 import sys
 import threading
 from datetime import datetime
+from pathlib import Path
 
 from .config import FROZEN, ROOT, home_dir
 
@@ -140,7 +141,16 @@ def launch(cfg):
         env["SEDJEM_HOME"] = str(cfg.home)
     if FROZEN:
         return sys.executable, ["--mcp"], env
-    return sys.executable, ["-P", "-m", "app.mcp"], env
+    return console_python(sys.executable), ["-P", "-m", "app.mcp"], env
+
+
+def console_python(exe):
+    """python.exe instead of the pythonw.exe next to it: app.cmd starts Sedjem with pythonw (no console window),
+    and an assistant talks to the MCP server over the standard streams, which is what python.exe is for."""
+    path = Path(exe)
+    if path.name.lower() == "pythonw.exe" and (path.parent / "python.exe").is_file():
+        return str(path.parent / "python.exe")
+    return str(path)
 
 
 def snippets(cfg, name="sedjem"):
