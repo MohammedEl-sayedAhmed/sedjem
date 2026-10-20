@@ -568,6 +568,9 @@ the voiceprint step with a stand-in model process).
 - With hosted models, the recording is uploaded only when you pick one and also tick "Upload this
   recording to …". The server checks this again, including for re-runs. Keys go only to their own
   service.
+- Checking for updates asks GitHub's API about this repository's releases and tested commits, once a
+  day when the first-start question was answered with yes, or when *Check now* is clicked. GitHub sees
+  the IP address and, for some checks, the commit that is running ([updates](12-updates.md)).
 - An assistant connected over MCP reads the transcripts that *Settings → Assistants* lets it see, and
   what it reads goes to the assistant's model, usually on its maker's servers. It never gets the
   audio, the keys or the settings ([assistants](11-assistants.md)).
@@ -602,6 +605,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams, joining them into `video.mp4` with PyAV, captions made by people as transcripts |
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
+| `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
 | `app/transcript.py` | lines from words, and the exports |
 | `app/compare.py` | transcriptions of one recording: grouping them, lining them up by time, and combining them into a new version |
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
@@ -628,6 +632,7 @@ Every change needs the header `X-Sedjem: 1`.
 | `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
 | `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, …}` | one transcription per video (all of them without `entries`), queued in playlist order |
 | `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
+| `GET /api/updates`, `POST /api/updates/check`, `/settings`, `/skip`, `/install` | *Settings → Updates*: the state, *Check now*, the switch and channel, *Skip this version*, *Update now* ([updates](12-updates.md)) |
 
 ## Limits
 

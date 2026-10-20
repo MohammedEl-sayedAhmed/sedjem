@@ -99,7 +99,10 @@ recording on your machine unless you choose a hosted service.
 - Settings has tabs for Models, Add models, Hosted services, Speed, Assistants and About.
 - Downloads resume if the connection drops and are checked against pinned checksums.
 - Has a dark theme, and contacts nothing on the internet except the model downloads, YouTube for the
-  links you add, and the hosted services you choose.
+  links you add, the hosted services you choose, and GitHub to check for updates when allowed.
+- Tells when a newer version is out, from stable releases or the latest tested changes, and updates
+  itself when asked: a git checkout by fast-forward, the Windows app through its installer. See
+  [updates](docs/12-updates.md).
 
 ## Models
 
@@ -287,6 +290,7 @@ was tried first and is not usable for this: it wrote most English terms in Arabi
 | [The app](docs/09-app.md) | using Sedjem, versions, comparing, its settings, API keys, privacy |
 | [Desktop app](docs/10-desktop.md) | running, building and testing on Windows and Linux |
 | [Assistants](docs/11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, and what they may see |
+| [Updates](docs/12-updates.md) | the two channels, what is sent to GitHub, and updating from the app or by hand |
 
 ## Name and logo
 
