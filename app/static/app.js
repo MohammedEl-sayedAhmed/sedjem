@@ -71,6 +71,7 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>',
   assistant: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.5A8.5 8.5 0 1 1 20.5 12z"/><path d="M12 9l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="currentColor" stroke-width="1.2"/></svg>',
+  update: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8 11.5l4-4 4 4"/></svg>',
   play: '<path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5z"/>',
   pause: '<rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/>',
 };
@@ -230,6 +231,7 @@ function renderTop() {
   const active = S.jobs.filter((j) => ACTIVE.has(j.status)).length;
   if (active) pills.push(`<span class="pill accent"><span class="dot pulse"></span>${active} in progress</span>`);
   if (downloading()) pills.push(`<button class="pill accent" data-open-settings="models">${ICON.download} Downloading</button>`);
+  pills.push(updPill());  // a newer version is out (updates.js)
   $("#topStatus").innerHTML = pills.join("");
   $("#storageInfo").textContent = `${S.jobs.length} transcription${S.jobs.length === 1 ? "" : "s"} · ${st.storage.free_gb} GB free`;
 }
@@ -1542,20 +1544,21 @@ function updateVideoPrep() {
 // ---------------------------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------------------------
-// Settings: one tab at a time (Models, Add models, Hosted services, Speed, Assistants, About), so nothing needs
-// a long scroll; a hosted service's key form opens only for the service being edited.
+// Settings: one tab at a time (Models, Add models, Hosted services, Speed, Assistants, About, Updates), so nothing
+// needs a long scroll; a hosted service's key form opens only for the service being edited.
 const SET = { tab: "models", add: "recommended", openKey: null, details: {}, animate: null };  // details: the open row of each tab
 const SET_TABS = [["models", "laptop", "Models"], ["add", "plus", "Add models"], ["hosted", "cloud", "Hosted services"],
-  ["speed", "bolt", "Speed"], ["assistants", "assistant", "Assistants"], ["about", "info", "About"]];
+  ["speed", "bolt", "Speed"], ["assistants", "assistant", "Assistants"], ["about", "info", "About"], ["updates", "update", "Updates"]];
 
 function openSettings(focus) {
   if (!S.status) return;  // still starting up
   if (focus === "speed" || focus === "power") SET.tab = "speed";
-  else if (focus === "assistants") SET.tab = "assistants";
+  else if (focus === "assistants" || focus === "updates") SET.tab = focus;
   else if (focus && model(focus)?.kind === "hosted") { Object.assign(SET, { tab: "hosted", openKey: focus }); SET.details.hosted = null; }
   renderSettings(focus);
   $("#settings").showModal();
   if (SET.tab === "assistants") loadAssistants();  // what assistants asked since it was last open
+  if (SET.tab === "updates") loadUpdates();  // updates.js
 }
 
 function setStatus(kind, text, icon = "") {
@@ -1710,14 +1713,14 @@ function renderSettings(focus) {
       note: st.youtube?.runtime && !st.deno.installed ? `For YouTube links; ${st.youtube.runtime.name} is used for now` : "Answers YouTube's check, for YouTube links" }] : [])];
   const readyLocal = items.filter((x) => x.d.installed || model(x.id)?.ready).length;
   const keys = hosted.filter((m) => m.key_source).length;
-  const counts = { models: `${readyLocal} of ${items.length}`, hosted: `${keys} of ${hosted.length}` };
+  const counts = { models: `${readyLocal} of ${items.length}`, hosted: `${keys} of ${hosted.length}`, updates: st.update?.available ? "New" : "" };
   if (!SET_TABS.some(([t]) => t === SET.tab)) SET.tab = "models";
 
   const nav = `<nav class="set-nav" role="tablist" aria-label="Settings sections">${SET_TABS.map(([t, icon, label]) =>
     `<button type="button" role="tab" id="tab-${t}" data-set-tab="${t}" aria-selected="${SET.tab === t}" aria-controls="set-panel" tabindex="${SET.tab === t ? 0 : -1}">
       ${ICON[icon]}<span>${label}</span>${counts[t] ? `<small>${counts[t]}</small>` : ""}</button>`).join("")}</nav>`;
   const panel = { models: modelsPanel, add: addPanel, hosted: hostedPanel, speed: speedPanel, assistants: assistantsPanel,
-    about: aboutPanel }[SET.tab](items, hosted);
+    about: aboutPanel, updates: updatesPanel }[SET.tab](items, hosted);
   // Redrawing the same tab (download progress every 1.5 s, a row opened) keeps the panel where it was scrolled,
   // the row of tabs on a narrow screen too, and the focus on a tab or switch drawn again
   const old = $("#set-panel"), top = old?.getAttribute("aria-labelledby") === `tab-${SET.tab}` ? old.scrollTop : 0;
@@ -1883,6 +1886,7 @@ function bindSettings(focus) {
     renderSettings();
     $(`#tab-${SET.tab}`)?.focus();
     if (SET.tab === "assistants") loadAssistants();
+    if (SET.tab === "updates") loadUpdates();
   }));
   const tabs = $$(".set-nav [role=tab]");
   tabs.forEach((b, i) => (b.onkeydown = (e) => {
@@ -1919,6 +1923,7 @@ function bindSettings(focus) {
   if (open) open.onclick = async () => { try { await api.post("/api/open-folder"); } catch (e) { toast(e.message, "error"); } };
   bindHub();
   bindAssistants();  // assistants.js
+  bindUpdates();  // updates.js
   $$("[data-forget-model]").forEach((b) => (b.onclick = () => forgetModel(b.dataset.forgetModel)));
   if (focus && focus !== "speed" && focus !== "power") { const el = $(`[data-key="${focus}"]`); if (el) setTimeout(() => el.focus(), 50); }
 }
@@ -2187,7 +2192,7 @@ function route() {
 }
 
 async function refreshStatus() {
-  try { S.status = await api.get("/api/status"); renderTop(); } catch (e) { /* server restarting */ }
+  try { S.status = await api.get("/api/status"); renderTop(); updStatus(); } catch (e) { /* server restarting */ }
 }
 
 let statusTimer = null;
