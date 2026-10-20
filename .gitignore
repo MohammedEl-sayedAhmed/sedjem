@@ -60,6 +60,8 @@ __pycache__/
 .playwright-mcp/
 build/
 dist/
+# the desktop build's stamp (version, commit, channel), written by desktop/build.py for the build only
+app/_build.json
 *.part
 *.part[0-9]
 *.joining
