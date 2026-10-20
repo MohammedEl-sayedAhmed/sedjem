@@ -217,6 +217,11 @@ def run_git(root, *args, timeout=60):
         return None
 
 
+def iso_date(s):
+    """An ISO 8601 date as git (2.41 and later) writes one: Z for UTC, else the offset."""
+    return re.sub(r"[+-]00:00$", "Z", s)
+
+
 def commit_date(root, sha):
     """When a commit was made (ISO 8601), from its object in .git when it is kept loose, else from git; None if
     neither knows."""
@@ -229,11 +234,11 @@ def commit_date(root, sha):
                     seconds, offset = line.rsplit(b" ", 2)[-2:]
                     shift = timedelta(hours=int(offset[1:3]), minutes=int(offset[3:5]))
                     zone = timezone(-shift if offset.startswith(b"-") else shift)
-                    return datetime.fromtimestamp(int(seconds), zone).isoformat()
+                    return iso_date(datetime.fromtimestamp(int(seconds), zone).isoformat())
         except (OSError, zlib.error, ValueError, OverflowError):
             pass
     p = run_git(root, "show", "-s", "--format=%cI", sha, timeout=10)
-    return p.stdout.strip() or None if p is not None and p.returncode == 0 else None
+    return (iso_date(p.stdout.strip()) or None) if p is not None and p.returncode == 0 else None
 
 
 def running(root=ROOT, frozen=FROZEN, stamp=STAMP, executable=None, platform=None):

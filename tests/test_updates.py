@@ -138,7 +138,7 @@ class VersionTests(unittest.TestCase):
         self.assertFalse(updates.newer("0.3.0", "not a version"))
 
     def test_the_settings_are_checked_when_saved(self):
-        home = Path(tempfile.mkdtemp(prefix="sedjem-updates-set-"))
+        home = Path(tempfile.mkdtemp(prefix="sedjem-updates-set-")).resolve()
         self.addCleanup(rmtree, home)
         (home / "app_data").mkdir()
         cfg = Config(home=home)
@@ -162,7 +162,7 @@ class VersionTests(unittest.TestCase):
 
 class RunningTests(unittest.TestCase):
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-running-"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-running-")).resolve()  # (Windows: the long name, not RUNNER~1)
         self.addCleanup(rmtree, self.tmp)
 
     def stamp(self, data):
@@ -248,10 +248,12 @@ class RunningTests(unittest.TestCase):
             git(self.tmp, "init", "-q", "-b", "main", str(repo))
             (repo / "a.txt").write_text("a\n", encoding="utf-8")
             git(repo, "add", "-A")
-            git(repo, "commit", "-q", "-m", "First")
+            with mock.patch.dict(os.environ, {"GIT_COMMITTER_DATE": "2026-10-20T10:44:12+0000"}):  # in UTC
+                git(repo, "commit", "-q", "-m", "First")
             head = git(repo, "rev-parse", "HEAD")
             self.assertEqual(updates.read_head(repo), (head, "main"))
-            date = git(repo, "show", "-s", "--format=%cI", head)
+            date = "2026-10-20T10:44:12Z"  # as git 2.41 and later writes it (earlier ones: +00:00)
+            self.assertIn(git(repo, "show", "-s", "--format=%cI", head), (date, "2026-10-20T10:44:12+00:00"))
             with mock.patch.object(updates.shutil, "which", return_value=None):  # from the loose object alone
                 self.assertEqual(updates.commit_date(repo, head), date)
             git(repo, "pack-refs", "--all")
@@ -262,13 +264,13 @@ class RunningTests(unittest.TestCase):
             git(repo, "worktree", "add", "-q", "-b", "side", str(self.tmp / "side"))
             (self.tmp / "side" / "b.txt").write_text("b\n", encoding="utf-8")
             git(self.tmp / "side", "add", "-A")
-            git(self.tmp / "side", "commit", "-q", "-m", "Side")
+            with mock.patch.dict(os.environ, {"GIT_COMMITTER_DATE": "2026-10-20T13:50:00+0300"}):  # not in UTC
+                git(self.tmp / "side", "commit", "-q", "-m", "Side")
             side = git(self.tmp / "side", "rev-parse", "HEAD")
             self.assertEqual(updates.read_head(self.tmp / "side"), (side, "side"))
             self.assertEqual(updates.read_head(repo), (head, "main"))
             run = updates.running(root=self.tmp / "side", frozen=False)
-            self.assertEqual((run["commit"], run["kind"], run["date"]), (side, "source",
-                                                                          git(repo, "show", "-s", "--format=%cI", side)))
+            self.assertEqual((run["commit"], run["kind"], run["date"]), (side, "source", "2026-10-20T13:50:00+03:00"))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -280,7 +282,7 @@ class UpdatesCase(unittest.TestCase):
     processes (the restarted app, the installer) and installing requirement files are mocked for every test."""
 
     def setUp(self):
-        self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-updates-"))
+        self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-updates-")).resolve()  # (Windows: the long name, not RUNNER~1)
         self.addCleanup(rmtree, self.tmp)
         self.gh = FakeGitHub()
         self.addCleanup(self.gh.close)
