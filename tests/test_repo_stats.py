@@ -6,7 +6,8 @@ stargazers and forks, which are read a hundred to a request. The charts are vali
 their numbers say (the running total of app downloads, the releases, the stars and forks, the clones and
 views per day), light and dark differ only in their colours, and a sparse or empty history still draws.
 The workflow never clones the repository (a clone would count itself) and the script needs only the standard
-library; the README's badges read the files the script writes. Offline: the GitHub calls are replaced.
+library; the README's badges and charts read the files the script writes. Offline: the GitHub calls are
+replaced.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
@@ -413,6 +414,22 @@ class Wiring(unittest.TestCase):
             self.assertIn(path, stats.FILES)
             self.assertIn(f"%2F{stats.BRANCH}%2F{path.replace('/', '%2F')}", readme, f"the {name} badge")
         self.assertIn(f"/tree/{stats.BRANCH}#readme", readme, "the badges link to the summary")
+
+    def test_the_readme_charts_are_files_the_script_writes(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        picture = re.search(r'<a href="([^"]+)">\s*<picture>(.*?)</picture>\s*</a>', readme, re.S)
+        self.assertIsNotNone(picture, "the charts, linked to the summary")
+        self.assertTrue(picture.group(1).endswith(f"/tree/{stats.BRANCH}#readme"))
+        raw = r'https://raw\.githubusercontent\.com/MohammedEl-sayedAhmed/sedjem/([^/"]+)/([^"]+)"'
+        dark = re.search(r'<source media="\(prefers-color-scheme: dark\)" srcset="' + raw, picture.group(2))
+        light = re.search(r'<img src="' + raw, picture.group(2))
+        written = stats.update({}, fetched(), REPO, "2026-10-20")
+        for theme, found in (("dark", dark), ("light", light)):
+            self.assertIsNotNone(found, theme)
+            branch, path = found.groups()
+            self.assertEqual((branch, path), (stats.BRANCH, stats.CHARTS[theme]))
+            self.assertIn(path, stats.FILES, "read back from the branch, so an unchanged chart isn't committed again")
+            self.assertIn(path, written)
 
 
 if __name__ == "__main__":

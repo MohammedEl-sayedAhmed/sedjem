@@ -295,6 +295,20 @@ ear as the app icon and again as the dot of the j, and ends the name with a typi
 then written down. The idea, the colour and mono versions, how to use them and the SVG and PNG files are
 in [docs/brand](docs/brand/README.md).
 
+## Activity
+
+<p align="center">
+  <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme">
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/MohammedEl-sayedAhmed/sedjem/stats/charts/activity-dark.svg">
+      <img src="https://raw.githubusercontent.com/MohammedEl-sayedAhmed/sedjem/stats/charts/activity-light.svg" width="800" alt="Charts of Sedjem's downloads of the app, its stars and forks over time, and its clones and page views per day">
+    </picture>
+  </a>
+</p>
+
+The stats workflow redraws these charts every day from GitHub's own numbers. The tables behind them are in
+[the stats summary](https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme).
+
 ## Thanks
 
 Sedjem stands on other people's work: the
