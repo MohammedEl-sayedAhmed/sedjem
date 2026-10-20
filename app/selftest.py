@@ -5,8 +5,11 @@
 3. job       a generated tone is uploaded, converted to 16 kHz FLAC and "transcribed" by a stand-in
              for the ElevenLabs API on 127.0.0.1 (nothing leaves the computer)
 4. video     a generated MPEG-4 clip is converted to the job page's H.264 video (app/video.py)
-5. window    (--window) a native window opens, loads the app and closes
-6. models    (--models, downloads about 820 MB) whisper-medium and the voiceprint model are
+5. mcp       the assistants' server (app/mcp.py) is started as an assistant starts it (Sedjem --mcp, or
+             python -m app.mcp from source) on a data folder with one transcription, and answers over
+             real pipes: the 2026-07-28 discover and a search, then the initialize handshake and the tools
+6. window    (--window) a native window opens, loads the app and closes
+7. models    (--models, downloads about 820 MB) whisper-medium and the voiceprint model are
              downloaded with the app's own downloader, and a public 11 s speech sample (JFK, from
              the openai/whisper repository) is transcribed with speaker labels through the app
 
@@ -28,6 +31,7 @@ from pathlib import Path
 import numpy as np
 import soundfile as sf
 
+from . import __version__, assistants
 from .config import ROOT, Config
 from .downloads import Downloads
 from .engines import worker_command
@@ -140,6 +144,66 @@ def check_video(tmp):
     return {"ok": shown == {"width": 64, "height": 48} and codec == "h264", "encoder": video.encoder(), "codec": codec}
 
 
+def check_mcp(tmp):
+    """The assistants' server on a data folder with one transcription, started with the command and environment
+    the connection snippets give an assistant (assistants.launch) and only the variables an assistant passes on,
+    and talked to over pipes. Each run sends its messages and closes stdin: the server must answer each one with
+    a line of JSON, print nothing else on stdout, and exit."""
+    from . import mcp
+    home, jid = Path(tmp) / "mcp-home", "20260101-120000-abcd"
+    folder = home / "app_data" / "jobs" / jid
+    folder.mkdir(parents=True)
+    (folder / "job.json").write_text(json.dumps({
+        "id": jid, "title": "Self-test meeting", "status": "done", "created": "2026-01-01T12:00:00+00:00",
+        "finished": "2026-01-01T12:00:05+00:00", "audio_s": 4.0, "model": "elevenlabs", "model_title": "ElevenLabs"}),
+        encoding="utf-8")
+    said = {"start": 0.5, "end": 2.0, "speaker": "1", "text": "تمام، the self-test deadline is today"}
+    (folder / "transcript.json").write_text(json.dumps({"lines": [said]}, ensure_ascii=False), encoding="utf-8")
+    command, args, extra = assistants.launch(Config(home=home))
+    passed = ("APPDATA", "HOMEDRIVE", "HOMEPATH", "LOCALAPPDATA", "PATH", "PATHEXT", "PROCESSOR_ARCHITECTURE",
+              "SYSTEMDRIVE", "SYSTEMROOT", "TEMP", "USERNAME", "USERPROFILE") if os.name == "nt" else \
+        ("HOME", "LOGNAME", "PATH", "SHELL", "TERM", "USER")  # what the MCP SDK's stdio client passes on
+    env = {**{k: os.environ[k] for k in passed if k in os.environ}, **extra}
+    client = {"name": "sedjem-self-test", "version": __version__}
+    meta = {"_meta": {mcp.VERSION_KEY: "2026-07-28", mcp.CAPABILITIES_KEY: {}, mcp.CLIENT_KEY: client}}
+    runs = {"modern": [{"jsonrpc": "2.0", "id": 1, "method": "server/discover", "params": meta},
+                       {"jsonrpc": "2.0", "id": 2, "method": "tools/call",
+                        "params": {**meta, "name": "search", "arguments": {"query": "deadline"}}}],
+            "legacy": [{"jsonrpc": "2.0", "id": 1, "method": "initialize",
+                        "params": {"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": client}},
+                       {"jsonrpc": "2.0", "method": "notifications/initialized"},
+                       {"jsonrpc": "2.0", "id": 2, "method": "tools/list"}]}
+    out = {"command": [command, *args]}
+    for era, messages in runs.items():
+        r = subprocess.run([command, *args], input=b"".join(json.dumps(m).encode() + b"\n" for m in messages),
+                           capture_output=True, env=env, cwd=tmp, timeout=180,
+                           creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
+        try:
+            answers = [json.loads(line) for line in r.stdout.decode("utf-8").splitlines()]
+        except ValueError:
+            return {**out, "ok": False, "error": f"{era}: stdout has more than JSON",
+                    "stdout": r.stdout[-1500:].decode("utf-8", "replace")}
+        results = [a.get("result") or {} for a in answers]
+        whole = r.returncode == 0 and len(answers) == 2
+        if era == "modern":
+            versions = results[0].get("supportedVersions") or [] if results else []
+            found = "self-test deadline" in ((results[1].get("content") or [{}])[0].get("text", "") if whole else "")
+            out[era] = {"answers": len(answers), "exit": r.returncode, "versions": versions, "found": found,
+                        "ok": whole and "2026-07-28" in versions and results[0].get("resultType") == "complete"
+                        and not results[1].get("isError") and found}
+        else:
+            tools = [t.get("name") for t in results[1].get("tools", [])] if whole else []
+            out[era] = {"answers": len(answers), "exit": r.returncode, "tools": tools,
+                        "ok": whole and results[0].get("protocolVersion") == "2025-06-18"
+                        and tools == [t["name"] for t in mcp.TOOLS]}
+        if not out[era]["ok"]:
+            out[era]["stderr"] = r.stderr.decode("utf-8", "replace")[-1500:]
+    logged = assistants.read_log(Config(home=home))
+    out["logged"] = bool(logged) and logged[0]["action"] == "search" and logged[0]["ids"] == [jid]
+    out["ok"] = out["modern"]["ok"] and out["legacy"]["ok"] and out["logged"]
+    return out
+
+
 def check_window(url):
     import webview
     outcome = {"ok": False}
@@ -216,7 +280,8 @@ def run(window=False, report=None, models=False):
     with tempfile.TemporaryDirectory(prefix="sedjem-selftest-") as tmp:
         checks = [("worker", lambda: results.__setitem__("worker", check_worker(tmp))),
                   ("server", lambda: check_server_and_job(tmp, results, window)),
-                  ("video", lambda: results.__setitem__("video", check_video(tmp)))]
+                  ("video", lambda: results.__setitem__("video", check_video(tmp))),
+                  ("mcp", lambda: results.__setitem__("mcp", check_mcp(tmp)))]
         if models:
             checks.append(("models", lambda: results.__setitem__("models", check_models(tmp))))
         for name, fn in checks:

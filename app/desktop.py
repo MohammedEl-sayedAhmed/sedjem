@@ -274,7 +274,12 @@ def main(argv=None):
     ap.add_argument("--report", help="with --self-test: write the results as JSON to this file")
     ap.add_argument("--models", action="store_true",
                     help="with --self-test: also download whisper-medium (~820 MB) and transcribe a speech sample")
+    ap.add_argument("--mcp", action="store_true",
+                    help="answer an assistant (Claude, Cursor, VS Code) over MCP on stdin and stdout; see app/mcp.py")
     args = ap.parse_args(argv)
+    if args.mcp:  # before anything prints or opens: stdout carries only the assistant's messages
+        from .mcp import main as serve
+        sys.exit(serve())
     if args.self_test:
         from .selftest import run
         sys.exit(run(window=args.window, report=args.report, models=args.models))

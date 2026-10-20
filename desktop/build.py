@@ -38,6 +38,7 @@ def main():
         # modules only imported inside functions or by the worker process
         "--hidden-import", "transcribe", "--hidden-import", "speakers", "--hidden-import", "sysinfo",
         "--hidden-import", "app.worker", "--hidden-import", "app.desktop", "--hidden-import", "app.selftest",
+        "--hidden-import", "app.mcp",  # Sedjem --mcp, the assistants' server
         # packages with native libraries or data files loaded at run time
         "--collect-all", "faster_whisper", "--collect-all", "ctranslate2", "--collect-all", "sherpa_onnx",
         "--collect-all", "transcribe_cpp", "--collect-all", "transcribe_cpp_native", "--collect-all", "av",
