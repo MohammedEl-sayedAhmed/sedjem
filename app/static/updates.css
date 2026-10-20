@@ -1,0 +1,123 @@
+/* Sedjem: updates (updates.js): the first-start question, the notice, Settings → Updates and the wait while
+   Sedjem restarts. Colours come from app.css, so both themes follow. */
+
+/* ---------- the first-start question ---------- */
+.upd-ask { width: min(460px, calc(100vw - 32px)); }
+.upd-ask .dlg-body p { margin: 0; font-size: 14.5px; line-height: 1.55; }
+
+/* ---------- the notice, with the toasts: a card that stays until it is answered ---------- */
+.toast.upd-notice {
+  width: 320px; max-width: calc(100vw - 36px); padding: 12px 12px 10px 14px;
+  background: var(--surface); color: var(--text); border: 1px solid var(--border);
+}
+.upd-notice-text { display: flex; align-items: center; gap: 9px; font-size: 14px; line-height: 1.4; }
+.upd-notice-text svg { width: 20px; height: 20px; flex: none; color: var(--accent); }
+.upd-notice-text b { font-weight: 620; overflow-wrap: anywhere; }
+.upd-notice-actions { display: flex; justify-content: flex-end; gap: 6px; margin-top: 10px; }
+
+/* ---------- Settings → Updates ---------- */
+.upd-running { margin-bottom: 14px; }
+.upd-running .about-text { min-width: 0; }
+.upd-running code { font-size: 12.5px; color: var(--text); }
+.set-text b.upd-error { color: var(--danger); }
+.upd-sec { margin-top: 18px; }
+.upd-sec h4 { font-size: 14px; font-weight: 650; margin: 0 0 8px; }
+.upd-empty {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; font-size: 13.5px; line-height: 1.45;
+  color: var(--muted); border: 1px dashed var(--border-strong); border-radius: 12px;
+}
+.upd-empty svg { width: 18px; height: 18px; flex: none; margin-top: 1px; }
+.upd-empty.ok { color: var(--text); background: var(--surface); border: 1px solid var(--border); }
+.upd-empty.ok svg { color: var(--ok); }
+
+.upd-card { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 14px 16px 16px; min-width: 0; }
+.upd-card-head { display: flex; align-items: flex-start; gap: 12px; }
+.upd-card-head b { font-size: 15.5px; font-weight: 650; overflow-wrap: anywhere; }
+.upd-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+
+/* Update now under way, failed or done */
+.upd-progress { margin-top: 14px; }
+.upd-progress-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; margin-bottom: 8px; font-size: 13.5px; }
+.upd-progress-row b { font-weight: 620; }
+.upd-progress-row span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.upd-failed {
+  display: flex; align-items: center; gap: 12px; margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--danger-soft); border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--border));
+}
+.upd-failed .set-text b { color: var(--danger); }
+.upd-failed .set-text span { font-size: 13px; overflow-wrap: anywhere; }
+.upd-done {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--ok-soft); font-size: 13.5px; line-height: 1.45; overflow-wrap: anywhere;
+}
+.upd-done > svg { width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--ok); }
+
+/* Update now can't run here: why, and the commands, each with its Copy */
+.upd-blocked {
+  display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; border-radius: var(--radius-sm);
+  background: var(--warn-soft); font-size: 13px; line-height: 1.45;
+}
+.upd-blocked > svg { width: 18px; height: 18px; flex: none; margin-top: 1px; color: var(--warn); }
+.upd-blocked-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.upd-blocked-text b { font-weight: 620; overflow-wrap: anywhere; }
+.upd-cmds { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.upd-cmd { display: flex; align-items: flex-start; gap: 2px; padding: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; }
+.upd-cmd pre {
+  flex: 1; min-width: 0; margin: 0; padding: 4px 8px; white-space: pre-wrap; overflow-wrap: anywhere;
+  font: 12px/1.5 var(--mono); color: var(--text); border-radius: 6px;
+}
+.upd-cmd pre:focus-visible { outline: 2px solid var(--accent); outline-offset: -1px; }
+.upd-cmd .btn { flex: none; height: 26px; padding: 0 8px; gap: 5px; font-size: 12.5px; }
+.upd-cmd .btn svg { width: 15px; height: 15px; }
+.upd-copy-box { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+
+/* the release notes (Markdown) */
+.upd-notes { margin-top: 14px; border-top: 1px solid var(--border); font-size: 13.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.upd-notes > :first-child { margin-top: 12px; }
+.upd-notes > :last-child { margin-bottom: 0; }
+.upd-notes h5 { font-size: 14px; font-weight: 650; margin: 16px 0 6px; }
+.upd-notes h6 { font-size: 13px; font-weight: 650; margin: 14px 0 4px; color: var(--muted); }
+.upd-notes p { margin: 8px 0; }
+.upd-notes ul, .upd-notes ol { margin: 6px 0 8px; padding-left: 20px; }
+.upd-notes li + li { margin-top: 3px; }
+.upd-notes li > ul, .upd-notes li > ol { margin: 3px 0 0; }
+.upd-notes code { font: 12px var(--mono); padding: 1px 5px; border-radius: 5px; background: var(--sunken); border: 1px solid var(--border); }
+.upd-notes pre {
+  margin: 8px 0; padding: 10px 12px; white-space: pre-wrap; overflow-wrap: anywhere;
+  background: var(--sunken); border: 1px solid var(--border); border-radius: 8px;
+}
+.upd-notes pre code { padding: 0; border: 0; background: none; font-size: 12px; line-height: 1.5; }
+.upd-notes blockquote { margin: 8px 0; padding: 0 12px; border-left: 3px solid var(--border-strong); color: var(--muted); }
+.upd-notes hr { border: 0; border-top: 1px solid var(--border); margin: 12px 0; }
+
+/* the Latest channel's changes */
+.upd-changes { list-style: none; margin: 14px 0 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+.upd-changes li {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: baseline; gap: 2px 14px;
+  padding: 8px 12px; font-size: 13px; line-height: 1.45;
+}
+.upd-changes li + li { border-top: 1px solid var(--border); }
+.upd-change-title { overflow-wrap: anywhere; }
+.upd-change-meta { display: inline-flex; align-items: baseline; gap: 8px; color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.upd-change-meta code { font-size: 12px; }
+.upd-change-meta a { text-decoration: none; }
+.upd-change-meta a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.upd-more { margin: 8px 2px 0; font-size: 13px; color: var(--muted); }
+
+/* ---------- the wait while Sedjem restarts, over everything ---------- */
+.upd-restart { width: min(400px, calc(100vw - 32px)); padding: 28px 24px 24px; text-align: center; }
+.upd-restart::backdrop { background: rgba(10, 14, 20, .6); backdrop-filter: blur(6px); }
+.upd-restart img { display: block; margin: 0 auto; }
+.upd-restart h2 { font-size: 18px; margin: 14px 0 6px; }
+.upd-restart p { margin: 0 0 16px; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.upd-restart .progress { max-width: 240px; margin: 0 auto; }
+@media (prefers-reduced-motion: reduce) { .upd-restart .progress.indeterminate i { animation: none; width: 100% !important; } }
+
+@media (max-width: 720px) {
+  .upd-card { padding: 12px; }
+  .upd-changes li { grid-template-columns: minmax(0, 1fr); }
+  .upd-failed { flex-wrap: wrap; }
+  .upd-blocked > svg { display: none; }  /* the commands get the width */
+  .upd-cmd .btn { width: 28px; padding: 0; }
+  .upd-cmd .btn span { display: none; }  /* the icon alone; its label still says what it copies */
+}

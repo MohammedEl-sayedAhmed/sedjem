@@ -115,6 +115,8 @@ class UiTestCase(unittest.TestCase):
             raise unittest.SkipTest("Playwright is not installed (pip install -r requirements-dev.txt)")
         cls.home = Path(tempfile.mkdtemp(prefix="sedjem-ui-"))
         (cls.home / "app_data").mkdir()
+        # The first-start question about updates (a dialog over the page) is answered: no automatic checks
+        (cls.home / "app_data" / "settings.json").write_text(json.dumps({"update_check": False}), encoding="utf-8")
         for job in cls.jobs:
             demo_job(cls.home, **job)
         cls.gpu = mock.patch.object(engines, "gpu_info", return_value=GPU)
