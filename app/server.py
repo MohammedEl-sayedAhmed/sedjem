@@ -15,11 +15,12 @@ import sys
 import threading
 import time
 import urllib.parse
+from datetime import datetime
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, compare, courses, engines, hub, report, video, youtube
+from . import __version__, assistants, compare, courses, engines, hub, report, video, youtube
 from . import transcript as T
 from . import history
 from .config import FROZEN, power_profile, set_power_profile
@@ -55,6 +56,7 @@ class App:
         self.gpu_probing = False
         self.used = (0.0, None)  # (time, bytes) of the last count of the transcriptions' size
         self.inspected = {}      # YouTube link -> (time, what youtube.inspect found), for adding it right after
+        self.settings_lock = threading.Lock()  # settings.json is read, changed and written one request at a time
         self.probe_gpu()
 
     def probe_gpu(self):
@@ -158,6 +160,17 @@ class App:
             "active": sum(1 for j in jobs if j["status"] in ACTIVE),
         }
 
+    def assistants_view(self):
+        """Settings → Assistants: the two switches, what is hidden one by one (newest first, with titles), the
+        newest entries of the log of what assistants asked, and the configuration for each assistant."""
+        s = self.cfg.settings()
+        jobs = {j["id"]: j for j in self.store.list()}  # newest first
+        marks = s["mcp_hidden"] if isinstance(s["mcp_hidden"], list) else []
+        return {"settings": {k: bool(s[k]) for k in ("mcp_courses", "mcp_recordings")},
+                "hidden": [hidden_item(k, jobs) for k in reversed(marks) if isinstance(k, str)],
+                "log": [log_item(e, jobs) for e in assistants.read_log(self.cfg, 50)],
+                "snippets": assistants.snippets(self.cfg)}
+
 
 def device_class(device):
     """"gpu" or "cpu" from a job's device, e.g. "vulkan: Intel(R) Iris(R) Xe Graphics" (older jobs have none)."""
@@ -168,6 +181,94 @@ def summary(job):
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
             "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course")
     return {k: job.get(k) for k in keys}
+
+
+# ---- assistants (app/assistants.py) -----------------------------------------------------------------
+
+def job_assistants(cfg, job):
+    """Whether assistants may see a transcription, for its page. reason: None (they may), "switch" (the switch
+    for its kind is off), "course" (its course is hidden) or "hidden" (it is hidden on its own); hidden_key:
+    the mark that hides it, if one does. The switch is named first: it hides it whatever the marks say."""
+    s = cfg.settings()
+    hidden = set(s.get("mcp_hidden") or ())
+    key, *rest = assistants.keys(job)
+    course = rest[0] if rest else None
+    switch = "mcp_courses" if assistants.kind(job) == "course" else "mcp_recordings"
+    hidden_key = course if course in hidden else key if key in hidden else None
+    reason = None
+    if not s[switch]:
+        reason = "switch"
+    elif hidden_key:
+        reason = "course" if hidden_key == course else "hidden"
+    return {"visible": assistants.visible(cfg, job, s), "reason": reason, "hidden_key": hidden_key,
+            "key": key, "hidden": key in hidden, "course_key": course, "course_hidden": course in hidden,
+            "switch": switch, "switch_on": bool(s[switch])}
+
+
+MONTHS = ("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+
+def day(iso):
+    """2026-09-25T22:00:00+03:00 -> 25 Sep 2026"""
+    try:
+        d = datetime.fromisoformat(str(iso))
+    except ValueError:
+        return ""
+    return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
+
+
+def hidden_item(key, jobs):
+    """A transcription or course hidden from assistants, as Settings lists it: {key, kind, title, detail}. One
+    that is no longer in the app keeps its key (title None), so its mark can still be taken off."""
+    kind, _, ident = str(key).partition(":")
+    if kind == "job":
+        job = jobs.get(ident)
+        if job is None:
+            return {"key": key, "kind": "transcription", "title": None, "detail": "This transcription was deleted"}
+        course = job.get("course") or {}
+        detail = (f"{course.get('title') or 'A course'}, lecture {course.get('index')}" if course.get("id")
+                  else "YouTube video" if job.get("youtube_id") else f"Recording, {day(job.get('created'))}".rstrip(", "))
+        return {"key": key, "kind": "transcription", "title": job.get("title") or "Untitled", "detail": detail}
+    lectures = [j for j in jobs.values() if (j.get("course") or {}).get("id") == ident]
+    if not lectures:
+        return {"key": key, "kind": "course", "title": None, "detail": "Its lectures were deleted"}
+    course = lectures[0]["course"]  # the newest lecture's
+    n, count = len({j["course"].get("index") for j in lectures}), course.get("count")
+    lectures_text = f"{n} of {count} lectures" if isinstance(count, int) and count > n else f"{n} lecture{'' if n == 1 else 's'}"
+    return {"key": key, "kind": "course", "title": course.get("title") or "Course", "detail": lectures_text}
+
+
+# What an assistant asked, in words: the actions are app/mcp.py's tools, resources/read and prompts/get, and
+# the detail is what it was about, as the server words it ("tokenizers, in Prompt Engineering"): (with the
+# detail, without one). An action this list doesn't know (a newer server's) is shown by its own name.
+ASKED = {"list_transcriptions": ("Listed the transcriptions ({})", "Listed the transcriptions"),
+         "list_courses": ("Listed the courses ({})", "Listed the courses"),
+         "course_outline": ("Read the outline of {}", "Read the outline of a course"),
+         "get_transcript": ("Read {}", "Read a transcript"),
+         "search": ("Searched for {}", "Searched the transcripts"),
+         "get_course_text": ("Read the course text of {}", "Read the text of a course"),
+         "resources/read": ("Read {}", "Read a transcript or a course"),
+         "prompts/get": ("Used the prompt {}", "Used a prompt")}
+
+
+def asked(entry):
+    """An entry of the log in words: Searched for tokenizers, in Prompt Engineering. A detail that only says
+    again what the words say ("courses" after Listed the courses) is left out."""
+    action = str(entry.get("action") or "")
+    detail = " ".join(str(entry.get("detail") or "").split())
+    with_detail, plain = ASKED.get(action) or ("{}: {}", action.replace("_", " ").replace("/", " ").strip().capitalize() or "Asked")
+    if not detail or detail.lower() in plain.lower().split():
+        return plain
+    return with_detail.format(detail) if action in ASKED else with_detail.format(plain, detail)
+
+
+def log_item(entry, jobs):
+    """An entry of the log for Settings, with the titles of the transcriptions it names (None for one that
+    was deleted since) and what was asked in words."""
+    ids = [str(i) for i in entry.get("ids") or []] if isinstance(entry.get("ids"), list) else []
+    return {"time": str(entry.get("time") or ""), "client": str(entry.get("client") or ""),
+            "action": str(entry.get("action") or ""), "detail": str(entry.get("detail") or ""), "ids": ids,
+            "titles": [(jobs[i].get("title") or "Untitled") if i in jobs else None for i in ids], "text": asked(entry)}
 
 
 def slug(text):
@@ -432,6 +533,7 @@ class Handler(BaseHTTPRequestHandler):
         out["details"] = report.details(job, out["lines"], out["edited"])
         out["detail_groups"] = report.groups(out["details"])  # the same, as the lines the job page shows
         out["version"] = history.current(self.app.store, jid, self.app.cfg)  # None while it runs
+        out["assistants"] = job_assistants(self.app.cfg, job)  # whether assistants may read it, and why not
         if job["status"] in ("failed", "interrupted", "cancelled"):
             log = folder / "log.txt"
             out["log"] = log.read_text(encoding="utf-8", errors="replace")[-4000:] if log.exists() else ""
@@ -697,11 +799,38 @@ class Handler(BaseHTTPRequestHandler):
     def settings(self, _params):
         p = self.body_json()
         values = {k: p[k] for k in self.app.cfg.SETTINGS if k in p}
-        try:
-            self.app.cfg.save_settings(**values)
-        except ValueError as e:
-            raise ApiError(400, str(e))
+        with self.app.settings_lock:
+            try:
+                self.app.cfg.save_settings(**values)
+            except ValueError as e:
+                raise ApiError(400, str(e))
         self.json(self.app.status())
+
+    # Assistants over MCP (app/assistants.py; app/mcp.py is the server they start): Settings → Assistants. The
+    # two switches are saved with the other settings (POST /api/settings).
+    def assistants_info(self, _params):
+        self.json(self.app.assistants_view())
+
+    def hide_from_assistants(self, _params):
+        """{key: "job:<id>" or "course:<playlist id>", hidden: true or false}: hidden from assistants, or
+        shown again. Answers like GET /api/assistants."""
+        p = self.body_json()
+        if not isinstance(p.get("hidden"), bool):
+            raise ApiError(400, "hidden must be true or false")
+        with self.app.settings_lock:
+            try:
+                assistants.set_hidden(self.app.cfg, p.get("key"), p["hidden"])
+            except ValueError as e:
+                raise ApiError(400, str(e))
+        self.json(self.app.assistants_view())
+
+    def clear_assistants_log(self, _params):
+        """Empties the list of what assistants asked. Answers like GET /api/assistants."""
+        try:
+            assistants.clear_log(self.app.cfg)
+        except OSError as e:
+            raise ApiError(500, f"could not clear the list: {e}")
+        self.json(self.app.assistants_view())
 
     def open_folder(self, _params):
         """Show the data folder in the file manager, or with {"job": id} the courses folder a YouTube job's
@@ -840,6 +969,9 @@ ROUTES = [
     ("POST", r"/api/keys", Handler.save_key),
     ("POST", r"/api/power", Handler.power),
     ("POST", r"/api/settings", Handler.settings),
+    ("GET", r"/api/assistants", Handler.assistants_info),
+    ("POST", r"/api/assistants/hide", Handler.hide_from_assistants),
+    ("POST", r"/api/assistants/log/clear", Handler.clear_assistants_log),
     ("POST", r"/api/open-folder", Handler.open_folder),
     ("POST", r"/api/probe", Handler.probe),
     ("POST", r"/api/downloads/([\w-]+)", Handler.download),

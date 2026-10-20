@@ -1,0 +1,53 @@
+/* Sedjem: assistants over MCP (assistants.js): Settings → Assistants, and the Assistants panel and course bar
+   button on a transcription's page. Colours come from app.css, so both themes follow. */
+
+/* ---------- Settings → Assistants ---------- */
+.ai-intro { margin: -4px 0 18px; font-size: 13.5px; }
+.ai-sec h4 { font-size: 14px; font-weight: 650; margin: 0 0 8px; }
+.ai-sec h4:focus { outline: none; }
+.ai-sec .set-list, .ai-sec .set-items { margin-bottom: 0; }
+.ai-sec-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+.ai-sec-head h4 { margin: 0; }
+.ai-lead { margin: -2px 0 10px; }
+.ai-empty {
+  margin: 0; padding: 12px 14px; font-size: 13px; line-height: 1.45; color: var(--muted);
+  border: 1px dashed var(--border-strong); border-radius: 12px;
+}
+.ai-hidden .set-item-row { min-height: 54px; }
+.ai-hidden .set-item-text b { overflow-wrap: anywhere; }
+.ai-hidden .set-item-text code { font-size: 12.5px; font-weight: 500; }
+
+.ai-snippets { display: flex; flex-direction: column; gap: 10px; }
+.ai-snippet { border: 1px solid var(--border); border-radius: 12px; padding: 10px 12px 12px; background: var(--surface); min-width: 0; }
+.ai-snippet-head { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.ai-snippet-head .set-text .hint { overflow-wrap: anywhere; }
+/* wrapped, so a long path is read whole; Copy copies the text as it is */
+.ai-code {
+  margin: 0; padding: 10px 12px; max-height: 360px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; tab-size: 2;
+  font: 12px/1.55 var(--mono); color: var(--text); background: var(--sunken);
+  border: 1px solid var(--border); border-radius: 8px;
+}
+.ai-code:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ai-copy-box { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+[data-ai-show][aria-disabled="true"], [data-ai-key][aria-disabled="true"] { opacity: .6; cursor: progress; }
+
+.ai-log { list-style: none; margin: 0; padding: 0; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.ai-log li { display: grid; grid-template-columns: 132px minmax(0, 1fr); gap: 2px 12px; padding: 9px 14px; font-size: 13px; line-height: 1.45; background: var(--surface); }
+.ai-log li + li { border-top: 1px solid var(--border); }
+.ai-log time { color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; white-space: nowrap; padding-top: 1px; }
+.ai-entry { min-width: 0; overflow-wrap: anywhere; }
+.ai-entry b { font-weight: 620; }
+.ai-titles { display: block; margin-top: 1px; font-size: 12.5px; color: var(--muted); }
+
+/* ---------- a transcription's page ---------- */
+.ai-state { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; line-height: 1.45; }
+.ai-state svg { width: 16px; height: 16px; flex: none; margin-top: 1px; color: var(--ok); }
+.ai-state.off svg { color: var(--muted); }
+.ai-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ai-actions .btn { white-space: normal; text-align: left; height: auto; min-height: 30px; padding-top: 4px; padding-bottom: 4px; }
+
+@media (max-width: 720px) {
+  .ai-log li { grid-template-columns: minmax(0, 1fr); }
+  .ai-snippet-head { flex-wrap: wrap; }
+  .ai-snippet-head .set-text { flex-basis: 100%; }
+}

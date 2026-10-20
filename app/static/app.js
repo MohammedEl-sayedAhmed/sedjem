@@ -70,6 +70,7 @@ const ICON = {
   info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>',
+  assistant: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.5A8.5 8.5 0 1 1 20.5 12z"/><path d="M12 9l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="currentColor" stroke-width="1.2"/></svg>',
   play: '<path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5z"/>',
   pause: '<rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/>',
 };
@@ -695,6 +696,7 @@ function renderJob() {
     <div class="side-col">
       ${slot}
       ${stats.ids.length ? `<div class="panel"><h3>Speakers</h3>${stats.ids.map((sid) => speakerRow(sid, stats)).join("")}</div>` : ""}
+      ${aiPanel()}
       ${detailsPanel()}
     </div>
   </div>` : ""}`;
@@ -922,6 +924,7 @@ function bindJob() {
   const follow = $("#followToggle");
   if (follow) follow.onchange = () => (S.follow = follow.checked);
   bindCourseBar(j);  // youtube.js
+  bindAi();  // assistants.js: hide it, or its course, from assistants
   bindTranscript();
   bindEditbar();
 }
@@ -1011,6 +1014,7 @@ function applyJob(r) {
   S.detailGroups = r.detail_groups || [];
   S.details = r.details || null;
   S.version = r.version ?? null;  // the current version in the history (app/history.py)
+  S.ai = r.assistants || null;  // whether assistants may read it, and why not (assistants.js)
 }
 
 async function loadJob(id) {
@@ -1538,18 +1542,20 @@ function updateVideoPrep() {
 // ---------------------------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------------------------
-// Settings: one tab at a time (Models, Add models, Hosted services, Speed, About), so nothing needs a long
-// scroll; a hosted service's key form opens only for the service being edited.
+// Settings: one tab at a time (Models, Add models, Hosted services, Speed, Assistants, About), so nothing needs
+// a long scroll; a hosted service's key form opens only for the service being edited.
 const SET = { tab: "models", add: "recommended", openKey: null, details: {}, animate: null };  // details: the open row of each tab
 const SET_TABS = [["models", "laptop", "Models"], ["add", "plus", "Add models"], ["hosted", "cloud", "Hosted services"],
-  ["speed", "bolt", "Speed"], ["about", "info", "About"]];
+  ["speed", "bolt", "Speed"], ["assistants", "assistant", "Assistants"], ["about", "info", "About"]];
 
 function openSettings(focus) {
   if (!S.status) return;  // still starting up
   if (focus === "speed" || focus === "power") SET.tab = "speed";
+  else if (focus === "assistants") SET.tab = "assistants";
   else if (focus && model(focus)?.kind === "hosted") { Object.assign(SET, { tab: "hosted", openKey: focus }); SET.details.hosted = null; }
   renderSettings(focus);
   $("#settings").showModal();
+  if (SET.tab === "assistants") loadAssistants();  // what assistants asked since it was last open
 }
 
 function setStatus(kind, text, icon = "") {
@@ -1710,12 +1716,18 @@ function renderSettings(focus) {
   const nav = `<nav class="set-nav" role="tablist" aria-label="Settings sections">${SET_TABS.map(([t, icon, label]) =>
     `<button type="button" role="tab" id="tab-${t}" data-set-tab="${t}" aria-selected="${SET.tab === t}" aria-controls="set-panel" tabindex="${SET.tab === t ? 0 : -1}">
       ${ICON[icon]}<span>${label}</span>${counts[t] ? `<small>${counts[t]}</small>` : ""}</button>`).join("")}</nav>`;
-  const panel = { models: modelsPanel, add: addPanel, hosted: hostedPanel, speed: speedPanel, about: aboutPanel }[SET.tab](items, hosted);
-  // Redrawing the same tab (download progress every 1.5 s, a row opened) keeps the panel where it was scrolled
+  const panel = { models: modelsPanel, add: addPanel, hosted: hostedPanel, speed: speedPanel, assistants: assistantsPanel,
+    about: aboutPanel }[SET.tab](items, hosted);
+  // Redrawing the same tab (download progress every 1.5 s, a row opened) keeps the panel where it was scrolled,
+  // the row of tabs on a narrow screen too, and the focus on a tab or switch drawn again
   const old = $("#set-panel"), top = old?.getAttribute("aria-labelledby") === `tab-${SET.tab}` ? old.scrollTop : 0;
+  const left = $("#settings .set-nav")?.scrollLeft || 0, was = document.activeElement;
+  const again = was?.closest?.("#settingsBody") ? (was.id ? `#${CSS.escape(was.id)}` : was.dataset.setting ? `[data-setting="${was.dataset.setting}"]` : "") : "";
   $("#settingsBody").innerHTML = `<div class="set-layout">${nav}
     <div class="set-panel" id="set-panel" role="tabpanel" aria-labelledby="tab-${SET.tab}">${panel}</div></div>`;
   if (top) $("#set-panel").scrollTop = top;
+  if (left) $("#settings .set-nav").scrollLeft = left;
+  if (again) $(`#settingsBody ${again}`)?.focus({ preventScroll: true });
   bindSettings(focus);
 }
 
@@ -1866,7 +1878,12 @@ function aboutPanel() {
 
 function bindSettings(focus) {
   const threads = S.status.settings?.threads || 10, cores = S.status.cpu_threads || threads;
-  $$("[data-set-tab]").forEach((b) => (b.onclick = () => { SET.tab = b.dataset.setTab; renderSettings(); $(`#tab-${SET.tab}`)?.focus(); }));
+  $$("[data-set-tab]").forEach((b) => (b.onclick = () => {
+    SET.tab = b.dataset.setTab;
+    renderSettings();
+    $(`#tab-${SET.tab}`)?.focus();
+    if (SET.tab === "assistants") loadAssistants();
+  }));
   const tabs = $$(".set-nav [role=tab]");
   tabs.forEach((b, i) => (b.onkeydown = (e) => {
     const step = { ArrowDown: 1, ArrowRight: 1, ArrowUp: -1, ArrowLeft: -1 }[e.key];
@@ -1901,6 +1918,7 @@ function bindSettings(focus) {
   const open = $("#openFolder");
   if (open) open.onclick = async () => { try { await api.post("/api/open-folder"); } catch (e) { toast(e.message, "error"); } };
   bindHub();
+  bindAssistants();  // assistants.js
   $$("[data-forget-model]").forEach((b) => (b.onclick = () => forgetModel(b.dataset.forgetModel)));
   if (focus && focus !== "speed" && focus !== "power") { const el = $(`[data-key="${focus}"]`); if (el) setTimeout(() => el.focus(), 50); }
 }
@@ -2084,6 +2102,7 @@ $$("#settings [data-close]").forEach((b) => (b.onclick = () => $("#settings").cl
 $("#settings").addEventListener("close", async () => {
   await refreshStatus();
   if (S.route.name === "new") renderNew();
+  aiFollow(S.status?.settings, S.status?.settings?.mcp_hidden);  // a switch changed, or something shown again
 });
 $("#settingsBtn").onclick = () => openSettings();
 $("#quitBtn").onclick = async () => {
