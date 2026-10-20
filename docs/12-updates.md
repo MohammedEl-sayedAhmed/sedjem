@@ -159,6 +159,7 @@ release, so the desktop app on *Latest changes* moves from preview to preview an
 | `updates.json` in the data folder | the last check's result and the answers' ETags |
 | `updates/` in the data folder | downloads, deleted the next time Sedjem starts |
 | `tests/test_updates.py`, `tests/github_support.py` | the tests, against a stand-in for GitHub's API and throwaway git repositories |
+| `tests/test_ui_updates.py`, `tests/test_ui_updates_e2e.py` | the browser tests of the question, the pill, the notice and *Settings → Updates*, the second with the real checks against the stand-in |
 
 Scripts can use the same calls as *Settings* (every change needs the header `X-Sedjem: 1`):
 `GET /api/updates` for the state, and `POST /api/updates/check`, `/api/updates/settings`
