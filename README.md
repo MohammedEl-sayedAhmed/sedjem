@@ -1,21 +1,24 @@
 # Sedjem statistics
 
-Updated on 2026-10-19 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
+Updated on 2026-10-20 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
 ## Totals
 
 | | |
 |---|---|
-| Downloads of the app, all releases | 11 |
-| Clones since 2026-10-05 | 11 (11 unique per day, added up) |
-| Page views since 2026-10-05 | 73 (29 unique per day, added up) |
+| Downloads of the app, all releases | 12 |
+| Clones since 2026-10-05 | 63 (35 unique per day, added up) |
+| Page views since 2026-10-05 | 85 (35 unique per day, added up) |
 | Stars, forks, watchers | 4, 0, 0 |
 
 ## Downloads by release
 
 | Release | File | Downloads |
 |---|---|---|
-| v0.1.0 | Sedjem-0.1.0-linux-x64.tar.gz | 2 |
+| v0.2.0 | Sedjem-0.2.0-linux-x64.tar.gz | 0 |
+| v0.2.0 | Sedjem-0.2.0-setup.exe | 0 |
+| v0.2.0 | SHA256SUMS.txt | 0 |
+| v0.1.0 | Sedjem-0.1.0-linux-x64.tar.gz | 3 |
 | v0.1.0 | Sedjem-0.1.0-setup.exe | 9 |
 | v0.1.0 | SHA256SUMS.txt | 1 |
 
@@ -23,6 +26,7 @@ Updated on 2026-10-19 by the Repository stats workflow on main (`.github/workflo
 
 | Day | Clones | Unique cloners | Views | Unique visitors |
 |---|---|---|---|---|
+| 2026-10-19 | 52 | 24 | 12 | 6 |
 | 2026-10-18 | 2 | 2 | 3 | 2 |
 | 2026-10-17 | 3 | 3 | 15 | 5 |
 | 2026-10-16 | 0 | 0 | 14 | 2 |
@@ -38,7 +42,7 @@ Updated on 2026-10-19 by the Repository stats workflow on main (`.github/workflo
 | 2026-10-06 | 0 | 0 | 14 | 4 |
 | 2026-10-05 | 0 | 0 | 3 | 2 |
 
-## Where visitors came from (the 14 days to 2026-10-19)
+## Where visitors came from (the 14 days to 2026-10-20)
 
 | Site | Views | Unique visitors |
 |---|---|---|
