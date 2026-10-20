@@ -202,7 +202,7 @@ newest first: when, which assistant (by the name and version it gives), what it 
 tokenizers", "get_transcript Prompt Engineering, lecture 4, 00:00-10:00") and which transcriptions the
 answer contained. A request for something hidden is logged too, with no transcriptions. *Clear* empties
 the log. It is kept in `mcp/log.jsonl` in the app's data folder (`app_data/` from source), one entry per
-line, and only the newest 2,000 entries are kept.
+line, and cut back to the newest 2,000 entries whenever it grows past 2,500.
 
 ## When it doesn't connect
 
