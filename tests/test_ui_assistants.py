@@ -159,6 +159,10 @@ class Assistants(UiTestCase):
         self.page.wait_for_selector("#settings .ai-log li:first-child:has-text('VS Code')")
         self.assertEqual(self.texts("#settings .ai-log li:first-child .ai-entry"),
                          ["VS Code Read the outline of Python for beginners Introduction, Loops"])
+        # as plain text too (copied, or read without the layout): the words stay apart without CSS's line break
+        self.assertEqual(self.page.eval_on_selector("#settings .ai-log li:first-child .ai-entry",
+                                                    "e => e.textContent.replace(/\\s+/g, ' ').trim()"),
+                         "VS Code Read the outline of Python for beginners Introduction, Loops")
 
         self.page.once("dialog", lambda d: d.dismiss())
         self.page.click("#aiClear")

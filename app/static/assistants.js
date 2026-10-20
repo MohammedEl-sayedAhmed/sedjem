@@ -65,7 +65,7 @@ function aiLogSection(log) {
     const shown = names.slice(0, 3), more = names.length - shown.length;
     const titles = names.length ? `<span class="ai-titles">${shown.map((t) => `<bdi>${esc(t)}</bdi>`).join(", ")}${more ? ` and ${more} more` : ""}</span>` : "";
     return `<li><time datetime="${esc(e.time)}">${esc(when(e.time))}</time>
-      <div class="ai-entry"><b>${esc(e.client || "An assistant")}</b> <span class="ai-what">${esc(e.text)}</span>${titles}</div></li>`;
+      <div class="ai-entry"><b>${esc(e.client || "An assistant")}</b> <span class="ai-what">${esc(e.text)}</span> ${titles}</div></li>`;
   }).join("");
   return `<section class="ai-sec" aria-labelledby="ai-log">
     <div class="ai-sec-head"><h4 id="ai-log" tabindex="-1">What assistants asked</h4>
