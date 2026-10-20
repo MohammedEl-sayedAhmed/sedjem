@@ -82,11 +82,21 @@ recording on your machine unless you choose a hosted service.
   a row or a time range from another model, review the result as a diff, and save it as a new
   version.
 
+### Work with an assistant
+
+- Answers assistants such as Claude Desktop, Claude Code, Cursor and VS Code over MCP, even while the
+  app is closed: they can list, search and read the transcripts and courses, read long ones in pieces,
+  and point to the lecture and the moment in the video. Prompts for summaries, meeting minutes, study
+  notes, quizzes and flashcards come with it.
+- Assistants see only what *Settings → Assistants* allows: courses, other recordings, or neither, and
+  any transcription or course can be hidden from them. A log shows what they asked. See
+  [assistants](docs/11-assistants.md).
+
 ### Models and settings
 
 - Adds models from a Hugging Face link, or with one click from a Recommended list that gives the
   evidence, size, licence and graphics cards for each.
-- Settings has tabs for Models, Add models, Hosted services, Speed and About.
+- Settings has tabs for Models, Add models, Hosted services, Speed, Assistants and About.
 - Downloads resume if the connection drops and are checked against pinned checksums.
 - Has a dark theme, and contacts nothing on the internet except the model downloads, YouTube for the
   links you add, and the hosted services you choose.
@@ -264,6 +274,7 @@ was tried first and is not usable for this: it wrote most English terms in Arabi
 | [Disk space and cleanup](docs/08-disk-and-cleanup.md) | what gets installed where, and how to remove it |
 | [The app](docs/09-app.md) | using Sedjem, versions, comparing, its settings, API keys, privacy |
 | [Desktop app](docs/10-desktop.md) | running, building and testing on Windows and Linux |
+| [Assistants](docs/11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, and what they may see |
 
 ## Name and logo
 

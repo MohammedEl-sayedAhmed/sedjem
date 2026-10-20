@@ -40,7 +40,9 @@ in the application menu and its window shows the Sedjem icon: the browser window
 Closing the window quits the app, and so does *Quit Sedjem* in *Settings*. `--browser` skips the native window,
 `--server` (or `--no-window`) runs only the server, and `--port N` picks the port (the default is
 8765, or any free one). The Windows installer also adds a *Sedjem (browser window)* shortcut, which
-starts it with `--browser`.
+starts it with `--browser`. `Sedjem --mcp` opens nothing: it is the command an assistant such as
+Claude Desktop runs to read the transcriptions over MCP, answering on standard input and output
+([assistants](11-assistants.md)).
 
 On Linux the native window needs Python bindings for one of the two engines. On KDE the simplest
 is Qt: `pip install "pywebview[qt]"` (about 150 MB). On GNOME it is GTK WebKit, which needs the
@@ -88,7 +90,8 @@ Build on the system you are building for, since PyInstaller doesn't cross-compil
 folder, about 470 MB on Linux (CTranslate2, onnxruntime, sherpa-onnx, the FFmpeg libraries,
 transcribe.cpp with its CPU and Vulkan backends, numpy); models and NVIDIA's CUDA libraries are not
 included, and the app downloads them when asked. The same executable
-runs the model worker (`Sedjem --transcribe …`), so each transcription still gets its own process.
+runs the model worker (`Sedjem --transcribe …`), so each transcription still gets its own process,
+and the assistants' MCP server (`Sedjem --mcp`).
 
 The GitHub Actions workflow [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml)
 builds and checks the app on Windows and Linux. It runs the unit tests, a self-test from source, the
@@ -104,7 +107,9 @@ touching your data. It starts the model process and has it import everything a l
 checks that the interface and API answer, then uploads a generated tone, converts it to 16 kHz FLAC
 and has it "transcribed" by a stand-in for the ElevenLabs API on 127.0.0.1. It also converts a
 generated MPEG-4 clip to the H.264 video the job page shows, which fails if the build's FFmpeg has no
-H.264 encoder. With `--window`, a native window opens, loads the app and closes. With `--models`
+H.264 encoder. It starts the assistants' server (`Sedjem --mcp`) the way an assistant does, on a data
+folder with one transcription, and checks over pipes that it answers in both versions of the MCP
+protocol with nothing else on its output. With `--window`, a native window opens, loads the app and closes. With `--models`
 (about 820 MB of downloads into a temporary folder), whisper-medium and the voiceprint model are fetched with the app's own downloader, and a
 public 11-second speech sample (JFK, from the openai/whisper repository) is transcribed with speaker
 labels. On the test laptop that gave *"and so my fellow americans, ask not what your country can do
