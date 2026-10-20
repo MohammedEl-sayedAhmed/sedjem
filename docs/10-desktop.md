@@ -5,9 +5,9 @@ or application menu entry, models downloaded from inside the app, and a Windows 
 It is the same code, the local server and the web interface, shown in a native window, so every
 feature works the same way in the browser and on the desktop.
 
-It builds, installs and runs on both systems, and the checks below pass; how it updates itself is
-described in [updates](12-updates.md). Code signing and Linux packages are not done yet (see the end
-of this page).
+It builds, installs and runs on both systems, and the checks below pass. It can update itself
+([updates](12-updates.md)). Code signing, updating the Linux build in place and Linux packages are not
+done yet (see the end of this page).
 
 ## Run it
 
@@ -202,6 +202,8 @@ hand.
   PC"; choose *More info*, then *Run anyway*).
 - Smaller updates. Each update downloads the whole installer or archive, not only the files that
   changed ([updates](12-updates.md)).
+- Updating in place on Linux. *Update now* runs the new installer on Windows, but on Linux it unpacks the
+  new build beside the old one ([updates](12-updates.md)).
 - macOS. pywebview and PyInstaller support it, but it hasn't been built or tested by the project.
 - Linux packages. There is no AppImage or .deb yet.
 - Windows before 10 may lack WebView2, and the installer doesn't bundle its bootstrapper; Sedjem

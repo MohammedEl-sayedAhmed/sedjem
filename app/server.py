@@ -20,7 +20,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import __version__, assistants, compare, courses, engines, hub, report, video, youtube
+from . import assistants, compare, courses, engines, hub, report, updates, video, youtube
 from . import transcript as T
 from . import history
 from .config import FROZEN, power_profile, set_power_profile
@@ -52,12 +52,22 @@ class App:
         self.server = None
         self.desktop = False    # set by the desktop app
         self.on_quit = None     # the desktop app closes its window instead of just stopping the server
+        self.restarting = False  # quitting for an update, which starts the app again on the same port
         self.gpu = None         # what transcribe.py can use here; found in the background at start
         self.gpu_probing = False
         self.used = (0.0, None)  # (time, bytes) of the last count of the transcriptions' size
         self.inspected = {}      # YouTube link -> (time, what youtube.inspect found), for adding it right after
         self.settings_lock = threading.Lock()  # settings.json is read, changed and written one request at a time
+        # Settings → Updates (app/updates.py); its background check is started by the app's entry points
+        self.updates = updates.Updates(cfg, quit=self.quit, show_folder=lambda folder: show_folder(folder),
+                                       port=lambda: self.server.server_address[1] if self.server else None)
         self.probe_gpu()
+
+    def quit(self, restarting=False):
+        """Quit as Settings → Quit does: the desktop app closes its window, else the server stops. restarting: an
+        update starts the app again, and the new one takes over the port."""
+        self.restarting = self.restarting or restarting
+        threading.Thread(target=self.on_quit or self.server.shutdown, daemon=True).start()
 
     def probe_gpu(self):
         if self.gpu_probing:
@@ -139,8 +149,10 @@ class App:
         if gpu.get("cuda_devices") and not gpu.get("cuda_libs") and "cuda" in items \
                 and self.downloads.status("cuda")["installed"]:
             self.probe_gpu()  # the NVIDIA libraries were just downloaded: check them again
+        settings = self.cfg.settings()
         return {
-            "app": "sedjem", "version": __version__,
+            # a desktop build's stamp names its version (a nightly preview is newer than app.__version__)
+            "app": "sedjem", "version": self.updates.running()["version"],
             "desktop": self.desktop, "frozen": FROZEN, "home": str(self.cfg.home),
             "models": [self.model_info(m, jobs) for m in self.cfg.models.values()],
             "catalog": hub.catalog(self.cfg),  # recommended models (app/catalog.toml)
@@ -150,7 +162,9 @@ class App:
             "youtube": {"runtime": youtube.runtime(self.cfg), "courses": str(self.cfg.courses)},
             "gpu": self.gpu, "gpu_probing": self.gpu_probing,
             "defaults": self.cfg.defaults,
-            "settings": self.cfg.settings(),
+            "settings": settings,
+            # the first-start question about checking for updates, and the top bar's pill (app/updates.py)
+            "update": self.updates.summary(settings),
             "cpu_threads": os.cpu_count(),
             "speakers_ready": self.cfg.speakers_ready(),
             "power": power_profile(),
@@ -912,10 +926,58 @@ class Handler(BaseHTTPRequestHandler):
         hub.forget(self.app.cfg, model_id)
         self.json(self.app.status())
 
+    # Updates (app/updates.py): Settings → Updates, the first-start question and the top bar's pill
+    def updates_state(self, _params):
+        self.json(self.app.updates.state())
+
+    def check_updates(self, _params):
+        """Asks GitHub now, whatever the automatic check is set to (at most about 15 s)."""
+        self.app.updates.check()
+        self.json(self.app.updates.state())
+
+    def update_settings(self, _params):
+        """{"enabled": true or false (check by itself once a day), "channel": "stable" or "latest"}, either or both."""
+        p = self.body_json()
+        values = {}
+        if "enabled" in p:
+            if not isinstance(p["enabled"], bool):
+                raise ApiError(400, "enabled must be true or false")
+            values["update_check"] = p["enabled"]
+        if "channel" in p:
+            if p["channel"] not in ("stable", "latest"):
+                raise ApiError(400, "channel must be stable or latest")
+            values["update_channel"] = p["channel"]
+        with self.app.settings_lock:
+            before = self.app.cfg.settings()
+            self.app.cfg.save_settings(**values)
+        self.app.updates.settings_changed(before, self.app.cfg.settings())
+        self.json(self.app.updates.state())
+
+    def skip_update(self, _params):
+        """{"skip": true} skips what is available now (no pill, no notice; Settings still lists it), false undoes it."""
+        p = self.body_json()
+        if not isinstance(p.get("skip"), bool):
+            raise ApiError(400, "skip must be true or false")
+        with self.app.settings_lock:
+            try:
+                self.app.updates.skip(p["skip"])
+            except updates.Refused as e:
+                raise ApiError(409, str(e))
+        self.json(self.app.updates.state())
+
+    def install_update(self, _params):
+        """Update now, in the background: GET /api/updates shows how far it got. Refused (409) with the reason when
+        it can't run, and while transcriptions run if the app has to restart for it."""
+        active = any(j["status"] in ACTIVE for j in self.app.store.list())
+        try:
+            self.app.updates.start_install(jobs_active=active)
+        except updates.Refused as e:
+            raise ApiError(409, str(e))
+        self.json(self.app.updates.state())
+
     def quit(self, _params):
         self.json({"bye": True})
-        target = self.app.on_quit or self.app.server.shutdown
-        threading.Thread(target=target, daemon=True).start()
+        self.app.quit()
 
 
 def show_folder(folder):
@@ -983,6 +1045,11 @@ ROUTES = [
     ("POST", r"/api/hub/inspect", Handler.hub_inspect),
     ("POST", r"/api/hub/add", Handler.hub_add),
     ("DELETE", r"/api/models/(hf-[\w-]+)", Handler.forget_model),
+    ("GET", r"/api/updates", Handler.updates_state),
+    ("POST", r"/api/updates/check", Handler.check_updates),
+    ("POST", r"/api/updates/settings", Handler.update_settings),
+    ("POST", r"/api/updates/skip", Handler.skip_update),
+    ("POST", r"/api/updates/install", Handler.install_update),
     ("POST", r"/api/quit", Handler.quit),
 ]
 

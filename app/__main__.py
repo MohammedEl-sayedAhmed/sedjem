@@ -7,6 +7,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
+from . import updates
 from .config import Config
 from .server import make_server
 
@@ -37,7 +38,8 @@ def main():
         print(f"added {dest}; remove that file to undo" if dest else "only on Linux desktops")
         return
     cfg = Config(args.config) if args.config else Config()
-    port = args.port or cfg.server["port"]
+    restarted = updates.restarted()  # started again by an update: the same port, and the open page reloads itself
+    port = restarted or args.port or cfg.server["port"]
     url = f"http://127.0.0.1:{port}/"
     try:
         server, app = make_server(cfg, port=port)
@@ -48,8 +50,9 @@ def main():
                 webbrowser.open(url)
             return
         sys.exit(f"port {port} is in use by another program; start with --port N")
+    app.updates.start()  # checks for updates in the background, if the user agreed to it
     print(f"Sedjem is running at {url}  (data: {cfg.storage}; stop with Ctrl+C)", flush=True)
-    if cfg.server.get("open_browser", True) and not args.no_browser:
+    if cfg.server.get("open_browser", True) and not args.no_browser and not restarted:
         threading.Timer(0.6, webbrowser.open, [url]).start()
     try:
         server.serve_forever()
