@@ -238,24 +238,28 @@ def hidden_item(key, jobs):
     return {"key": key, "kind": "course", "title": course.get("title") or "Course", "detail": lectures_text}
 
 
-# What an assistant asked, in words: the actions are the tools, resources and prompts of app/mcp.py. One this
-# list doesn't know (a newer server's) is shown by its own name.
-ASKED = {"list_transcriptions": "Listed the transcriptions", "list_courses": "Listed the courses",
-         "course_outline": "Read the outline of a course", "get_transcript": "Read a transcript",
-         "search": "Searched the transcripts", "get_course_text": "Read a whole course",
-         "read_resource": "Read a resource", "resource": "Read a resource",
-         "get_prompt": "Used a prompt", "prompt": "Used a prompt",
-         "complete": "Asked for suggestions", "completion": "Asked for suggestions"}
+# What an assistant asked, in words: the actions are app/mcp.py's tools, resources/read and prompts/get, and
+# the detail is what it was about, as the server words it ("tokenizers, in Prompt Engineering"): (with the
+# detail, without one). An action this list doesn't know (a newer server's) is shown by its own name.
+ASKED = {"list_transcriptions": ("Listed the transcriptions ({})", "Listed the transcriptions"),
+         "list_courses": ("Listed the courses ({})", "Listed the courses"),
+         "course_outline": ("Read the outline of {}", "Read the outline of a course"),
+         "get_transcript": ("Read {}", "Read a transcript"),
+         "search": ("Searched for {}", "Searched the transcripts"),
+         "get_course_text": ("Read the course text of {}", "Read the text of a course"),
+         "resources/read": ("Read {}", "Read a transcript or a course"),
+         "prompts/get": ("Used the prompt {}", "Used a prompt")}
 
 
 def asked(entry):
-    """An entry of the log in words: Searched the transcripts for “tokenizers”."""
+    """An entry of the log in words: Searched for tokenizers, in Prompt Engineering. A detail that only says
+    again what the words say ("courses" after Listed the courses) is left out."""
     action = str(entry.get("action") or "")
     detail = " ".join(str(entry.get("detail") or "").split())
-    text = ASKED.get(action) or action.replace("_", " ").strip().capitalize() or "Asked"
-    if detail:
-        text += f" for “{detail}”" if action == "search" else f": {detail}"
-    return text
+    with_detail, plain = ASKED.get(action) or ("{}: {}", action.replace("_", " ").replace("/", " ").strip().capitalize() or "Asked")
+    if not detail or detail.lower() in plain.lower().split():
+        return plain
+    return with_detail.format(detail) if action in ASKED else with_detail.format(plain, detail)
 
 
 def log_item(entry, jobs):

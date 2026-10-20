@@ -151,18 +151,40 @@ class AssistantsApi(unittest.TestCase):
         self.assertTrue(self.cfg.settings()["mcp_recordings"])
 
     def test_the_log(self):
-        assistants.log(self.cfg, "Claude Desktop 1.2", "search", "tokenizers", [INTRO, GONE])
-        assistants.log(self.cfg, "Cursor", "get_transcript", "Introduction 00:00-10:00", [INTRO])
-        assistants.log(self.cfg, "Claude Code", "rename_speaker", "", [])  # a tool this app doesn't know yet
+        # the details as app/mcp.py words them
+        for client, action, detail, ids in (
+                ("Claude Desktop 1.2", "search", "tokenizers", [INTRO, GONE]),
+                ("Claude Desktop 1.2", "search", "loops, in Python for beginners", [LOOPS]),
+                ("Cursor", "get_transcript", "Python for beginners, lecture 1, 00:00-10:00", [INTRO]),
+                ("Cursor", "list_transcriptions", '"loops", done', [LOOPS]),
+                ("Cursor", "list_courses", "courses", []),
+                ("VS Code", "course_outline", "Python for beginners", [INTRO, LOOPS]),
+                ("VS Code", "get_course_text", "Python for beginners, characters 1-50,000", [INTRO, LOOPS]),
+                ("Claude Code", "resources/read", "Sprint planning", [MEETING]),
+                ("Claude Code", "prompts/get", "summarize: Sprint planning", [MEETING]),
+                ("Claude Code", "search", "", []),  # a call that failed before it said what it was about
+                ("Claude Code", "rename_speaker", "", []),  # a tool this app doesn't know yet
+                ("Claude Code", "edit_line", "Sprint planning, line 4", [MEETING])):
+            assistants.log(self.cfg, client, action, detail, ids)
         log = self.call("GET", "/api/assistants")[1]["log"]
-        self.assertEqual([(e["client"], e["text"]) for e in log], [
-            ("Claude Code", "Rename speaker"),
-            ("Cursor", "Read a transcript: Introduction 00:00-10:00"),
-            ("Claude Desktop 1.2", "Searched the transcripts for “tokenizers”")])
-        self.assertEqual((log[2]["ids"], log[2]["titles"]), ([INTRO, GONE], ["Introduction", None]),
+        self.assertEqual([e["text"] for e in reversed(log)], [
+            "Searched for tokenizers",
+            "Searched for loops, in Python for beginners",
+            "Read Python for beginners, lecture 1, 00:00-10:00",
+            'Listed the transcriptions ("loops", done)',
+            "Listed the courses",
+            "Read the outline of Python for beginners",
+            "Read the course text of Python for beginners, characters 1-50,000",
+            "Read Sprint planning",
+            "Used the prompt summarize: Sprint planning",
+            "Searched the transcripts",
+            "Rename speaker",
+            "Edit line: Sprint planning, line 4"])
+        first = log[-1]
+        self.assertEqual((first["client"], first["action"], first["detail"]), ("Claude Desktop 1.2", "search", "tokenizers"))
+        self.assertEqual((first["ids"], first["titles"]), ([INTRO, GONE], ["Introduction", None]),
                          "a transcription deleted since has no title")
-        self.assertEqual((log[2]["action"], log[2]["detail"]), ("search", "tokenizers"))
-        self.assertRegex(log[2]["time"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")
+        self.assertRegex(first["time"], r"^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d")
         for i in range(60):
             assistants.log(self.cfg, "Cursor", "search", f"q{i}")
         log = self.call("GET", "/api/assistants")[1]["log"]

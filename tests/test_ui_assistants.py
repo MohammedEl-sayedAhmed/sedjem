@@ -142,14 +142,14 @@ class Assistants(UiTestCase):
 
     def test_what_assistants_asked(self):
         assistants.log(self.cfg, "Claude Desktop 1.2", "search", "tokenizers", [INTRO, LOOPS, MEETING, TALK, GONE])
-        assistants.log(self.cfg, "Cursor", "get_transcript", "Sprint planning 00:00-10:00", [MEETING])
-        assistants.log(self.cfg, "Claude Code", "list_courses", "<b>a query</b>")
+        assistants.log(self.cfg, "Cursor", "get_transcript", "Sprint planning, 00:00-10:00", [MEETING])
+        assistants.log(self.cfg, "Claude Code", "search", "<b>a query</b>")
         self.open()
         self.open_tab()
         self.assertEqual(self.texts("#settings .ai-log .ai-entry"), [
-            "Claude Code Listed the courses: <b>a query</b>",
-            "Cursor Read a transcript: Sprint planning 00:00-10:00 Sprint planning",
-            "Claude Desktop 1.2 Searched the transcripts for “tokenizers” Introduction, Loops, Sprint planning and 2 more"])
+            "Claude Code Searched for <b>a query</b>",
+            "Cursor Read Sprint planning, 00:00-10:00 Sprint planning",
+            "Claude Desktop 1.2 Searched for tokenizers Introduction, Loops, Sprint planning and 2 more"])
         self.assertEqual(self.page.locator("#settings .ai-entry b").count(), 3, "what an assistant sent is text, never markup")
         self.assertTrue(all(t.startswith("Today ") for t in self.texts("#settings .ai-log time")))
 
@@ -158,7 +158,7 @@ class Assistants(UiTestCase):
         self.open_tab()
         self.page.wait_for_selector("#settings .ai-log li:first-child:has-text('VS Code')")
         self.assertEqual(self.texts("#settings .ai-log li:first-child .ai-entry"),
-                         ["VS Code Read the outline of a course: Python for beginners Introduction, Loops"])
+                         ["VS Code Read the outline of Python for beginners Introduction, Loops"])
 
         self.page.once("dialog", lambda d: d.dismiss())
         self.page.click("#aiClear")
