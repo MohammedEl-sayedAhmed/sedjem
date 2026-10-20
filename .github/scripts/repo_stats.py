@@ -6,11 +6,16 @@ This script, run once a day by .github/workflows/stats.yml, adds the latest numb
 `stats` branch, so the history reaches back further than 14 days. It also rewrites a summary there
 (README.md) and two badge files that shields.io reads for the badges in the main README.
 
+Stars and forks have a history on GitHub already: the lists of stargazers and forks give the day of each
+star and fork, a hundred to a request. stars.csv is rebuilt from them on every run, so it reaches back to
+the first star.
+
 It talks to GitHub only through the REST API, never with git: GitHub counts every clone, including a
 checkout by a build machine, so a daily checkout would show up as a clone of its own.
 
 Tokens, from the environment:
-  GITHUB_TOKEN  reads releases and the repository, and writes the stats branch (contents: write)
+  GITHUB_TOKEN  reads the releases, the repository, its stargazers and forks, and writes the stats branch
+                (contents: write)
   STATS_TOKEN   reads clones, views and referrers, which need Administration read access: a fine-grained
                 token for this repository. If it is missing, GITHUB_TOKEN is tried; when neither can read
                 them, the traffic files are left as they were and the summary says when they were last read.
@@ -26,6 +31,7 @@ import os
 import sys
 import urllib.error
 import urllib.request
+from collections import Counter
 from datetime import datetime, timezone
 
 API = "https://api.github.com"
@@ -37,6 +43,7 @@ FIELDS = {
     "downloads.csv": ["date", "release", "asset", "downloads"],
     "referrers.csv": ["date", "referrer", "views", "unique"],
     "repo.csv": ["date", "stars", "forks", "watchers"],
+    "stars.csv": ["date", "stars", "forks"],
 }
 FILES = [*FIELDS, "state.json", "README.md", "badges/downloads.json", "badges/clones.json"]
 
@@ -68,6 +75,18 @@ def merge_daily(rows, items, name):
 def replace_day(rows, today, new):
     """A snapshot table with today's rows replaced by `new` (each given today's date)."""
     return [r for r in rows if r["date"] != today] + [{"date": today, **n} for n in new]
+
+
+def star_history(stargazers, forks):
+    """stars.csv rows from GitHub's lists ({starred_at} and {created_at}): for each day on which one of
+    today's stargazers starred or a fork was made, the running totals at the end of that day."""
+    stars = Counter(s["starred_at"][:10] for s in stargazers if s.get("starred_at"))
+    made = Counter(f["created_at"][:10] for f in forks if f.get("created_at"))
+    rows, s, f = [], 0, 0
+    for day in sorted(stars.keys() | made.keys()):
+        s, f = s + stars[day], f + made[day]
+        rows.append({"date": day, "stars": str(s), "forks": str(f)})
+    return rows
 
 
 def is_app(asset):
@@ -125,6 +144,10 @@ def summary(tables, repo, today, traffic_read):
               "Clones include those by build machines: every run of the Desktop build workflow clones the repository. "
               "The stats workflow does not, so it adds nothing to the counts.",
               "",
+              "Stars and forks come from GitHub's lists of the current stargazers and forks, which give the day of "
+              "each star and fork, so their history reaches back to the first star. A star that is taken back "
+              "leaves the history altogether. stars.csv holds the running totals for each day on which they grew.",
+              "",
               "The CSV files beside this summary hold every number by day. The download, referrer and repository "
               "tables are snapshots: one set of rows per day, with GitHub's running totals at the time.", ""]
     return "\n".join(lines)
@@ -132,8 +155,8 @@ def summary(tables, repo, today, traffic_read):
 
 def update(old, fetched, repo, today):
     """New file contents from the old ones (path -> text, missing files absent) and today's numbers:
-    fetched = {"releases": [...], "repo": {...}, "clones": [...] or None, "views": ..., "referrers": ...}
-    (None when the traffic could not be read)."""
+    fetched = {"releases": [...], "repo": {...}, "stargazers": [...] or None, "forks": ...,
+    "clones": [...] or None, "views": ..., "referrers": ...} (None when they could not be read)."""
     tables = {name: read_csv(old.get(name)) for name in FIELDS}
     state = json.loads(old.get("state.json") or "{}")
     if fetched["clones"] is not None:
@@ -142,6 +165,8 @@ def update(old, fetched, repo, today):
         tables["referrers.csv"] = replace_day(tables["referrers.csv"], today, [
             {"referrer": r["referrer"], "views": str(r["count"]), "unique": str(r["uniques"])} for r in fetched["referrers"]])
         state["traffic_read"] = today
+    if fetched.get("stargazers") is not None and fetched.get("forks") is not None:
+        tables["stars.csv"] = star_history(fetched["stargazers"], fetched["forks"])
     tables["downloads.csv"] = replace_day(tables["downloads.csv"], today, [
         {"release": rel["tag_name"], "asset": a["name"], "downloads": str(a["download_count"])}
         for rel in fetched["releases"] if not rel.get("draft") for a in rel["assets"]])
@@ -165,10 +190,10 @@ class GitHubError(Exception):
         self.status = status
 
 
-def call(token, path, method="GET", body=None, raw=False):
+def call(token, path, method="GET", body=None, raw=False, accept=None):
     req = urllib.request.Request(API + path, method=method, data=None if body is None else json.dumps(body).encode(),
                                  headers={"Authorization": f"Bearer {token}", "X-GitHub-Api-Version": "2022-11-28",
-                                          "Accept": "application/vnd.github.raw" if raw else "application/vnd.github+json",
+                                          "Accept": accept or ("application/vnd.github.raw" if raw else "application/vnd.github+json"),
                                           "User-Agent": "repo-stats"})
     try:
         with urllib.request.urlopen(req, timeout=30) as resp:
@@ -178,15 +203,28 @@ def call(token, path, method="GET", body=None, raw=False):
     return data.decode() if raw else json.loads(data or b"null")
 
 
-def fetch(repo, token, traffic_token):
-    releases, page = [], 1
+def pages(token, path, accept=None):
+    """Every item of a list, a hundred to a request."""
+    items, page = [], 1
     while True:
-        batch = call(token, f"/repos/{repo}/releases?per_page=100&page={page}")
-        releases += batch
+        batch = call(token, f"{path}{'&' if '?' in path else '?'}per_page=100&page={page}", accept=accept)
+        items += batch
         if len(batch) < 100:
-            break
+            return items
         page += 1
-    got = {"releases": releases, "repo": call(token, f"/repos/{repo}"), "clones": None, "views": None, "referrers": None}
+
+
+def fetch(repo, token, traffic_token):
+    info = call(token, f"/repos/{repo}")
+    got = {"releases": pages(token, f"/repos/{repo}/releases"), "repo": info,
+           "stargazers": None, "forks": None, "clones": None, "views": None, "referrers": None}
+    try:  # the day of each star and fork; none to ask for while there are none
+        got["stargazers"] = pages(token, f"/repos/{repo}/stargazers", accept="application/vnd.github.star+json") \
+            if info.get("stargazers_count") else []
+        got["forks"] = pages(token, f"/repos/{repo}/forks?sort=oldest") if info.get("forks_count") else []
+    except GitHubError as e:
+        got["stargazers"] = got["forks"] = None
+        print(f"::warning::The stargazers and forks could not be read ({e}); stars.csv is left as it was.")
     for tok in dict.fromkeys(t for t in (traffic_token, token) if t):  # the stats token first, then the other
         try:
             got["clones"] = call(tok, f"/repos/{repo}/traffic/clones?per=day")["clones"]

@@ -1,7 +1,8 @@
 """Tests for the repository statistics (.github/scripts/repo_stats.py): the daily history grows past
 GitHub's 14 days, a day reported again replaces the old numbers, snapshots keep one set of rows a day,
 the checksum list isn't counted as a download, the badges and summary show the totals, and a run without
-access to the traffic keeps the old traffic files and says so. The workflow never clones the repository (a
+access to the traffic keeps the old traffic files and says so. The star history is rebuilt from the
+stargazers and forks, which are read a hundred to a request. The workflow never clones the repository (a
 clone would count itself) and the script needs only the standard library; the README's badges read the files
 the script writes. Offline: the GitHub calls are replaced.
 Run: .venv/bin/python -m unittest discover -s tests -v
@@ -29,12 +30,15 @@ def day(d, count, uniques):
 
 
 def fetched(clones=(), views=(), downloads=(("v0.1.0", "Sedjem-setup.exe", 9), ("v0.1.0", "SHA256SUMS.txt", 1)),
-            referrers=(("github.com", 6, 3),), traffic=True):
+            referrers=(("github.com", 6, 3),), traffic=True, stargazers=None, forks=None):
+    """What fetch() returns. stargazers and forks: the days of each star and fork (None: not read)."""
     releases = {}
     for tag, name, n in downloads:
         releases.setdefault(tag, []).append({"name": name, "download_count": n})
     return {"releases": [{"tag_name": t, "assets": a} for t, a in releases.items()],
             "repo": {"stargazers_count": 4, "forks_count": 1, "subscribers_count": 2},
+            "stargazers": None if stargazers is None else [{"starred_at": f"{d}T16:33:08Z", "user": {"login": "x"}} for d in stargazers],
+            "forks": None if forks is None else [{"created_at": f"{d}T09:00:00Z", "full_name": "x/sedjem"} for d in forks],
             "clones": list(clones) if traffic else None, "views": list(views) if traffic else None,
             "referrers": [{"referrer": r, "count": c, "uniques": u} for r, c, u in referrers] if traffic else None}
 
@@ -98,12 +102,22 @@ class Update(unittest.TestCase):
         once = stats.update({}, f, REPO, "2026-10-01")
         self.assertEqual(stats.update(once, f, REPO, "2026-10-01"), once)
 
+    def test_the_star_history_comes_from_the_stargazers_and_forks(self):
+        new = stats.update({}, fetched(stargazers=["2026-09-28", "2026-09-28", "2026-09-28", "2026-09-29"],
+                                       forks=["2026-10-02"]), REPO, "2026-10-20")
+        self.assertEqual([(r["date"], r["stars"], r["forks"]) for r in stats.read_csv(new["stars.csv"])],
+                         [("2026-09-28", "3", "0"), ("2026-09-29", "4", "0"), ("2026-10-02", "4", "1")])
+        # a day the lists could not be read keeps the history, and a day with none has none
+        self.assertEqual(stats.update(new, fetched(), REPO, "2026-10-21")["stars.csv"], new["stars.csv"])
+        self.assertEqual(stats.update(new, fetched(stargazers=[], forks=[]), REPO, "2026-10-21")["stars.csv"],
+                         "date,stars,forks\n")
+
 
 class Fetch(unittest.TestCase):
     def test_the_stats_token_reads_the_traffic_and_a_refusal_falls_back(self):
         calls = []
 
-        def call(token, path, method="GET", body=None, raw=False):
+        def call(token, path, method="GET", body=None, raw=False, accept=None):
             calls.append((token, path.split("?")[0]))
             if "/traffic/" in path:
                 if token == "stats-token":
@@ -119,7 +133,7 @@ class Fetch(unittest.TestCase):
         self.assertIn(("actions-token", f"/repos/{REPO}/traffic/clones"), calls)
 
     def test_no_traffic_access_at_all_warns_and_records_the_rest(self):
-        def call(token, path, method="GET", body=None, raw=False):
+        def call(token, path, method="GET", body=None, raw=False, accept=None):
             if "/traffic/" in path:
                 raise stats.GitHubError(403, "no")
             return [] if "/releases" in path else {"stargazers_count": 0}
@@ -128,6 +142,46 @@ class Fetch(unittest.TestCase):
             got = stats.fetch(REPO, "actions-token", None)
         self.assertIsNone(got["clones"])
         self.assertIn("STATS_TOKEN", out.call_args[0][0])
+
+    def test_stars_and_forks_are_read_with_their_days_a_hundred_to_a_request(self):
+        calls = []
+
+        def call(token, path, method="GET", body=None, raw=False, accept=None):
+            calls.append((path, accept))
+            page = int(re.search(r"[?&]page=(\d+)", path).group(1)) if "page=" in path else None
+            if path.startswith(f"/repos/{REPO}/stargazers"):
+                return [{"starred_at": "2026-09-28T16:33:08Z"}] * (100 if page == 1 else 3)
+            if path.startswith(f"/repos/{REPO}/forks"):
+                return [{"created_at": "2026-10-02T09:00:00Z"}]
+            if "/traffic/" in path:
+                return {"clones": [], "views": []} if "popular" not in path else []
+            return [] if "/releases" in path else {"stargazers_count": 103, "forks_count": 1}
+
+        with mock.patch.object(stats, "call", call):
+            got = stats.fetch(REPO, "actions-token", None)
+        self.assertEqual(len(got["stargazers"]), 103)
+        self.assertEqual(len(got["forks"]), 1)
+        star_calls = [(p, a) for p, a in calls if "/stargazers" in p]
+        self.assertEqual([p for p, _ in star_calls], [f"/repos/{REPO}/stargazers?per_page=100&page=1",
+                                                      f"/repos/{REPO}/stargazers?per_page=100&page=2"])
+        self.assertTrue(all(a == "application/vnd.github.star+json" for _, a in star_calls), "starred_at needs it")
+        self.assertIn((f"/repos/{REPO}/forks?sort=oldest&per_page=100&page=1", None), calls)
+
+    def test_no_request_for_stars_or_forks_while_there_are_none_and_a_failure_keeps_the_history(self):
+        def call(token, path, method="GET", body=None, raw=False, accept=None):
+            self.assertNotIn("/forks", path)
+            if "/stargazers" in path:
+                raise stats.GitHubError(502, "bad gateway")
+            if "/traffic/" in path:
+                return {"clones": [], "views": []} if "popular" not in path else []
+            return [] if "/releases" in path else {"stargazers_count": 2, "forks_count": 0}
+
+        with mock.patch.object(stats, "call", call), mock.patch("builtins.print") as out:
+            got = stats.fetch(REPO, "actions-token", None)
+        self.assertIsNone(got["stargazers"])
+        self.assertIsNone(got["forks"])
+        self.assertIn("stars.csv is left as it was", out.call_args[0][0])
+        self.assertEqual(got["clones"], [], "the rest is still read")
 
 
 class Wiring(unittest.TestCase):
