@@ -204,19 +204,23 @@ Download `Sedjem-<version>-setup.exe` from the [latest release](https://github.c
 It installs for your user, without admin rights (about 80 MB). It isn't signed yet, so Windows
 SmartScreen warns about an unknown publisher; choose *More info*, then *Run anyway*.
 
-From source, install Python 3.12 and [Git](https://git-scm.com/), then in a terminal:
+From source, install Python 3.12 and [Git](https://git-scm.com/), then in PowerShell (the terminal of
+VS Code and Windows Terminal) or the Command Prompt:
 
-```bat
+```powershell
 git clone https://github.com/MohammedEl-sayedAhmed/sedjem.git
 cd sedjem
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt
-app.cmd
+.\app.cmd
 ```
 
-`app.cmd` opens Sedjem in a window of its own (Edge WebView2), without a console. If nothing opens,
-`.venv\Scripts\python -m app.desktop` shows why. To build the installer yourself, see
-[the desktop notes](docs/10-desktop.md#build-it).
+With [uv](https://docs.astral.sh/uv/) instead of pip, the two middle lines are `uv venv .venv --python 3.12`
+and `uv pip install --python .venv -r requirements.txt -r requirements-desktop.txt`.
+
+`.\app.cmd` opens Sedjem in a window of its own (Edge WebView2), without a console. PowerShell runs a
+file in the current folder only with `.\` in front. If nothing opens, `.venv\Scripts\python -m app.desktop`
+shows why. To build the installer yourself, see [the desktop notes](docs/10-desktop.md#build-it).
 
 ### Linux
 
@@ -226,7 +230,7 @@ You need Python 3.12 and [uv](https://docs.astral.sh/uv/).
 git clone https://github.com/MohammedEl-sayedAhmed/sedjem.git
 cd sedjem
 uv venv .venv --python 3.12
-VIRTUAL_ENV=.venv uv pip install -r requirements.txt
+uv pip install --python .venv -r requirements.txt
 ./app.sh              # opens Sedjem at http://127.0.0.1:8765
 ./app.sh --desktop    # or in a window of its own
 ```

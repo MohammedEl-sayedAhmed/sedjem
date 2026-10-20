@@ -14,11 +14,13 @@ done yet (see the end of this page).
 | | From source | Desktop build |
 |---|---|---|
 | Linux | `./app.sh --desktop` | `dist/Sedjem/Sedjem` |
-| Windows | `app.cmd` (after the one-time setup below) | Start menu → Sedjem (installer), or `Sedjem.exe` |
+| Windows | `.\app.cmd` (after the one-time setup below) | Start menu → Sedjem (installer), or `Sedjem.exe` |
 
-To set up on Windows from source, once: install Python 3.12, then in the project folder run
-`py -3.12 -m venv .venv` and `.venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt`.
-`app.cmd` starts Sedjem without a console, so when nothing opens, `.venv\Scripts\python -m app.desktop`
+To set up on Windows from source, once: install Python 3.12, then in the project folder, in PowerShell
+or the Command Prompt, run `py -3.12 -m venv .venv` and
+`.venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt`. With uv, run
+`uv venv .venv --python 3.12` and `uv pip install --python .venv -r requirements.txt -r requirements-desktop.txt`.
+`.\app.cmd` starts Sedjem without a console, so when nothing opens, `.venv\Scripts\python -m app.desktop`
 shows the reason.
 
 Sedjem picks the first of these that works:
@@ -101,7 +103,8 @@ and the assistants' MCP server (`Sedjem --mcp`).
 
 The Tests workflow ([`.github/workflows/tests.yml`](../.github/workflows/tests.yml)) runs the tests on
 Windows and Linux for every push and pull request, and on Windows also sets Sedjem up from source
-exactly as above (`py -3.12 -m venv .venv`, `pip install`, then `app.cmd`) and checks that it starts.
+exactly as above, in PowerShell: with pip, checking that `.\app.cmd` starts it, and with uv, checking
+that its self-test passes.
 
 The GitHub Actions workflow [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml)
 builds and checks the app on Windows and Linux. It runs the unit tests, a self-test from source, the

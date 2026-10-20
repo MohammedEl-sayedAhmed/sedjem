@@ -829,8 +829,10 @@ class Updates:
         return problem, self.manual_commands(sha, stash, branch != "main", files, tool) if problem else []
 
     def manual_commands(self, sha, stash, switch, files, tool):
-        """The commands that update the checkout by hand, from its folder."""
+        """The commands that update the checkout by hand, from its folder. On Windows they are for PowerShell (the
+        terminal of VS Code and Windows Terminal), which runs a program given by a quoted path only after &."""
         python = sys.executable
+        run = "& " if self.platform.startswith("win") else ""
         commands = [f'cd "{self.root}"']
         if stash:
             commands.append('git stash push -m "Before updating Sedjem"')
@@ -839,7 +841,7 @@ class Updates:
         commands += ["git fetch origin main", f"git merge --ff-only {sha}"]
         for f in files:
             commands.append(f'uv pip install -p "{python}" -r {f}' if tool and tool[0] == "uv"
-                            else f'"{python}" -m pip install -r {f}')
+                            else f'{run}"{python}" -m pip install -r {f}')
         if stash:
             commands.append("git stash pop")
         return commands

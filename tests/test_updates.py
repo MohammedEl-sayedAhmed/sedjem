@@ -885,12 +885,20 @@ class SourceTests(UpdatesCase):
         with self.which(None), mock.patch.object(updates.importlib.util, "find_spec", return_value=None):
             a = self.checked(up)["available"]
             self.assertIn("neither uv nor pip", a["blocked"])
+            pip = ("& " if sys.platform.startswith("win") else "") + f'"{sys.executable}" -m pip install -r'
             self.assertEqual(a["commands"], [f'cd "{self.checkout}"', "git fetch origin main", f"git merge --ff-only {c}",
-                                             f'"{sys.executable}" -m pip install -r requirements-dev.txt',
-                                             f'"{sys.executable}" -m pip install -r requirements.txt'])
+                                             f"{pip} requirements-dev.txt", f"{pip} requirements.txt"])
             with self.assertRaises(updates.Refused):
                 up.start_install()
         self.assertEqual(self.head(), self.repos.first)
+
+    def test_on_windows_the_commands_are_for_powershell(self):
+        # PowerShell, the terminal of VS Code and Windows Terminal, runs a program given by a quoted path only after &
+        self.changed_requirements()
+        for platform, run in (("win32", "& "), ("linux", "")):
+            with self.which(None), mock.patch.object(updates.importlib.util, "find_spec", return_value=None):
+                a = self.checked(self.make(root=self.checkout, frozen=False, platform=platform))["available"]
+            self.assertIn(f'{run}"{sys.executable}" -m pip install -r requirements.txt', a["commands"], platform)
 
     def test_with_uv_the_commands_use_it(self):
         self.changed_requirements()

@@ -99,7 +99,7 @@ When Sedjem was started from a terminal, the new process runs in the background 
 writes what it prints to `sedjem.log` in the data folder. *Quit Sedjem* in *Settings* stops it.
 
 When one of the conditions isn't met (local changes, another branch, no git, or neither uv nor pip for
-changed requirements), *Settings* says why and lists the exact commands to run instead.
+changed requirements), *Settings* says why and lists the exact commands to run instead (on Windows, for PowerShell).
 
 ### The Windows installer
 
@@ -132,10 +132,12 @@ In the project folder, with no local changes:
 ```sh
 git switch main
 git pull --ff-only origin main
-VIRTUAL_ENV=.venv uv pip install -r requirements.txt     # Linux, an environment made with uv
+uv pip install --python .venv -r requirements.txt     # an environment made with uv
 ```
 
-On Windows the last step is `.venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt`.
+On Windows add `-r requirements-desktop.txt` to the last step. With pip instead of uv it is
+`.venv/bin/pip install -r requirements.txt` on Linux and
+`.venv\Scripts\pip install -r requirements.txt -r requirements-desktop.txt` on Windows.
 Then start Sedjem again. `git pull` takes the newest commit on main, whose tests may not have passed
 yet. To take the tested commit that *Settings* offers instead, run `git fetch origin main` and
 `git merge --ff-only <commit>` in place of the pull.

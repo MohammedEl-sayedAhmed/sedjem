@@ -10,7 +10,7 @@ You need Python 3.12 and [uv](https://docs.astral.sh/uv/), plus `curl`. The benc
 need `ffmpeg`; the transcriber and the app don't.
 
 ```sh
-uv venv .venv --python 3.12 && VIRTUAL_ENV=.venv uv pip install -r requirements.txt
+uv venv .venv --python 3.12 && uv pip install --python .venv -r requirements.txt
 
 # Default engine: the whisper-medium Arabic–English code-switching fine-tune (0.8 GB), plus the
 # Whisper tokenizer it needs to run offline
@@ -140,8 +140,8 @@ It needs PyTorch and about 1.3 GB more disk, and on the test meetings it was slo
 and used more memory. The aligner model's licence is CC-BY-NC-4.0 (non-commercial use only).
 
 ```sh
-VIRTUAL_ENV=.venv uv pip install torch --index-url https://download.pytorch.org/whl/cpu
-VIRTUAL_ENV=.venv uv pip install transformers uroman \
+uv pip install --python .venv torch --index-url https://download.pytorch.org/whl/cpu
+uv pip install --python .venv transformers uroman \
   "ctc-forced-aligner @ git+https://github.com/MahmoudAshraf97/ctc-forced-aligner@64293cc6d711e57666c4a8b098e9fd93b381fd88"
 .venv/bin/python bench/fetch_models.py \
   MahmoudAshraf/mms-300m-1130-forced-aligner:config.json \
