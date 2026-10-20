@@ -198,9 +198,10 @@ assistant's actions on other systems still deserve a look.
 ## The log
 
 *What assistants asked* in *Settings → Assistants* lists every tool call, resource read and prompt,
-newest first: when, which assistant (by the name and version it gives), what it asked ("search
-tokenizers", "get_transcript Prompt Engineering, lecture 4, 00:00-10:00") and which transcriptions the
-answer contained. A request for something hidden is logged too, with no transcriptions. *Clear* empties
+newest first: when, which assistant (by the name and version it gives, or "An assistant" when it gives
+none), what it asked in words ("Searched for tokenizers, in Prompt Engineering", "Read Prompt Engineering,
+lecture 4, 00:00-10:00") and which transcriptions the answer contained. A request for something hidden is
+logged too, with no transcriptions, and so is a request for a tool that doesn't exist. *Clear* empties
 the log. It is kept in `mcp/log.jsonl` in the app's data folder (`app_data/` from source), one entry per
 line, and cut back to the newest 2,000 entries whenever it grows past 2,500.
 

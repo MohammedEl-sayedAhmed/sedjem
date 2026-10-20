@@ -794,10 +794,13 @@ class Log(Case):
         self.send("tools/call", {"name": "list_transcriptions", "arguments": {"bogus": 1}})
         self.modern("resources/read", {"uri": f"sedjem://transcript/{MEETING}"}, client={"name": "Cursor", "version": "2.0"})
         self.modern("tools/call", {"name": "list_courses"}, client=None)
+        self.modern("tools/call", {"name": "made_up_tool"}, client=None)
         log = list(reversed(assistants.read_log(self.cfg)))
         self.assertEqual([(e["client"], e["action"]) for e in log], [
             ("Claude Desktop 1.2", "search"), ("Claude Desktop 1.2", "get_transcript"), ("Claude Desktop 1.2", "get_transcript"),
-            ("Claude Desktop 1.2", "list_transcriptions"), ("Cursor 2.0", "resources/read"), ("unknown", "list_courses")])
+            ("Claude Desktop 1.2", "list_transcriptions"), ("Cursor 2.0", "resources/read"), ("", "list_courses"),
+            ("", "tools/call")])  # a nameless client stays nameless; a made-up tool's name isn't an action
+        self.assertEqual(log[-1]["detail"], "a tool that doesn't exist: made_up_tool")
         self.assertEqual((log[0]["detail"], log[0]["ids"]), ("deadline", [MEETING]))
         self.assertTrue(re.fullmatch(r"Prompt Engineering, lecture 4, 00:00-\d\d:\d\d", log[1]["detail"]), log[1]["detail"])
         self.assertEqual(log[1]["ids"], [CONTEXT])

@@ -232,5 +232,20 @@ class AssistantsApi(unittest.TestCase):
                          "a YouTube video on its own counts with the courses")
 
 
+
+class LogWording(unittest.TestCase):
+    """The log's wording in Settings (server.ASKED) is written for the actions app/mcp.py logs: every one of
+    them must have its words, or a new tool would show up in Settings as its bare name."""
+
+    def test_every_action_the_mcp_server_logs_has_words(self):
+        from app import mcp, server
+        actions = set(mcp.TOOL) | {"resources/read", "prompts/get", "tools/call"}
+        self.assertEqual(actions - set(server.ASKED), set())
+        self.assertEqual(server.asked({"action": "search", "detail": "tokenizers, in Prompt Engineering"}),
+                         "Searched for tokenizers, in Prompt Engineering")
+        self.assertEqual(server.asked({"action": "tools/call", "detail": "a tool that doesn't exist: x"}),
+                         "Asked for a tool that doesn't exist: x")
+
+
 if __name__ == "__main__":
     unittest.main()

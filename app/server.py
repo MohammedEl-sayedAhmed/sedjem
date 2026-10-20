@@ -248,7 +248,8 @@ ASKED = {"list_transcriptions": ("Listed the transcriptions ({})", "Listed the t
          "search": ("Searched for {}", "Searched the transcripts"),
          "get_course_text": ("Read the course text of {}", "Read the text of a course"),
          "resources/read": ("Read {}", "Read a transcript or a course"),
-         "prompts/get": ("Used the prompt {}", "Used a prompt")}
+         "prompts/get": ("Used the prompt {}", "Used a prompt"),
+         "tools/call": ("Asked for {}", "Asked for a tool that doesn't exist")}
 
 
 def asked(entry):

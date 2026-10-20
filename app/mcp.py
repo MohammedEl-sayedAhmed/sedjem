@@ -984,10 +984,11 @@ def prompt_messages(lib, name, args):
 # ---- the protocol ---------------------------------------------------------------------------------
 
 def client_name(info):
-    """How the log names a client: its clientInfo's name and version, "claude-ai 0.1.0"."""
+    """How the log names a client: its clientInfo's name and version, "claude-ai 0.1.0" ("" when it sends none;
+    Settings then says "An assistant")."""
     if not isinstance(info, dict):
-        return "unknown"
-    return " ".join(str(info.get(k) or "").strip() for k in ("name", "version")).strip()[:120] or "unknown"
+        return ""
+    return " ".join(str(info.get(k) or "").strip() for k in ("name", "version")).strip()[:120]
 
 
 def reply(rid, result):
@@ -1018,7 +1019,7 @@ class Server:
         self.cfg = cfg or Config()
         self.store = Store(self.cfg.storage)
         self.version = None    # the version agreed in initialize (the earlier protocols)
-        self.client = "unknown"  # the client that sent it
+        self.client = ""  # the client that sent it
 
     def handle_line(self, line):
         """One line from the client (bytes) → the line to answer with (bytes, without the newline) or None."""
@@ -1137,7 +1138,7 @@ class Server:
         if args is not None and not isinstance(args, dict):
             raise RpcError(INVALID_PARAMS, "Invalid params: arguments must be an object")
         if name not in TOOL:
-            assistants.log(self.cfg, client, name, "no such tool")
+            assistants.log(self.cfg, client, "tools/call", f"a tool that doesn't exist: {name[:60]}")  # not its name as the action
             raise RpcError(INVALID_PARAMS, f"Unknown tool: {name}")
         call = Call(TOOL[name], args or {})
         try:
