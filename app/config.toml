@@ -23,6 +23,12 @@ model = "whisper-medium"
 speakers = "auto"           # "none", "auto" (estimate the number) or a number
 language = "ar"             # "ar", "en" or "auto"
 
+[updates]
+# Settings → Updates (app/updates.py, docs/12-updates.md): the repository whose releases and tested commits
+# are offered, and GitHub's API, asked without a login. Whether Sedjem checks by itself is asked on first start.
+repo = "MohammedEl-sayedAhmed/sedjem"
+api = "https://api.github.com"
+
 [local]
 # python = ""               # interpreter for local runs; default: the one running the app
 threads = 10                # CPU threads for the local models

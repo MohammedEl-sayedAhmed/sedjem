@@ -120,7 +120,10 @@ class Config:
     # Settings changed in the app (Settings → Speed) are saved to <storage>/settings.json and win over
     # the same keys in [local].
     SETTINGS = {"performance_while_running": False, "device": "auto", "threads": 10,
-                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": []}  # assistants (app/assistants.py)
+                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],  # assistants (app/assistants.py)
+                # updates (app/updates.py): check by itself (None: not asked yet), the channel, a version or
+                # commit the user skipped
+                "update_check": None, "update_channel": "stable", "update_skip": None}
 
     def saved_settings(self):
         return _read_json(self.settings_path)
@@ -146,6 +149,14 @@ class Config:
             if key == "mcp_hidden":
                 from .assistants import check_hidden  # (it imports this module)
                 if check_hidden(value):
+                    continue
+            if key == "update_check" and (value is None or isinstance(value, bool)):
+                continue
+            if key == "update_channel" and value in ("stable", "latest"):
+                continue
+            if key == "update_skip":
+                from .updates import check_skip  # (it imports this module)
+                if check_skip(value):
                     continue
             raise ValueError(f"bad value for {key}: {value!r}")
         saved = {**self.saved_settings(), **values}

@@ -381,13 +381,15 @@ class SettingsTests(unittest.TestCase):
 
     def test_defaults_come_from_the_config(self):
         self.assertEqual(self.cfg.settings(), {"performance_while_running": False, "device": "auto", "threads": 10,
-                                               "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": []})
+                                               "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
+                                               "update_check": None, "update_channel": "stable", "update_skip": None})
 
     def test_saved_settings_win_and_survive_a_restart(self):
         self.cfg.save_settings(device="cpu", threads=2, performance_while_running=True)
         again = Config(home=self.home)
         self.assertEqual(again.settings(), {"performance_while_running": True, "device": "cpu", "threads": 2,
-                                            "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": []})
+                                            "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
+                                            "update_check": None, "update_channel": "stable", "update_skip": None})
 
     def test_bad_values_are_refused(self):
         for bad in ({"device": "tpu"}, {"threads": 0}, {"threads": 10_000}, {"threads": True},
