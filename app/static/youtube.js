@@ -208,7 +208,8 @@ function bindCourses() {
   $$("#jobList details.lectures").forEach((d) => (d.ontoggle = () => (COURSE_OPEN[d.dataset.course] = d.open)));
 }
 
-// The job page of a YouTube video: its course, the lectures before and after it, and the folder of its files.
+// The job page of a YouTube video: its course, the lectures before and after it, the folder of its files, and
+// a lecture's button that hides its whole course from assistants (assistants.js).
 function courseBar(j) {
   if (!j.youtube_id) return "";
   const folder = `<button type="button" class="btn btn-sm" id="openCourse">${ICON.folder} ${j.course ? "Open course folder" : "Open folder"}</button>`;
@@ -222,7 +223,7 @@ function courseBar(j) {
     : `<span class="btn btn-sm" aria-disabled="true">${after ? "" : icon}${label}${after ? icon : ""}</span>`;
   return `<nav class="course-bar" aria-label="Course">
     <span class="course-label">${YT_ICON.course}<span><b dir="${mixDir(j.course.title)}">${esc(j.course.title)}</b> · lecture ${esc(j.course.index)} of ${esc(j.course.count)}</span></span>
-    <span class="course-steps">${step(prev, "Previous", YT_ICON.prev, false)}${step(next, "Next", YT_ICON.next, true)}</span>${folder}</nav>`;
+    <span class="course-steps">${step(prev, "Previous", YT_ICON.prev, false)}${step(next, "Next", YT_ICON.next, true)}</span>${folder}${aiCourseButton(j)}</nav>`;
 }
 
 function bindCourseBar(j) {

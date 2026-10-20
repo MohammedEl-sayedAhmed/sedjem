@@ -169,7 +169,7 @@ class UiTestCase(unittest.TestCase):
             }""", [method, path, body])
 
     def open_settings(self, tab=None):
-        """Open Settings, on one of its tabs: models, add, hosted, speed or about."""
+        """Open Settings, on one of its tabs: models, add, hosted, speed, assistants or about."""
         self.page.click("#settingsBtn")
         self.page.wait_for_selector("#settings[open] .set-panel")
         if tab:
