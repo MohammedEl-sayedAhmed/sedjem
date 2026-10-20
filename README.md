@@ -1,8 +1,9 @@
+<!-- The logo and the charts below are each in a link whose address ends in GitHub's marker for a theme
+     (#gh-light-mode-only, #gh-dark-mode-only), so GitHub shows the one for the theme chosen on GitHub.
+     A <picture> would follow the system's light or dark setting instead, which can differ from it. -->
 <h1 align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/brand/sedjem-logo-colour-dark.svg">
-    <img src="docs/brand/sedjem-logo-colour.svg" width="380" alt="Sedjem">
-  </picture>
+  <a href="docs/brand/sedjem-logo-colour.svg#gh-light-mode-only"><img src="docs/brand/sedjem-logo-colour.svg" width="380" alt="Sedjem"></a>
+  <a href="docs/brand/sedjem-logo-colour-dark.svg#gh-dark-mode-only"><img src="docs/brand/sedjem-logo-colour-dark.svg" width="380" alt="Sedjem"></a>
 </h1>
 
 <p align="center">
@@ -19,9 +20,8 @@
 </p>
 
 <p align="center">
-  <!-- The hero is always the light screenshot. To follow the reader's theme instead, move this line inside the
-       <picture> below: <source media="(prefers-color-scheme: dark)" srcset="docs/images/transcript-dark.png">
-       (or use transcript-dark.png as the img to always show the dark one). -->
+  <!-- The hero is always the light screenshot. To follow the reader's theme instead, show transcript-dark.png
+       beside it the way the logo at the top is (or use transcript-dark.png as the img to always show the dark one). -->
   <picture>
     <img src="docs/images/transcript.png" width="900" alt="A sprint planning transcript in Sedjem: Arabic lines with English terms such as sprint, login bug and dashboard, four named speakers with their share of the talking, the run details with the NVIDIA logo next to the graphics card, and the audio player along the bottom">
   </picture>
@@ -298,12 +298,8 @@ in [docs/brand](docs/brand/README.md).
 ## Activity
 
 <p align="center">
-  <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme">
-    <picture>
-      <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/MohammedEl-sayedAhmed/sedjem/stats/charts/activity-dark.svg">
-      <img src="https://raw.githubusercontent.com/MohammedEl-sayedAhmed/sedjem/stats/charts/activity-light.svg" width="800" alt="Charts of Sedjem's downloads of the app, its stars and forks over time, and its clones and page views per day">
-    </picture>
-  </a>
+  <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/stats/README.md#gh-light-mode-only"><img src="https://raw.githubusercontent.com/MohammedEl-sayedAhmed/sedjem/stats/charts/activity-light.svg" width="800" alt="Charts of Sedjem's downloads of the app, its stars and forks over time, and its clones and page views per day"></a>
+  <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/stats/README.md#gh-dark-mode-only"><img src="https://raw.githubusercontent.com/MohammedEl-sayedAhmed/sedjem/stats/charts/activity-dark.svg" width="800" alt="Charts of Sedjem's downloads of the app, its stars and forks over time, and its clones and page views per day"></a>
 </p>
 
 The stats workflow redraws these charts every day from GitHub's own numbers. The tables behind them are in
