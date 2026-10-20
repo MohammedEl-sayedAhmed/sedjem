@@ -1,19 +1,72 @@
-# Build and check the desktop app on Windows and Linux.
-# Runs only when started by hand (Actions → Desktop build → Run workflow, or `gh workflow run desktop.yml`)
-# or for a version tag. A tag (git tag v0.1.0 && git push origin v0.1.0) also publishes a GitHub release
-# with the Windows installer, the Linux build and their checksums; the tag must match app/__init__.py.
+# Build and check the desktop app on Windows and Linux, and publish it.
+# Runs when started by hand (Actions → Desktop build → Run workflow, or `gh workflow run desktop.yml`), for a
+# version tag, and when the Nightly preview workflow (preview.yml) calls it with a version and a commit. Started
+# by hand it only builds and checks. A tag or a call also publishes the Windows installer, the Linux build and
+# their checksums on GitHub (.github/scripts/preview_plan.py checks the version first):
+#   vX.Y.Z                       a release; X.Y.Z must match app/__init__.py (git tag v0.3.0 && git push origin v0.3.0)
+#   vX.Y.Z-preview.YYYYMMDD[.N]  a pre-release, normally from preview.yml; X.Y.Z must be the next patch after
+#                                the newest release
 name: Desktop build
 
 on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+  workflow_call:
+    inputs:
+      version:
+        description: "The preview to build and publish, such as 0.2.1-preview.20261021"
+        type: string
+        required: true
+      commit:
+        description: "The full sha of the commit to build"
+        type: string
+        required: true
 
 permissions:
   contents: read
 
 jobs:
+  version:
+    # What is built, from which commit, and whether it is published; a version that doesn't fit stops here.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      channel: ${{ steps.version.outputs.channel }}
+      base: ${{ steps.version.outputs.base }}
+      commit: ${{ steps.version.outputs.commit }}
+      publish: ${{ steps.version.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          persist-credentials: false
+
+      - name: Version
+        id: version
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          CALLED_WITH: ${{ inputs.version }}
+        run: |
+          app=$(python3 -c "import app; print(app.__version__)")
+          if [ -n "$CALLED_WITH" ]; then           # a nightly preview, from preview.yml
+            version=$CALLED_WITH publish=true
+          elif [ "$GITHUB_REF_TYPE" = tag ]; then   # a pushed tag
+            version=${GITHUB_REF_NAME#v} publish=true
+          else                                      # by hand: built and checked, not published
+            version=$app publish=false
+          fi
+          # adds channel (stable or preview) and base (the release a preview follows) to the outputs
+          python3 .github/scripts/preview_plan.py check "$version" --app-version "$app" --repo "$GITHUB_REPOSITORY"
+          {
+            echo "version=$version"
+            echo "commit=$(git rev-parse HEAD)"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -25,6 +78,8 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.commit }}
 
       - uses: actions/setup-python@v5
         with:
@@ -40,15 +95,6 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-desktop.txt -r requirements-dev.txt
 
-      - name: Version
-        id: version
-        run: |
-          version=$(python -c "import app; print(app.__version__)")
-          if [ "$GITHUB_REF_TYPE" = tag ] && [ "v$version" != "$GITHUB_REF_NAME" ]; then
-            echo "tag $GITHUB_REF_NAME doesn't match app/__init__.py ($version)"; exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
       - name: Tests (the hosted services are local stand-ins; no models needed)
         run: python -m unittest discover -s tests -v
         env:
@@ -59,7 +105,11 @@ jobs:
         run: python -m app.desktop --self-test --report selftest-source.json
 
       - name: Build
+        # the build's stamp (app/_build.json) names this version and channel
         run: python desktop/build.py
+        env:
+          SEDJEM_VERSION: ${{ needs.version.outputs.version }}
+          SEDJEM_CHANNEL: ${{ needs.version.outputs.channel }}
 
       - name: Self-test the build (Linux)
         if: runner.os == 'Linux'
@@ -98,10 +148,11 @@ jobs:
         if: runner.os == 'Windows'
         continue-on-error: true
         shell: pwsh
+        env:
+          SEDJEM_VERSION: ${{ needs.version.outputs.version }}
         run: |
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y; }
-          $env:SEDJEM_VERSION = "${{ steps.version.outputs.version }}"
           & $iscc desktop\installer.iss
 
       - name: Installer update mode (Windows)
@@ -112,7 +163,7 @@ jobs:
         timeout-minutes: 15
         shell: pwsh
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.version.outputs.version }}
         run: |
           $setup = (Resolve-Path "dist\Sedjem-${env:VERSION}-setup.exe").Path
           $dir = Join-Path $env:RUNNER_TEMP "Sedjem install"
@@ -203,12 +254,14 @@ jobs:
           path: dist/Sedjem
           retention-days: 7
 
-      - name: Linux archive (version tags)
-        if: runner.os == 'Linux' && github.ref_type == 'tag'
-        run: tar -czf "dist/Sedjem-${{ steps.version.outputs.version }}-linux-x64.tar.gz" -C dist Sedjem
+      - name: Linux archive (published builds)
+        if: runner.os == 'Linux' && needs.version.outputs.publish == 'true'
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: tar -czf "dist/Sedjem-$VERSION-linux-x64.tar.gz" -C dist Sedjem
 
       - name: Upload the Linux archive
-        if: runner.os == 'Linux' && github.ref_type == 'tag'
+        if: runner.os == 'Linux' && needs.version.outputs.publish == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Sedjem-linux
@@ -216,16 +269,20 @@ jobs:
           retention-days: 7
 
   release:
-    # A version tag: publish the installer and the Linux build as a GitHub release.
-    if: github.ref_type == 'tag'
-    needs: build
+    # A release tag publishes a release; a preview, a pre-release of its commit, with notes saying what it is.
+    if: needs.version.outputs.publish == 'true'
+    needs: [version, build]
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.commit }}
+          persist-credentials: false
 
-      # by name: a tag without the Windows installer or the Linux archive must not be published
+      # by name: a version without the Windows installer or the Linux archive must not be published
       - uses: actions/download-artifact@v4
         with:
           name: Sedjem-windows-setup
@@ -239,10 +296,22 @@ jobs:
       - name: Publish
         env:
           GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          CHANNEL: ${{ needs.version.outputs.channel }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+          BASE: ${{ needs.version.outputs.base }}
         run: |
+          tag="v$VERSION"
           cd release
           ls -la
-          sha256sum * > SHA256SUMS.txt
-          notes="../.github/release-notes/$GITHUB_REF_NAME.md"
-          if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
-          gh release create "$GITHUB_REF_NAME" * --repo "$GITHUB_REPOSITORY" --title "Sedjem ${GITHUB_REF_NAME#v}" "$@"
+          sha256sum -- * > SHA256SUMS.txt
+          if [ "$CHANNEL" = preview ]; then
+            python3 ../.github/scripts/preview_plan.py notes "$VERSION" --commit "$COMMIT" --base "$BASE" \
+              --repo "$GITHUB_REPOSITORY" > ../preview-notes.md
+            gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" \
+              --prerelease --target "$COMMIT" --notes-file ../preview-notes.md
+          else
+            notes="../.github/release-notes/$tag.md"
+            if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
+            gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" "$@"
+          fi
