@@ -435,6 +435,14 @@ class Api(unittest.TestCase):
     def add(self, url, **body):
         return self.call("POST", "/api/youtube", {"url": url, "model": "elevenlabs", "confirm_upload": True, **body})
 
+    def settled(self, check, timeout=30):
+        """Wait until check() is true: a job's history and course files are written just after it says it is done."""
+        end = time.time() + timeout
+        while not check():
+            if time.time() > end:
+                self.fail("the files never caught up with the jobs")
+            time.sleep(0.05)
+
     def test_1_a_playlist_becomes_a_course(self):
         url = "https://www.youtube.com/playlist?list=PLcourse"
         status, found = self.call("POST", "/api/youtube/inspect", {"url": url})
@@ -450,6 +458,9 @@ class Api(unittest.TestCase):
         self.assertEqual(course, {"id": "PLcourse", "title": "Python: a course", "url": url, "count": 4, "folder": "Python a course"})
         done = [self.wait(j["id"]) for j in jobs]
         self.assertEqual([d["job"]["status"] for d in done], ["done"] * 3, [d["job"].get("error") for d in done])
+        # the last lecture's files, then course.md: by then every job's history and files are written
+        self.settled(lambda: (self.course / "03 - Loops.srt").exists()
+                     and "Transcripts of 3 of 4 lectures" in (self.course / "course.md").read_text(encoding="utf-8"))
         self.assertEqual(self.ran, ["vid00000001", "vid00000003"], "the video with captions made by people skips the model")
         self.assertEqual([v for v, _ in self.fake.downloads[::2]], ["vid00000001", "vid00000002", "vid00000003"], "in order")
         first, second = done[0], done[1]
@@ -518,6 +529,7 @@ class Api(unittest.TestCase):
         job = self.wait(r["jobs"][0]["id"])
         self.assertEqual((job["job"]["status"], job["job"]["kind"], job["job"].get("course")), ("done", "captions", None))
         md = self.tmp / "courses" / "Videos" / "درس منفرد [vid00000004].md"
+        self.settled(md.exists)
         self.assertIn("‏[00:00] أهلاً بكم في الدرس الأول اليوم نتكلم عن ال variables.", md.read_text(encoding="utf-8"))
         with mock.patch.object(server, "show_folder") as shown:
             status, opened = self.call("POST", "/api/open-folder", {"job": job["job"]["id"]})
