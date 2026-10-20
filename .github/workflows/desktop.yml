@@ -52,9 +52,9 @@ jobs:
           app=$(python3 -c "import app; print(app.__version__)")
           if [ -n "$CALLED_WITH" ]; then           # a nightly preview, from preview.yml
             version=$CALLED_WITH publish=true
-          elif [ "$GITHUB_REF_TYPE" = tag ]; then   # a pushed tag
+          elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = tag ]; then   # a pushed tag
             version=${GITHUB_REF_NAME#v} publish=true
-          else                                      # by hand: built and checked, not published
+          else                                      # by hand (even on a tag): built and checked, not published
             version=$app publish=false
           fi
           # adds channel (stable or preview) and base (the release a preview follows) to the outputs
