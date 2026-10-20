@@ -8,21 +8,76 @@ Build on the system you build for (Windows builds on Windows): PyInstaller does 
 The models are not bundled; the app downloads them (Settings → Models). Needs the
 packages in requirements.txt and requirements-desktop.txt. The Windows installer is made from the
 result with Inno Setup: iscc desktop/installer.iss
+
+Every build carries a stamp, app/_build.json, so that the app knows what it is running (for updates):
+  {"version": "0.2.1-preview.20261021", "commit": "<sha>", "date": "<commit date>",
+   "channel": "stable" or "preview", "built": "<build time>"}
+The version and the channel come from SEDJEM_VERSION and SEDJEM_CHANNEL when they are set (the Desktop
+build workflow sets both), otherwise from app/__init__.py, and the channel from the version. The commit
+and its date come from git; the times are in UTC. The file is written for the build and removed again,
+so a copy run from source never has one.
 """
 import argparse
+import json
 import os
+import re
+import subprocess
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
-import PyInstaller.__main__
-
 ROOT = Path(__file__).resolve().parent.parent
+STAMP = ROOT / "app" / "_build.json"  # bundled into app/, beside config.toml; git-ignored
+# a release, or a nightly preview of the next patch: 0.2.1-preview.20261021, then .2, .3 the same day
+VERSION = re.compile(r"\d+\.\d+\.\d+(?:-preview\.\d{8}(?:\.[1-9]\d*)?)?")
+
+
+def utc(moment):
+    """A time as GitHub's API writes it: 2026-10-21T02:41:07Z."""
+    return moment.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
+def git(*args):
+    """What a git command prints in the project folder, or None without git or a checkout."""
+    try:
+        out = subprocess.run(["git", *args], cwd=ROOT, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if out.returncode != 0:
+        return None
+    return out.stdout.strip() or None
+
+
+def app_version():
+    text = (ROOT / "app" / "__init__.py").read_text(encoding="utf-8")
+    return re.search(r'^__version__\s*=\s*"([^"]+)"', text, re.M).group(1)
+
+
+def stamp(env=None, now=None):
+    """The build's stamp (see the top of this file). ValueError if SEDJEM_VERSION or SEDJEM_CHANNEL is wrong."""
+    env = os.environ if env is None else env
+    version = env.get("SEDJEM_VERSION") or app_version()
+    if not VERSION.fullmatch(version):
+        raise ValueError(f"version {version!r} is neither X.Y.Z nor X.Y.Z-preview.YYYYMMDD[.N]")
+    channel = "preview" if "-preview." in version else "stable"
+    if env.get("SEDJEM_CHANNEL") and env["SEDJEM_CHANNEL"] != channel:
+        raise ValueError(f"SEDJEM_CHANNEL is {env['SEDJEM_CHANNEL']!r}, but version {version} is a {channel} version")
+    commit = git("rev-parse", "HEAD")
+    seconds = git("show", "-s", "--format=%ct", "HEAD") if commit else None
+    return {"version": version, "commit": commit,
+            "date": utc(datetime.fromtimestamp(int(seconds), timezone.utc)) if seconds else None,
+            "channel": channel, "built": utc(now or datetime.now(timezone.utc))}
 
 
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--console", action="store_true", help="keep a console window (debugging)")
     args = ap.parse_args()
+    try:
+        info = stamp()
+    except ValueError as e:
+        sys.exit(f"desktop/build.py: {e}")
+    import PyInstaller.__main__  # here, so that the tests can read the stamp without PyInstaller
     sep = os.pathsep
     opts = [
         str(ROOT / "desktop" / "sedjem.py"), "--name", "Sedjem", "--noconfirm", "--clean", "--onedir",
@@ -33,6 +88,7 @@ def main():
         "--add-data", f"{ROOT / 'app' / 'static'}{sep}app/static",
         "--add-data", f"{ROOT / 'app' / 'config.toml'}{sep}app",
         "--add-data", f"{ROOT / 'app' / 'catalog.toml'}{sep}app",  # the recommended models
+        "--add-data", f"{STAMP}{sep}app",  # what this build is: version, commit, channel
         # the licence and the author credit travel with every copy
         "--add-data", f"{ROOT / 'LICENSE'}{sep}.", "--add-data", f"{ROOT / 'NOTICE'}{sep}.",
         # modules only imported inside functions or by the worker process
@@ -52,9 +108,21 @@ def main():
     icon = ROOT / "desktop" / "sedjem.ico"
     if sys.platform == "win32" and icon.exists():
         opts += ["--icon", str(icon)]
-    PyInstaller.__main__.run(opts)
+    STAMP.write_text(json.dumps(info, indent=1) + "\n", encoding="utf-8")
+    try:
+        PyInstaller.__main__.run(opts)
+    finally:
+        STAMP.unlink(missing_ok=True)  # only builds have a stamp; from source the app reads .git
+    bundled = ROOT / "dist" / "Sedjem" / "_internal" / "app" / STAMP.name
+    try:
+        ok = json.loads(bundled.read_text(encoding="utf-8")) == info
+    except (OSError, ValueError):
+        ok = False
+    if not ok:
+        sys.exit(f"desktop/build.py: the build has no stamp, or another one, at {bundled}")
     exe = ROOT / "dist" / "Sedjem" / ("Sedjem.exe" if sys.platform == "win32" else "Sedjem")
-    print(f"\nbuilt {exe}\ncheck it with: {exe} --self-test --report selftest.json")
+    print(f"\nbuilt {exe}: Sedjem {info['version']} ({info['channel']}), commit {info['commit'] or 'unknown'}")
+    print(f"check it with: {exe} --self-test --report selftest.json")
 
 
 if __name__ == "__main__":
