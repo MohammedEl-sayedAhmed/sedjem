@@ -41,6 +41,17 @@ class LauncherTests(unittest.TestCase):
         self.assertIn(f"--class={desktop.WM_CLASS}", args)
         self.assertIn("--app=http://127.0.0.1:8765/", args)
 
+    def test_on_wayland_the_window_goes_through_xwayland_to_keep_its_class(self):
+        def launched(env):
+            with mock.patch.object(desktop, "browser_candidates", return_value=["/usr/bin/chromium"]), \
+                    mock.patch.object(desktop.subprocess, "Popen") as popen, mock.patch.dict(desktop.os.environ, env, clear=True), \
+                    mock.patch.object(desktop.sys, "platform", "linux"):
+                desktop.app_mode_browser("http://127.0.0.1:8765/", "/tmp/profile")
+            return popen.call_args.args[0]
+        self.assertIn("--ozone-platform=x11", launched({"WAYLAND_DISPLAY": "wayland-0", "DISPLAY": ":0"}))
+        self.assertNotIn("--ozone-platform=x11", launched({"DISPLAY": ":0"}), "plain X11 needs nothing more")
+        self.assertNotIn("--ozone-platform=x11", launched({"WAYLAND_DISPLAY": "wayland-0"}), "no XWayland: stay on Wayland")
+
 
 class PortTests(unittest.TestCase):
     """Starting the app again: it takes back its port from a copy that was just closed, and finds a copy

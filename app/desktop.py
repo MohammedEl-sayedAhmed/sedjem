@@ -251,8 +251,12 @@ def browser_candidates():
 
 def app_mode_browser(url, profile):
     """A Chromium-family browser showing only the app (--app), or None if there is none."""
-    # its own profile makes it a separate browser process, so --class names only this window (Linux, X11)
+    # its own profile makes it a separate browser process, so --class names only this window (Linux). Only X11
+    # honours --class: on Wayland the browser names the window after its address, the taskbar can't match it
+    # to sedjem.desktop and shows the browser's icon, so there the window is drawn through XWayland.
     extra = [f"--class={WM_CLASS}"] if sys.platform.startswith("linux") else []
+    if extra and os.environ.get("WAYLAND_DISPLAY") and os.environ.get("DISPLAY"):
+        extra.append("--ozone-platform=x11")
     for exe in browser_candidates():
         try:
             return subprocess.Popen([exe, f"--app={url}", f"--user-data-dir={profile}", "--no-first-run",
