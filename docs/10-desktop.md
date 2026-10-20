@@ -5,8 +5,9 @@ or application menu entry, models downloaded from inside the app, and a Windows 
 It is the same code, the local server and the web interface, shown in a native window, so every
 feature works the same way in the browser and on the desktop.
 
-It builds, installs and runs on both systems, and the checks below pass. Code signing,
-auto-update and Linux packages are not done yet (see the end of this page).
+It builds, installs and runs on both systems, and the checks below pass; how it updates itself is
+described in [updates](12-updates.md). Code signing and Linux packages are not done yet (see the end
+of this page).
 
 ## Run it
 
@@ -105,9 +106,46 @@ exactly as above (`py -3.12 -m venv .venv`, `pip install`, then `app.cmd`) and c
 The GitHub Actions workflow [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml)
 builds and checks the app on Windows and Linux. It runs the unit tests, a self-test from source, the
 build, and a self-test of the build; on Windows also the real-model test, a native-window test and
-the installer, which it uploads and keeps for 7 days. It only runs when started by hand
-(*Actions → Desktop build → Run workflow*, or `gh workflow run desktop.yml`) or for a version tag
-(`git tag v0.1.0 && git push --tags`), so it doesn't use Actions minutes on every push.
+the installer, which it uploads and keeps for 7 days. It runs when started by hand
+(*Actions → Desktop build → Run workflow*, or `gh workflow run desktop.yml`), for a version tag
+(`git tag v0.3.0 && git push origin v0.3.0`; the version must match `app/__init__.py`) and for the
+nightly previews below, so it doesn't use Actions minutes on every push. A tag or a preview also
+publishes the Windows installer, the Linux archive and `SHA256SUMS.txt` on GitHub, as a release or a
+pre-release.
+
+## Releases and nightly previews
+
+Each build carries a stamp, `app/_build.json`, which tells Sedjem what it is running when it looks
+for [updates](12-updates.md): the version, the commit it was built from and that commit's date, the
+channel (`stable` for a release, `preview` for a nightly preview) and when it was built.
+`desktop/build.py` writes it for the build and removes it again, so a copy run from source never has
+one; from source, Sedjem reads the commit from `.git`. The workflow sets the version and the channel
+with `SEDJEM_VERSION` and `SEDJEM_CHANNEL`; without them they come from `app/__init__.py`.
+
+The Windows installer has an update mode for Sedjem's own updates:
+`Sedjem-<version>-setup.exe /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /UPDATE=1`
+installs over the existing installation without asking anything, closes Sedjem if it is still
+running, and starts the new version when it is done. It first removes the program files of the
+version it replaces (the `_internal` folder), so nothing of the old version is left beside the new
+one, and it never touches the data folder. A silent installation without `/UPDATE=1` still starts
+nothing. The Desktop build workflow tries this on Windows: it installs the new installer into a
+temporary folder, installs it again over itself in update mode, and checks that the old files are
+gone, the data folder is kept, Sedjem started from the installed folder and answers, and the
+uninstaller still removes the program.
+
+The Nightly preview workflow ([`.github/workflows/preview.yml`](../.github/workflows/preview.yml))
+runs once a day. It takes the newest commit on main whose Tests workflow passed on Windows and Linux,
+and builds it only when neither the newest release nor the newest preview contains it already. The
+build goes through the Desktop build workflow, with all its checks, and is published as a
+pre-release with the same files as a release and notes that link to its commit. Its version is the
+next patch after the newest release and the date: after 0.2.0 comes `0.2.1-preview.20261021`, and a
+second preview on the same day is `0.2.1-preview.20261021.2`, so a preview sorts after the release
+before it and before the next one. Previews are removed together with their tags after a week,
+except the newest, and releases are never touched. `gh workflow run preview.yml` runs it at once. A
+preview tag pushed by hand is published the same way, once the Desktop build workflow has checked
+that it follows the newest release. The script that decides all this,
+[`.github/scripts/preview_plan.py`](../.github/scripts/preview_plan.py), describes the rules at its
+top.
 
 ## Self-test
 
@@ -162,7 +200,8 @@ hand.
 
 - Code signing. Unsigned installers trigger a Windows SmartScreen warning ("Windows protected your
   PC"; choose *More info*, then *Run anyway*).
-- Updates. There is no auto-update; install a new version over the old one.
+- Smaller updates. Each update downloads the whole installer or archive, not only the files that
+  changed ([updates](12-updates.md)).
 - macOS. pywebview and PyInstaller support it, but it hasn't been built or tested by the project.
 - Linux packages. There is no AppImage or .deb yet.
 - Windows before 10 may lack WebView2, and the installer doesn't bundle its bootstrapper; Sedjem
