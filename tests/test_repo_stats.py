@@ -199,6 +199,16 @@ def chart(new, theme="light"):
     return ET.fromstring(new[stats.CHARTS[theme]])
 
 
+def contrast(a, b):
+    """WCAG's contrast ratio of two #rrggbb colours."""
+    def luminance(c):
+        r, g, b = (v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4
+                   for v in (int(c[i:i + 2], 16) / 255 for i in (1, 3, 5)))
+        return 0.2126 * r + 0.7152 * g + 0.0722 * b
+    hi, lo = sorted((luminance(a), luminance(b)), reverse=True)
+    return (hi + 0.05) / (lo + 0.05)
+
+
 class Plot:
     """A panel of a chart and its scales, read from its data-x and data-y attributes."""
 
@@ -265,13 +275,31 @@ class Charts(unittest.TestCase):
             for banned in ("<script", "href", "url(", "@import", "<image", "<foreignObject", "—"):
                 self.assertNotIn(banned, text)
             self.assertIn("system-ui", root.get("font-family"))
-            self.assertIsNone(root.find(f"{SVG}rect"), "no background: GitHub's shows through")
+
+    def test_each_chart_is_on_a_card_of_its_own_so_it_reads_on_a_page_of_either_theme(self):
+        # GitHub shows the other theme's chart where its theme markers don't apply (or both of them)
+        new = self.history()
+        for theme, colours in stats.THEMES.items():
+            root = chart(new, theme)
+            card = [e for e in root if e.tag not in (f"{SVG}title", f"{SVG}desc")][0]
+            self.assertEqual(card.tag, f"{SVG}rect", "drawn first, under everything else")
+            self.assertEqual((card.get("fill"), card.get("stroke")), (colours["card"], colours["edge"]))
+            width, height = float(root.get("width")), float(root.get("height"))
+            self.assertEqual([float(card.get(k)) for k in ("x", "y", "width", "height")],
+                             [0.5, 0.5, width - 1, height - 1], "the whole chart")
+            for e in root.iter(f"{SVG}text"):
+                self.assertGreaterEqual(contrast(e.get("fill"), colours["card"]), 4.5, f"{theme}: {e.text}")
+                x, anchor = float(e.get("x")), e.get("text-anchor", "start")
+                if anchor != "middle":
+                    self.assertTrue(stats.MARGIN <= x if anchor == "start" else x <= width - stats.MARGIN,
+                                    f"{theme}: {e.text} keeps off the card's edge")
 
     def test_the_summary_on_the_branch_shows_them_for_the_readers_theme(self):
         summary = self.history()["README.md"]
-        self.assertIn(f'<source media="(prefers-color-scheme: dark)" srcset="{stats.CHARTS["dark"]}">', summary)
-        self.assertIn(f'<img src="{stats.CHARTS["light"]}"', summary)
-        self.assertLess(summary.index("<picture>"), summary.index("## Totals"), "above the tables")
+        for theme, path in stats.CHARTS.items():
+            self.assertIn(f'<a href="{path}#gh-{theme}-mode-only"><img src="{path}"', summary)
+        self.assertNotIn("<picture>", summary, "it would follow the system's setting, not the theme chosen on GitHub")
+        self.assertLess(summary.index("#gh-light-mode-only"), summary.index("## Totals"), "above the tables")
         self.assertTrue(all(path in stats.FILES for path in stats.CHARTS.values()),
                         "read back from the branch, so an unchanged chart isn't committed again")
 
@@ -417,19 +445,24 @@ class Wiring(unittest.TestCase):
 
     def test_the_readme_charts_are_files_the_script_writes(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        picture = re.search(r'<a href="([^"]+)">\s*<picture>(.*?)</picture>\s*</a>', readme, re.S)
-        self.assertIsNotNone(picture, "the charts, linked to the summary")
-        self.assertTrue(picture.group(1).endswith(f"/tree/{stats.BRANCH}#readme"))
         raw = r'https://raw\.githubusercontent\.com/MohammedEl-sayedAhmed/sedjem/([^/"]+)/([^"]+)"'
-        dark = re.search(r'<source media="\(prefers-color-scheme: dark\)" srcset="' + raw, picture.group(2))
-        light = re.search(r'<img src="' + raw, picture.group(2))
         written = stats.update({}, fetched(), REPO, "2026-10-20")
-        for theme, found in (("dark", dark), ("light", light)):
-            self.assertIsNotNone(found, theme)
-            branch, path = found.groups()
+        for theme in stats.CHARTS:
+            found = re.search(rf'<a href="([^"#]+)#gh-{theme}-mode-only"><img src="{raw}', readme)
+            self.assertIsNotNone(found, f"the {theme} chart, in a link with GitHub's marker for its theme")
+            link, branch, path = found.groups()
+            self.assertTrue(link.endswith(f"/blob/{stats.BRANCH}/README.md"), "linked to the summary")
             self.assertEqual((branch, path), (stats.BRANCH, stats.CHARTS[theme]))
             self.assertIn(path, stats.FILES, "read back from the branch, so an unchanged chart isn't committed again")
             self.assertIn(path, written)
+
+    def test_the_readme_logo_and_charts_follow_the_theme_chosen_on_github(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+        self.assertNotIn("prefers-color-scheme", readme, "a <picture> goes by the system's light or dark setting, "
+                         "which can differ from the theme chosen on GitHub")
+        for theme, logo in (("light", "sedjem-logo-colour.svg"), ("dark", "sedjem-logo-colour-dark.svg")):
+            self.assertIn(f'<a href="docs/brand/{logo}#gh-{theme}-mode-only"><img src="docs/brand/{logo}"', readme)
+            self.assertTrue((ROOT / "docs" / "brand" / logo).is_file(), logo)
 
 
 if __name__ == "__main__":

@@ -121,11 +121,11 @@ def summary(tables, repo, today, traffic_read):
     if traffic_read != today:
         lines += [f"Clones, views and referrers could not be read today (last read: {traffic_read or 'never'}). "
                   "The STATS_TOKEN secret is missing or has expired.", ""]
-    lines += ["<picture>",
-              f'  <source media="(prefers-color-scheme: dark)" srcset="{CHARTS["dark"]}">',
-              f'  <img src="{CHARTS["light"]}" width="800" alt="Charts of the downloads of the app, the stars '
-              'and forks over time, and the clones and page views per day">',
-              "</picture>", ""]
+    # Each chart in a link whose address ends in GitHub's marker for its theme, so GitHub shows the one for
+    # the theme chosen on GitHub. A <picture> would follow the system's light or dark setting instead.
+    lines += [f'<a href="{path}#gh-{theme}-mode-only"><img src="{path}" width="800" alt="Charts of the downloads '
+              'of the app, the stars and forks over time, and the clones and page views per day"></a>'
+              for theme, path in CHARTS.items()] + [""]
     lines += ["## Totals", "", "| | |", "|---|---|",
               f"| Downloads of the app, all releases | {total(app, 'downloads'):,} |"]
     if since:
@@ -204,20 +204,21 @@ def update(old, fetched, repo, today):
 # Downloads and stars are running totals, drawn as lines from the day their history starts; clones and
 # page views are the daily numbers, drawn as columns with the unique count in front. The panels share the
 # days, so a release lines up with what followed it. Light and dark differ only in their colours, and
-# the background is transparent, for GitHub's light and dark themes. Each mark carries its numbers in
-# data- attributes and each panel its scales (data-x, data-y), which tests/test_repo_stats.py checks.
+# each is drawn on a card of its own background, so it still reads on a page of the other theme (where
+# GitHub's theme markers don't apply, both show). Each mark carries its numbers in data- attributes and
+# each panel its scales (data-x, data-y), which tests/test_repo_stats.py checks.
 
-# GitHub's text and border greys, the README's teal as the accent (the light teal holds as much chroma
-# as sRGB allows at its lightness), and an orange for forks that stays apart from it with colour
-# blindness too (checked as a pair for each theme).
+# GitHub's text and border greys and page colours, the README's teal as the accent (the light teal holds
+# as much chroma as sRGB allows at its lightness), and an orange for forks that stays apart from it with
+# colour blindness too (checked as a pair for each theme).
 THEMES = {
     "light": {"ink": "#1f2328", "text": "#59636e", "grid": "#e4e8ec", "base": "#b8c0c8", "release": "#8c959f",
-              "accent": "#0b7f7d", "pale": "#9dcccb", "forks": "#eb6834"},
+              "accent": "#0b7f7d", "pale": "#9dcccb", "forks": "#eb6834", "card": "#ffffff", "edge": "#d1d9e0"},
     "dark": {"ink": "#e6edf3", "text": "#9198a1", "grid": "#2d333b", "base": "#3d444d", "release": "#656c76",
-             "accent": "#14a3a1", "pale": "#176a69", "forks": "#d95926"},
+             "accent": "#14a3a1", "pale": "#176a69", "forks": "#d95926", "card": "#0d1117", "edge": "#3d444d"},
 }
 FONT = 'system-ui, -apple-system, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'
-WIDTH, MARGIN, GUTTER = 800, 8, 40
+WIDTH, MARGIN, GUTTER = 800, 20, 40  # MARGIN: the room inside the card's edge, on every side
 PANEL_W = (WIDTH - 2 * MARGIN - GUTTER) / 2
 # The plot inside a panel: room on the left for the value axis, on the right for the last value, above
 # for the title, subtitle and legend, below for the dates
@@ -544,10 +545,11 @@ def column(x, w, top, bottom, r, fill):
 def activity_chart(data, repo, t):
     """The four panels as one SVG in the colours of theme t."""
     name = repo.split("/")[-1].capitalize()
-    out = [text(MARGIN, 20, f"{name} on GitHub", 15, t["ink"], font_weight="600"),
-           text(WIDTH - MARGIN, 20, period(data["first"], data["last"]), 12, t["text"], text_anchor="end")]
+    out = [text(MARGIN, MARGIN + 12, f"{name} on GitHub", 15, t["ink"], font_weight="600"),
+           text(WIDTH - MARGIN, MARGIN + 12, period(data["first"], data["last"]), 12, t["text"], text_anchor="end")]
     left, right = MARGIN, MARGIN + PANEL_W + GUTTER
-    row1, row2 = 40, 40 + PANEL_H + 22
+    row1 = MARGIN + 32
+    row2 = row1 + PANEL_H + 22
 
     dl = data["downloads"]
     p = Panel(left, row1, "downloads", "Downloads of the app, all releases",
@@ -590,12 +592,13 @@ def activity_chart(data, repo, t):
         for s in wrap(note, 11, WIDTH - 2 * MARGIN):
             y += 15
             out.append(text(MARGIN, y, s, 11, t["text"]))
-    height = math.ceil(y + 8)
+    height = math.ceil(y + MARGIN)
     return "\n".join([
         f"<svg{attrs(xmlns='http://www.w3.org/2000/svg', width=WIDTH, height=height)} viewBox=\"0 0 {WIDTH} {height}\""
         f" role=\"img\" aria-labelledby=\"title desc\" font-family={quoteattr(FONT)}>",
         f"<title id=\"title\">{escape(f'{name} on GitHub: downloads, stars and forks, clones and page views')}</title>",
         f"<desc id=\"desc\">{escape(describe(data))}</desc>",
+        f"<rect{attrs(x=0.5, y=0.5, width=WIDTH - 1, height=height - 1, rx=6, fill=t['card'], stroke=t['edge'])}/>",
         *out, "</svg>", ""])
 
 
@@ -706,7 +709,7 @@ def main(argv=None):
         # the job's summary has no branch to resolve the charts' paths against
         raw = f"https://raw.githubusercontent.com/{args.repo}/{args.branch}/"
         with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as f:
-            f.write(re.sub(r'(src|srcset)="(charts/)', rf'\1="{raw}\2', new["README.md"]))
+            f.write(re.sub(r'(src|href)="(charts/)', rf'\1="{raw}\2', new["README.md"]))
     changed = {p: t for p, t in new.items() if old.get(p) != t}
     if args.out:
         for p, t in new.items():
