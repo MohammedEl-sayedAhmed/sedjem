@@ -157,9 +157,10 @@ class UiTestCase(unittest.TestCase):
         self.assertEqual(self.errors, [], "the page logged errors")
 
     def open(self, route="#/new"):
-        """Load the app at a route and wait until it has its status."""
-        self.page.goto(f"{self.base}/{route}")
-        self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
+        """Load the app at a route and wait until it has its status. The first page a browser opens can take long
+        on a CI machine (on Windows it once took more than the usual 10 s), so the load has 30 s."""
+        self.page.goto(f"{self.base}/{route}", timeout=30_000)
+        self.page.wait_for_function("() => typeof S !== 'undefined' && S.status", timeout=30_000)
 
     def api(self, method, path, body=None):
         """Call the app's API from the page (with the header every change needs)."""
