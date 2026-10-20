@@ -990,6 +990,9 @@ ROUTES = [
 class Server(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = True
+    # A page opens several connections at once. With the default queue of 5, Windows refuses the ones that
+    # don't fit while the server is busy (Linux makes them wait), and the page fails to load.
+    request_queue_size = 64
 
     def handle_error(self, request, client_address):
         if isinstance(sys.exc_info()[1], ConnectionError):  # the browser dropped a connection it kept open (a player)

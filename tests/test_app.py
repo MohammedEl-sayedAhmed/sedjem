@@ -348,5 +348,26 @@ class Api(unittest.TestCase):
         self.assertTrue(r["lines"] and r["lines"][0]["text"])
 
 
+class Backlog(unittest.TestCase):
+    """A browser opens several connections at once while the server may still be busy: none is refused.
+    (Windows refuses connections beyond the listen queue, which made a page fail to load in CI.)"""
+
+    def test_a_burst_of_connections_waits_instead_of_being_refused(self):
+        import socket
+        home = Path(tempfile.mkdtemp(prefix="sedjem-backlog-"))
+        server, _app = make_server(Config(home=home), port=0)  # listening, but not accepting yet
+        socks = []
+        try:
+            for _ in range(30):
+                c = socket.create_connection(("127.0.0.1", server.server_address[1]), timeout=5)
+                socks.append(c)
+            self.assertEqual(len(socks), 30)
+        finally:
+            for c in socks:
+                c.close()
+            server.server_close()
+            shutil.rmtree(home, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()
