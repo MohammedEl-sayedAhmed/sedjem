@@ -232,4 +232,8 @@ in the built app on Windows and Linux.
 
 On Linux, the self-test of a desktop build made with `desktop/build.py` passes, and the build's
 `Sedjem --mcp` answered the official SDK's client in both protocol versions, with its first answer
-about 0.2 seconds after it was started. The project has not yet tried each assistant's own app with it.
+about 0.2 seconds after it was started. Claude Code 2.1, connected from source with a configuration
+like the snippet, answered a question about the Prompt Engineering course through the server: it listed
+the courses, searched in English and then in Arabic letters, read the outline and a piece of lecture 4,
+and gave the link at the moment the teacher explains tokenizers. Claude Desktop, Cursor and VS Code have
+not been tried yet.
