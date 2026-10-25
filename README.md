@@ -1,6 +1,6 @@
 # Sedjem statistics
 
-Updated on 2026-10-24 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
+Updated on 2026-10-25 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
 <a href="charts/activity-light.svg#gh-light-mode-only"><img src="charts/activity-light.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
 <a href="charts/activity-dark.svg#gh-dark-mode-only"><img src="charts/activity-dark.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
@@ -10,8 +10,8 @@ Updated on 2026-10-24 by the Repository stats workflow on main (`.github/workflo
 | | |
 |---|---|
 | Downloads of the app, all releases | 16 |
-| Clones since 2026-10-05 | 267 (102 unique per day, added up) |
-| Page views since 2026-10-05 | 134 (38 unique per day, added up) |
+| Clones since 2026-10-05 | 281 (110 unique per day, added up) |
+| Page views since 2026-10-05 | 139 (39 unique per day, added up) |
 | Stars, forks, watchers | 4, 0, 0 |
 
 ## Downloads by release
@@ -35,6 +35,8 @@ Updated on 2026-10-24 by the Repository stats workflow on main (`.github/workflo
 
 | Day | Clones | Unique cloners | Views | Unique visitors |
 |---|---|---|---|---|
+| 2026-10-24 | 2 | 2 | 5 | 1 |
+| 2026-10-23 | 12 | 6 | 0 | 0 |
 | 2026-10-22 | 24 | 12 | 1 | 1 |
 | 2026-10-21 | 31 | 17 | 0 | 0 |
 | 2026-10-20 | 149 | 38 | 48 | 2 |
@@ -54,7 +56,7 @@ Updated on 2026-10-24 by the Repository stats workflow on main (`.github/workflo
 | 2026-10-06 | 0 | 0 | 14 | 4 |
 | 2026-10-05 | 0 | 0 | 3 | 2 |
 
-## Where visitors came from (the 14 days to 2026-10-24)
+## Where visitors came from (the 14 days to 2026-10-25)
 
 | Site | Views | Unique visitors |
 |---|---|---|
