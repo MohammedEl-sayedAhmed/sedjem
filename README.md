@@ -257,8 +257,10 @@ the server, for any browser to use. The details are in [the desktop notes](docs/
 ## How it works
 
 The recording is cut at pauses (Silero VAD) into pieces of up to 25 seconds, and each piece goes to
-the speech model. Separately, a voiceprint model (NVIDIA TitaNet-small) describes what the voice
-sounds like every 0.75 seconds, and spectral clustering groups those voiceprints into speakers.
+the speech model. Separately, a voiceprint model (NVIDIA TitaNet-small by default) describes what the
+voice sounds like every 0.75 seconds, and spectral clustering groups those voiceprints into speakers.
+NVIDIA's Nemotron-3-Diarization, which can be chosen instead in Settings, does this in one model: it
+gives every speaker's probability every 10 ms, and counts the people better in larger meetings.
 Whisper gives every word a time, so each word gets the speaker whose voice is heard at that
 moment; for Cohere, which gives no word times, the pieces are cut where the voice changes.
 It all runs on the processor, or on a graphics card when one works.
@@ -327,7 +329,8 @@ Cohere Transcribe Arabic (the
 [GGUF build](https://huggingface.co/handy-computer/cohere-transcribe-arabic-07-2026-gguf) from
 handy-computer, run with transcribe.cpp), OpenAI Whisper through
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and CTranslate2,
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with NVIDIA TitaNet, Silero VAD, PyAV,
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with NVIDIA TitaNet,
+[NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) (run with NumPy), Silero VAD, PyAV,
 [pywebview](https://pywebview.flowrl.com/), PyInstaller and Inno Setup. The benchmark uses the
 [Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch) and ArzEn test sets.
 
@@ -347,7 +350,8 @@ and the commercial licence.
 
 The models keep their own licences: the whisper-medium fine-tune and Whisper large-v3 are MIT (check
 the fine-tune's card for its training data), Cohere Transcribe Arabic and the Whisper tokenizer are
-Apache-2.0, and NVIDIA TitaNet through sherpa-onnx is CC-BY-4.0. The desktop build bundles
+Apache-2.0, NVIDIA TitaNet through sherpa-onnx is CC-BY-4.0, 3D-Speaker CAM++ is Apache-2.0, and
+NVIDIA Nemotron-3-Diarization is under the OpenMDW 1.1 licence, which allows commercial use. The desktop build bundles
 third-party packages under their own licences, including the FFmpeg libraries that come with PyAV
 (LGPL). The hosted services are used under their own terms. The full-colour logos of the models,
 services and some systems are the brands' own files, taken from their brand pages and sites (and one

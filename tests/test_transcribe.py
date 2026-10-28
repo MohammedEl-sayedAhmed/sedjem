@@ -46,6 +46,9 @@ class Timeline:
     def speaker_at(self, t):
         return 1 if t < 3 else 2
 
+    def speaker_over(self, a, b):
+        return self.speaker_at((a + b) / 2)
+
     def changes(self, a, b):
         return [3.0] if a < 3 < b else []
 

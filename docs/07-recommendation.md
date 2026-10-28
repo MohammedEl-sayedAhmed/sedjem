@@ -40,10 +40,9 @@ For speaker labels, the local voice clustering with TitaNet-small (the default) 
 meetings of two or three people: 2–11% of words went to the wrong person on four of five, and 17% on
 the fifth, a 2-person excerpt where ElevenLabs' own labels were 27% off. `--speakers 0` estimated the
 number of people correctly in 5 of 6 meetings. Larger meetings remain weak (38% on a 5-person one).
-NVIDIA's Nemotron-3-Diarization, tested since, halves that to 19% and counted the people right in all
-6, but it needs PyTorch, which the app doesn't use
-([speaker labels](04-speaker-labels.md#nvidia-nemotron-3-diarization)). pyannote `community-1`,
-which also needs PyTorch and a free Hugging Face token, is untested.
+NVIDIA's Nemotron-3-Diarization, which can be chosen in Settings since, halves that to 19% and counted
+the people right in all 6 ([speaker labels](04-speaker-labels.md#nvidia-nemotron-3-diarization)).
+pyannote `community-1`, which needs PyTorch and a free Hugging Face token, is untested.
 
 ## Real meetings are much harder than the benchmarks
 
@@ -65,13 +64,12 @@ labels.
    spot-checked.
 3. Try a hybrid (untested): Cohere for Arabic and whisper-medium for stretches that are mostly
    English, with a language-ID step per chunk picking the engine.
-4. Run Nemotron-3-Diarization without PyTorch (an ONNX export or NeMo-Speech.cpp) and offer it for
-   larger meetings.
+4. Score the speaker models on a public set of recordings too, so that others can check the numbers.
 5. Give Whisper a team's jargon with `--prompt` (plausible, untested).
-6. Reclaim disk space: delete Audar (1.9 GB), the voiceprint models other than
-   `nemo_en_titanet_small.onnx` (about 230 MB; only `bench/compare_voiceprints.py` uses them), the
-   Nemotron benchmark's environment and model (`.venv-bench/` and `models/Nemotron-3-Diarization/`,
-   2.2 GB), and whichever of the two local engines you don't use.
+6. Reclaim disk space: delete Audar (1.9 GB), the speaker models you don't use (Settings → Models
+   deletes the ones it offers; the WeSpeaker models serve only `bench/compare_voiceprints.py`), the
+   environment of `bench/check_nemotron.py` (`.venv-bench/`, 1.8 GB), and whichever of the two local
+   engines you don't use.
 
 ## For a product later
 

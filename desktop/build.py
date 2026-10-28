@@ -93,6 +93,7 @@ def main():
         "--add-data", f"{ROOT / 'LICENSE'}{sep}.", "--add-data", f"{ROOT / 'NOTICE'}{sep}.",
         # modules only imported inside functions or by the worker process
         "--hidden-import", "transcribe", "--hidden-import", "speakers", "--hidden-import", "sysinfo",
+        "--hidden-import", "nemotron", "--hidden-import", "threadpoolctl",
         "--hidden-import", "app.worker", "--hidden-import", "app.desktop", "--hidden-import", "app.selftest",
         "--hidden-import", "app.mcp",  # Sedjem --mcp, the assistants' server
         # packages with native libraries or data files loaded at run time

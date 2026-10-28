@@ -92,16 +92,30 @@ people on one excerpt and scored worse there (19.0% against 17.0% with the true 
 NVIDIA's Nemotron-3-Diarization (September 2026, about 100M parameters, OpenMDW 1.1 licence, which
 allows commercial use) replaces all of the steps above with one model. Every 10 ms it gives the
 probability that each of up to 8 speakers is talking, so it also hears when two people talk at once.
-Arabic is not among the languages its model card lists. `bench/compare_nemotron.py` runs it on the CPU
-with PyTorch and Transformers, and gives each of the same Whisper words the speaker with the highest
-average probability over the word; with the true count N given, only the N speakers it heard longest
-can get words. TitaNet-small labels the same words again in the same run, so only the speaker step
-differs.
+Arabic is not among the languages its model card lists. It can be chosen instead of TitaNet-small in
+Settings → Models, or with `--voiceprint-model models/diarization/Nemotron-3-Diarization` on the
+command line.
+
+Sedjem runs NVIDIA's weights with NumPy alone (`nemotron.py`), following the Transformers
+implementation step by step: a log-mel spectrogram, 8 of its 10 ms frames stacked into one, then the
+recording in chunks of 27.2 s, each seen together with a cache of up to 264 earlier frames that keeps
+the clearest ones of every speaker, so the speaker numbers hold from one chunk to the next. On the six
+excerpts its probabilities stayed within 0.000007 of Transformers' on five and within 0.015 on the
+sixth, and not one 10 ms frame changed who was talking (`bench/check_nemotron.py`, which needs
+PyTorch and Transformers; `tests/test_nemotron.py` checks a tiny random model the same way without
+them).
+
+The probabilities become the same kind of timeline as the voiceprints: in 80 ms steps, speech is where
+someone's probability is above 0.5, and it goes to the most likely speaker, with the same 3-step
+smoothing. Each word goes to the speaker most likely over the whole word, which put 10.0% of the words
+on the wrong person against 10.2% when only the middle of the word counts. With the true count N
+given, only the N speakers it heard longest get any. `bench/compare_nemotron.py` labels the same
+Whisper words this way and with TitaNet-small in the same run, so only the speaker step differs.
 
 | Speaker labels | Size | Wrong speaker, true count given | Wrong speaker, count estimated | Count estimated right | Seconds per 10-minute excerpt |
 |---|---|---|---|---|---|
-| TitaNet-small voiceprints and clustering | 40 MB | 11.7% | 10.2% | 5 of 6 | 6 |
-| Nemotron-3-Diarization | 397 MB | 10.0% | 10.0% | 6 of 6 | 14 |
+| TitaNet-small voiceprints and clustering | 40 MB | 11.7% | 10.2% | 5 of 6 | 5 |
+| Nemotron-3-Diarization | 397 MB | 10.0% | 10.0% | 6 of 6 | 30 |
 
 It counted the people right on all six excerpts, including the 5-person one where TitaNet-small found
 2, so giving it the true count changed nothing. On that excerpt it put 19.4% of the words on the
@@ -116,15 +130,15 @@ TitaNet-small with the true count and 20.1% with its estimate. Making use of the
 transcribing each voice of an overlap separately.
 
 The times are for the speaker step alone, with 4 threads on the test laptop in the balanced power
-mode, on 28 October 2026. Both are small next to transcription: Whisper took 0.53 times real time
-on these excerpts in the performance mode, about 320 s each. The Nemotron run peaked at 1.5 GB of
-memory. Sedjem doesn't use
-PyTorch, so the benchmark runs in an environment of its own, which takes 1.8 GB of disk.
+mode, on 28 October 2026. Transformers with PyTorch took 14 s for the same work, so NumPy is about
+twice as slow; with all 12 threads, NumPy's default, it was twice as slow again, so `nemotron.py`
+keeps it to 4. Both models are small next to transcription: Whisper took 0.53 times real time on these
+excerpts in the performance mode, about 320 s each. The Nemotron step peaked at 0.65 GB of memory.
 
-TitaNet-small stays the default for now: Nemotron is better on the larger meeting and at counting
-people, and level on the smaller ones. Offering it in the app needs a way to run it without PyTorch,
-such as an ONNX export, or NVIDIA's NeMo-Speech.cpp with the 8-bit GGUF file (107 MB) in the model's
-repository.
+TitaNet-small stays the default: it is a tenth of the size and six times faster, and level with
+Nemotron on meetings of two or three people. Nemotron is the better choice for larger meetings, where
+it counted the people right and put half as many words on the wrong person. It hears at most 8
+speakers.
 
 ## Forced alignment (experimental)
 
@@ -167,7 +181,7 @@ its start, end and speaker, so speaker models can be compared without transcribi
   WeSpeaker voiceprints have a cosine similarity of 0.90 (1.0 is identical). TitaNet-small's are at
   0.48, though scores from different models can't be compared directly.
 - Larger meetings are hard: 38% of words were misattributed on the 5-person excerpt even with
-  TitaNet (19% with Nemotron-3-Diarization, which the app can't run yet).
+  TitaNet (19% with Nemotron-3-Diarization).
 - The reference labels used for scoring were corrected by hand from ElevenLabs output and are not
   perfect either, especially for short interjections.
 
