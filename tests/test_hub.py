@@ -161,11 +161,11 @@ def tearDownModule():
 
 
 def temp_config(add_cleanup):
-    """A Config on an empty data folder, without the voiceprint download (it would come from GitHub)."""
+    """A Config on an empty data folder, without the speaker models' downloads (TitaNet-small's would come from GitHub)."""
     home = Path(tempfile.mkdtemp(prefix="sedjem-hub-"))
     add_cleanup(shutil.rmtree, home, ignore_errors=True)
     (home / "app_data").mkdir()
-    (home / "app_data" / "config.toml").write_text("[local]\nvoiceprint_files = []\n")
+    (home / "app_data" / "config.toml").write_text("[local]\nspeaker_models = []\n")
     return Config(home=home)
 
 

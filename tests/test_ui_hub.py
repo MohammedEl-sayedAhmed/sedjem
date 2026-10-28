@@ -19,8 +19,8 @@ WHISPER_HF = "hf-org--whisper-hf"
 
 class HubTestCase(UiTestCase):
     """A Sedjem server whose Hugging Face is the stand-in (the catalog's repositories included), without the
-    voiceprint download (it would come from GitHub), and where Transformers checkpoints can't be converted,
-    as in the desktop build and in CI."""
+    speaker models' downloads (TitaNet-small's would come from GitHub), and where Transformers checkpoints can't
+    be converted, as in the desktop build and in CI."""
 
     @classmethod
     def setUpClass(cls):
@@ -38,7 +38,7 @@ class HubTestCase(UiTestCase):
         except BaseException:
             cls.stop_fake()
             raise
-        cls.app.cfg.local = {**cls.app.cfg.local, "voiceprint_files": []}
+        cls.app.cfg.local = {**cls.app.cfg.local, "speaker_models": []}
 
     @classmethod
     def stop_fake(cls):

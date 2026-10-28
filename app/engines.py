@@ -71,10 +71,7 @@ def local_command(cfg, model, audio, out_dir, progress_file, options):
         cmd += ["--whisper-model", whisper or model["whisper_model"]]
     elif model["engine"] in ("cohere", "gguf"):  # gguf: any speech model transcribe.cpp runs
         cmd += ["--cohere-model", str(cfg.path(model["cohere_model"]))]
-    speakers = options.get("speakers", "none")
-    if speakers != "none" and cfg.speakers_ready():
-        cmd += ["--speakers", "0" if speakers == "auto" else str(int(speakers)),
-                "--voiceprint-model", str(cfg.path(cfg.local["voiceprint_model"]))]
+    cmd += cfg.speaker_args(options.get("speakers", "none"))  # the speaker model chosen in Settings, or TitaNet-small
     hint = (options.get("prompt") or "").strip()
     if hint and model.get("prompt"):
         from transcribe import STYLE_PROMPT, gets_style_hint

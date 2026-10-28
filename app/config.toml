@@ -32,7 +32,9 @@ api = "https://api.github.com"
 [local]
 # python = ""               # interpreter for local runs; default: the one running the app
 threads = 10                # CPU threads for the local models
-voiceprint_model = "models/diarization/nemo_en_titanet_small.onnx"
+# The speaker model that tells the speakers apart: an id from [[local.speaker_models]] below, also chosen in
+# Settings → Models. While the chosen one isn't downloaded TitaNet-small is used, and without it there are no labels.
+speaker_model = "titanet-small"
 # Switch the computer to the performance power profile while local jobs run, and back afterwards
 # (Linux, powerprofilesctl). Power-saver makes local models about 3-5x slower. Also a switch in Settings.
 performance_while_running = false
@@ -41,11 +43,75 @@ performance_while_running = false
 device = "auto"
 
 # Files the app downloads (Settings → Models), pinned to a revision and checked by size and SHA-256.
-[[local.voiceprint_files]]
+
+# Speaker models, for speaker labels (speakers.py). path is what the speaker step gets (--voiceprint-model): a file,
+# or a folder of files. note is the line Settings shows under the title, with the download size after it; maker
+# picks the logo; max_speakers, for a model that tells apart only so many people, lowers a larger number given for a
+# recording. TitaNet-small's download is called "voiceprints". How they compare: docs/04-speaker-labels.md.
+[[local.speaker_models]]
+id = "titanet-small"
+title = "TitaNet-small"
+maker = "NVIDIA"
+note = "Voiceprints grouped into speakers; the default"
+path = "models/diarization/nemo_en_titanet_small.onnx"
+
+[[local.speaker_models.files]]
 url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx"
 path = "models/diarization/nemo_en_titanet_small.onnx"
 size = 40257283
 sha256 = "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e"
+
+[[local.speaker_models]]
+id = "titanet-large"
+title = "TitaNet-large"
+maker = "NVIDIA"
+note = "The larger TitaNet"
+path = "models/diarization/nemo_en_titanet_large.onnx"
+
+[[local.speaker_models.files]]
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_large.onnx"
+path = "models/diarization/nemo_en_titanet_large.onnx"
+size = 101405493
+sha256 = "d51abcf31717ef28162f26acb9d44dd4127c3d44c9b8624f699f3425daca8e77"
+
+[[local.speaker_models]]
+id = "campplus"
+title = "3D-Speaker CAM++"
+maker = "Alibaba"           # 3D-Speaker, by Alibaba's speech lab
+note = "Voiceprints, trained on Chinese and English"
+path = "models/diarization/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+
+[[local.speaker_models.files]]
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+path = "models/diarization/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+size = 28281164
+sha256 = "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+
+[[local.speaker_models]]
+id = "nemotron-3-diarization"
+title = "Nemotron-3-Diarization"
+maker = "NVIDIA"
+note = "One model finds who speaks when; OpenMDW 1.1 licence, which allows commercial use"
+path = "models/diarization/Nemotron-3-Diarization"
+max_speakers = 8
+
+[[local.speaker_models.files]]
+url = "https://huggingface.co/nvidia/Nemotron-3-Diarization/resolve/f667ed73aee57d40cc39428eb768b4fd87a0a29e/config.json"
+path = "models/diarization/Nemotron-3-Diarization/config.json"
+size = 1458
+sha256 = "dd795ec07ffa09acf18d231aa3fa8642aa5c521760953754e02559a7413b6873"
+
+[[local.speaker_models.files]]
+url = "https://huggingface.co/nvidia/Nemotron-3-Diarization/resolve/f667ed73aee57d40cc39428eb768b4fd87a0a29e/processor_config.json"
+path = "models/diarization/Nemotron-3-Diarization/processor_config.json"
+size = 623
+sha256 = "91726746788a024a2f0f2f699a6c3667f0d74e6a0e9288fc44fe3018e23af68e"
+
+[[local.speaker_models.files]]
+url = "https://huggingface.co/nvidia/Nemotron-3-Diarization/resolve/f667ed73aee57d40cc39428eb768b4fd87a0a29e/model.safetensors"
+path = "models/diarization/Nemotron-3-Diarization/model.safetensors"
+size = 396954592
+sha256 = "c074d86335b3b794f8fa5edc25594558f128bdb3914d27806a3a5a2e44963cb6"
 
 # NVIDIA's cuBLAS (and NVRTC, which it can use) for the Whisper models on an NVIDIA GPU, taken from
 # NVIDIA's pip packages. Settings offers the download only when an NVIDIA GPU is found; only the listed
@@ -382,7 +448,7 @@ base_url = "https://api.openai.com/v1"
 key_env = "OPENAI_API_KEY"
 key_url = "https://platform.openai.com/api-keys"
 api_model = "gpt-transcribe"  # or gpt-4o-transcribe ($0.36/h), gpt-4o-mini-transcribe ($0.18/h), whisper-1 ($0.36/h)
-diarize_model = "gpt-4o-transcribe-diarize"  # used when speaker labels are on ($0.36/h); "": voiceprints here
+diarize_model = "gpt-4o-transcribe-diarize"  # used when speaker labels are on ($0.36/h); "": the speaker model here
 carry_speakers = true       # later parts get clips of up to 4 voices heard before, so those keep their numbers
 upload_format = "webm"      # Opus in WebM, about 14 MB an hour at 32 kbps; also "ogg", "mp3" or "flac"
 upload_kbps = 32
@@ -402,7 +468,7 @@ kind = "hosted"
 engine = "groq"
 title = "Groq Whisper large-v3"
 tagline = "Stock Whisper with the Egyptian hint, on Groq's servers"
-facts = ["Not measured; the same model got 20.8% WER locally", "Speaker labels from voiceprints on this computer",
+facts = ["Not measured; the same model got 20.8% WER locally", "Speaker labels from the speaker model on this computer",
          "Free: 8 h of audio a day, then $0.111/h", "Keeps no copy by default"]
 service = "Groq"
 base_url = "https://api.groq.com/openai/v1"
@@ -417,7 +483,7 @@ prompt = true               # added after the Egyptian style hint (Whisper promp
 rtf = 0.02
 privacy = "Groq keeps no copy by default, but may log requests for up to 30 days to look into errors or abuse."
 prompt_hint = "Added after the Egyptian style hint that Whisper gets. Whisper prompts are short, so terms past about 200 characters are left out."
-speakers_hint = "Groq gives no speaker labels, so they come from the voiceprints on this computer, as for the local models (the voiceprint model is in Settings). Each line goes to the person heard most during it."
+speakers_hint = "Groq gives no speaker labels, so they come from the speaker model on this computer, as for the local models (chosen in Settings, under Models). Each line goes to the person heard most during it."
 
 [[models]]
 id = "mistral"

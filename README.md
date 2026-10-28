@@ -48,7 +48,8 @@ recording on your machine unless you choose a hosted service.
   chosen, or read in place from a path on the computer.
 - Runs three models on your computer: Cohere Transcribe Arabic, a whisper-medium fine-tune for
   Arabic–English code-switching, and Whisper large-v3 with an Egyptian style hint.
-- Labels speakers by their voiceprints. Give the number of people, or let it estimate.
+- Labels speakers by voice, with the speaker model chosen in Settings: TitaNet-small by default, or
+  another such as NVIDIA's Nemotron-3-Diarization. Give the number of people, or let it estimate.
 - Or sends the recording to one of nine hosted services with your own API key: ElevenLabs,
   Speechmatics, Google Gemini, Deepgram, AssemblyAI, Azure AI Speech, OpenAI, Groq and Mistral.
   A recording is uploaded only after you tick the box that allows it, every time.
@@ -150,7 +151,7 @@ published figure, none of them has been measured on Egyptian speech by the proje
 | Google Gemini | Gemini 3.5 Transcribe | code-switching | built in |
 | AssemblyAI | Universal-3.5 Pro | code-switching | built in |
 | OpenAI | gpt-transcribe, or gpt-4o-transcribe-diarize for labels | told to expect both | built in |
-| Groq | Whisper large-v3 with the Egyptian hint | like the local Whisper large-v3 | from voiceprints on your computer |
+| Groq | Whisper large-v3 with the Egyptian hint | like the local Whisper large-v3 | from the speaker model on your computer |
 | Mistral | Voxtral Mini Transcribe 2 | detects the language | built in |
 | Deepgram | Nova-3, `ar-EG` | one language per recording | built in |
 | Azure AI Speech | fast transcription, `ar-EG` | one language per recording | built in |
@@ -245,7 +246,8 @@ The [latest release](https://github.com/MohammedEl-sayedAhmed/sedjem/releases/la
 build (`Sedjem-<version>-linux-x64.tar.gz`): unpack it and run `Sedjem/Sedjem`.
 
 On first start, open *Settings → Models* and download whisper-medium (778 MB) or
-Cohere (1.6 GB). The voiceprint model for speaker labels (40 MB) comes with the first one.
+Cohere (1.6 GB). TitaNet-small, the speaker model for speaker labels (40 MB), comes with the first
+one; the other speaker models can be chosen and downloaded under *Speaker labels* on the same tab.
 
 ### The desktop app
 
@@ -260,7 +262,7 @@ The recording is cut at pauses (Silero VAD) into pieces of up to 25 seconds, and
 the speech model. Separately, a voiceprint model (NVIDIA TitaNet-small by default) describes what the
 voice sounds like every 0.75 seconds, and spectral clustering groups those voiceprints into speakers.
 NVIDIA's Nemotron-3-Diarization, which can be chosen instead in Settings, does this in one model: it
-gives every speaker's probability every 10 ms, and counts the people better in larger meetings.
+gives every speaker's probability every 10 ms, and on the test meetings it did better with five people.
 Whisper gives every word a time, so each word gets the speaker whose voice is heard at that
 moment; for Cohere, which gives no word times, the pieces are cut where the voice changes.
 It all runs on the processor, or on a graphics card when one works.

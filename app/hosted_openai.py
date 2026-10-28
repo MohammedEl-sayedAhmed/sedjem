@@ -6,7 +6,7 @@ at pauses into parts that fit the service's file size and duration limits, and e
 the part's start time added. OpenAI's gpt-transcribe and gpt-4o models return text without
 timestamps, so they get one request per stretch of at most 25 s instead, and each stretch is a line.
 Groq (and OpenAI with diarize_model = "") gives no speaker labels; when labels are asked for, they
-come from the voiceprints on this computer, as for the local models.
+come from the speaker model on this computer (Settings → Models), as for the local models.
 Importing this module adds the three services to engines.HOSTED.
 """
 import base64
@@ -288,14 +288,16 @@ def run(cfg, model, job_dir, on_progress, cancelled, fields, parse, piece_s=None
 
 
 # ---------------------------------------------------------------------------------------------
-# Speaker labels from the voiceprints on this computer, for the models that have none
+# Speaker labels from the speaker model on this computer, for the models that have none
 # ---------------------------------------------------------------------------------------------
 
 class Timeline:
-    """Who is heard when: the voiceprint windows' centres (s) and speakers from the voice step."""
+    """Who is heard when: the voiceprint windows' centres (s) and speakers from the voice step, and the name of the
+    speaker model's file or folder (recorded in the job, as transcribe.py records it for local runs)."""
 
-    def __init__(self, centers, labels):
+    def __init__(self, centers, labels, model=None):
         self.centers, self.labels = np.asarray(centers, dtype=float), np.asarray(labels, dtype=int)
+        self.model = model
 
     def speaker(self, start, end):
         """The speaker of most windows centred between start and end, else of the window nearest the
@@ -309,18 +311,17 @@ class Timeline:
 
 
 def voice_timeline(cfg, job_dir, opts, on_progress, cancelled):
-    """With speaker labels on and the voiceprint model downloaded: the voice step the local models
-    use (speakers.py), run in the model process (app/worker.py --speaker-timeline). Else None."""
-    speakers = opts.get("speakers", "none")
-    if speakers == "none" or not cfg.speakers_ready():
+    """With speaker labels on and a speaker model downloaded: the voice step the local models use
+    (speakers.py) with the speaker model in use, run in the model process (app/worker.py
+    --speaker-timeline). Else None."""
+    args = cfg.speaker_args(opts.get("speakers", "none"))  # --speakers N --voiceprint-model PATH, or []
+    if not args:
         return None
     on_progress({"stage": "speakers"})
     job_dir = Path(job_dir)
     log_path = job_dir / "log.txt"
     cmd = engines.worker_command(cfg) + [
-        "--speaker-timeline", str(job_dir / "audio.flac"),
-        "--speakers", "0" if speakers == "auto" else str(int(speakers)),
-        "--voiceprint-model", str(cfg.path(cfg.local["voiceprint_model"])),
+        "--speaker-timeline", str(job_dir / "audio.flac"), *args,
         "--threads", str(min(4, int(cfg.setting("threads"))))]  # as transcribe.py's voice step
     env = {**os.environ, "PYTHONUNBUFFERED": "1", "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8",
            "PYTHONPATH": str(ROOT), "SEDJEM_LOG": str(log_path)}
@@ -337,7 +338,7 @@ def voice_timeline(cfg, job_dir, opts, on_progress, cancelled):
         tail = [x for x in out if x.strip()][-8:]
         raise EngineError("\n".join(["telling the speakers apart by voice failed", *tail]))
     data = json.loads(found)
-    return Timeline(data["centers"], data["labels"])
+    return Timeline(data["centers"], data["labels"], model=Path(args[args.index("--voiceprint-model") + 1]).name)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -416,10 +417,10 @@ def detected_language(replies):
     return None
 
 
-def result(lines, replies, name, cfg=None, timeline=None):
+def result(lines, replies, name, timeline=None):
     meta = {"detected_language": detected_language(replies), "api_model": name, "parts": len(replies)}
     if timeline is not None:
-        meta["voiceprint_model"] = Path(cfg.local["voiceprint_model"]).name
+        meta["voiceprint_model"] = timeline.model  # the speaker model's file or folder
     return {"lines": lines, "meta": meta}
 
 
@@ -453,7 +454,7 @@ def whisper_prompt(opts, room=200):
 
 def openai(cfg, model, job_dir, job, on_progress, cancelled):
     """OpenAI's transcription models. Speaker labels come from gpt-4o-transcribe-diarize (see
-    openai_diarized), or with diarize_model = "" from the voiceprints on this computer. Of the others,
+    openai_diarized), or with diarize_model = "" from the speaker model on this computer. Of the others,
     whisper-1 returns segments with times; gpt-transcribe and the gpt-4o models return text only, so
     they are sent one short stretch at a time."""
     opts = job.get("options") or {}
@@ -466,7 +467,7 @@ def openai(cfg, model, job_dir, job, on_progress, cancelled):
                   *language(opts), *whisper_prompt(opts)]
         lines, replies = run(cfg, model, job_dir, on_progress, cancelled, lambda *_: fields, segment_lines,
                              timeline=timeline)
-        return result(lines, replies, name, cfg, timeline)
+        return result(lines, replies, name, timeline)
     fields = [("model", name), ("response_format", "json")]
     if name.startswith("gpt-transcribe"):  # several languages, and the terms as keywords
         langs = {"ar": ["ar", "en"], "en": ["en"]}.get(opts.get("language", "ar"), [])
@@ -476,7 +477,7 @@ def openai(cfg, model, job_dir, job, on_progress, cancelled):
         fields += language(opts) + ([("prompt", ", ".join(terms)[:1000])] if terms else [])
     lines, replies = run(cfg, model, job_dir, on_progress, cancelled, lambda *_: fields, text_lines,
                          piece_s=float(model.get("piece_s", 25)), timeline=timeline)
-    return result(lines, replies, name, cfg, timeline)
+    return result(lines, replies, name, timeline)
 
 
 def openai_diarized(cfg, model, job_dir, opts, on_progress, cancelled):
@@ -508,7 +509,7 @@ def openai_diarized(cfg, model, job_dir, opts, on_progress, cancelled):
 
 def groq(cfg, model, job_dir, job, on_progress, cancelled):
     """Groq's hosted Whisper: segments with times. It has no speaker labels, so they come from the
-    voiceprints on this computer."""
+    speaker model on this computer."""
     opts = job.get("options") or {}
     name = model.get("api_model", "whisper-large-v3")
     fields = [("model", name), ("response_format", "verbose_json"), ("timestamp_granularities[]", "segment"),
@@ -516,7 +517,7 @@ def groq(cfg, model, job_dir, job, on_progress, cancelled):
     timeline = voice_timeline(cfg, job_dir, opts, on_progress, cancelled)
     lines, replies = run(cfg, model, job_dir, on_progress, cancelled, lambda *_: fields, segment_lines,
                          timeline=timeline)
-    return result(lines, replies, name, cfg, timeline)
+    return result(lines, replies, name, timeline)
 
 
 def mistral(cfg, model, job_dir, job, on_progress, cancelled):

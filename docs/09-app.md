@@ -20,11 +20,12 @@ or from *Settings → Models*. Downloads resume after a dropped connection and a
 pinned checksum.
 
 *Settings* has six tabs. *Models* lists the models on the computer, with their downloads and
-removal. *Add models* has two views: *Recommended* and *From Hugging Face*. *Hosted services* holds
-the API keys, *Speed* the graphics card, power mode and processor threads, *Assistants* what
-assistants connected over MCP may see, how to connect them and what they asked
-([assistants](11-assistants.md)), and *About* the version, the licence and the folder where the app
-keeps its data.
+removal, and under *Speaker labels* the speaker models, with the choice of the one that labels the
+speakers ([speaker models](#speaker-models)). *Add models* has two views: *Recommended* and *From
+Hugging Face*. *Hosted services* holds the API keys, *Speed* the graphics card, power mode and
+processor threads, *Assistants* what assistants connected over MCP may see, how to connect them and
+what they asked ([assistants](11-assistants.md)), and *About* the version, the licence and the
+folder where the app keeps its data.
 
 Each model or service in *Models*, *Recommended* and *Hosted services* has a line of key facts under
 its name: who made it, the engine, the licence and which graphics cards it can use, or for a service
@@ -43,7 +44,8 @@ models and the player use. The uploaded original is then deleted unless `keep_or
 
 Each model is shown with its strengths (see below). Local ones run through
 `transcribe.py`. Hosted ones upload the recording only after you tick a confirmation box.
-Speaker labels can be off, estimated, or set to the number of people.
+Speaker labels can be off, estimated, or set to the number of people. For the local models they
+come from the speaker model chosen in *Settings → Models*.
 
 While a local model works you see the stage, a progress bar with the time left, and the transcript
 growing chunk by chunk. You can cancel at any time, and a cancelled hosted job is deleted on the
@@ -82,9 +84,9 @@ light and dark themes, the layout works in a narrow window, and the page loads n
 
 Each transcription keeps a record of how it was made: the recording (name, format, codec, sample
 rate, channels, bit rate, size, length), the model (its engine and file, or the service and API
-model), the run (processor or graphics card, power mode, threads, times, speed, peak memory, app
-version) and the computer (maker and model, operating system, processor, memory, graphics cards).
-The *Details* panel shows the main lines, with the makers' logos next to the hardware and the
+model), the run (processor or graphics card, power mode, threads, times, speed, peak memory, speaker
+model, app version) and the computer (maker and model, operating system, processor, memory, graphics
+cards). The *Details* panel shows the main lines, with the makers' logos next to the hardware and the
 system, *More details* the rest, and *Copy details* copies all of it. The exports carry it too:
 plain text starts with a short header, WebVTT with a `NOTE`, Markdown ends with a Details section
 and JSON has a `details` object. SRT has no place for comments and stays as it was. Transcriptions
@@ -319,10 +321,36 @@ All model settings live in [`app/config.toml`](../app/config.toml). Each `[[mode
 
 The other sections are `[server]` (host and port; keep it on 127.0.0.1), `[storage]` (the data
 folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language)
-and `[local]` (Python, CPU threads, voiceprint model, `performance_while_running`). Personal
-overrides go in `app_data/config.toml` with the same layout, so `app/config.toml` can stay as
+and `[local]` (Python, CPU threads, the speaker models and the one chosen, `performance_while_running`).
+Personal overrides go in `app_data/config.toml` with the same layout, so `app/config.toml` can stay as
 shipped. A `[[models]]` entry there with the same `id` changes only the fields it lists, and
 `disabled = true` hides a model.
+
+### Speaker models
+
+Speaker labels come from a speaker model on the computer, for the local models and for the hosted
+ones that have no labels of their own (Groq, and OpenAI with `diarize_model = ""`). *Settings →
+Models* lists four under *Speaker labels*. TitaNet-small (the default), TitaNet-large and 3D-Speaker
+CAM++ make voiceprints that are then grouped by voice, and NVIDIA's Nemotron-3-Diarization finds who
+speaks when in one model. Each row shows whether the model is downloaded, its size and a short note,
+and downloads and deletes like the models above it. The radio button in front of each one chooses
+the one to use, and the choice is saved at once; with the keyboard, the arrow keys move it.
+
+A model that isn't downloaded can be chosen too. It is used once its download is done. Until then
+TitaNet-small labels the speakers, and when TitaNet-small isn't downloaded either, transcriptions
+have no speaker labels. The chosen row says which of the two applies, also after the chosen model is
+deleted. Downloading a local model still downloads TitaNet-small too when it isn't there.
+Nemotron-3-Diarization tells apart a limited number of people (`max_speakers` in its entry), so a
+larger number given for a recording is lowered to it, as the new transcription page says. How the
+four compare on the project's meetings is in [speaker labels](04-speaker-labels.md).
+
+They are the `[[local.speaker_models]]` entries of `app/config.toml`. Each has an `id`, a `title`,
+the `note` shown under it, a `maker` for the logo, the `path` the speaker step is given
+(`--voiceprint-model`: a file, or a folder for Nemotron-3-Diarization) and its `files`, pinned by
+URL, size and SHA-256 like the files of the models. `[local] speaker_model` is the one chosen until
+another is picked in Settings, which saves it to `app_data/settings.json`. TitaNet-small's download
+keeps its old name, `voiceprints`. Each transcription records the speaker model's file or folder,
+shown under *More details*.
 
 ### Models from Hugging Face
 
@@ -531,7 +559,7 @@ delete afterwards.
   (`known_speaker_names[]` and `known_speaker_references[]` as data URLs), and a voice it recognises
   keeps its number; a fifth voice, or one it doesn't match, gets a new number, so merge those in the
   transcript. `whisper-1` ($0.36/h) returns segments with times and gets the Egyptian style hint as
-  for Groq (not measured with it). With `diarize_model = ""`, labels come from the voiceprints on this
+  for Groq (not measured with it). With `diarize_model = ""`, labels come from the speaker model on this
   computer instead.
   There is no free tier. OpenAI doesn't train on API data, and for transcriptions it keeps no
   abuse-monitoring logs and no application state.
@@ -542,7 +570,7 @@ delete afterwards.
   language set to English the hint is left out. Segments Whisper itself marks as silence
   (`no_speech_prob` over 0.6 with `avg_logprob` under -1) are dropped. The free plan allows 20
   requests a minute, 2 h of audio an hour, 8 h a day and 25 MB per file (100 MB on the developer
-  plan), so parts stay under 24 MB. Groq has no speaker labels; they come from the voiceprints on this
+  plan), so parts stay under 24 MB. Groq has no speaker labels; they come from the speaker model on this
   computer. It keeps no request data by default, but may log requests for up to 30 days to look into
   errors or abuse.
 - **Mistral** runs `voxtral-mini-2602` (Voxtral Mini Transcribe 2, $0.18/h) with
@@ -554,13 +582,13 @@ delete afterwards.
   parts are kept to 58 minutes; each part has its own speaker numbers. Mistral may use API data to
   improve its models unless *Anonymous improvement data* is switched off (*Admin*, then *Privacy*).
 
-**Speaker labels from voiceprints.** For a model without speaker labels (Groq, or OpenAI with
-`diarize_model = ""`), when labels are on and the voiceprint model is downloaded, the app runs the
-voice step of the local models (TitaNet-small voiceprints, spectral clustering) before uploading. It
-runs in the model process (`app/worker.py --speaker-timeline`, which prints the timeline as JSON),
-and each line gets the speaker of most voiceprint windows within it, so a line that spans a change
-of speaker goes to whoever talks most in it. Run once with the real model on six public Perle clips
-joined together, the step took 1.3 s and gave each clip its own speaker.
+**Speaker labels on this computer.** For a model without speaker labels (Groq, or OpenAI with
+`diarize_model = ""`), when labels are on and a speaker model is downloaded, the app runs the voice
+step of the local models before uploading, with the speaker model in use ([speaker
+models](#speaker-models)). It runs in the model process (`app/worker.py --speaker-timeline`, which
+prints the timeline as JSON), and each line gets the speaker of most windows within it, so a line
+that spans a change of speaker goes to whoever talks most in it. Run once with TitaNet-small on six
+public Perle clips joined together, the step took 1.3 s and gave each clip its own speaker.
 
 **Checked on 25 September 2026** in the official docs:
 [OpenAI's speech-to-text guide](https://developers.openai.com/api/docs/guides/speech-to-text), the
@@ -602,7 +630,7 @@ its error format, whether its free mode includes Voxtral, and the OpenAI key pag
 couldn't be fetched). None of the three was measured on Egyptian speech by the project, and the clients were
 tested only against local stand-ins (`tests/test_providers_openai.py`: request fields, the file sent,
 parts and time offsets, speaker numbers across parts, errors 401, 413 and 429, retries, cancel, and
-the voiceprint step with a stand-in model process).
+the speaker step with a stand-in model process).
 
 ## Privacy
 
@@ -652,7 +680,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/engines.py` | local runs (`app/worker.py` running `transcribe.py --progress-file`), and the ElevenLabs and Speechmatics clients |
 | `app/hosted_more.py` | the Gemini, Deepgram, AssemblyAI and Azure Speech clients, and cutting long recordings at pauses |
 | `app/downloads.py` | model downloads, resumable and checked against the pinned size and SHA-256 |
-| `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from voiceprints |
+| `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from the speaker model |
 | `app/hub.py` | models added from Hugging Face: links, the API, GGUF headers, conversion, `models.json` |
 | `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams, joining them into `video.mp4` with PyAV, captions made by people as transcripts |
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
@@ -663,7 +691,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
 | `sysinfo.py` | this computer and a recording's format (PyAV), for the details and `transcribe.py`'s `.meta.json` |
 | `app/static/` | the interface (HTML, CSS and JavaScript, no build step) |
-| `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the details, the video (on short clips made by `tests/media.py`), and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
+| `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the speaker models, the details, the video (on short clips made by `tests/media.py`), and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
 
 Run the tests with `.venv/bin/python -m unittest discover -s tests -v`.
 
@@ -674,6 +702,7 @@ Every change needs the header `X-Sedjem: 1`.
 | Call | What |
 |---|---|
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space |
+| `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
 | `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&confirm_upload=` | the body is the file |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
 | `GET /api/jobs`, `GET /api/jobs/<id>` | the list; one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |

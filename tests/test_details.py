@@ -334,7 +334,7 @@ class DetailsTests(unittest.TestCase):
             ("Run", "Started"): ("2026-09-25 21:41", True),
             ("Run", "Finished"): ("2026-09-25 22:01", True),
             ("Run", "Peak memory"): ("3.0 GB", True),
-            ("Run", "Voiceprints"): ("nemo_en_titanet_small.onnx", True),
+            ("Run", "Speaker model"): ("nemo_en_titanet_small.onnx", True),
             ("Run", "App"): ("Sedjem 0.1.0", True),
             ("Computer", "Computer"): ("LENOVO ThinkPad L14 Gen 3", False),
             ("Computer", "Processor"): ("12th Gen Intel Core i5-1245U, 12 threads", False),

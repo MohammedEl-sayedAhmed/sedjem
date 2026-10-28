@@ -78,7 +78,13 @@ model's card, downloads them:
 | whisper-medium code-switching | 778 MB | Hugging Face `Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2`, plus the Whisper tokenizer |
 | Cohere Transcribe Arabic | 1.6 GB | Hugging Face `handy-computer/cohere-transcribe-arabic-07-2026-gguf` |
 | Whisper large-v3 | 3.1 GB | Hugging Face `Systran/faster-whisper-large-v3` (a copy already in the Hugging Face cache is used instead) |
-| Voiceprint model (speaker labels) | 40 MB | sherpa-onnx release (TitaNet-small), fetched together with the first model |
+| TitaNet-small, the default speaker model (speaker labels) | 40 MB | sherpa-onnx release, fetched together with the first model |
+
+The other speaker models are downloaded only when asked, under *Speaker labels* on the same tab, which
+shows their sizes and chooses the one that labels the speakers: TitaNet-large and 3D-Speaker CAM++ from
+the same sherpa-onnx release, and NVIDIA's Nemotron-3-Diarization from Hugging Face
+(`nvidia/Nemotron-3-Diarization`), a folder of three files
+([speaker models](09-app.md#speaker-models)).
 
 Every file is pinned in `app/config.toml` by URL (at a fixed revision), size and SHA-256. A download
 resumes after a dropped connection (HTTP range requests) and only becomes the real file once the size

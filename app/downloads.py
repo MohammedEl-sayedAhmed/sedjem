@@ -112,7 +112,7 @@ class Downloads:
             job["state"] = "cancelled"
 
     def remove(self, item_id):
-        """Delete an item's files (and any partial download)."""
+        """Delete an item's files (and any partial download), and the folder they were in once it is empty."""
         if self.busy(item_id):
             raise RuntimeError("wait until the download has finished or cancel it")
         item = self.cfg.download_items()[item_id]
@@ -122,6 +122,11 @@ class Downloads:
             for p in self.unpacked(f).values():
                 p.unlink(missing_ok=True)
                 p.with_name(p.name + ".part").unlink(missing_ok=True)
+        for folder in {self.cfg.path(f["path"]).parent for f in item["files"]}:  # e.g. Nemotron-3-Diarization/
+            try:
+                folder.rmdir()
+            except OSError:  # other files are still in it, or it is in use
+                pass
         if item.get("convert"):  # the converted model, a conversion cut short, and the conversion's log
             for folder in (item["convert"]["to"], item["convert"]["to"] + ".part", item["convert"]["from"]):
                 shutil.rmtree(self.cfg.path(folder), ignore_errors=True)

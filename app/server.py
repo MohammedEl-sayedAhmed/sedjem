@@ -23,7 +23,7 @@ from pathlib import Path
 from . import assistants, compare, courses, engines, hub, report, updates, video, youtube
 from . import transcript as T
 from . import history
-from .config import FROZEN, power_profile, set_power_profile
+from .config import FALLBACK_SPEAKER_MODEL, FROZEN, power_profile, set_power_profile
 from .downloads import Downloads
 from .jobs import ACTIVE, Runner, Store, probe_seconds
 
@@ -139,6 +139,20 @@ class App:
                 "download": download,
                 "region": self.cfg.region(model) if "region" in model else None}
 
+    def speaker_models(self):
+        """Settings → Models, Speaker labels: each speaker model with its download (and `item`, the download's id)
+        and whether it is on disk, the one chosen, the one used (the one chosen once it is downloaded, else
+        TitaNet-small, the fallback; None: no speaker labels)."""
+        cfg, items = self.cfg, self.cfg.download_items()
+        models = cfg.speaker_models()
+        # the downloads before the files, as in model_info: one that ends meanwhile still shows as running
+        downloads = {m["item"]: self.downloads.status(m["item"]) for m in models.values() if m["item"] in items}
+        used = cfg.speaker_model()
+        keys = ("id", "title", "note", "maker", "max_speakers", "item")
+        return {"chosen": cfg.speaker_model_choice(models), "used": used and used["id"], "fallback": FALLBACK_SPEAKER_MODEL,
+                "models": [{**{k: m.get(k) for k in keys}, "ready": cfg.speaker_model_ready(m),
+                            "download": downloads.get(m["item"])} for m in models.values()]}
+
     def used_bytes(self):
         """Disk space of all transcriptions (audio copies, transcripts, logs), counted at most every 30 s."""
         at, size = self.used
@@ -161,7 +175,8 @@ class App:
             "desktop": self.desktop, "frozen": FROZEN, "home": str(self.cfg.home),
             "models": [self.model_info(m, jobs) for m in self.cfg.models.values()],
             "catalog": hub.catalog(self.cfg),  # recommended models (app/catalog.toml)
-            "voiceprints": self.downloads.status("voiceprints") if "voiceprints" in items else None,
+            "voiceprints": self.downloads.status("voiceprints") if "voiceprints" in items else None,  # TitaNet-small's
+            "speaker_models": self.speaker_models(),  # which one labels the speakers (Settings → Models)
             "cuda": self.downloads.status("cuda") if "cuda" in items else None,
             "deno": self.downloads.status("deno") if "deno" in items else None,  # for YouTube links
             "youtube": {"runtime": youtube.runtime(self.cfg), "courses": str(self.cfg.courses)},
@@ -972,7 +987,8 @@ class Handler(BaseHTTPRequestHandler):
     def remove_download(self, _params, item_id):
         if item_id not in self.app.cfg.download_items():
             raise ApiError(404, "nothing to remove with that name")
-        if any(j["status"] in ACTIVE and (j["model"] == item_id or item_id in ("voiceprints", "cuda")) and j["kind"] == "local"
+        shared = {"cuda", *(m["item"] for m in self.app.cfg.speaker_models().values())}  # what any local run may use
+        if any(j["status"] in ACTIVE and (j["model"] == item_id or item_id in shared) and j["kind"] == "local"
                or item_id == "deno" and j.get("stage") == "downloading" for j in self.app.store.list()):
             raise ApiError(409, "a transcription is using it; wait until it has finished")
         try:
