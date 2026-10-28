@@ -14,6 +14,7 @@ public-set results is ignored by git.
 | `models/Audar-ASR-V1-Turbo/` | 1.9 GB | Audar Turbo Q4_K_M and its BF16 audio encoder |
 | `models/diarization/` | 0.3 GB | voiceprint models. `--speakers` needs only TitaNet-small (the default); TitaNet-large, WeSpeaker ResNet34 (the first default) and ResNet152 and 3D-Speaker CAM++ are used only by `bench/compare_voiceprints.py`; there is also an unused pyannote segmentation model |
 | `models/mms-300m-1130-forced-aligner/` | 1.3 GB | the optional forced-aligner model for `--align` |
+| `.venv-bench/`, `models/Nemotron-3-Diarization/` | 1.8 GB and 0.4 GB | the environment with PyTorch and Transformers, and the model, used only by `bench/compare_nemotron.py` |
 | `data/` | about 0.4 GB | public test clips (Perle, ArzEn, Mixat) in three audio conditions, chunks of the test calls, and the 10-minute meeting excerpts |
 | `results/poc/`, `results/meetings/` | small | transcripts of the private calls and meetings |
 | `app_data/` | about 50 MB per hour of recordings | the app's transcriptions (16 kHz audio copies, transcripts, logs) and saved API keys. Delete a transcription in the app, or the whole folder |

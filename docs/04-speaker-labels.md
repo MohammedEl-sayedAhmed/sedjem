@@ -87,6 +87,45 @@ meetings `--speakers 0` is a reasonable choice even when the headcount is known.
 also missed on 2–3-person excerpts, and not always by finding too few: CAM++ found 3 speakers for 2
 people on one excerpt and scored worse there (19.0% against 17.0% with the true count).
 
+## NVIDIA Nemotron-3-Diarization
+
+NVIDIA's Nemotron-3-Diarization (September 2026, about 100M parameters, OpenMDW 1.1 licence, which
+allows commercial use) replaces all of the steps above with one model. Every 10 ms it gives the
+probability that each of up to 8 speakers is talking, so it also hears when two people talk at once.
+Arabic is not among the languages its model card lists. `bench/compare_nemotron.py` runs it on the CPU
+with PyTorch and Transformers, and gives each of the same Whisper words the speaker with the highest
+average probability over the word; with the true count N given, only the N speakers it heard longest
+can get words. TitaNet-small labels the same words again in the same run, so only the speaker step
+differs.
+
+| Speaker labels | Size | Wrong speaker, true count given | Wrong speaker, count estimated | Count estimated right | Seconds per 10-minute excerpt |
+|---|---|---|---|---|---|
+| TitaNet-small voiceprints and clustering | 40 MB | 11.7% | 10.2% | 5 of 6 | 6 |
+| Nemotron-3-Diarization | 397 MB | 10.0% | 10.0% | 6 of 6 | 14 |
+
+It counted the people right on all six excerpts, including the 5-person one where TitaNet-small found
+2, so giving it the true count changed nothing. On that excerpt it put 19.4% of the words on the
+wrong person, against 38.4% for TitaNet-small with the true count and 21.6% with its estimate. On the
+five excerpts of two or three people the two are level at 9.0% pooled: per excerpt 2.7%, 8.4%,
+10.0%, 3.2% and 17.7% for Nemotron, against 4.6%, 7.8%, 10.4%, 2.6% and 16.5%.
+
+It hears two or more people at once in 4.0% of the speech (0.6–8.0% per excerpt). Sedjem gives every
+word one speaker, and so does the reference, so this is not an advantage yet: of the 169 words said
+in those stretches, Nemotron's most likely speaker was the wrong one for 29.6%, against 26.6% for
+TitaNet-small with the true count and 20.1% with its estimate. Making use of the overlap would mean
+transcribing each voice of an overlap separately.
+
+The times are for the speaker step alone, with 4 threads on the test laptop in the balanced power
+mode, on 28 October 2026. Both are small next to transcription: Whisper took 0.53 times real time
+on these excerpts in the performance mode, about 320 s each. The Nemotron run peaked at 1.5 GB of
+memory. Sedjem doesn't use
+PyTorch, so the benchmark runs in an environment of its own, which takes 1.8 GB of disk.
+
+TitaNet-small stays the default for now: Nemotron is better on the larger meeting and at counting
+people, and level on the smaller ones. Offering it in the app needs a way to run it without PyTorch,
+such as an ONNX export, or NVIDIA's NeMo-Speech.cpp with the 8-bit GGUF file (107 MB) in the model's
+repository.
+
 ## Forced alignment (experimental)
 
 Cutting Cohere's audio at every speaker change means each piece is transcribed without the words
@@ -128,7 +167,7 @@ its start, end and speaker, so speaker models can be compared without transcribi
   WeSpeaker voiceprints have a cosine similarity of 0.90 (1.0 is identical). TitaNet-small's are at
   0.48, though scores from different models can't be compared directly.
 - Larger meetings are hard: 38% of words were misattributed on the 5-person excerpt even with
-  TitaNet.
+  TitaNet (19% with Nemotron-3-Diarization, which the app can't run yet).
 - The reference labels used for scoring were corrected by hand from ElevenLabs output and are not
   perfect either, especially for short interjections.
 

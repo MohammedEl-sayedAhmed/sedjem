@@ -205,7 +205,11 @@ Private meeting recordings with reference transcripts (the expected layout is de
 .venv/bin/python transcribe.py data/private-meetings/mK.wav --engine cohere --out results/meetings/cohere-plain
 .venv/bin/python bench/score_meetings.py        # scores every folder in results/meetings/ as one engine
 .venv/bin/python bench/compare_voiceprints.py   # relabels the whisper words with each voiceprint model
+.venv-bench/bin/python bench/compare_nemotron.py  # and with Nemotron-3-Diarization, against TitaNet-small
 ```
+
+`bench/compare_nemotron.py` needs PyTorch and Transformers, so it runs in an environment of its own,
+`.venv-bench/`; its first lines say how to set it up and fetch the model.
 
 Their audio, transcripts and results stay in the git-ignored `data/` and `results/meetings/`.
 
@@ -219,7 +223,7 @@ Their audio, transcripts and results stay in the git-ignored `data/` and `result
 | `align.py` | forced alignment for engines without word times (experimental) |
 | `bench/serve.sh` | starts llama-server (127.0.0.1 only) for r2t2, qwen3asr or audar |
 | `bench/prepare_data.py`, `run_bench.py`, `run_configs.sh`, `score.py` | the public-set benchmark |
-| `bench/prepare_private_meetings.py`, `score_meetings.py`, `eval_meetings.py`, `compare_voiceprints.py` | scoring on private meetings with reference transcripts (data and results stay git-ignored) |
+| `bench/prepare_private_meetings.py`, `score_meetings.py`, `eval_meetings.py`, `compare_voiceprints.py`, `compare_nemotron.py` | scoring on private meetings with reference transcripts (data and results stay git-ignored) |
 | `bench/fetch_models.py` | resumable, checksum-verified model downloader (`bench/run_bench.py --device gpu` benchmarks on the GPU) |
 | `bench/samples/` | the pinned clip lists of the public test sets |
 | `tests/` | unit tests (`.venv/bin/python -m unittest discover -s tests -v`) |

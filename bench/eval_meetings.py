@@ -126,11 +126,12 @@ def evaluate(ref_turns, hyp, prefix=False):
         ref = ref[:best_prefix(ref, hyp)]
     ref_text, hyp_text = " ".join(w for w, _ in ref), " ".join(w for w, _ in hyp)
     out = jiwer.process_words(ref_text, hyp_text)
-    pairs = []
+    pairs, aligned = [], []
     for c in out.alignments[0]:
         if c.type in ("equal", "substitute"):
             for i, j in zip(range(c.ref_start_idx, c.ref_end_idx), range(c.hyp_start_idx, c.hyp_end_idx)):
                 pairs.append((hyp[j][1], ref[i][1]))
+                aligned.append(j)
     mapping = best_mapping(pairs)
     agree = sum(1 for h, r in pairs if mapping.get(h) == r)
     errors, totals = script_errors([w for w, _ in ref], hyp_text)
@@ -156,6 +157,8 @@ def evaluate(ref_turns, hyp, prefix=False):
         "ref_speakers": len(ref_people), "ref_speakers_20w": sum(1 for n in ref_people.values() if n >= 20),
         "hyp_speakers": len({s for _, s in hyp}),
         "mapping": mapping,
+        # for every aligned hypothesis word (its index in hyp): credited to the right person or not
+        "right_speaker": {j: mapping.get(h) == r for j, (h, r) in zip(aligned, pairs)},
     }
 
 
@@ -172,7 +175,9 @@ def main():
         names = json.loads(Path(args.map).read_text() if Path(args.map).exists() else args.map)
     turns = reference_turns(args.reference, names, args.speakers.split(",") if args.speakers else None)
     hyp = hypothesis_words(json.loads(Path(args.hypothesis).read_text()))
-    print(json.dumps(evaluate(turns, hyp, args.prefix), ensure_ascii=False, indent=1))
+    r = evaluate(turns, hyp, args.prefix)
+    del r["right_speaker"]
+    print(json.dumps(r, ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":
