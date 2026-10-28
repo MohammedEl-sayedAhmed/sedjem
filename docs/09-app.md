@@ -188,6 +188,12 @@ and version 1 holds the edits made until then. If the model's output is gone, ve
 starts from the transcript as it was. Changes made to the files outside the app are saved as a
 version of their own the next time the transcript is opened.
 
+A branch (see [main transcript and branches](#main-transcript-and-branches)) starts its history with
+version 0 of kind "Branch": the copy it was made from, with a link to that transcript and the number of
+that version. A version saved by an assistant ([assistants](11-assistants.md)) is marked *Assistant*,
+with the assistant's name. *New branch from this version*, on every version and in its view, makes a
+new transcript of the recording from it.
+
 The versions are kept in the transcription's folder under `history/`: `index.json` lists them, and
 each version is one file with its title, speaker names and lines. The newest version is also in
 `transcript.json` and `job.json`, where the rest of the app reads it. The code is in
@@ -205,7 +211,12 @@ returns one with its changes (`?against=<m>` compares it with another), `PATCH` 
 `{"message": …}` sets its message, and `POST /api/jobs/<id>/versions/<n>/restore` restores it.
 `POST /api/jobs/<id>/diff` takes the same body as `PATCH /api/jobs/<id>` and returns what it would
 change, without saving. `PATCH /api/jobs/<id>` also takes a `message`, and the exports take
-`?version=<n>`.
+`?version=<n>`. A script that read a version and changes it can pass that version's number as
+`base_version` with `PATCH /api/jobs/<id>`: when the latest version is another one by then (the app or
+an assistant saved one meanwhile), the answer is 409 with `{"error": …, "version": <the latest>}` and
+nothing is changed. Without `base_version`, `PATCH` works as it always did. The app and the MCP server
+(another process) never change a history at the same moment: each holds a lock on the transcription's
+folder (`history.lock`) while it does.
 
 ## Comparing and combining transcripts
 
@@ -225,25 +236,66 @@ differences. *Only rows that differ* hides the rest, and clicking a row plays it
 the speakers its own way, so the other columns' speakers are matched to the first column's by who is
 talking at the same time. The match can be changed in the Speakers panel.
 
-The first column is the base. To make your own version, press *Keep* in the rows where another model
-got it right, or give a time range (from 1:05 to 2:30, say) and the model to take it from. Shift
-with *Keep* takes every row from the last one kept in that column. Where the picks overlap, the later
-one wins, and everywhere else the base's text stays. A line is taken or left whole, by where its
-middle falls. *Use as base* makes another column the base.
+The base is the recording's main transcript when it is one of the columns, else the first column. To
+make your own version, press *Keep* in the rows where another model got it right, or give a time range
+(from 1:05 to 2:30, say) and the model to take it from. Shift with *Keep* takes every row from the last
+one kept in that column. Where the picks overlap, the later one wins, and everywhere else the base's
+text stays. A line is taken or left whole, by where its middle falls. *Use as base* makes another
+column the base.
 
 *Save as a new version* shows the change first, the same way an edit is reviewed, with an optional
 message. It is saved as a new version of the base transcript, so it shows in that transcript's
-History as a version of kind "Combined", with a summary of what came from where (for example "With
-the text of ElevenLabs Scribe v2 for 00:03 to 00:07: 1 line changed"). Version 0 is still the
-model's output, the other transcriptions are not changed, and restoring an earlier version undoes the
-combination. Speakers keep the base's numbers and names; a speaker the base does not have keeps the
-name it had in its own transcript. The code is in `app/compare.py` and `app/static/compare.js`.
+History as a version of kind "Combined", with a summary of what came from where, naming each
+transcript by its label and the version it was at (for example "With the text of ElevenLabs Scribe v2
+(version 0) for 00:03 to 00:07: 1 line changed"). The version also records each stretch's
+transcript, version and time range. Version 0 is still the model's output, the other transcriptions
+are not changed, and restoring an earlier version undoes the combination. Speakers keep the base's
+numbers and names; a speaker the base does not have keeps the name it had in its own transcript. The
+code is in `app/compare.py` and `app/static/compare.js`.
 
 For scripts: `GET /api/jobs/<id>/group` lists the transcriptions of a recording, and `GET
 /api/jobs` gives each one a `group`. `GET /api/compare?ids=<a>,<b>[,<c>]&base=<a>` returns the rows.
 `POST /api/combine` with `{"ids": […], "base": …, "picks": [{"start", "end", "from"}], "speakers":
 {…}, "message": …}` saves the combination, and `POST /api/combine/preview` with the same body returns
-what it would change, without saving.
+what it would change, without saving. Without `base`, both take the main transcript when it is one of
+`ids`, else the first. The saved version's `combined` has `sources` (`id`, `label`, `version`) and
+`ranges` (`start`, `end`, `from`, `version`).
+
+## Main transcript and branches
+
+A recording works like a repository with a main line and branches. The transcripts the models made
+are its branches, one per run, and more branches can be made from any version of any of them. A
+branch named "suggestions", say, can hold machine guesses that have not been checked yet, while the
+main transcript holds only checked text.
+
+*New branch from this version* in History (and *Branches → New branch from this version* on the page,
+for the version shown) asks for a name in place and makes a new transcript of the recording that
+starts as a copy of that version: its lines with their times and speakers, the speaker names and the
+title. It shares the audio with the others by hardlink, as *Run again with* does, and no model runs.
+Its History starts with that copy as version 0, which links to the transcript and version it came
+from. A branch is edited, compared, combined, restored and exported like any transcript, and a
+branch of a transcription hidden from assistants is hidden too.
+
+*Branches → Make this the main transcript* chooses the transcript to curate. A recording has at most
+one: choosing another one unmarks the first, and only a finished transcript can be chosen. It can be
+a model's transcript, or a branch made for it from any of them at any version, which is then edited
+or gets stretches brought in from the other branches by combining. The main transcript is listed
+first with a *Main* mark, in the sidebar and in the row of transcripts on each page; the others are
+named by their branch's name or their model, numbered when two have the same one. The recording's
+title in the sidebar opens the main transcript, the compare view takes it as the base, *Compare* on
+another transcript's page compares that one with it, and a YouTube lecture's files in the courses
+folder follow it (without one, they follow the transcription that finished last, leaving out
+branches that are not the main one). *Unmark as the main transcript* takes the mark off. A recording
+without a main transcript works as before.
+
+For scripts: `POST /api/jobs/<id>/branch` with `{"version": <n>, "name": …}` makes a branch and
+answers with it (201). The name is required; its spaces are folded and it is cut at 60 characters.
+It answers 404 when there is no such version and 409 while the transcription is running. `POST
+/api/jobs/<id>/main` with `{"main": true}` (or `false`) chooses the main transcript (or unmarks it)
+and answers like `GET /api/jobs/<id>/group`, which lists the main transcript first, then the others
+oldest first, each with its `label` and `main`. `GET /api/jobs` says `main` and `branch` for each
+transcription. In `job.json`, the main transcript has `"main": true`, and a branch has `"branch":
+{"name": …, "from": {"id": …, "version": …}}` and `rerun_of` set to the transcript it was made from.
 
 ## The models and their settings
 
@@ -607,7 +659,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
 | `app/transcript.py` | lines from words, and the exports |
-| `app/compare.py` | transcriptions of one recording: grouping them, lining them up by time, and combining them into a new version |
+| `app/compare.py` | transcriptions of one recording: grouping them, their main transcript and labels, lining them up by time, and combining them into a new version |
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
 | `sysinfo.py` | this computer and a recording's format (PyAV), for the details and `transcribe.py`'s `.meta.json` |
 | `app/static/` | the interface (HTML, CSS and JavaScript, no build step) |
@@ -625,8 +677,10 @@ Every change needs the header `X-Sedjem: 1`.
 | `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&confirm_upload=` | the body is the file |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
 | `GET /api/jobs`, `GET /api/jobs/<id>` | the list; one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |
-| `PATCH /api/jobs/<id>` | `title`, `speaker_names`, `lines`, or `merge: {from, into}` |
+| `PATCH /api/jobs/<id>` | `title`, `speaker_names`, `lines`, or `merge: {from, into}`; with `base_version`, 409 and no change when that isn't the latest version |
 | `POST /api/jobs/<id>/cancel`, `POST /api/jobs/<id>/rerun`, `DELETE /api/jobs/<id>` | |
+| `POST /api/jobs/<id>/branch` with `{"version": …, "name": …}` | a branch: a new transcript of the recording that starts as that version |
+| `POST /api/jobs/<id>/main` with `{"main": true}` | the recording's main transcript (`false` unmarks it) |
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
 | `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |

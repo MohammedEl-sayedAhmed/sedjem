@@ -81,13 +81,18 @@ recording on your machine unless you choose a hosted service.
 - Compares them side by side, with the words that differ marked, and combines the best parts: keep
   a row or a time range from another model, review the result as a diff, and save it as a new
   version.
+- Treats each recording like a repository with a main line and branches. The model transcripts are
+  its branches, a new branch can start from any version of any of them, and one transcript can be
+  chosen as the main one: it is listed first, opened from the recording, and combined into from any
+  branch, with each stretch's source and version kept in its History.
 
 ### Work with an assistant
 
 - Answers assistants such as Claude Desktop, Claude Code, Cursor and VS Code over MCP, even while the
   app is closed: they can list, search and read the transcripts and courses, read long ones in pieces,
-  and point to the lecture and the moment in the video. Prompts for summaries, meeting minutes, study
-  notes, quizzes and flashcards come with it.
+  and point to the lecture and the moment in the video. With your agreement, an assistant can also
+  save a corrected version of a transcript; every earlier version stays. Prompts for summaries,
+  meeting minutes, study notes, quizzes and flashcards come with it.
 - Assistants see only what *Settings → Assistants* allows: courses, other recordings, or neither, and
   any transcription or course can be hidden from them. A log shows what they asked. See
   [assistants](docs/11-assistants.md).
