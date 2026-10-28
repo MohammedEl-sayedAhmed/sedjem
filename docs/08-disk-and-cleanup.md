@@ -12,9 +12,9 @@ public-set results is ignored by git.
 | `models/whisper-medium-arabic-codeswitched-ct2/` | 0.8 GB | the default engine, plus the Whisper tokenizer so it runs offline |
 | `models/cohere-transcribe-arabic-07-2026-gguf/` | 1.6 GB | Cohere Transcribe Arabic, Q4_K_M |
 | `models/Audar-ASR-V1-Turbo/` | 1.9 GB | Audar Turbo Q4_K_M and its BF16 audio encoder |
-| `models/diarization/` | 0.3 GB | speaker models. `--speakers` needs only TitaNet-small (the default). TitaNet-large and 3D-Speaker CAM++ can also be chosen in the app (*Settings → Models*), which downloads Nemotron-3-Diarization into `Nemotron-3-Diarization/` here when asked; WeSpeaker ResNet34 (the first default) and ResNet152 are used only by `bench/compare_voiceprints.py`; there is also an unused pyannote segmentation model |
+| `models/diarization/` | 0.3 GB, 0.7 GB with Nemotron | speaker models. `--speakers` needs only TitaNet-small (the default). TitaNet-large and 3D-Speaker CAM++ can also be chosen in the app (*Settings → Models*), which downloads Nemotron-3-Diarization into `Nemotron-3-Diarization/` here when asked; WeSpeaker ResNet34 (the first default) and ResNet152 are used only by `bench/compare_voiceprints.py`; there is also an unused pyannote segmentation model |
 | `models/mms-300m-1130-forced-aligner/` | 1.3 GB | the optional forced-aligner model for `--align` |
-| `.venv-bench/`, `models/Nemotron-3-Diarization/` | 1.8 GB and 0.4 GB | the environment with PyTorch and Transformers, and the model, used only by `bench/compare_nemotron.py` |
+| `.venv-bench/` | 1.8 GB | an environment with PyTorch and Transformers, used only by `bench/check_nemotron.py` to compare `nemotron.py` with NVIDIA's own implementation |
 | `data/` | about 0.4 GB | public test clips (Perle, ArzEn, Mixat) in three audio conditions, chunks of the test calls, and the 10-minute meeting excerpts |
 | `results/poc/`, `results/meetings/` | small | transcripts of the private calls and meetings |
 | `app_data/` | about 50 MB per hour of recordings | the app's transcriptions (16 kHz audio copies, transcripts, logs) and saved API keys. Delete a transcription in the app, or the whole folder |
