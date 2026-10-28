@@ -269,6 +269,7 @@ ASKED = {"list_transcriptions": ("Listed the transcriptions ({})", "Listed the t
          "get_transcript": ("Read {}", "Read a transcript"),
          "search": ("Searched for {}", "Searched the transcripts"),
          "get_course_text": ("Read the course text of {}", "Read the text of a course"),
+         "save_version": ("{}", "Asked to save a version"),  # the detail says what was saved, or why it wasn't
          "resources/read": ("Read {}", "Read a transcript or a course"),
          "prompts/get": ("Used the prompt {}", "Used a prompt"),
          "tools/call": ("Asked for {}", "Asked for a tool that doesn't exist")}
