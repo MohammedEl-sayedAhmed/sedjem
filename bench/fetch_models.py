@@ -67,13 +67,14 @@ def fetch_range(url, part, start, end):
             time.sleep(3)
 
 
-def fetch_file(repo, name, size, sha256, folder=MODELS):
+def fetch_file(repo, name, size, sha256, folder=MODELS, revision="main"):
+    """repo is "owner/name" for a model, "datasets/owner/name" for a dataset."""
     folder.mkdir(parents=True, exist_ok=True)
     dest = folder / name
     if dest.exists() and dest.stat().st_size == size:
         print(f"have {name}", flush=True)
         return
-    url = f"https://huggingface.co/{repo}/resolve/main/{name}"
+    url = f"https://huggingface.co/{repo}/resolve/{revision}/{name}"
     if size == 0:
         dest.write_bytes(b"")
         print(f"done {name} (empty file)", flush=True)
@@ -120,11 +121,12 @@ def report():
         last = now
 
 
-def lookup(spec):
+def lookup(spec, kind="models", revision="main"):
     """'repo/name:file' -> (repo, file, size, sha256, folder) from the Hugging Face API; the file
-    goes to models/<name>/. Small non-LFS files have no published SHA-256 and are size-checked only."""
+    goes to models/<name>/. Small non-LFS files have no published SHA-256 and are size-checked only.
+    kind="datasets" looks in a dataset repository instead."""
     repo, path = spec.split(":", 1)
-    tree = requests.get(f"https://huggingface.co/api/models/{repo}/tree/main?recursive=true", timeout=30).json()
+    tree = requests.get(f"https://huggingface.co/api/{kind}/{repo}/tree/{revision}?recursive=true", timeout=30).json()
     entry = next(e for e in tree if e["path"] == path)
     return repo, path, entry["size"], (entry.get("lfs") or {}).get("oid"), MODELS / repo.split("/")[1]
 
