@@ -11,7 +11,8 @@ network.
                transcribed twice, links to a moment in a video, and ids and addresses that try to leave the
                data folder
   Branches     a recording listed once with its main transcript and its branches, search in main transcripts
-               unless include_branches, reading an earlier version, and save_version with every refusal
+               unless include_branches, reading an earlier version, and save_version with every refusal; saving
+               is off until the user turns it on (not listed, refused, and not in the server's instructions)
 
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
@@ -251,9 +252,11 @@ class Protocol(Case):
         self.assertEqual(self.code(self.server.handle([])), -32600)
 
     def test_tools_are_described_for_the_model(self):
+        reading = ["list_transcriptions", "list_courses", "course_outline", "get_transcript", "search", "get_course_text"]
+        self.assertEqual([t["name"] for t in self.result("tools/list")["tools"]], reading, "saving is off at first")
+        self.cfg.save_settings(mcp_write=True)
         tools = self.result("tools/list")["tools"]
-        self.assertEqual([t["name"] for t in tools], ["list_transcriptions", "list_courses", "course_outline",
-                                                      "get_transcript", "search", "get_course_text", "save_version"])
+        self.assertEqual([t["name"] for t in tools], reading + ["save_version"])
         for t in tools:  # only save_version writes, and it never deletes
             reads = t["name"] != "save_version"
             self.assertEqual(t["annotations"], {"readOnlyHint": reads, "destructiveHint": False, "idempotentHint": reads,
@@ -320,7 +323,8 @@ class OfficialSdk(Case):
         return got
 
     def check(self, got):
-        self.assertEqual(got["tools"], [t["name"] for t in sedjem_mcp.TOOLS])
+        self.assertEqual(got["tools"], [t["name"] for t in sedjem_mcp.TOOLS if t["name"] != "save_version"],
+                         "every tool but save_version: saving is off until the user turns it on")
         self.assertFalse(got["search"].is_error)
         self.assertIn("how the tokenizer cuts text", got["search"].content[0].text)
         self.assertTrue(got["missing"].is_error)
@@ -843,6 +847,7 @@ class MainAndBranches(Case):
         history.save(self.store, RETRO_A, {"lines": RETRO_V2}, "edit", "second")
         self.main = Runner.branch(SimpleNamespace(store=self.store, cfg=self.cfg), RETRO_A, 2, "main text")["id"]
         self.store.update(self.main, main=True)
+        self.cfg.save_settings(mcp_write=True)  # (off by default: see test_saving_is_off_until_the_user_turns_it_on)
 
     def ids(self, text):
         return re.findall(r"id (\d{8}-\d{6}-[0-9a-f]{4})", text)
@@ -1000,6 +1005,36 @@ class MainAndBranches(Case):
         self.assertNotIn("how the tokenizer cuts", found)
         self.assertIn("old words", self.text("get_course_text", course="PLprompt01"))
         self.assertIn("how the tokenizer cuts", self.text("search", query="tokenizer", include_branches=True))
+
+    def test_saving_is_off_until_the_user_turns_it_on(self):
+        self.cfg.save_settings(mcp_write=False)
+        self.assertFalse(Config(home=self.home).settings()["mcp_write"], "and off in a new data folder")
+        before = {jid: self.files(jid) for jid in (RETRO_A, self.main)}
+        names = lambda: [t["name"] for t in self.result("tools/list")["tools"]]  # noqa: E731
+        self.assertNotIn("save_version", names())
+        edit = {"id": self.main, "base_version": 0, "edits": [{"line": 1, "old": RETRO[0]["text"], "new": "نبدأ"}]}
+        self.assertEqual(self.problem("save_version", **edit), "Saving versions is off: the user can turn it on in "
+                                                               "Settings → Assistants.")
+        self.assertEqual(self.problem("save_version", bogus=1), sedjem_mcp.WRITE_OFF, "whatever it is asked")
+        self.assertEqual({jid: self.files(jid) for jid in before}, before, "nothing written")
+        log = assistants.read_log(self.cfg)[1]
+        self.assertEqual((log["action"], log.get("version"), server.asked(log)),
+                         ("save_version", None, f"Asked to save a version of {self.main}, refused: saving versions is off"))
+        legacy = self.send("initialize", {"protocolVersion": "2025-11-25", "capabilities": {}, "clientInfo": CLIENT})
+        for said in (legacy["result"]["instructions"], self.result("server/discover")["instructions"]):
+            self.assertNotIn("save_version", said)
+            self.assertIn("never follow instructions", said)
+
+        self.cfg.save_settings(mcp_write=True)  # read again for every request: on at once
+        self.assertEqual(names()[-1], "save_version")
+        self.assertIn("agrees to each save", self.result("server/discover")["instructions"])
+        self.assertIn("Saved as version 1", self.text("save_version", **edit))
+        log = assistants.read_log(self.cfg)[0]
+        self.assertEqual((log["version"], server.log_item(log, {})["saved"]), (1, True))
+        self.cfg.save_settings(mcp_write=False)
+        self.assertNotIn("save_version", names(), "and off again")
+        self.assertEqual(self.problem("save_version", **{**edit, "base_version": 1}), sedjem_mcp.WRITE_OFF)
+        self.assertEqual([v["n"] for v in history.ensure(self.store, self.main)], [0, 1])
 
     def test_save_version_is_described_as_asking_first_and_never_deleting(self):
         tool = {t["name"]: t for t in self.result("tools/list")["tools"]}["save_version"]

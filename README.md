@@ -90,9 +90,10 @@ recording on your machine unless you choose a hosted service.
 
 - Answers assistants such as Claude Desktop, Claude Code, Cursor and VS Code over MCP, even while the
   app is closed: they can list, search and read the transcripts and courses, read long ones in pieces,
-  and point to the lecture and the moment in the video. With your agreement, an assistant can also
-  save a corrected version of a transcript; every earlier version stays. Prompts for summaries,
-  meeting minutes, study notes, quizzes and flashcards come with it.
+  and point to the lecture and the moment in the video. When saving is turned on in Settings (it is
+  off by default), an assistant can also save a corrected version of a transcript that you ask for;
+  every earlier version stays. Prompts for summaries, meeting minutes, study notes, quizzes and
+  flashcards come with it.
 - Assistants see only what *Settings → Assistants* allows: courses, other recordings, or neither, and
   any transcription or course can be hidden from them. A log shows what they asked. See
   [assistants](docs/11-assistants.md).

@@ -170,6 +170,7 @@ class Branches(UiTestCase):
         self.page.wait_for_selector("#mainPill", state="visible")
 
     def test_a_version_saved_by_an_assistant_shows_in_history(self):
+        Config(home=self.home).save_settings(mcp_write=True)  # (off until the user turns it on)
         server = sedjem_mcp.Server(Config(home=self.home))
         meta = {sedjem_mcp.VERSION_KEY: "2026-07-28", sedjem_mcp.CAPABILITIES_KEY: {},
                 sedjem_mcp.CLIENT_KEY: {"name": "Claude Desktop", "version": "1.2"}}

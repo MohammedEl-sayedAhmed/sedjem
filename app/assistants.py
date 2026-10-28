@@ -1,16 +1,20 @@
 """What assistants connected over MCP (app/mcp.py) may see, the log of what they asked, and how to connect them.
 
-Three settings, saved like the others in <storage>/settings.json and changed in Settings → Assistants:
+Four settings, saved like the others in <storage>/settings.json and changed in Settings → Assistants:
   mcp_courses     YouTube courses and videos added on their own are visible (default on)
   mcp_recordings  every other transcription (meetings, calls, files) is visible (default on)
   mcp_hidden      transcriptions and courses hidden one by one: "job:<id>" and "course:<playlist id>"
+  mcp_write       assistants may save new versions of transcripts (save_version; default off). Transcript text is
+                  quoted data that anyone in a recording could have said, so nothing an assistant reads in it can
+                  lead to a save unless the user turned this on; a save never deletes anything either.
 
 To an assistant, a hidden or switched-off transcription is as if it didn't exist: it is never listed, searched,
 read, offered as a resource or suggested in a completion.
 
 The log is <storage>/mcp/log.jsonl, one JSON object per line, oldest first:
   {"time": ISO time, "client": "Claude Desktop 1.2", "action": "search", "detail": "tokenizers", "ids": [job ids]}
-It is kept to its newest LOG_KEEP entries and shown in Settings → Assistants.
+with "version" too for a version an assistant saved. It is kept to its newest LOG_KEEP entries and shown in
+Settings → Assistants.
 """
 import json
 import os
@@ -56,6 +60,12 @@ def visible(cfg, job, settings=None):
     return not any(k in hidden for k in keys(job))
 
 
+def writes(cfg, settings=None):
+    """Whether assistants may save new versions of transcripts (mcp_write: only when the user turned it on)."""
+    s = settings if settings is not None else cfg.settings()
+    return s.get("mcp_write") is True
+
+
 def set_hidden(cfg, key, hide):
     """Hide ("job:<id>" or "course:<playlist id>") from assistants, or show again; returns the settings."""
     if not HIDDEN_KEY.match(str(key or "")):
@@ -80,10 +90,12 @@ def log_path(cfg):
     return cfg.storage / "mcp" / "log.jsonl"
 
 
-def log(cfg, client, action, detail="", ids=()):
-    """Add one entry; never raises (a log that can't be written must not stop an answer)."""
+def log(cfg, client, action, detail="", ids=(), version=None):
+    """Add one entry; never raises (a log that can't be written must not stop an answer). version: the number of the
+    version an assistant saved."""
     entry = {"time": datetime.now().astimezone().isoformat(timespec="seconds"), "client": str(client or "")[:120],
-             "action": str(action)[:60], "detail": str(detail or "")[:300], "ids": [str(i) for i in ids][:200]}
+             "action": str(action)[:60], "detail": str(detail or "")[:300], "ids": [str(i) for i in ids][:200],
+             **({"version": version} if isinstance(version, int) and not isinstance(version, bool) else {})}
     path = log_path(cfg)
     try:
         with _log_lock:

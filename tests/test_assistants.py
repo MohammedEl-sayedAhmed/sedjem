@@ -36,6 +36,14 @@ class Visibility(unittest.TestCase):
     def test_everything_is_visible_by_default(self):
         self.assertEqual(self.seen(), ["Sprint planning", "Intro", "A talk"])
 
+    def test_saving_is_off_until_turned_on(self):
+        self.assertEqual((self.cfg.settings()["mcp_write"], assistants.writes(self.cfg)), (False, False))
+        self.cfg.save_settings(mcp_write=True)
+        self.assertTrue(assistants.writes(self.cfg))
+        self.assertTrue(assistants.writes(None, {"mcp_write": True}), "from settings read once")
+        self.cfg.settings_path.write_text(json.dumps({"mcp_write": "yes"}), encoding="utf-8")  # changed by hand
+        self.assertFalse(assistants.writes(self.cfg), "only a real true turns it on")
+
     def test_the_two_switches(self):
         self.cfg.save_settings(mcp_recordings=False)
         self.assertEqual(self.seen(), ["Intro", "A talk"], "a YouTube video on its own counts with the courses")
@@ -79,9 +87,10 @@ class Visibility(unittest.TestCase):
         for value in ("job:20261019-100000-aaaa", ["job:x"], [1], {"job": 1}):
             with self.assertRaises(ValueError):
                 self.cfg.save_settings(mcp_hidden=value)
-        for key in ("mcp_courses", "mcp_recordings"):
-            with self.assertRaises(ValueError):
-                self.cfg.save_settings(**{key: "yes"})
+        for key in ("mcp_courses", "mcp_recordings", "mcp_write"):
+            for value in ("yes", 1, None):
+                with self.assertRaises(ValueError, msg=(key, value)):
+                    self.cfg.save_settings(**{key: value})
         self.assertEqual(self.cfg.settings()["mcp_hidden"], [])
 
     def test_an_entry_changed_by_hand_does_not_block_hiding(self):
@@ -101,6 +110,13 @@ class Log(unittest.TestCase):
 
     def tearDown(self):
         shutil.rmtree(self.home, ignore_errors=True)
+
+    def test_a_saved_version_is_logged_with_its_number(self):
+        assistants.log(self.cfg, "Claude Desktop 1.2", "save_version", "Saved version 3 of Intro", ["20261019-110000-bbbb"], 3)
+        assistants.log(self.cfg, "Cursor", "search", "loops", version=True)  # (not a number: left out)
+        saved, other = assistants.read_log(self.cfg)[1], assistants.read_log(self.cfg)[0]
+        self.assertEqual((saved["action"], saved["version"]), ("save_version", 3))
+        self.assertNotIn("version", other)
 
     def test_newest_first(self):
         assistants.log(self.cfg, "Claude Desktop 1.2", "search", "tokenizers", ["20261019-110000-bbbb"])

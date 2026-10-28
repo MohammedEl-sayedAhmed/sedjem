@@ -195,7 +195,7 @@ def check_mcp(tmp):
             tools = [t.get("name") for t in results[1].get("tools", [])] if whole else []
             out[era] = {"answers": len(answers), "exit": r.returncode, "tools": tools,
                         "ok": whole and results[0].get("protocolVersion") == "2025-06-18"
-                        and tools == [t["name"] for t in mcp.TOOLS]}
+                        and tools == [t["name"] for t in mcp.listed_tools(Config(home=home).settings())]}  # (saving off)
         if not out[era]["ok"]:
             out[era]["stderr"] = r.stderr.decode("utf-8", "replace")[-1500:]
     logged = assistants.read_log(Config(home=home))

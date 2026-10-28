@@ -1,6 +1,7 @@
 """Browser tests of assistants over MCP in the app (app/static/assistants.js): Settings → Assistants with its two
-switches (kept after a reload), what is hidden one by one and Show again, the four connection snippets and Copy,
-and what assistants asked (written here with assistants.log, as app/mcp.py does) and Clear; hiding a transcription
+switches (kept after a reload) and the switch that lets assistants save versions (off until turned on), what is
+hidden one by one and Show again, the four connection snippets and Copy, and what assistants asked (written here
+with assistants.log, as app/mcp.py does, a saved version standing out) and Clear; hiding a transcription
 from its page and a course from a lecture's course bar; the dark theme and a narrow window. Headless Chromium
 against a Sedjem server with demo transcripts (see tests/ui_support.py).
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_assistants.py" -v
@@ -29,8 +30,8 @@ class Assistants(UiTestCase):
 
     def setUp(self):
         super().setUp()
-        self.cfg = self.app.cfg  # each test starts with everything visible and nothing in the log
-        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[])
+        self.cfg = self.app.cfg  # each test starts with everything visible, saving off and nothing in the log
+        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[], mcp_write=False)
         assistants.clear_log(self.cfg)
 
     def open_tab(self):
@@ -50,11 +51,14 @@ class Assistants(UiTestCase):
         self.assertIn("Claude Desktop, Claude Code, Cursor and VS Code can read and search",
                       self.page.inner_text("#settings .ai-intro"))
         self.assertEqual(self.texts("#settings .ai-sec h4"),
-                         ["What assistants can see", "Hidden from assistants", "Connect an assistant", "What assistants asked"])
+                         ["What assistants can see", "What assistants can change", "Hidden from assistants",
+                          "Connect an assistant", "What assistants asked"])
         self.assertEqual(self.texts("#settings .ai-sec .set-row .set-text b"),
-                         ["Courses and YouTube videos", "Meetings and other recordings"])
+                         ["Courses and YouTube videos", "Meetings and other recordings",
+                          "Let assistants save new versions of transcripts"])
         self.assertTrue(self.page.is_checked("#settings [data-setting=mcp_courses]"))
         self.assertTrue(self.page.is_checked("#settings [data-setting=mcp_recordings]"))
+        self.assertFalse(self.page.is_checked("#settings [data-setting=mcp_write]"), "saving is off at first")
         self.assertIn("Nothing is hidden", self.page.inner_text("#settings .ai-empty >> nth=0"))
         snippets = assistants.snippets(self.cfg)
         self.assertEqual(self.texts("#settings .ai-snippet-head b"), CLIENTS)
@@ -92,6 +96,41 @@ class Assistants(UiTestCase):
         self.page.keyboard.press("Escape")  # the page follows when Settings closes
         self.page.wait_for_selector("#aiPanel:has-text('Visible to assistants connected to Sedjem.')")
         self.assertTrue(self.cfg.settings()["mcp_recordings"])
+
+    def test_saving_versions_is_off_until_turned_on_and_a_save_stands_out_in_the_log(self):
+        self.open()
+        self.open_tab()
+        hint = self.page.inner_text("#settings .ai-sec:has(#ai-change) .set-text .hint")
+        self.assertIn("A save never deletes anything", hint)
+        self.assertIn("History can undo it", hint)
+        self.page.locator("#settings [data-setting=mcp_write]").check()
+        self.page.wait_for_selector(".toast >> text=Saved")
+        self.assertTrue(self.cfg.settings()["mcp_write"])
+        self.assertTrue(self.api("GET", "/api/assistants")["json"]["settings"]["mcp_write"])
+        self.page.reload()
+        self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
+        self.open_tab()
+        self.assertTrue(self.page.is_checked("#settings [data-setting=mcp_write]"), "kept after a reload")
+        self.page.locator("#settings [data-setting=mcp_write]").uncheck()
+        self.page.wait_for_selector(".toast >> text=Saved")
+        self.assertFalse(self.cfg.settings()["mcp_write"])
+
+        # what an assistant saved stands out from what it read: that it was a save, the version and the transcript
+        self.page.keyboard.press("Escape")
+        assistants.log(self.cfg, "Cursor", "search", "planning", [MEETING])
+        assistants.log(self.cfg, "Claude Desktop 1.2", "save_version", "Saved version 3 of Sprint planning", [MEETING], 3)
+        assistants.log(self.cfg, "Claude Code", "save_version", "Asked to save a version of Sprint planning, refused: "
+                                                                "saving versions is off", [MEETING])
+        self.open_tab()
+        self.page.wait_for_selector("#settings .ai-log li.ai-saved")
+        self.assertEqual(self.texts("#settings .ai-log li.ai-saved .ai-entry"),
+                         ["Saved version 3 Claude Desktop 1.2 Saved version 3 of Sprint planning Sprint planning"])
+        self.assertEqual(self.texts("#settings .ai-log li.ai-saved .ai-saved-mark"), ["Saved version 3"])
+        self.assertEqual(self.page.locator("#settings .ai-log li").count(), 3)
+        self.assertEqual(self.page.locator("#settings .ai-log li.ai-saved").count(), 1, "a refused one doesn't stand out")
+        marked, plain = self.page.evaluate("""() => [...document.querySelectorAll('#settings .ai-log li')].slice(0, 2)
+            .map((li) => getComputedStyle(li).backgroundColor)""")[::-1]
+        self.assertNotEqual(marked, plain)
 
     def test_hiding_from_a_page_and_from_a_course_bar(self):
         self.job_page(MEETING)

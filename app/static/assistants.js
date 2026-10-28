@@ -1,6 +1,7 @@
 /* Sedjem: assistants over MCP (the server side is app/assistants.py; app/mcp.py is the server an assistant
    starts). Settings → Assistants has what assistants can see (two switches, and what is hidden one by one),
-   the setting that connects each assistant, and what they asked. A transcription's page says whether
+   whether they may save new versions of transcripts (off until turned on), the setting that connects each
+   assistant, and what they asked, with the versions they saved standing out. A transcription's page says whether
    assistants can read it and hides it or shows it again; a lecture's course bar does the same for its whole
    course. Loaded before app.js: it only defines things, and uses app.js's helpers (S, SET, api, $, $$, esc,
    when, toast, ICON, brandTile, renderSettings) and youtube.js's YT_ICON when they run. */
@@ -10,8 +11,10 @@ const AI_ICON = {
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.4 3.2M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
 };
-// The two switches: a transcription follows one of them by its kind (app/assistants.py kind)
-const AI_SWITCH = { mcp_courses: "Courses and YouTube videos", mcp_recordings: "Meetings and other recordings" };
+// The two switches: a transcription follows one of them by its kind (app/assistants.py kind); and saving
+const AI_SWITCH = { mcp_courses: "Courses and YouTube videos", mcp_recordings: "Meetings and other recordings",
+  mcp_write: "Let assistants save new versions of transcripts" };
+const AI_SAVE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
 // What GET /api/assistants answered: {settings, hidden, log, snippets}. Fetched each time the tab opens.
 const AI = { data: null, error: "", loading: false };
 
@@ -20,18 +23,20 @@ const AI = { data: null, error: "", loading: false };
 // ---------------------------------------------------------------------------------------------
 function assistantsPanel() {
   const set = S.status.settings || {}, d = AI.data;
-  const sw = (key, hint) => `<label class="set-row">
+  const sw = (key, hint, on = set[key] !== false) => `<label class="set-row">
       <div class="set-text"><b>${esc(AI_SWITCH[key])}</b><span class="hint">${esc(hint)}</span></div>
-      <input type="checkbox" class="switch" data-setting="${key}" ${set[key] === false ? "" : "checked"}></label>`;
+      <input type="checkbox" class="switch" data-setting="${key}" ${on ? "checked" : ""}></label>`;
   const rest = d ? aiHiddenSection(d.hidden) + aiConnectSection(d.snippets) + aiLogSection(d.log)
     : `<p class="hint">${AI.error ? esc(`Couldn't load the rest: ${AI.error}`) : "Loading…"}</p>`;
   return `<h3>Assistants</h3>
     <p class="hint ai-intro">Assistants such as Claude Desktop, Claude Code, Cursor and VS Code can read and search these
       transcripts through MCP, also while Sedjem is closed. What an assistant reads goes to its model, like anything
-      else shared in a chat with it. For now assistants can only read; editing and starting transcriptions come later.</p>
+      else shared in a chat with it. Assistants only read, unless saving is turned on below; starting transcriptions comes later.</p>
     <section class="ai-sec" aria-labelledby="ai-see"><h4 id="ai-see">What assistants can see</h4>
       <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists, and YouTube videos added on their own.")}
         ${sw("mcp_recordings", "Every other transcription: meetings, calls and other files.")}</div></section>
+    <section class="ai-sec" aria-labelledby="ai-change"><h4 id="ai-change">What assistants can change</h4>
+      <div class="set-list">${sw("mcp_write", "Off unless you turn it on. An assistant then saves a corrected version when you ask it to. A save never deletes anything: it is a new version, and History can undo it.", set.mcp_write === true)}</div></section>
     ${rest}`;
 }
 
@@ -64,8 +69,10 @@ function aiLogSection(log) {
     const names = (e.titles || []).map((t) => t ?? "a deleted transcription");
     const shown = names.slice(0, 3), more = names.length - shown.length;
     const titles = names.length ? `<span class="ai-titles">${shown.map((t) => `<bdi>${esc(t)}</bdi>`).join(", ")}${more ? ` and ${more} more` : ""}</span>` : "";
-    return `<li><time datetime="${esc(e.time)}">${esc(when(e.time))}</time>
-      <div class="ai-entry"><b>${esc(e.client || "An assistant")}</b> <span class="ai-what">${esc(e.text)}</span> ${titles}</div></li>`;
+    // a version an assistant saved stands out: that it was a save, the new version's number, and the transcript
+    const saved = e.saved ? `<span class="pill ai-saved-mark">${AI_SAVE_ICON} Saved version ${esc(e.version)}</span> ` : "";
+    return `<li${e.saved ? ' class="ai-saved"' : ""}><time datetime="${esc(e.time)}">${esc(when(e.time))}</time>
+      <div class="ai-entry">${saved}<b>${esc(e.client || "An assistant")}</b> <span class="ai-what">${esc(e.text)}</span> ${titles}</div></li>`;
   }).join("");
   return `<section class="ai-sec" aria-labelledby="ai-log">
     <div class="ai-sec-head"><h4 id="ai-log" tabindex="-1">What assistants asked</h4>

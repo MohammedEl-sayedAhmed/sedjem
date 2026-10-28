@@ -121,6 +121,7 @@ class Config:
     # the same keys in [local].
     SETTINGS = {"performance_while_running": False, "device": "auto", "threads": 10,
                 "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],  # assistants (app/assistants.py)
+                "mcp_write": False,  # assistants may save new versions of transcripts (off until the user turns it on)
                 # updates (app/updates.py): check by itself (None: not asked yet), the channel, a version or
                 # commit the user skipped
                 "update_check": None, "update_channel": "stable", "update_skip": None}
@@ -144,7 +145,7 @@ class Config:
             if key == "threads" and isinstance(value, int) and not isinstance(value, bool) \
                     and 1 <= value <= max(1, os.cpu_count() or 1):
                 continue
-            if key in ("mcp_courses", "mcp_recordings") and isinstance(value, bool):
+            if key in ("mcp_courses", "mcp_recordings", "mcp_write") and isinstance(value, bool):
                 continue
             if key == "mcp_hidden":
                 from .assistants import check_hidden  # (it imports this module)

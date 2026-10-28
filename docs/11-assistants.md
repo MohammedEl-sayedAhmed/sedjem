@@ -7,9 +7,9 @@ the courses, so a question like "summarize lecture 3 of Prompt Engineering", "qu
 is answered from the transcripts, pointing to the lecture and to the moment in the video. Nothing has to
 be copied by hand.
 
-An assistant can also save a corrected version of a transcript, when the user asks for that change and
-agrees to it ([saving a version](#saving-a-version)). Nothing it does deletes anything: every earlier
-version stays. Starting transcriptions from an assistant, a connection over HTTP, and ChatGPT are
+When saving is turned on in *Settings → Assistants* (it is off by default), an assistant can also save a
+corrected version of a transcript, when the user asks for that change and agrees to it ([saving a
+version](#saving-a-version)). Nothing it does deletes anything: every earlier version stays. Starting transcriptions from an assistant, a connection over HTTP, and ChatGPT are
 planned later ([issue #10](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/10)).
 
 ## How it works
@@ -22,8 +22,9 @@ started as `Sedjem --mcp`. From source it is `python -P -m app.mcp`, with the pr
 - It reads the data folder directly, so it works while the app is closed, and it opens no network port.
 - It reads the same data folder as the app. When the app runs on another folder (`SEDJEM_HOME`), the
   connection snippets pass that folder on.
-- It changes nothing in the data folder apart from adding to the log of what assistants asked, and
-  saving the versions an assistant saves with `save_version`, each a new version of a transcript.
+- It changes nothing in the data folder apart from adding to the log of what assistants asked, and,
+  while saving is turned on, the versions an assistant saves with `save_version`, each a new version of
+  a transcript.
 - It is written with Python's standard library only, so the desktop build doesn't grow. It speaks both
   versions of the protocol in use: the one where a connection starts with a handshake (2024-11-05 to
   2025-11-25), and the one where every request carries its own version (2026-07-28).
@@ -122,7 +123,7 @@ can reach it.
 | `get_transcript` | A transcript by id, or by course and lecture number, as lines of `[mm:ss] Speaker: text`, for a time range or from a line on, and an earlier version of it with `version`. Each answer says which version it gives, of how many, and whether it is the recording's main transcript or a branch. |
 | `search` | Where something was said, across everything or in one course or transcription: each match with its lecture, time, the lines around it, and for a YouTube video a link that opens it at that moment. Of a recording with a main transcript, only that one is searched unless `include_branches` is true; without one, its transcripts that aren't branches made in the app. |
 | `get_course_text` | A whole course as one text, the same as its `course.md` file, in pieces. |
-| `save_version` | A corrected version of a transcript, saved as its newest version, from line edits or from all its lines, on top of the version it was made on. See [saving a version](#saving-a-version). |
+| `save_version` | A corrected version of a transcript, saved as its newest version, from line edits or from all its lines, on top of the version it was made on. Offered only while saving is turned on. See [saving a version](#saving-a-version). |
 
 A long transcript is read in pieces: one answer holds up to 12,000 characters by default and 40,000 at
 most, and an answer that is cut ends with the exact call that continues it, by time or by line. A long
@@ -141,6 +142,14 @@ so searching for an Arabic spelling as well can find more. A link to a moment is
 with `&t=` and the second, for example `https://www.youtube.com/watch?v=<id>&t=754s`.
 
 ### Saving a version
+
+Saving is off by default. *Let assistants save new versions of transcripts*, under *What assistants can
+change* in *Settings → Assistants*, turns it on. The reason is that transcript text is quoted data:
+anyone in a meeting or a video can say something that reads like an instruction to an assistant, and
+an assistant can be led astray by it. While saving is off, no such instruction can lead to a write,
+whatever the assistant makes of it: `save_version` is not offered to assistants, a call to it is
+refused with nothing saved, and the server's description doesn't mention it. The switch applies at
+once, also to an assistant that is already connected, like the others.
 
 `save_version` is the one tool that changes something, and its description says so: it is not
 read-only, though not destructive either. The assistant has to ask the user before every call and
@@ -200,10 +209,12 @@ for Claude, for example), under that service's terms. The audio itself never lea
 through MCP: assistants get the text, the titles, the dates, the speaker names and the details listed
 above. API keys, the app's settings, file paths and recordings are never given out.
 
-*Settings → Assistants* has two switches:
+*Settings → Assistants* has two switches for what they may see:
 
 - *Courses and YouTube videos*: every course lecture, and every YouTube video added on its own.
 - *Meetings and other recordings*: everything else.
+
+A third, off by default, lets them save new versions of transcripts ([saving a version](#saving-a-version)).
 
 A single transcription can be hidden with *Hide from assistants* on its page (*Show to assistants*
 undoes it), and a whole course with *Hide course from assistants* on any of its lecture pages, which
@@ -229,7 +240,8 @@ assistant's actions on other systems still deserve a look.
 newest first: when, which assistant (by the name and version it gives, or "An assistant" when it gives
 none), what it asked in words ("Searched for tokenizers, in Prompt Engineering", "Read Prompt Engineering,
 lecture 4, 00:00-10:00", "Saved version 3 of Sprint planning") and which transcriptions the answer
-contained. A save that was refused is listed with the reason. A request for something hidden is
+contained. A saved version stands out, marked with its number, and a save that was refused is listed
+with the reason. A request for something hidden is
 logged too, with no transcriptions, and so is a request for a tool that doesn't exist. *Clear* empties
 the log. It is kept in `mcp/log.jsonl` in the app's data folder (`app_data/` from source), one entry per
 line, and cut back to the newest 2,000 entries whenever it grows past 2,500.
@@ -253,7 +265,8 @@ connects as a client in both versions and checks every answer against the protoc
 data folders, the tests also cover the switches and hiding, the log, Arabic spellings in search,
 reading in pieces, the lecture chosen when a video was transcribed twice, links to moments, ids and
 addresses that try to reach outside the data folder, a recording listed once with its main transcript
-and branches, reading an earlier version, and every way `save_version` refuses, with nothing saved.
+and branches, reading an earlier version, and every way `save_version` refuses, with nothing saved, starting with saving being off until it
+is turned on.
 `tests/test_branches.py` checks that the lock on a transcription's history holds across processes.
 
 The self-test (`Sedjem --self-test`, see [the desktop notes](10-desktop.md#self-test)) starts the

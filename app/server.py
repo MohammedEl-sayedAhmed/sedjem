@@ -185,7 +185,7 @@ class App:
         s = self.cfg.settings()
         jobs = {j["id"]: j for j in self.store.list()}  # newest first
         marks = s["mcp_hidden"] if isinstance(s["mcp_hidden"], list) else []
-        return {"settings": {k: bool(s[k]) for k in ("mcp_courses", "mcp_recordings")},
+        return {"settings": {k: bool(s[k]) for k in ("mcp_courses", "mcp_recordings")} | {"mcp_write": s["mcp_write"] is True},
                 "hidden": [hidden_item(k, jobs) for k in reversed(marks) if isinstance(k, str)],
                 "log": [log_item(e, jobs) for e in assistants.read_log(self.cfg, 50)],
                 "snippets": assistants.snippets(self.cfg)}
@@ -288,11 +288,14 @@ def asked(entry):
 
 def log_item(entry, jobs):
     """An entry of the log for Settings, with the titles of the transcriptions it names (None for one that
-    was deleted since) and what was asked in words."""
+    was deleted since) and what was asked in words. saved: an assistant saved a new version of a transcript, the
+    one in version (Settings makes these stand out)."""
     ids = [str(i) for i in entry.get("ids") or []] if isinstance(entry.get("ids"), list) else []
+    version = entry.get("version") if isinstance(entry.get("version"), int) and not isinstance(entry.get("version"), bool) else None
     return {"time": str(entry.get("time") or ""), "client": str(entry.get("client") or ""),
             "action": str(entry.get("action") or ""), "detail": str(entry.get("detail") or ""), "ids": ids,
-            "titles": [(jobs[i].get("title") or "Untitled") if i in jobs else None for i in ids], "text": asked(entry)}
+            "titles": [(jobs[i].get("title") or "Untitled") if i in jobs else None for i in ids], "text": asked(entry),
+            "saved": entry.get("action") == "save_version" and version is not None, "version": version}
 
 
 def slug(text):

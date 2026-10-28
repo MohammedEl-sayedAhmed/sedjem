@@ -57,8 +57,8 @@ class AssistantsApi(unittest.TestCase):
         cls.gpu.stop()
         shutil.rmtree(cls.home, ignore_errors=True)
 
-    def setUp(self):  # each test starts with everything visible and nothing in the log
-        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[])
+    def setUp(self):  # each test starts with everything visible, saving off and nothing in the log
+        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[], mcp_write=False)
         assistants.clear_log(self.cfg)
 
     def call(self, method, path, body=None, headers=None):
@@ -80,7 +80,7 @@ class AssistantsApi(unittest.TestCase):
         status, body = self.call("GET", "/api/assistants")
         self.assertEqual(status, 200)
         self.assertEqual(set(body), {"settings", "hidden", "log", "snippets"})
-        self.assertEqual(body["settings"], {"mcp_courses": True, "mcp_recordings": True})
+        self.assertEqual(body["settings"], {"mcp_courses": True, "mcp_recordings": True, "mcp_write": False})
         self.assertEqual((body["hidden"], body["log"]), ([], []))
         self.assertEqual(body["snippets"], assistants.snippets(self.cfg))
         self.assertEqual([s["client"] for s in body["snippets"]], ["Claude Desktop", "Claude Code", "Cursor", "VS Code"])
@@ -197,12 +197,34 @@ class AssistantsApi(unittest.TestCase):
     def test_the_switches_are_saved_with_the_other_settings(self):
         status, st = self.call("POST", "/api/settings", {"mcp_recordings": False})
         self.assertEqual((status, st["settings"]["mcp_recordings"], st["settings"]["mcp_courses"]), (200, False, True))
-        self.assertEqual(self.call("GET", "/api/assistants")[1]["settings"], {"mcp_courses": True, "mcp_recordings": False})
+        self.assertEqual(self.call("GET", "/api/assistants")[1]["settings"],
+                         {"mcp_courses": True, "mcp_recordings": False, "mcp_write": False}, "saving is off at first")
         status, st = self.call("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertEqual({k: st["settings"][k] for k in ("mcp_courses", "mcp_recordings", "mcp_hidden")},
                          {"mcp_courses": True, "mcp_recordings": False, "mcp_hidden": []})
         self.assertFalse(Config(home=self.home).settings()["mcp_recordings"], "kept for the next start")
+
+    def test_the_saving_switch_is_saved(self):
+        status, st = self.call("POST", "/api/settings", {"mcp_write": True})
+        self.assertEqual((status, st["settings"]["mcp_write"]), (200, True))
+        self.assertTrue(self.call("GET", "/api/assistants")[1]["settings"]["mcp_write"])
+        self.assertTrue(Config(home=self.home).settings()["mcp_write"], "kept for the next start")
+        for bad in ("true", 1, None):
+            self.assertEqual(self.call("POST", "/api/settings", {"mcp_write": bad})[0], 400, bad)
+        self.assertTrue(self.cfg.settings()["mcp_write"])
+        self.assertEqual(self.call("POST", "/api/settings", {"mcp_write": False})[1]["settings"]["mcp_write"], False)
+
+    def test_a_saved_version_stands_out_in_the_log(self):
+        assistants.log(self.cfg, "Claude Desktop 1.2", "save_version", "Saved version 3 of Sprint planning", [MEETING], 3)
+        assistants.log(self.cfg, "Cursor", "save_version", "Asked to save a version of Sprint planning, refused: base_version "
+                                                           "1 is not the latest version", [MEETING])
+        refused, saved = self.call("GET", "/api/assistants")[1]["log"]
+        self.assertEqual({k: saved[k] for k in ("text", "titles", "saved", "version")},
+                         {"text": "Saved version 3 of Sprint planning", "titles": ["Sprint planning"], "saved": True,
+                          "version": 3})
+        self.assertEqual((refused["saved"], refused["version"]), (False, None))
+        self.assertTrue(refused["text"].startswith("Asked to save a version of Sprint planning, refused"))
 
     def test_a_transcription_page_says_why_it_is_hidden(self):
         def state(jid):

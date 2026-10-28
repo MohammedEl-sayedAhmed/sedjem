@@ -38,6 +38,10 @@
 .ai-entry { min-width: 0; overflow-wrap: anywhere; }
 .ai-entry b { font-weight: 620; }
 .ai-titles { display: block; margin-top: 1px; font-size: 12.5px; color: var(--muted); }
+/* a version an assistant saved: the one kind of entry that changed something */
+.ai-log li.ai-saved { background: color-mix(in srgb, var(--warn) 8%, var(--surface)); box-shadow: inset 3px 0 0 var(--warn); }
+.ai-saved-mark { height: 20px; padding: 0 8px; margin-right: 4px; font-size: 11.5px; background: var(--warn-soft); color: var(--warn); vertical-align: 1px; }
+.ai-saved-mark svg { width: 12px; height: 12px; }
 
 /* ---------- a transcription's page ---------- */
 .ai-state { display: flex; gap: 8px; align-items: flex-start; margin: 0; font-size: 13px; line-height: 1.45; }
