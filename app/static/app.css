@@ -708,6 +708,11 @@ label.set-row { cursor: pointer; }
 .ver-msg { margin-top: 6px; font-weight: 600; overflow-wrap: anywhere; }
 .ver-sum { margin-top: 3px; font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
 .ver-actions, .ver-edit { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+.ver-actions .btn svg { width: 14px; height: 14px; }
+.ver-origin a { color: var(--accent); font-weight: 600; }
+.ver-by { display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 13px; color: var(--cloud); }
+.ver-by svg { width: 14px; height: 14px; flex: none; }
+.main-pill svg { width: 13px; height: 13px; }
 .ver-edit input { flex: 1; min-width: 180px; height: 30px; padding: 4px 10px; }
 .menu.up { top: auto; bottom: calc(100% + 6px); }
 .ver-view-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 14px; }

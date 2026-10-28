@@ -258,11 +258,11 @@ function jobPercent(j) {
 function renderSidebar() {
   const q = $("#jobSearch").value.trim().toLowerCase();
   const hit = (j) => !q || (j.title || "").toLowerCase().includes(q) || (j.model_title || "").toLowerCase().includes(q)
-    || (j.course?.title || "").toLowerCase().includes(q);
+    || (j.course?.title || "").toLowerCase().includes(q) || (j.branch?.name || "").toLowerCase().includes(q);
   // a recording once, with its transcripts (compare.js); a course once, with its lectures (youtube.js)
   const recordings = jobGroups(S.jobs.filter((j) => !j.course)).filter((r) => r.jobs.some(hit));
-  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit)).map((c) => ({ ...c, main: c.jobs[0] }))]
-    .sort((a, b) => b.main.created.localeCompare(a.main.created) || b.main.id.localeCompare(a.main.id));
+  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit)).map((c) => ({ ...c, newest: c.jobs[0] }))]
+    .sort((a, b) => b.newest.created.localeCompare(a.newest.created) || b.newest.id.localeCompare(a.newest.id));
   if (!items.length) {
     $("#jobList").innerHTML = `<div class="empty-list">${S.jobs.length ? "No matches" : "Your transcriptions will appear here."}</div>`;
     return;
@@ -270,7 +270,7 @@ function renderSidebar() {
   const today = new Date().toDateString();
   let group = null;
   $("#jobList").innerHTML = items.map((r) => {
-    const j = r.main;
+    const j = r.newest;
     const g = new Date(j.created).toDateString() === today ? "Today" : "Earlier";
     const head = g !== group ? `<div class="job-group">${(group = g)}</div>` : "";
     if (r.course) return head + courseItem(r);
@@ -666,6 +666,7 @@ function renderJob() {
     <div class="title-row">
       <h1 class="job-title" id="jobTitle" contenteditable="plaintext-only" spellcheck="false" dir="${mixDir(j.title || "Untitled")}" data-mixdir title="Click to rename">${esc(j.title || "Untitled")}</h1>
       ${S.version != null ? `<button class="pill accent ver-pill" id="versionPill" title="The current version. Show the history">v${S.version}</button>` : ""}
+      <span class="pill ok main-pill" id="mainPill" title="The main transcript of this recording" ${isMainJob(j) ? "" : "hidden"}>${BRANCH_ICON} Main</span>
     </div>
     <div class="meta">${meta}</div>
     ${courseBar(j)}
@@ -674,6 +675,9 @@ function renderJob() {
       <div class="menu-wrap"><button class="btn" data-menu="exportMenu" ${hasLines ? "" : "disabled"}>${ICON.download} Export ${ICON.chevron}</button><div class="menu" id="exportMenu">${exportMenu}</div></div>
       <button class="btn" id="copyBtn" ${hasLines ? "" : "disabled"}>${ICON.copy} Copy text</button>
       <div class="menu-wrap"><button class="btn" data-menu="rerunMenu" ${S.hasAudio ? "" : "disabled"}>${ICON.redo} Run again with ${ICON.chevron}</button><div class="menu" id="rerunMenu">${rerunMenu || '<button disabled>No other model is ready</button>'}</div></div>
+      <div class="menu-wrap"><button class="btn" data-menu="branchMenu" ${j.status === "done" && S.version != null ? "" : "disabled"}>${BRANCH_ICON} Branches ${ICON.chevron}</button><div class="menu" id="branchMenu">
+        <button type="button" id="mainBtn">${mainItem(j)}</button>
+        <button type="button" id="branchHere">${BRANCH_ICON} New branch from this version…</button></div></div>
       <button class="btn${S.editing ? " btn-primary" : ""}" id="editBtn" ${hasLines && !active ? "" : "disabled"}>${ICON.edit} ${S.editing ? "Done editing" : "Edit"}</button>
       <button class="btn" id="historyBtn" ${S.version != null ? "" : "disabled"}>${HISTORY_ICON} History</button>
       <span class="spacer"></span>
@@ -882,7 +886,11 @@ function bindJob() {
   $$("#exportMenu a").forEach((a) => (a.onclick = (e) => saveExport(e, a)));
   const copy = $("#copyBtn");
   if (copy) copy.onclick = () => copyText();  // the text only; Copy details has the rest
-  $$("#historyBtn, #versionPill").forEach((b) => (b.onclick = openHistory));
+  $$("#historyBtn, #versionPill").forEach((b) => (b.onclick = () => openHistory()));
+  const mainBtn = $("#mainBtn");
+  if (mainBtn) mainBtn.onclick = () => setMain(!isMainJob(S.job));
+  const branchHere = $("#branchHere");
+  if (branchHere) branchHere.onclick = () => { closeMenus(); openHistory(S.version); };
   const copyDetails = $("#copyDetails");
   if (copyDetails) copyDetails.onclick = async () => {
     try { await navigator.clipboard.writeText(detailsText()); toast("Details copied"); } catch (e) { toast("Could not copy: " + e.message, "error"); }
@@ -1116,9 +1124,10 @@ async function copyText(version) {
 // ---------------------------------------------------------------------------------------------
 const HISTORY_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 2.6-6.4L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>';
 const CLOSE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>';
-const KIND_LABEL = { "model output": "Model output", edit: "Edit", rename: "Rename", merge: "Merge", restore: "Restore", combine: "Combined" };
+const KIND_LABEL = { "model output": "Model output", edit: "Edit", rename: "Rename", merge: "Merge", restore: "Restore", combine: "Combined", branch: "Branch" };
+const BRANCH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="5" r="2.2"/><circle cx="6" cy="19" r="2.2"/><circle cx="18" cy="8" r="2.2"/><path d="M6 7.2v9.6M18 10.2c0 4-4.5 3.8-10.4 7.3"/></svg>';
 const EDITBAR = `<div class="editbar"><span>Unsaved changes</span><button class="btn btn-sm" id="discardBtn">Discard</button><button class="btn btn-sm btn-primary" id="saveBtn">Review and save</button></div>`;
-const HIST = { jid: null, versions: [], view: null, editing: null };  // the History dialog
+const HIST = { jid: null, versions: [], view: null, editing: null, branching: null };  // the History dialog; branching: the version a branch is being named for
 const REVIEW = { draft: null };  // the edits being reviewed before they are saved
 const latestVersion = () => (HIST.versions.length ? HIST.versions[HIST.versions.length - 1].n : -1);  // (0: the model's output)
 const drafting = () => S.editing && S.draft;
@@ -1280,13 +1289,15 @@ async function saveReviewed(message) {
 }
 
 // ---- History ------------------------------------------------------------------------------------
-async function openHistory() {
+// branchFrom: open it with the name of a new branch from that version asked for (the page's Branches menu)
+async function openHistory(branchFrom = null) {
   if (!S.job || S.version == null) return;
   const dlg = diffDialog("history", "History");
-  Object.assign(HIST, { jid: S.job.id, view: null, editing: null });
+  Object.assign(HIST, { jid: S.job.id, view: null, editing: null, branching: null });
   $("#historyBody").innerHTML = `<p class="hint">Loading…</p>`;
   if (!dlg.open) dlg.showModal();
   await loadVersions();
+  if (branchFrom != null && HIST.versions.some((v) => v.n === branchFrom)) { HIST.branching = branchFrom; renderVersions(); }
 }
 
 async function loadVersions() {
@@ -1296,7 +1307,26 @@ async function loadVersions() {
 }
 
 function kindPill(v) {
-  return v.kind === "model output" ? `<span class="pill accent">Original</span>` : `<span class="pill">${esc(KIND_LABEL[v.kind] || v.kind)}</span>`;
+  const by = v.by === "assistant" ? `<span class="pill cloud" title="Saved by an assistant${v.client ? ` (${esc(v.client)})` : ""} over MCP">${ICON.assistant} Assistant</span>` : "";
+  if (v.kind === "model output") return `<span class="pill accent">Original</span>`;
+  if (v.kind === "branch") return `<span class="pill accent">${BRANCH_ICON} Branch</span>`;
+  return `<span class="pill">${esc(KIND_LABEL[v.kind] || v.kind)}</span>${by}`;
+}
+
+// What a version says about where it came from: a branch's start (linked to the transcript it was made from, while
+// that is still there), or who saved it when an assistant did. Else its summary.
+function verAbout(v) {
+  const src = v.kind === "branch" && v.origin ? S.jobs.find((x) => x.id === v.origin.id) : null;
+  const sum = src ? `<div class="ver-sum ver-origin">Branched from <a href="#/job/${esc(src.id)}" data-ver-origin>${esc(labelOf(src))}</a>, version ${esc(v.origin.version)}</div>`
+    : `<div class="ver-sum" dir="${mixDir(v.summary)}">${esc(v.summary || "")}</div>`;
+  const by = v.by === "assistant" ? `<div class="ver-by">${ICON.assistant} Saved by an assistant${v.client ? `: ${esc(v.client)}` : ""}</div>` : "";
+  return sum + by;
+}
+
+// The name of a new branch from version n, asked for in place (not in a separate window)
+function branchForm(n) {
+  return `<form class="ver-edit ver-branch" data-ver-branch-form="${n}"><input type="text" maxlength="60" dir="auto" data-mixdir placeholder="Name of the branch, such as suggestions" aria-label="Name of the new branch from version ${n}">
+    <button type="submit" class="btn btn-sm btn-primary">Create branch</button><button type="button" class="btn btn-sm" data-ver-branch-cancel>Cancel</button></form>`;
 }
 
 function versionActions(v, withView) {
@@ -1304,7 +1334,8 @@ function versionActions(v, withView) {
   const links = Object.entries(EXPORT_TYPES).map(([fmt, [label]]) => `<a href="/api/jobs/${HIST.jid}/export/${fmt}?version=${v.n}" data-fmt="${fmt}" data-version="${v.n}" download>${ICON.download} ${label} (.${fmt})</a>`).join("");
   return `${withView ? `<button class="btn btn-sm" data-ver-view="${v.n}">View</button>` : ""}
     ${v.n === latestVersion() ? "" : `<button class="btn btn-sm" data-ver-restore="${v.n}">Restore</button>`}
-    <div class="menu-wrap"><button class="btn btn-sm" data-menu="${menu}">${ICON.download} Export ${ICON.chevron}</button><div class="menu" id="${menu}">${links}</div></div>`;
+    <div class="menu-wrap"><button class="btn btn-sm" data-menu="${menu}">${ICON.download} Export ${ICON.chevron}</button><div class="menu" id="${menu}">${links}</div></div>
+    <button class="btn btn-sm" data-ver-branch="${v.n}" title="A new transcript of this recording that starts as this version">${BRANCH_ICON} New branch from this version</button>`;
 }
 
 function versionRow(v) {
@@ -1315,8 +1346,8 @@ function versionRow(v) {
   return `<div class="ver${current ? " current" : ""}" data-n="${v.n}">
     <div class="ver-head"><b class="ver-n">v${v.n}</b>${kindPill(v)}${current ? `<span class="pill ok">Current</span>` : ""}<span class="ver-time">${esc(when(v.time))}</span></div>
     ${message}
-    <div class="ver-sum" dir="${mixDir(v.summary)}">${esc(v.summary || "")}</div>
-    ${editing ? "" : `<div class="ver-actions">${versionActions(v, true)}<button class="btn btn-sm btn-ghost" data-ver-msg="${v.n}">${v.message ? "Edit message" : "Add message"}</button></div>`}
+    ${verAbout(v)}
+    ${editing ? "" : HIST.branching === v.n ? branchForm(v.n) : `<div class="ver-actions">${versionActions(v, true)}<button class="btn btn-sm btn-ghost" data-ver-msg="${v.n}">${v.message ? "Edit message" : "Add message"}</button></div>`}
   </div>`;
 }
 
@@ -1342,7 +1373,8 @@ function renderVersionView() {
       <button class="btn btn-sm" id="verCopy">${ICON.copy} Copy text</button>${versionActions(v, false)}</div>
     <div class="ver-head"><b class="ver-title">Version ${v.n}</b>${kindPill(v)}${v.n === latestVersion() ? `<span class="pill ok">Current</span>` : ""}<span class="ver-time">${esc(when(v.time))}</span></div>
     ${v.message ? `<div class="ver-msg" dir="${mixDir(v.message)}">${esc(v.message)}</div>` : ""}
-    <div class="ver-sum" dir="${mixDir(v.summary)}">${esc(v.summary || "")}</div>
+    ${verAbout(v)}
+    ${HIST.branching === v.n ? branchForm(v.n) : ""}
     ${options.length > (v.parent == null ? 1 : 0) ? `<label class="ver-against">Compare with <select id="verAgainst">${options.join("")}</select></label>` : ""}
     ${ch ? changesHtml(ch, true) : `<div class="diff">${diffRows(plain, false)}</div>`}`;
   bindHistory();
@@ -1359,9 +1391,19 @@ function fitMenu(id, box) {  // open upwards when the menu would run past the bo
 
 function bindHistory() {
   const body = $("#historyBody");
-  $$("[data-ver-view]", body).forEach((b) => (b.onclick = () => viewVersion(+b.dataset.verView)));
+  const redraw = () => (HIST.view ? renderVersionView() : renderVersions());
+  $$("[data-ver-view]", body).forEach((b) => (b.onclick = () => { HIST.branching = null; viewVersion(+b.dataset.verView); }));
   $$("[data-ver-restore]", body).forEach((b) => (b.onclick = () => restoreVersion(+b.dataset.verRestore)));
-  $$("[data-ver-msg]", body).forEach((b) => (b.onclick = () => { HIST.editing = +b.dataset.verMsg; renderVersions(); }));
+  $$("[data-ver-msg]", body).forEach((b) => (b.onclick = () => { HIST.editing = +b.dataset.verMsg; HIST.branching = null; renderVersions(); }));
+  $$("[data-ver-branch]", body).forEach((b) => (b.onclick = () => { HIST.branching = +b.dataset.verBranch; HIST.editing = null; redraw(); }));
+  const named = $("[data-ver-branch-form]", body);
+  if (named) {
+    const input = $("input", named);
+    named.onsubmit = (e) => { e.preventDefault(); makeBranch(+named.dataset.verBranchForm, input.value); };
+    $("[data-ver-branch-cancel]", named).onclick = () => { HIST.branching = null; redraw(); };
+    input.onkeydown = (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); HIST.branching = null; redraw(); } };
+    input.focus();
+  }
   $$("[data-menu]", body).forEach((b) => (b.onclick = (e) => { e.stopPropagation(); toggleMenu(b.dataset.menu); fitMenu(b.dataset.menu, body); }));
   $$(".menu a[data-fmt]", body).forEach((a) => (a.onclick = (e) => saveExport(e, a, +a.dataset.version)));
   const form = $("[data-ver-form]", body);
@@ -1375,6 +1417,54 @@ function bindHistory() {
   if (back) back.onclick = () => { HIST.view = null; renderVersions(); };
   const copy = $("#verCopy", body);
   if (copy) copy.onclick = () => copyText(HIST.view.version.n);
+}
+
+// A new transcript of the recording that starts as version n (POST /api/jobs/<id>/branch), opened at once
+async function makeBranch(n, name) {
+  name = name.replace(/\s+/g, " ").trim();
+  if (!name) { toast("Give the branch a name", "error"); $("[data-ver-branch-form] input")?.focus(); return; }
+  const go = $("[data-ver-branch-form] button[type='submit']");
+  if (go) go.disabled = true;
+  try {
+    const r = await api.post(`/api/jobs/${HIST.jid}/branch`, { version: n, name });
+    HIST.branching = null;
+    $("#history").close();
+    await refreshJobs();
+    location.hash = `#/job/${r.id}`;
+    toast(`Branch “${name}” made from version ${n}`);
+  } catch (e) {
+    if (go) go.disabled = false;
+    toast(e.message, "error");
+  }
+}
+
+// ---- the main transcript of a recording (POST /api/jobs/<id>/main) ------------------------------------
+// Whether a job is its recording's main transcript: as the list says (one per recording), else its job.json
+function isMainJob(j) {
+  const listed = S.jobs.find((x) => x.id === j?.id);
+  return listed ? !!listed.main : j?.main === true;
+}
+function mainItem(j) {
+  return isMainJob(j) ? `${ICON.check} Unmark as the main transcript` : `${BRANCH_ICON} Make this the main transcript`;
+}
+
+async function setMain(on) {
+  closeMenus();
+  const j = S.job;
+  try {
+    await api.post(`/api/jobs/${j.id}/main`, { main: on });
+    j.main = on;
+    await refreshJobs();  // the sidebar and the switcher on this page show it first
+    showMain();
+    toast(on ? "This is now the recording's main transcript" : "This is no longer the recording's main transcript");
+  } catch (e) { toast(e.message, "error"); }
+}
+
+function showMain() {  // the Main mark and the menu item, without drawing the page again
+  if (!S.job) return;
+  const pill = $("#mainPill"), item = $("#mainBtn");
+  if (pill) pill.hidden = !isMainJob(S.job);
+  if (item) item.innerHTML = mainItem(S.job);
 }
 
 async function saveMessage(n, message) {

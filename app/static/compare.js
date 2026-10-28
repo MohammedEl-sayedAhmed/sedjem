@@ -1,8 +1,11 @@
 /* Sedjem: the transcripts of one recording (the server side is app/compare.py). The sidebar shows a
    recording once with its transcripts, the job page switches between them, and the compare view lines two
    or three of them up by time, marks the words that differ, and saves the parts picked from each as a new
-   version of one of them (its History has the versions). Loaded before app.js: it only defines things, and uses app.js's helpers (S, api, $, esc,
-   clock, mixDir, the player) when they run. */
+   version of one of them (its History has the versions). A recording can have a main transcript: it is
+   listed first with a Main mark, the recording's title opens it, and the compare view takes it as the base.
+   The others are its branches, each named by its label (a branch's name, else its model). Loaded before
+   app.js: it only defines things, and uses app.js's helpers (S, api, $, esc, clock, mixDir, the player) when
+   they run. */
 "use strict";
 
 const CMP_ICON = {
@@ -28,7 +31,8 @@ const STATUS_WORD = { done: "Done", failed: "Failed", cancelled: "Cancelled", in
 // Groups: the sidebar and the switcher on the job page
 // ---------------------------------------------------------------------------------------------
 
-// The transcriptions by recording, in the list's order: newest first, by each recording's newest.
+// The transcriptions by recording, in the list's order: newest first, by each recording's newest. main: its
+// main transcript, when one is chosen (the list marks it, app/compare.py).
 function jobGroups(jobs) {
   const by = new Map();
   for (const j of jobs) {
@@ -36,8 +40,14 @@ function jobGroups(jobs) {
     if (!by.has(key)) by.set(key, []);
     by.get(key).push(j);
   }
-  return [...by.values()].map((list) => ({ jobs: list, main: list[0] }));
+  return [...by.values()].map((list) => ({ jobs: list, newest: list[0], main: list.find((j) => j.main) || null }));
 }
+
+// A recording's transcripts as they are shown: its main transcript first, then the others in the order given.
+const mainFirst = (list) => {
+  const main = list.find((j) => j.main);
+  return main ? [main, ...list.filter((j) => j !== main)] : list;
+};
 
 // The transcripts of a job's recording, oldest first.
 function groupOf(id) {
@@ -45,35 +55,43 @@ function groupOf(id) {
   return me ? S.jobs.filter((j) => (j.group || j.id) === (me.group || me.id)).reverse() : [];
 }
 
-// A transcript's label in a group: its model, numbered when the model was used more than once.
+// A transcript's name in its recording: a branch's name, else its model.
+const jobName = (j) => j.branch?.name || j.model_title || j.model;
+
+// A transcript's label in a group (oldest first): its name, numbered when two or more have the same one (as
+// labels() in app/compare.py).
 function verLabels(list) {
   const seen = {}, count = {};
-  for (const j of list) count[j.model_title || j.model] = (count[j.model_title || j.model] || 0) + 1;
+  for (const j of list) count[jobName(j)] = (count[jobName(j)] || 0) + 1;
   return new Map(list.map((j) => {
-    const name = j.model_title || j.model;
+    const name = jobName(j);
     seen[name] = (seen[name] || 0) + 1;
     return [j.id, count[name] > 1 ? `${name} ${seen[name]}` : name];
   }));
 }
 
+// A transcript's label wherever it is shown on its own (History, the compare view's menu).
+const labelOf = (j) => verLabels(groupOf(j.id)).get(j.id) || jobName(j);
+
 function verPill(j, on, label) {
-  const tip = [j.model_title || j.model, STATUS_WORD[j.status] || "In progress", when(j.created)].join(" · ");
+  const tip = [j.main ? "Main transcript" : "", j.branch ? `Branch of version ${j.branch.from?.version}` : "",
+    label !== (j.model_title || j.model) ? j.model_title || j.model : "", STATUS_WORD[j.status] || "In progress", when(j.created)];
   const bad = ["failed", "interrupted"].includes(j.status) ? " bad" : "";
-  return `<a class="pill ver${on ? " on" : ""}${bad}" href="#/job/${j.id}" title="${esc(tip)}"${on ? ' aria-current="page"' : ""}>`
-    + `${ACTIVE.has(j.status) ? '<span class="dot pulse"></span>' : ""}<span>${esc(label)}</span></a>`;
+  return `<a class="pill ver${on ? " on" : ""}${j.main ? " main" : ""}${bad}" href="#/job/${j.id}" title="${esc(tip.filter(Boolean).join(" · "))}"${on ? ' aria-current="page"' : ""}>`
+    + `${ACTIVE.has(j.status) ? '<span class="dot pulse"></span>' : ""}${j.main ? '<span class="main-mark">Main</span>' : ""}<span>${esc(label)}</span></a>`;
 }
 
-// A recording with several transcripts in the sidebar: the title opens the newest, a pill each (oldest
-// first) opens that one.
+// A recording with several transcripts in the sidebar: the title opens its main transcript (else the newest),
+// a pill each opens that one: the main one first, then the others oldest first.
 function groupItem(g) {
   const open = (j) => S.route.name === "job" && S.route.id === j.id;
   const here = g.jobs.some(open) || (S.route.name === "compare" && g.jobs.some((j) => S.route.ids.includes(j.id)));
   const busy = g.jobs.find((j) => ACTIVE.has(j.status));
-  const j = g.main, list = [...g.jobs].reverse(), labels = verLabels(list);
+  const j = g.main || g.newest, list = [...g.jobs].reverse(), labels = verLabels(list);
   const bar = busy ? `<div class="bar"><i style="width:${jobPercent(busy).toFixed(1)}%"></i></div>` : "";
   return `<div class="job-item grouped${here ? " active" : ""}">
     <a class="t" href="#/job/${j.id}" dir="${mixDir(j.title || "Untitled")}">${esc(j.title || "Untitled")}</a>${statusLabel(busy || j)}
-    <span class="d"><span class="vers">${list.map((x) => verPill(x, open(x), labels.get(x.id))).join("")}</span>${j.audio_s ? `<span class="len">${clock(j.audio_s)}</span>` : ""}</span>
+    <span class="d"><span class="vers">${mainFirst(list).map((x) => verPill(x, open(x), labels.get(x.id))).join("")}</span>${j.audio_s ? `<span class="len">${clock(j.audio_s)}</span>` : ""}</span>
     ${bar}</div>`;
 }
 
@@ -83,16 +101,17 @@ function groupBar(j) {
   return `<div id="groupBar">${CMP.bar}</div>`;
 }
 
+// Compare: this transcript with the main one (to bring text into it), else with the newest other one.
 function groupBarInner(j) {
   const list = groupOf(j.id);
   if (list.length < 2) return "";
-  const done = list.filter((x) => x.status === "done");
-  const pair = j.status === "done" ? [j.id, ...done.filter((x) => x.id !== j.id).slice(-1).map((x) => x.id)]
+  const done = list.filter((x) => x.status === "done"), main = done.find((x) => x.main && x.id !== j.id);
+  const pair = j.status === "done" ? [j.id, ...(main ? [main] : done.filter((x) => x.id !== j.id).slice(-1)).map((x) => x.id)]
     : done.slice(-2).map((x) => x.id);
   const cmp = pair.length === 2 ? `<a class="btn btn-sm" id="compareBtn" href="#/compare/${pair.join(",")}">${CMP_ICON.columns} Compare</a>` : "";
   const labels = verLabels(list);
   return `<nav class="versions" aria-label="Transcripts of this recording"><span class="versions-label">Transcripts of this recording</span>
-    ${list.map((x) => verPill(x, x.id === j.id, labels.get(x.id))).join("")}${cmp}</nav>`;
+    ${mainFirst(list).map((x) => verPill(x, x.id === j.id, labels.get(x.id))).join("")}${cmp}</nav>`;
 }
 
 // After the list of transcriptions was fetched again (only when something changed, so focus stays put)
@@ -114,7 +133,10 @@ async function renderCompare(ids) {
   }
   CMP.ids = ids;
   CMP.picks = CMP.picks.filter((p) => ids.includes(p.from));
-  if (!ids.includes(CMP.base)) { CMP.base = ids[0]; CMP.speakers = {}; }
+  if (!ids.includes(CMP.base)) {  // the server's choice: the recording's main transcript when it is one of them, else the first
+    CMP.base = null;
+    CMP.speakers = {};
+  }
   if (ids.length < 2 || ids.length > 3 || new Set(ids).size !== ids.length) {
     view.innerHTML = `<div class="welcome"><h1>Compare transcripts</h1><p>Choose two or three transcripts of one recording.</p></div>`;
     return;
@@ -126,9 +148,10 @@ async function renderCompare(ids) {
 async function cmpLoad() {
   const token = ++CMP.loading;
   try {
-    const data = await api.get(`/api/compare?ids=${CMP.ids.join(",")}&base=${CMP.base}`);
+    const data = await api.get(`/api/compare?ids=${CMP.ids.join(",")}${CMP.base ? `&base=${CMP.base}` : ""}`);
     if (token !== CMP.loading || S.route.name !== "compare") return;
     CMP.data = data;
+    CMP.base = data.base;
     cmpDraw();
   } catch (e) {
     if (token !== CMP.loading || S.route.name !== "compare") return;
@@ -151,6 +174,7 @@ function leaveCompare(hash) {
 }
 
 const cmpJob = (id) => CMP.data.jobs.find((j) => j.id === id);
+const cmpLabel = (j) => j.label || j.model_title || j.model;  // its label in the recording (app/compare.py)
 const cmpMap = (id) => ({ ...(CMP.data.mapping[id] || {}), ...(CMP.speakers[id] || {}) });
 
 // Speakers as in the base: a line's speaker in the base's numbering, and its name there. A speaker the base
@@ -217,8 +241,8 @@ function cmpDraw() {
   const differ = d.rows.filter((r) => !r.same).length;
   const more = groupOf(d.base).filter((j) => j.status === "done" && !d.ids.includes(j.id));
   const add = n < 3 && more.length ? `<div class="menu-wrap"><button type="button" class="btn btn-sm" data-menu="cmpAdd">${CMP_ICON.plus} Add a transcript ${ICON.chevron}</button>
-    <div class="menu right" id="cmpAdd">${more.map((j) => `<a href="#/compare/${[...d.ids, j.id].join(",")}">${jobIcon(j)} ${esc(j.model_title || j.model)}<span class="sub">${esc(when(j.created))}</span></a>`).join("")}</div></div>` : "";
-  const choices = d.jobs.map((j) => `<option value="${j.id}"${j.id === d.ids.find((x) => x !== d.base) ? " selected" : ""}>${esc(j.model_title || j.model)}</option>`).join("");
+    <div class="menu right" id="cmpAdd">${more.map((j) => `<a href="#/compare/${[...d.ids, j.id].join(",")}">${jobIcon(j)} ${esc(labelOf(j))}<span class="sub">${esc(when(j.created))}</span></a>`).join("")}</div></div>` : "";
+  const choices = d.jobs.map((j) => `<option value="${j.id}"${j.id === d.ids.find((x) => x !== d.base) ? " selected" : ""}>${esc(cmpLabel(j))}</option>`).join("");
   view.innerHTML = `
   <div class="cmp-head">
     <h1>Compare transcripts</h1>
@@ -251,11 +275,11 @@ function cmpDraw() {
 function cmpColHead(j) {
   const d = CMP.data, isBase = j.id === d.base;
   return `<div class="cmp-col">
-    <a class="cmp-col-title" href="#/job/${j.id}" title="Open this transcript">${jobIcon(j)}<span>${esc(j.model_title || j.model)}</span></a>
-    <div class="cmp-col-sub">${esc(when(j.created))}${j.speakers.length ? ` · ${j.speakers.length} speaker${j.speakers.length === 1 ? "" : "s"}` : ""}</div>
+    <a class="cmp-col-title" href="#/job/${j.id}" title="Open this transcript">${jobIcon(j)}<span>${esc(cmpLabel(j))}</span>${j.main ? '<span class="main-mark">Main</span>' : ""}</a>
+    <div class="cmp-col-sub">${j.branch ? `${esc(j.model_title || j.model)} · ` : ""}${esc(when(j.created))}${j.speakers.length ? ` · ${j.speakers.length} speaker${j.speakers.length === 1 ? "" : "s"}` : ""}</div>
     <div class="cmp-col-actions">${isBase ? `<span class="pill accent" title="Its text is kept wherever you choose nothing else">Base</span>`
       : `<button type="button" class="pill" data-base="${j.id}">Use as base</button>`}
-      ${d.ids.length > 2 ? `<button type="button" class="icon-btn" data-drop="${j.id}" title="Take it out of the comparison" aria-label="Take ${esc(j.model_title || j.model)} out of the comparison">${CMP_ICON.close}</button>` : ""}</div>
+      ${d.ids.length > 2 ? `<button type="button" class="icon-btn" data-drop="${j.id}" title="Take it out of the comparison" aria-label="Take ${esc(cmpLabel(j))} out of the comparison">${CMP_ICON.close}</button>` : ""}</div>
   </div>`;
 }
 
@@ -272,14 +296,14 @@ function cmpCell(cell, k, r) {
   const lines = cell.map((x) => {
     const who = cmpSpeaker(id, x.speaker);
     const head = who != null && who !== prev
-      ? `<div class="who"${id !== d.base ? ` title="${esc(cmpOwnName(j, x.speaker))} in ${esc(j.model_title || j.model)}"` : ""}>${esc(cmpName(who))}</div>` : "";
+      ? `<div class="who"${id !== d.base ? ` title="${esc(cmpOwnName(j, x.speaker))} in ${esc(cmpLabel(j))}"` : ""}>${esc(cmpName(who))}</div>` : "";
     prev = who;
     const text = x.spans.map(([t, c]) => (c ? `<mark class="d${c}">${esc(t)}</mark>` : esc(t))).join(" ");
     return `<div class="cmp-line" style="--c:${spkColor(who)}">${head}<p class="text" dir="${mixDir(x.text)}">${text}</p></div>`;
   }).join("");
-  return `<div class="cmp-cell" data-label="${esc(j.model_title || j.model)}">
+  return `<div class="cmp-cell" data-label="${esc(cmpLabel(j))}">
     ${lines || `<p class="cmp-nothing">Nothing here</p>`}
-    <button type="button" class="pill keep" data-keep="${r}:${k}" aria-pressed="false" aria-label="Keep ${esc(j.model_title || j.model)} at ${clock(d.rows[r].start)}">Keep</button>
+    <button type="button" class="pill keep" data-keep="${r}:${k}" aria-pressed="false" aria-label="Keep ${esc(cmpLabel(j))} at ${clock(d.rows[r].start)}">Keep</button>
   </div>`;
 }
 
@@ -295,14 +319,14 @@ function cmpSpeakersPanel() {
         + (known ? "" : `<option value="${esc(t)}" selected>${esc(cmpName(t))} (new)</option>`) + `<option value="new">New speaker</option>`;
       return `<div class="cmp-map-item"><span class="sw" style="background:${spkColor(t)}"></span><span>${esc(cmpOwnName(j, s.id))}</span>
         <span class="arrow" aria-hidden="true">→</span>
-        <select data-map="${esc(j.id)}:${esc(s.id)}" aria-label="${esc(cmpOwnName(j, s.id))} of ${esc(j.model_title || j.model)} is">${options}</select>
+        <select data-map="${esc(j.id)}:${esc(s.id)}" aria-label="${esc(cmpOwnName(j, s.id))} of ${esc(cmpLabel(j))} is">${options}</select>
         <span class="share">${together && s.talk ? `${Math.round(together / s.talk * 100)}% at the same time` : human(s.talk)}</span></div>`;
     }).join("");
-    return `<div class="cmp-map-row"><div class="cmp-map-model">${jobIcon(j)} ${esc(j.model_title || j.model)}</div><div class="cmp-map-list">${items}</div></div>`;
+    return `<div class="cmp-map-row"><div class="cmp-map-model">${jobIcon(j)} ${esc(cmpLabel(j))}</div><div class="cmp-map-list">${items}</div></div>`;
   }).join("");
   if (!rows) return "";
   return `<div class="panel cmp-speakers"><h3>Speakers</h3>
-    <p class="hint">Each model numbers the speakers its own way. They are matched to ${esc(base.model_title)}'s by who talks at the same time, and the new version uses ${esc(base.model_title)}'s names. Change a match if it is wrong.</p>
+    <p class="hint">Each model numbers the speakers its own way. They are matched to ${esc(cmpLabel(base))}'s by who talks at the same time, and the new version uses ${esc(cmpLabel(base))}'s names. Change a match if it is wrong.</p>
     ${rows}</div>`;
 }
 
@@ -321,8 +345,8 @@ function cmpUpdate() {
     });
   });
   const base = cmpJob(d.base), by = cmpBySource();
-  const text = by.size ? `${esc(base.model_title)}, with ${joinWords([...by].map(([id, list]) => `${esc(cmpJob(id).model_title)} in ${list.length} place${list.length === 1 ? "" : "s"}`))}`
-    : `Everything from ${esc(base.model_title)} so far`;
+  const text = by.size ? `${esc(cmpLabel(base))}, with ${joinWords([...by].map(([id, list]) => `${esc(cmpLabel(cmpJob(id)))} in ${list.length} place${list.length === 1 ? "" : "s"}`))}`
+    : `Everything from ${esc(cmpLabel(base))} so far`;
   $("#cmpBar").innerHTML = `<span id="cmpSummary">${text}</span>
     <button type="button" class="btn btn-sm" id="cmpUndo" ${CMP.undo.length ? "" : "disabled"}>Undo</button>
     <button type="button" class="btn btn-sm" id="cmpClear" ${CMP.picks.length ? "" : "disabled"}>Clear</button>
@@ -400,7 +424,7 @@ function cmpBind() {
     const from = $("#cmpRangeFrom").value, a = cmpParseTime($("#cmpRangeStart").value), b = cmpParseTime($("#cmpRangeEnd").value);
     if (!(a >= 0 && b > a)) { toast("Give a start and an end time, like 1:05 and 2:30.", "error"); return; }
     cmpChange(() => CMP.picks.push({ start: a, end: b, from }));
-    toast(`Keeping ${cmpJob(from).model_title} from ${clock(a)} to ${clock(b)}`);
+    toast(`Keeping ${cmpLabel(cmpJob(from))} from ${clock(a)} to ${clock(b)}`);
   };
 }
 
@@ -426,8 +450,9 @@ async function cmpSaveDialog() {
     $("#cmpReviewForm [data-close]").onclick = () => dlg.close();
     $("#cmpReviewForm").onsubmit = (e) => { e.preventDefault(); cmpSave(dlg); };
   }
-  const list = [...cmpBySource()].map(([id, spans]) => `<li>${esc(cmpJob(id).model_title)}: ${spans.map(([a, b]) => `${clock(a)}–${clock(b)}`).join(", ")}</li>`).join("");
-  $("#cmpReviewBody").innerHTML = `<p class="cmp-sum">This is saved as version ${r.version + 1} of the ${esc(base.model_title)} transcript. It keeps that text except here:</p>
+  const list = [...cmpBySource()].map(([id, spans]) => `<li>${esc(cmpLabel(cmpJob(id)))}: ${spans.map(([a, b]) => `${clock(a)}–${clock(b)}`).join(", ")}</li>`).join("");
+  const into = base.main ? `the main transcript (${esc(cmpLabel(base))})` : `the ${esc(cmpLabel(base))} transcript`;
+  $("#cmpReviewBody").innerHTML = `<p class="cmp-sum">This is saved as version ${r.version + 1} of ${into}. It keeps that text except here:</p>
     <ul class="cmp-sum-list">${list}</ul>
     <p class="hint diff-base">Compared with version ${r.version}, the current one. The earlier versions stay in its History, so you can go back.</p>
     ${changesHtml(r.changes, true)}`;

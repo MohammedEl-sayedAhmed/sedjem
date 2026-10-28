@@ -157,8 +157,9 @@ async function ytStart(params) {
 // Courses: the sidebar and the job page
 // ---------------------------------------------------------------------------------------------
 
-// The courses in the list, by playlist: {id, course, main (its newest job), jobs, lectures: the newest job
-// of each lecture, in playlist order}.
+// The courses in the list, by playlist: {id, course, main (its newest job), jobs, lectures: the transcript of
+// each lecture that opens it, in playlist order: its main transcript, else its newest that isn't a branch (as
+// the course files, app/courses.py)}.
 function courseGroups(jobs) {
   const by = new Map();
   for (const j of jobs) {
@@ -167,9 +168,12 @@ function courseGroups(jobs) {
     by.get(j.course.id).jobs.push(j);
   }
   for (const g of by.values()) {
-    const newest = new Map();
-    for (const j of g.jobs) if (!newest.has(j.course.index)) newest.set(j.course.index, j);  // the list is newest first
-    g.lectures = [...newest.values()].sort((a, b) => a.course.index - b.course.index);
+    const pick = new Map();
+    for (const j of g.jobs) {  // the list is newest first
+      const had = pick.get(j.course.index);
+      if (!had || (j.main && !had.main) || (!had.main && had.branch && !j.branch)) pick.set(j.course.index, j);
+    }
+    g.lectures = [...pick.values()].sort((a, b) => a.course.index - b.course.index);
   }
   return [...by.values()];
 }

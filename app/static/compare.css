@@ -19,6 +19,13 @@
 .pill.ver.on { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
 .pill.ver.bad { color: var(--danger); }
 .pill.ver .dot { width: 6px; height: 6px; color: var(--accent); }
+/* the recording's main transcript: first, with a Main mark */
+.main-mark {
+  flex: none; padding: 0 5px; border-radius: 99px; font-size: 10px; font-weight: 700; line-height: 15px;
+  letter-spacing: .03em; text-transform: uppercase; background: var(--ok-soft); color: var(--ok);
+}
+.pill.ver.main { border-color: color-mix(in srgb, var(--ok) 40%, transparent); }
+.cmp-col-title .main-mark { margin-left: 2px; }
 .job-item.grouped.active .pill.ver:not(.on) { background: var(--surface); }
 
 /* ---------- job page: the switcher ---------- */
