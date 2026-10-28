@@ -161,9 +161,13 @@ def diarize(audio, n_speakers=None, threads=4, model=MODEL):
     """Build a Timeline for 16 kHz float32 audio; n_speakers=None estimates the count.
     `model` is any sherpa-onnx speaker-embedding ONNX file (WeSpeaker, TitaNet, CAM++, ...), or a
     Nemotron-3-Diarization folder, which hears at most 8 speakers."""
-    if nemotron.is_model(model):
-        return activity_timeline(nemotron.Model(model).probabilities(audio, threads), n_speakers)
-    return timeline(*voiceprints(audio, threads, model), n_speakers)
+    from threadpoolctl import threadpool_limits
+    # NumPy's matrix library takes every core by default; on a laptop processor with efficiency cores the
+    # clustering's eigendecompositions took 17-57 s per 17-minute recording that way, 2-3 s with 4 threads
+    with threadpool_limits(limits=threads, user_api="blas"):
+        if nemotron.is_model(model):
+            return activity_timeline(nemotron.Model(model).probabilities(audio, threads), n_speakers)
+        return timeline(*voiceprints(audio, threads, model), n_speakers)
 
 
 def activity_timeline(probs, n_speakers=None, frame_s=0.01, step=8):
