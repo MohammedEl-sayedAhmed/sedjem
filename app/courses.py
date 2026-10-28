@@ -6,9 +6,11 @@
   <courses>/Videos/<video title> [<video id>].md     a video added on its own (and its .srt)
 
 <courses> is [storage] courses in the config, next to app_data and models in the data folder. The files are
-written when a transcription finishes and again whenever its transcript, title or speaker names change; a
-lecture whose transcriptions were all deleted loses its files. When a video was transcribed more than once,
-the files follow the transcription that finished last. Only files of these names are ever written or removed.
+written when a transcription finishes and again whenever its transcript, title or speaker names change, or
+another transcription becomes the main one; a lecture whose transcriptions were all deleted loses its files.
+When a video was transcribed more than once, the files follow its main transcript when one is chosen
+(app/compare.py), else the transcription that finished last, leaving out branches that aren't main (unless
+nothing else is left). Only files of these names are ever written or removed.
 """
 import re
 import threading
@@ -136,15 +138,29 @@ def _write(path, text):
         tmp.replace(path)
 
 
+def ranked(jobs):
+    """A lecture's (or a video's) finished transcriptions, the one to use first: its main transcript, then the others
+    that aren't branches, the one that finished last first, then the branches that aren't main."""
+    from .compare import main_of  # (it imports app/jobs.py, which imports this module)
+    main = main_of(jobs)
+    rest = sorted((j for j in jobs if j is not main),
+                  key=lambda j: (str(j.get("finished") or ""), str(j.get("created") or ""), j["id"]), reverse=True)
+    return ([main] if main else []) + [j for j in rest if not j.get("branch")] + [j for j in rest if j.get("branch")]
+
+
 def _lectures(store, match):
-    """{key: (job, lines)} of the finished jobs that match, the one that finished last for each key."""
+    """{key: (job, lines)} of the finished jobs that match: for each key (a lecture, or a video on its own) the first
+    of ranked() that has a transcript."""
+    by_key = {}
+    for job in (j for j in store.list() if match(j) and j.get("status") == "done"):
+        by_key.setdefault((job.get("course") or {}).get("index") or job.get("youtube_id"), []).append(job)
     found = {}
-    for job in sorted((j for j in store.list() if match(j) and j.get("status") == "done"),
-                      key=lambda j: (j.get("finished") or "", j.get("created") or "", j["id"])):
-        data = store.transcript(job["id"])
-        if data and data.get("lines") is not None:
-            key = (job.get("course") or {}).get("index") or job.get("youtube_id")
-            found[key] = (job, data["lines"])
+    for key, jobs in by_key.items():
+        for job in ranked(jobs):
+            data = store.transcript(job["id"])
+            if data and data.get("lines") is not None:
+                found[key] = (job, data["lines"])
+                break
     return found
 
 

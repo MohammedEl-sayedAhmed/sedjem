@@ -9,8 +9,17 @@ parent}), and one snapshot per version (v0000.json, v0001.json, ...: title, spea
 current version is also in transcript.json and job.json as before, so the rest of the app reads those.
 A job that finished before the history existed gets one the first time it is opened: version 0 is the
 model's output if the folder still has it, version 1 the transcript as it was by then.
+
+A branch (app/jobs.py Runner.branch) is a job whose version 0 is a copy of another transcript's version, of
+kind "branch", with its origin ({id, version}). A change can be saved on top of a known version only
+(base_version): when the latest version is another one, Stale is raised and nothing is saved. The MCP server
+(app/mcp.py) is another process that saves versions too, so every change to a history is made under
+locked(), which also holds a lock on the job folder's history.lock.
 """
+import contextlib
 import difflib
+import os
+import threading
 from datetime import datetime
 
 from . import engines
@@ -19,10 +28,95 @@ from .jobs import ACTIVE, now, read_json, write_json
 
 QUICK = ("rename", "merge")  # changes made outside edit mode: renaming, merging speakers, the title
 FOLD_SECONDS = 120  # quick changes this close together, without a message, are kept as one version
+FIRST = ("model output", "branch")  # the kinds a version 0 that starts a transcript has
+LOCK_FILE = "history.lock"
+
+
+class Stale(Exception):
+    """A change made on top of a version that is no longer the latest one (base_version), or on a job that has no
+    history yet (one still running): nothing was saved. latest: the latest version's number, or None."""
+
+    def __init__(self, latest):
+        super().__init__(f"the latest version is {latest}" if latest is not None else "there are no versions yet")
+        self.latest = latest
 
 
 def clean_message(message):
     return " ".join(str(message or "").split())[:500]
+
+
+# ---- one change at a time, in this process and in the MCP server -------------------------------------
+
+_held = threading.local()  # this thread's locks: {(data folder, job id): [depth, the open lock file or None]}
+
+
+@contextlib.contextmanager
+def locked(store, jid):
+    """Hold a job's history: store.lock, which the app's request threads share, and an exclusive lock on the job
+    folder's history.lock, which the MCP server (app/mcp.py, another process) takes before it saves a version.
+    Re-entrant in a thread (save() calls ensure(), restore() calls save()). A job whose folder is gone gets
+    store.lock alone."""
+    key = (str(store.root), jid)
+    with store.lock:
+        held = getattr(_held, "jobs", None)
+        if held is None:
+            held = _held.jobs = {}
+        if key in held:
+            held[key][0] += 1
+            try:
+                yield
+            finally:
+                held[key][0] -= 1
+            return
+        folder = store.dir(jid)
+        held[key] = [1, _lock_file(folder) if folder.is_dir() else None]
+        try:
+            yield
+        finally:
+            _, handle = held.pop(key)
+            if handle is not None:
+                _unlock_file(handle)
+
+
+def _lock_file(folder):
+    """The job folder's history.lock, opened and locked (waiting for another process to let go of it)."""
+    try:
+        handle = open(folder / LOCK_FILE, "a+b")
+    except OSError:  # deleted meanwhile, or a folder that can't be written: store.lock alone
+        return None
+    try:
+        if os.name == "nt":
+            import msvcrt
+            handle.seek(0)
+            for tries in range(6):  # each try waits up to about 10 s
+                try:
+                    msvcrt.locking(handle.fileno(), msvcrt.LK_LOCK, 1)
+                    break
+                except OSError:
+                    if tries == 5:
+                        raise
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    except BaseException:
+        handle.close()
+        raise
+    return handle
+
+
+def _unlock_file(handle):
+    try:
+        if os.name == "nt":
+            import msvcrt
+            handle.seek(0)
+            msvcrt.locking(handle.fileno(), msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    except OSError:  # closing it lets go of the lock as well
+        pass
+    finally:
+        handle.close()
 
 
 def _folder(store, jid):
@@ -34,8 +128,9 @@ def _snapshot(store, jid, n):
 
 
 def _original(store, jid, versions):
-    """The model's output (the first version), or None if it wasn't kept."""
-    return _snapshot(store, jid, versions[0]["n"]) if versions and versions[0]["kind"] == "model output" else None
+    """What the transcript started as (the first version): the model's output, or for a branch the version it was
+    made from; None if that wasn't kept."""
+    return _snapshot(store, jid, versions[0]["n"]) if versions and versions[0]["kind"] in FIRST else None
 
 
 def _write(store, jid, versions, entry, state):
@@ -203,11 +298,17 @@ def _add(store, jid, versions, old, new, kind, message="", summary=None, time=No
 
 
 def _start(store, jid, job, state, cfg):
-    """Version 0, the model's output, and version 1 with any changes made before the history began."""
+    """Version 0, the model's output, and version 1 with any changes made before the history began. (A branch
+    starts its history when it is made; one whose history was lost starts again from its transcript.)"""
     lines = model_output(store, jid, job, cfg)
     entry = {"n": 0, "time": job.get("finished") or job.get("created") or now(), "kind": "model output",
              "message": "", "parent": None}
-    if lines is None:  # edited before the history began, and the model's own output wasn't kept
+    origin = (job.get("branch") or {}).get("from") if isinstance(job.get("branch"), dict) else None
+    if origin and lines is not None:
+        entry.update(kind="branch", origin=origin, summary="A branch whose history was started again from its "
+                                                           "transcript")
+        first = {**state, "lines": lines}
+    elif lines is None:  # edited before the history began, and the model's own output wasn't kept
         first = state
         entry.update(kind="edit", summary="The model's original output was not kept, so this is the transcript "
                                           "as it was when the history began")
@@ -227,7 +328,7 @@ def ensure(store, jid, cfg=None):
     """The job's versions, oldest first, or None while it runs or has no lines. The first call for a
     finished job starts its history, and a transcript changed outside the app (by hand, or with an
     older Sedjem) is saved as a new version before anything else happens."""
-    with store.lock:
+    with locked(store, jid):
         job = store.get(jid)
         if job is None or job["status"] in ACTIVE:
             return None
@@ -271,15 +372,19 @@ def _apply(store, jid, job, change, versions=None):
         store.update(jid, **fields)
 
 
-def save(store, jid, change, kind, message="", summary=None, cfg=None, merge=None, **extra):
+def save(store, jid, change, kind, message="", summary=None, cfg=None, merge=None, base_version=None, **extra):
     """Apply a change to the job (any of "title", "speaker_names", "lines") and keep the result as a new
     version. Returns the version's entry, or None if nothing changed. A quick change (kind "rename" or
     "merge"; merge describes a merge as in quick_summary) made soon after another one, both without a
-    message, is folded into it. A job without a history (still running) just gets the change."""
+    message, is folded into it. A job without a history (still running) just gets the change.
+    base_version: the version the change was made on; when the latest version is another one, or the job has
+    no history yet, Stale is raised and nothing is changed."""
     message = clean_message(message)
-    with store.lock:
+    with locked(store, jid):
         job = store.get(jid)
         versions = ensure(store, jid, cfg)
+        if base_version is not None and (versions is None or versions[-1]["n"] != base_version):
+            raise Stale(versions[-1]["n"] if versions else None)
         if versions is None:
             _apply(store, jid, job, change)
             return None
@@ -308,7 +413,7 @@ def save(store, jid, change, kind, message="", summary=None, cfg=None, merge=Non
 def preview(store, jid, change, cfg=None):
     """What saving a change would do, without saving it (to review edits first): the summary it would
     get and the differences (see compare); None while the job has no history."""
-    with store.lock:
+    with locked(store, jid):
         versions = ensure(store, jid, cfg)
         if versions is None:
             return None
@@ -326,7 +431,7 @@ def _find(store, jid, n, cfg):
 def restore(store, jid, n, message="", cfg=None):
     """Make version n the current one again, as a new version (nothing is removed). Returns the new
     entry, or None if the transcript is already the same; raises KeyError if there is no version n."""
-    with store.lock:
+    with locked(store, jid):
         versions, entry, state = _find(store, jid, n, cfg)
         if state is None:
             raise KeyError(n)
@@ -337,7 +442,7 @@ def restore(store, jid, n, message="", cfg=None):
 
 def set_message(store, jid, n, message, cfg=None):
     """Add, change or clear the message of version n; returns the versions. KeyError if there is none."""
-    with store.lock:
+    with locked(store, jid):
         versions, entry, _ = _find(store, jid, n, cfg)
         if entry is None:
             raise KeyError(n)
@@ -349,7 +454,7 @@ def set_message(store, jid, n, message, cfg=None):
 def version(store, jid, n, cfg=None, against=None):
     """Version n: its entry, title, speaker names and lines, and what changed from version against (by
     default the version before it; "changes" is None for the first). None if either version is missing."""
-    with store.lock:
+    with locked(store, jid):
         versions, entry, state = _find(store, jid, n, cfg)
         against = entry.get("parent") if entry and against is None else against
         before = _snapshot(store, jid, against) if any(v["n"] == against for v in versions) else None
@@ -358,10 +463,50 @@ def version(store, jid, n, cfg=None, against=None):
     return {"version": entry, **state, "against": against, "changes": compare(before, state) if before else None}
 
 
+def contents(store, jid, n, cfg=None):
+    """Version n's title, speaker names and lines; None if there is no version n (or no history yet)."""
+    with locked(store, jid):
+        return _find(store, jid, n, cfg)[2]
+
+
+def start_branch(store, jid, state, origin, summary, time=None):
+    """Version 0 of a branch, written by Runner.branch before its job.json: state (title, speaker names, lines) is
+    the version it was made from, origin {"id", "version"} says which."""
+    entry = {"n": 0, "time": time or now(), "kind": "branch", "message": "", "summary": summary, "parent": None,
+             "origin": origin}
+    _write(store, jid, [entry], entry, state)
+    return entry
+
+
+def read_versions(store, jid):
+    """The versions as index.json lists them, read without starting or changing the history (app/mcp.py reads them
+    this way); None when there is no history yet or it can't be read."""
+    path = _folder(store, jid) / "index.json"
+    index = read_json(path) if path.exists() else None
+    versions = index.get("versions") if isinstance(index, dict) else None
+    if not isinstance(versions, list) or not versions or not all(
+            isinstance(v, dict) and isinstance(v.get("n"), int) and not isinstance(v.get("n"), bool) for v in versions):
+        return None
+    return versions
+
+
+def read_snapshot(store, jid, n):
+    """Version n's title, speaker names and lines, read without starting or changing the history; None if missing."""
+    path = _folder(store, jid) / f"v{n:04d}.json"
+    data = read_json(path) if path.exists() else None
+    return data if isinstance(data, dict) and isinstance(data.get("lines"), list) else None
+
+
+def latest_version(store, jid):
+    """The number of the latest version, read without writing: 0 when there is no history yet."""
+    versions = read_versions(store, jid)
+    return versions[-1]["n"] if versions else 0
+
+
 def at(store, jid, n, cfg=None):
     """(job, lines, edited) as they were at version n, for the exports, edited saying whether its lines
     differ from the model's; None if there is no version n."""
-    with store.lock:
+    with locked(store, jid):
         versions, _, state = _find(store, jid, n, cfg)
         job = store.get(jid)
         first = _original(store, jid, versions)

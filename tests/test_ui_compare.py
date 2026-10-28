@@ -148,7 +148,7 @@ class Compare(UiTestCase):
             self.assertIn("Combined", top.locator(".ver-head").inner_text())
             self.assertEqual(top.locator(".ver-msg").inner_text(), "Best of both")
             self.assertTrue(top.locator(".ver-sum").inner_text().startswith(
-                "With the text of ElevenLabs Scribe v2 for 00:03–00:07, 00:11–00:15: 2 lines changed"))
+                "With the text of ElevenLabs Scribe v2 (version 0) for 00:03–00:07, 00:11–00:15: 2 lines changed"))
             self.assertEqual(self.texts("#history .ver .ver-n")[-1], "v0", "the model's output is still there")
 
         check_history()

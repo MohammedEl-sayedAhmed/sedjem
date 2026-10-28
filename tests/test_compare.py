@@ -451,7 +451,9 @@ class Api(unittest.TestCase):
         status, pre, _ = self.call("POST", "/api/combine/preview", body)
         self.assertEqual(status, 200, pre)
         self.assertEqual((pre["base"], pre["version"]), (a, 1), "v0 the model's output, v1 the names given before the history began")
-        self.assertTrue(pre["summary"].startswith("With the text of Cohere Transcribe Arabic for 00:09–00:25: "), pre["summary"])
+        # named by its label in the recording (the second Cohere transcript of it) and the version it was at
+        self.assertTrue(pre["summary"].startswith("With the text of Cohere Transcribe Arabic 2 (version 1) for 00:09–00:25: "),
+                        pre["summary"])
         self.assertEqual([r["op"] for r in pre["changes"]["lines"]].count("same"), 2)
         self.assertEqual(self.call("GET", f"/api/jobs/{a}")[1]["lines"], self.base_lines)
 
@@ -472,8 +474,9 @@ class Api(unittest.TestCase):
         self.assertEqual([x["n"] for x in v["versions"]], [0, 1, 2])
         self.assertEqual((v["versions"][0]["kind"], v1["kind"], v1["message"]), ("model output", "combine", "Best of both"))
         self.assertEqual(v1["summary"], pre["summary"])
-        self.assertEqual(v1["combined"]["ranges"], [{"start": rows[2]["from"], "end": 25, "from": b}])
-        self.assertEqual(v1["combined"]["sources"], [{"id": b, "model_title": "Cohere Transcribe Arabic"}])
+        self.assertEqual(v1["combined"]["ranges"], [{"start": rows[2]["from"], "end": 25, "from": b, "version": 1}])
+        self.assertEqual(v1["combined"]["sources"], [{"id": b, "model_title": "Cohere Transcribe Arabic",
+                                                      "label": "Cohere Transcribe Arabic 2", "version": 1}])
         self.assertEqual(v1["combined"]["speakers"][b], {"1": "2", "2": "3"})
         _, v0, _ = self.call("GET", f"/api/jobs/{a}/versions/0")
         self.assertEqual(v0["lines"], self.base_lines, "version 0 is still the model's output")

@@ -6,6 +6,10 @@ a picture also gets video.mp4 for the job page (app/video.py). Jobs go through p
 recording) → queued → running → done / failed / cancelled. Local and hosted jobs have separate queues,
 so an upload doesn't wait for a long local run; the video is made on its own thread meanwhile.
 
+A branch (Runner.branch) is a job made from a version of another transcript of the same recording: it shares
+the audio by hardlink like a re-run, and no model runs. A recording's main transcript has "main": true in
+job.json (app/compare.py).
+
 A job made from a YouTube link (source_url, app/youtube.py) is downloaded first, one at a time in the
 order the jobs were added (a playlist's in playlist order): video.mp4, or only the sound as source.<ext>,
 and captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
@@ -484,6 +488,54 @@ class Runner:
                 link_or_copy(folder / name, self.store.dir(new["id"]) / name)
         self.submit(new["id"])
         return self.store.get(new["id"])
+
+    def branch(self, jid, n, name, before=None):
+        """A new transcript of the same recording that starts as version n of this one: its title, speaker names
+        and lines, with the audio (and video) shared by hardlink as in rerun. No model runs: it is done at once.
+        Its version 0 is that copy, of kind "branch", and job.json says where it came from in "branch": {"name",
+        "from": {"id", "version"}}. It joins the group through rerun_of and the fingerprint. before(new id) runs
+        once its folder is ready and before job.json is written, so the job is listed only when it is whole.
+        Raises KeyError when there is no version n."""
+        from . import history  # imported here because it uses this module's helpers
+        with history.locked(self.store, jid):  # the version and the job as they are now
+            old = self.store.get(jid)
+            state = history.contents(self.store, jid, n, self.cfg) if old else None
+        if state is None:
+            raise KeyError(n)
+        folder = self.store.dir(jid)
+        shown = old.get("video") if (folder / video.NAME).exists() else None
+        at = now()
+        meta = {"title": state["title"], "source_name": old.get("source_name"), "created": at,
+                **{k: old.get(k) for k in ("model", "model_title", "kind", "options", "source", "audio_s", "fingerprint")},
+                "status": "done", "stage": None, "speaker_names": state["speaker_names"], "rerun_of": jid,
+                "started": at, "finished": at, "branch": {"name": name, "from": {"id": jid, "version": n}},
+                **{k: old[k] for k in ("source_url", "youtube_id", "course", "captions") if old.get(k)},  # still the lecture
+                **({"video": shown} if shown else {})}
+        for _ in range(50):  # an id that is taken is drawn again, as in new_job
+            new = self.store.new_id()
+            try:
+                (self.store.root / new).mkdir()
+                break
+            except FileExistsError:
+                continue
+        else:
+            raise RuntimeError("no free id for a new job")
+        dest = self.store.dir(new)
+        try:
+            for name_ in ("audio.flac", video.NAME):
+                if name_ == "audio.flac" or shown:
+                    link_or_copy(folder / name_, dest / name_)
+            self.store.save_transcript(new, {"lines": state["lines"], "edited": False, "model": old.get("model")})
+            label = (old.get("branch") or {}).get("name") or old.get("model_title") or old.get("model")
+            history.start_branch(self.store, new, state, {"id": jid, "version": n},
+                                 f"Branched from {label}, version {n}", at)
+            if before:
+                before(new)
+            write_json(dest / "job.json", {"id": new, **meta})
+        except BaseException:
+            shutil.rmtree(dest, ignore_errors=True)
+            raise
+        return self.store.get(new)
 
     def new_job(self, title, source_name, model_id, options, **extra):
         model = self.cfg.models[model_id]

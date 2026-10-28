@@ -15,22 +15,30 @@ Combining keeps the base transcript's lines everywhere except in the stretches p
 depending on where its middle is. The other transcripts' speakers are mapped onto the base's by how
 long they talk at the same time, and the base's speaker names carry over. The result is saved as a new
 version of the base transcript (app/history.py), so it is reviewed as a diff first and can be restored
-from, or undone in, its History; version 0 stays the model's output.
+from, or undone in, its History; version 0 stays the model's output. The version records where each
+stretch came from: the transcript, its label and the version it was at.
+
+A recording works like a repository: one of its transcripts can be its main one ("main": true in job.json,
+POST /api/jobs/<id>/main), and the others are its branches: the model transcripts, and branches made from a
+version of any of them (Runner.branch in app/jobs.py). Each is named by its label: a branch's name, else the
+model's title, numbered when two have the same one. Without a main transcript a recording works as before.
 """
 import bisect
+import contextlib
 import difflib
 import hashlib
 import math
 import re
 import threading
 import unicodedata
+from collections import Counter
 
 import soundfile as sf
 
 from . import history
 from . import transcript as T
 from .engines import partial_lines
-from .jobs import ACTIVE
+from .jobs import ACTIVE, ID_RE
 
 EDGE = 0.75       # seconds at each end of a line that may lie across a row boundary
 TINY_ROW = 0.8    # a row shorter than this (seconds) that only some transcripts have joins a neighbour...
@@ -155,6 +163,53 @@ def group_of(store, jid):
 def lines_of(store, jid):
     data = store.transcript(jid)
     return data["lines"] if data else partial_lines(store.dir(jid))
+
+
+# ---- main and branches -----------------------------------------------------------------------------
+
+def main_of(jobs):
+    """The main transcript among the jobs of one recording, or None: the finished one marked main. Marking one
+    unmarks the others of its group, so there is one; when two groups that each had one become one (the same
+    audio found later), the newest of them."""
+    marked = [j for j in jobs if j.get("main") is True and j.get("status") == "done"]
+    return max(marked, key=lambda j: j["id"]) if marked else None
+
+
+def mains(jobs, groups):
+    """{group id: its main transcript's id} for the groups that have one. groups: group_ids(jobs)."""
+    by = {}
+    for j in jobs:
+        by.setdefault(groups[j["id"]], []).append(j)
+    return {gid: main["id"] for gid, members in by.items() if (main := main_of(members))}
+
+
+def label(job):
+    """A transcript's name in its recording: a branch's name, else its model's title."""
+    branch = job.get("branch") if isinstance(job.get("branch"), dict) else {}
+    return str(branch.get("name") or job.get("model_title") or job.get("model") or "")
+
+
+def labels(jobs):
+    """{job id: label} for the transcripts of one recording, given oldest first: numbered when two or more have the
+    same one ("Cohere Transcribe Arabic 2"), as verLabels in app/static/compare.js."""
+    count, seen, out = Counter(label(j) for j in jobs), Counter(), {}
+    for j in jobs:
+        name = label(j)
+        seen[name] += 1
+        out[j["id"]] = f"{name} {seen[name]}" if count[name] > 1 else name
+    return out
+
+
+def default_base(ids, main):
+    """The base when none is given: the recording's main transcript when it is one of ids (text is brought into it),
+    else the first."""
+    return main["id"] if main is not None and main["id"] in ids else ids[0]
+
+
+def main_first(jobs):
+    """The jobs of one recording (oldest first) with its main transcript first, if it has one."""
+    main = main_of(jobs)
+    return ([main] if main else []) + [j for j in jobs if j is not main]
 
 
 # ---- words that differ ---------------------------------------------------------------------------
@@ -401,6 +456,11 @@ def combine(tracks, base, picks, mapping):
 
 def comparable(store, ids):
     """The jobs to compare or combine, in the order given: 2 or 3 finished transcripts of one recording."""
+    return _comparable(store, ids)[0]
+
+
+def _comparable(store, ids):
+    """(comparable(), the recording's jobs oldest first)."""
     if not 2 <= len(ids) <= MAX_COMPARE or len(set(ids)) != len(ids):
         raise Invalid(400, "choose 2 or 3 different transcripts")
     for jid in ids:
@@ -412,24 +472,25 @@ def comparable(store, ids):
         raise Invalid(400, "these are transcripts of different recordings")
     if any(by_id[jid]["status"] in ACTIVE for jid in ids):
         raise Invalid(409, "wait until the transcription has finished")
-    return [by_id[jid] for jid in ids]
+    return [by_id[jid] for jid in ids], group
 
 
-def job_info(job, lines):
+def job_info(job, lines, name=None, main=False):
     talk = {}
     for x in lines:
         if x["speaker"] is not None:
             talk[x["speaker"]] = talk.get(x["speaker"], 0) + max(0.0, x["end"] - x["start"])
-    return {**{k: job.get(k) for k in ("id", "title", "model", "model_title", "kind", "status", "created")},
-            "speaker_names": job.get("speaker_names") or {},
+    return {**{k: job.get(k) for k in ("id", "title", "model", "model_title", "kind", "status", "created", "branch")},
+            "label": name or label(job), "main": main, "speaker_names": job.get("speaker_names") or {},
             "speakers": [{"id": s, "talk": round(talk[s], 1)} for s in T.speaker_ids(lines)]}
 
 
 def view(store, ids, base=None):
     """What the compare view shows: the transcripts, the rows lined up by time with the words that
     differ marked, and how the other transcripts' speakers map onto the base's."""
-    jobs = comparable(store, ids)
-    base = base or ids[0]
+    jobs, group = _comparable(store, ids)
+    names, main = labels(group), main_of(group)
+    base = base or default_base(ids, main)
     if base not in ids:
         raise Invalid(400, "the base must be one of the transcripts compared")
     tracks = [lines_of(store, jid) for jid in ids]
@@ -453,7 +514,8 @@ def view(store, ids, base=None):
     others = [(jid, lines) for jid, lines in zip(ids, tracks) if jid != base]
     return {
         "ids": ids, "base": base, "audio_s": jobs[ids.index(base)].get("audio_s"),
-        "jobs": [job_info(j, lines) for j, lines in zip(jobs, tracks)],
+        "jobs": [job_info(j, lines, names.get(j["id"]), main is not None and j["id"] == main["id"])
+                 for j, lines in zip(jobs, tracks)],
         "mapping": {jid: map_speakers(lines, base_lines) for jid, lines in others},
         "overlap": {jid: {s: {b: round(sec, 1) for b, sec in o.items()} for s, o in talk_overlap(lines, base_lines).items()}
                     for jid, lines in others},
@@ -499,14 +561,15 @@ def combination(store, body, cfg=None):
     (base job id, the change for history.save, the summary, what the version records)."""
     if not isinstance(body, dict):
         raise Invalid(400, "expected a JSON object")
-    ids = [str(x) for x in body.get("ids") or []] if isinstance(body.get("ids"), list) else []
-    jobs = comparable(store, ids)
+    ids = _ids(body)
+    jobs, group = _comparable(store, ids)
     by_id = {j["id"]: j for j in jobs}
-    base = str(body.get("base") or ids[0])
+    base = str(body.get("base") or default_base(ids, main_of(group)))
     if base not in by_id:
         raise Invalid(400, "the base must be one of the transcripts combined")
     picks = clean_picks(body.get("picks", []), ids)
     changes = clean_speakers(body.get("speakers"), ids, base)
+    versions = {jid: history.current(store, jid, cfg) for jid in ids}  # the version each one is at (its history in step)
     tracks = {jid: lines_of(store, jid) for jid in ids}
     mapping = {jid: {**map_speakers(tracks[jid], tracks[base]), **changes.get(jid, {})} for jid in ids if jid != base}
     lines = combine(tracks, base, picks, mapping)
@@ -523,14 +586,22 @@ def combination(store, body, cfg=None):
                 names[t] = own[s]
     sources = [jid for jid in ids if jid != base and any(o == jid for _, _, o in ranges)]
     audio_s = by_id[base].get("audio_s")
-    title = lambda jid: by_id[jid].get("model_title") or by_id[jid].get("model")
-    parts = [f"{title(jid)} for " + ", ".join(f"{T.clock(a)}–{T.clock(min(b, audio_s or b))}"
-                                              for a, b, o in ranges if o == jid) for jid in sources]
+    title = lambda jid: by_id[jid].get("model_title") or by_id[jid].get("model")  # noqa: E731
+    named = labels(group)
+    parts = [f"{named[jid]} (version {versions[jid]}) for "
+             + ", ".join(f"{T.clock(a)}–{T.clock(min(b, audio_s or b))}" for a, b, o in ranges if o == jid)
+             for jid in sources]
     summary = "With the text of " + "; ".join(parts)
-    record = {"sources": [{"id": jid, "model_title": title(jid)} for jid in sources],
-              "ranges": [{"start": round(a, 2), "end": round(b, 2), "from": o} for a, b, o in ranges],
+    record = {"sources": [{"id": jid, "model_title": title(jid), "label": named[jid], "version": versions[jid]}
+                          for jid in sources],
+              "ranges": [{"start": round(a, 2), "end": round(b, 2), "from": o, "version": versions[o]}
+                         for a, b, o in ranges],
               "speakers": {jid: mapping[jid] for jid in sources}}
     return base, {"lines": lines, "speaker_names": names}, summary, record
+
+
+def _ids(body):
+    return [str(x) for x in body.get("ids") or []] if isinstance(body, dict) and isinstance(body.get("ids"), list) else []
 
 
 def preview_combined(store, body, cfg=None):
@@ -546,7 +617,11 @@ def save_combined(store, body, cfg=None):
     """Save a combination as a new version of the base transcript, with an optional message (body
     "message"). Version 0 stays the model's output, and the version can be reviewed and restored in
     History like any other. Returns (base job id, the version's entry)."""
-    with store.lock:  # versions are numbered in the order they are saved
+    ids = _ids(body)
+    with store.lock, contextlib.ExitStack() as held:  # versions are numbered in the order they are saved
+        if 2 <= len(ids) <= MAX_COMPARE:  # every transcript read stays as it is meanwhile (the MCP server saves too)
+            for jid in sorted({x for x in ids if ID_RE.match(x)}):
+                held.enter_context(history.locked(store, jid))
         base, change, summary, record = combination(store, body, cfg)
         found = history.preview(store, base, change, cfg)
         if found is None:

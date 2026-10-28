@@ -35,9 +35,11 @@ AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
 
 
 class ApiError(Exception):
-    def __init__(self, status, message):
+    """An answer other than 200: {"error": message}, with anything in extra next to it."""
+
+    def __init__(self, status, message, **extra):
         super().__init__(message)
-        self.status = status
+        self.status, self.extra = status, extra
 
 
 class App:
@@ -195,9 +197,12 @@ def device_class(device):
 
 
 def summary(job):
+    """A job as the list and the group give it. main: whether it is its recording's main transcript (the list and the
+    group say it of the group's one main transcript, app/compare.py); branch: {name, from: {id, version}} for a
+    branch, else None."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
-            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course")
-    return {k: job.get(k) for k in keys}
+            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course", "branch")
+    return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True}
 
 
 # ---- assistants (app/assistants.py) -----------------------------------------------------------------
@@ -367,7 +372,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "not found")
         except (ApiError, compare.Invalid) as e:
             self.drain()
-            self.json({"error": str(e)}, e.status)
+            self.json({"error": str(e), **getattr(e, "extra", {})}, e.status)
         except ConnectionError:  # the browser went away (e.g. seeking the player); Windows: ConnectionAbortedError
             self.close_connection = True
         except Exception as e:  # report instead of dropping the connection
@@ -422,7 +427,9 @@ class Handler(BaseHTTPRequestHandler):
         jobs = self.app.store.list()
         compare.fill_later(self.app.store, jobs)  # fingerprints of older jobs, for the groups
         groups = compare.group_ids(jobs)
-        self.json({"jobs": [{**summary(j), "group": groups[j["id"]]} for j in jobs]})
+        mains = compare.mains(jobs, groups)  # one main transcript per recording, at most
+        self.json({"jobs": [{**summary(j), "group": groups[j["id"]], "main": mains.get(groups[j["id"]]) == j["id"]}
+                            for j in jobs]})
 
     def ready_model(self, p, default=None):
         """The model a request names (else the default), if it can run now; a hosted one only with the
@@ -591,12 +598,22 @@ class Handler(BaseHTTPRequestHandler):
         return change, kind, merge
 
     def patch_job(self, _params, jid):
-        """A change to the title, speaker names or lines, saved as a new version (app/history.py)."""
+        """A change to the title, speaker names or lines, saved as a new version (app/history.py). With
+        base_version, the version the change was made on: when the latest version is another one, 409 with the
+        latest one's number ({"error", "version"}) and nothing is changed."""
         store = self.app.store
         p = self.body_json()
-        with store.lock:  # one change at a time, so versions are numbered in the order they are saved
+        base = p.get("base_version")
+        if base is not None and (not isinstance(base, int) or isinstance(base, bool) or base < 0):
+            raise ApiError(400, "base_version must be a version number: a whole number, 0 or more")
+        with history.locked(store, jid):  # one change at a time, so versions are numbered in the order they are saved
             change, kind, merge = self.change_from(self.job(jid), p)
-            history.save(store, jid, change, kind, p.get("message"), cfg=self.app.cfg, merge=merge)
+            try:
+                history.save(store, jid, change, kind, p.get("message"), cfg=self.app.cfg, merge=merge, base_version=base)
+            except history.Stale as e:
+                now_at = f"version {e.latest} is the latest" if e.latest is not None else "it has no versions yet"
+                raise ApiError(409, f"The transcript changed after version {base}: {now_at}. Nothing was saved.",
+                               version=e.latest)
         self.changed(jid)
         self.get_job({}, jid)
 
@@ -720,9 +737,67 @@ class Handler(BaseHTTPRequestHandler):
 
     # transcripts of one recording: grouping, comparing and combining them (app/compare.py)
     def job_group(self, _params, jid):
+        """The transcripts of a recording: its main one first, then the others oldest first, each with its label
+        (a branch's name, else the model's title, numbered when two have the same one) and whether it is main."""
         self.job(jid)
         gid, jobs = compare.group_of(self.app.store, jid)
-        self.json({"group": gid, "jobs": [{**summary(j), "group": gid} for j in jobs]})
+        main, names = compare.main_of(jobs), compare.labels(jobs)
+        self.json({"group": gid, "jobs": [{**summary(j), "group": gid, "main": j is main, "label": names[j["id"]]}
+                                          for j in compare.main_first(jobs)]})
+
+    def branch_job(self, _params, jid):
+        """{version, name}: a new transcript of the same recording that starts as that version of this one, a
+        branch (app/jobs.py Runner.branch). No model runs. The name is required: spaces are folded and it is cut
+        at 60 characters. A branch of a transcription hidden from assistants is hidden too. Answers like POST
+        /api/jobs/<id>/rerun: 201 with the new job."""
+        job, p, cfg = self.job(jid), self.body_json(), self.app.cfg
+        n = p.get("version")
+        if isinstance(n, str) and re.fullmatch(r"[0-9]{1,6}", n):
+            n = int(n)
+        if not isinstance(n, int) or isinstance(n, bool) or n < 0:
+            raise ApiError(400, "version must be a version number: a whole number, 0 or more")
+        name = " ".join(str(p.get("name") or "").split())[:60].strip()
+        if not name:
+            raise ApiError(400, "give the branch a name")
+        if job["status"] in ACTIVE:
+            raise ApiError(409, "wait until the transcription has finished")
+        if not (self.app.store.dir(jid) / "audio.flac").exists():
+            raise ApiError(409, "this transcription has no prepared audio")
+
+        def hide_too(new):  # before the branch is listed, so an assistant never sees it
+            with self.app.settings_lock:
+                hidden = cfg.setting("mcp_hidden")
+                if isinstance(hidden, list) and f"job:{jid}" in hidden:
+                    assistants.set_hidden(cfg, f"job:{new}", True)
+        try:
+            new = self.app.runner.branch(jid, n, name, before=hide_too)
+        except KeyError:
+            raise ApiError(404, "no such version")
+        except ValueError as e:  # the list of hidden transcriptions is full
+            raise ApiError(400, str(e))
+        self.changed(new["id"], new)
+        self.json(summary(new), 201)
+
+    def set_main(self, _params, jid):
+        """{"main": true or false}: this transcript becomes its recording's main one (no other of the group stays
+        main), or stops being main. Only a finished transcript can be main. A course's files follow the main
+        transcript. Answers like GET /api/jobs/<id>/group."""
+        p, store = self.body_json(), self.app.store
+        if not isinstance(p.get("main"), bool):
+            raise ApiError(400, "main must be true or false")
+        self.job(jid)
+        _, jobs = compare.group_of(store, jid)  # (works out older jobs' fingerprints first)
+        with store.lock:
+            job = self.job(jid)
+            if p["main"] and job["status"] != "done":
+                raise ApiError(409, "only a finished transcription can be the main one")
+            if p["main"]:
+                for other in jobs:
+                    if other["id"] != jid and (store.get(other["id"]) or {}).get("main"):
+                        store.update(other["id"], main=False)
+            store.update(jid, main=p["main"])
+        self.changed(jid)
+        self.job_group({}, jid)
 
     def compare_jobs(self, params):
         ids = [x for x in str(params.get("ids") or "").split(",") if x]
@@ -1024,6 +1099,8 @@ ROUTES = [
     ("GET", rf"/api/jobs/{ID}/video", Handler.video),
     ("GET", rf"/api/jobs/{ID}/export/(\w+)", Handler.export),
     ("GET", rf"/api/jobs/{ID}/group", Handler.job_group),
+    ("POST", rf"/api/jobs/{ID}/branch", Handler.branch_job),
+    ("POST", rf"/api/jobs/{ID}/main", Handler.set_main),
     ("GET", r"/api/compare", Handler.compare_jobs),
     ("POST", r"/api/combine", Handler.combine_jobs),
     ("POST", r"/api/combine/preview", Handler.combine_preview),
