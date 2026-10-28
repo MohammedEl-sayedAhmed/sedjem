@@ -91,6 +91,15 @@ class HistoryInStore(unittest.TestCase):
     def numbers(self, jid):
         return [v["n"] for v in history.ensure(self.store, jid)]
 
+    def test_a_speaker_written_as_a_number_or_as_text_is_the_same_speaker(self):
+        # transcribe.py writes speakers as numbers (MODEL_LINES), the app's edits as text: one line edited is one
+        # line changed, not every line with a speaker
+        as_text = [{**x, "speaker": None if x["speaker"] is None else str(x["speaker"])} for x in MODEL_LINES]
+        edited = changed(as_text, 1, "Yes, let's start with the review.")
+        old = {"title": "Weekly sync", "speaker_names": {}, "lines": MODEL_LINES}
+        self.assertEqual(history.describe(old, {**old, "lines": edited}), "1 line changed")
+        self.assertEqual([r["op"] for r in history.diff_lines(MODEL_LINES, edited)], ["same", "changed", "same", "same"])
+
     def test_model_output_is_version_0_and_never_changes(self):
         jid, lines = make_job(self.store)
         v0_file = self.store.dir(jid) / "history" / "v0000.json"

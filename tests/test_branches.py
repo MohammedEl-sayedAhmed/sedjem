@@ -258,8 +258,8 @@ class Main(Base):
         self.assertTrue(text.startswith("1 recording with 3 transcriptions"), text)
         self.assertEqual([line.split(" · ")[0] for line in text.splitlines() if " · " in line][:1], [f"  id {s}"])
         self.assertIn("the main transcript of this recording (main text), latest version 0; its branches:", text)
-        self.assertIn(f"  - whisper-medium code-switching · whisper-medium code-switching · id {a} · latest version 1", text)
-        self.assertIn(f"  - Cohere Transcribe Arabic · Cohere Transcribe Arabic · id {b} · latest version 0", text)
+        self.assertIn(f"  - whisper-medium code-switching · id {a} · latest version 1", text)
+        self.assertIn(f"  - Cohere Transcribe Arabic · id {b} · latest version 0", text)
         self.assertLess(text.index(f"id {s}"), text.index(f"id {a}"))
         self.assertLess(text.index(f"id {a}"), text.index(f"id {b}"))
 

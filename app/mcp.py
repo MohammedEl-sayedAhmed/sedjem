@@ -678,7 +678,8 @@ def recording_lines(lib, r):
     else:
         out.append("  its branches:")
     for j in r["branches"]:
-        parts = [names.get(j["id"], compare.label(j)), model_title(j), f"id {j['id']}",
+        name, model = names.get(j["id"], compare.label(j)), model_title(j)
+        parts = [name, "" if name == model or name.startswith(model + " ") else model, f"id {j['id']}",  # (a model's name once)
                  "" if j.get("status") == "done" else str(j.get("status") or ""),
                  f"latest version {history.latest_version(lib.store, j['id'])}" if j.get("status") == "done" else "",
                  made_from(lib, j, names)]

@@ -863,8 +863,8 @@ class MainAndBranches(Case):
         retro = text[text.index("- Retro"):].split("\n- ")[0]
         self.assertEqual(self.ids(retro), [self.main, RETRO_A, RETRO_B], "the main transcript first, then the others")
         self.assertIn("the main transcript of this recording (main text), latest version 0; its branches:", retro)
-        self.assertIn(f"  - Cohere Transcribe Arabic · Cohere Transcribe Arabic · id {RETRO_A} · latest version 2", retro)
-        self.assertIn(f"  - whisper-medium code-switching · whisper-medium code-switching · id {RETRO_B} · latest version 0",
+        self.assertIn(f"  - Cohere Transcribe Arabic · id {RETRO_A} · latest version 2", retro)
+        self.assertIn(f"  - whisper-medium code-switching · id {RETRO_B} · latest version 0",
                       retro)
         self.assertEqual(text.count("- Retro"), 1, "listed once")
         page = self.text("list_transcriptions", limit=1)

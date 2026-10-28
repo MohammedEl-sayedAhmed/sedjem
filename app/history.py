@@ -213,12 +213,14 @@ def diff_lines(old, new):
     that are gone ({"op": "removed", "line"}) where they were. A changed line also has its "old" version
     and, if its text changed, "words" (see diff_words). Lines are matched by their times, which edits keep."""
     key = lambda x: (x["start"], x["end"])
+    # transcribe.py writes speakers as numbers and the app's edits as text ("1"): the same speaker either way
+    who = lambda x: None if x.get("speaker") is None else str(x["speaker"])
     sm = difflib.SequenceMatcher(None, [key(x) for x in old], [key(x) for x in new], autojunk=False)
     rows = []
     for tag, i1, i2, j1, j2 in sm.get_opcodes():
         pairs = min(i2 - i1, j2 - j1) if tag in ("equal", "replace") else 0
         for a, b in zip(old[i1:i1 + pairs], new[j1:j1 + pairs]):
-            if key(a) == key(b) and a["text"] == b["text"] and a.get("speaker") == b.get("speaker"):
+            if key(a) == key(b) and a["text"] == b["text"] and who(a) == who(b):
                 rows.append({"op": "same", "line": b})
             else:
                 row = {"op": "changed", "line": b, "old": a}
