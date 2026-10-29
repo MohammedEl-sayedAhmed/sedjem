@@ -1,6 +1,6 @@
 # Sedjem statistics
 
-Updated on 2026-10-28 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
+Updated on 2026-10-29 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
 <a href="charts/activity-light.svg#gh-light-mode-only"><img src="charts/activity-light.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
 <a href="charts/activity-dark.svg#gh-dark-mode-only"><img src="charts/activity-dark.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
@@ -9,29 +9,30 @@ Updated on 2026-10-28 by the Repository stats workflow on main (`.github/workflo
 
 | | |
 |---|---|
-| Downloads of the app, all releases | 18 |
-| Clones since 2026-10-05 | 309 (127 unique per day, added up) |
-| Page views since 2026-10-05 | 164 (49 unique per day, added up) |
-| Stars, forks, watchers | 5, 0, 0 |
+| Downloads of the app, all releases | 25 |
+| Clones since 2026-10-05 | 337 (135 unique per day, added up) |
+| Page views since 2026-10-05 | 214 (61 unique per day, added up) |
+| Stars, forks, watchers | 6, 0, 0 |
 
 ## Downloads by release
 
 | Release | File | Downloads |
 |---|---|---|
-| v0.2.1-preview.20261020.2 | Sedjem-0.2.1-preview.20261020.2-linux-x64.tar.gz | 0 |
-| v0.2.1-preview.20261020.2 | Sedjem-0.2.1-preview.20261020.2-setup.exe | 1 |
-| v0.2.1-preview.20261020.2 | SHA256SUMS.txt | 1 |
-| v0.2.0 | Sedjem-0.2.0-linux-x64.tar.gz | 0 |
-| v0.2.0 | Sedjem-0.2.0-setup.exe | 5 |
-| v0.2.0 | SHA256SUMS.txt | 0 |
-| v0.1.0 | Sedjem-0.1.0-linux-x64.tar.gz | 3 |
-| v0.1.0 | Sedjem-0.1.0-setup.exe | 9 |
-| v0.1.0 | SHA256SUMS.txt | 1 |
+| v0.2.1-preview.20261029 | Sedjem-0.2.1-preview.20261029-linux-x64.tar.gz | 1 |
+| v0.2.1-preview.20261029 | Sedjem-0.2.1-preview.20261029-setup.exe | 1 |
+| v0.2.1-preview.20261029 | SHA256SUMS.txt | 1 |
+| v0.2.0 | Sedjem-0.2.0-linux-x64.tar.gz | 1 |
+| v0.2.0 | Sedjem-0.2.0-setup.exe | 6 |
+| v0.2.0 | SHA256SUMS.txt | 1 |
+| v0.1.0 | Sedjem-0.1.0-linux-x64.tar.gz | 4 |
+| v0.1.0 | Sedjem-0.1.0-setup.exe | 12 |
+| v0.1.0 | SHA256SUMS.txt | 2 |
 
 ## Last 30 days
 
 | Day | Clones | Unique cloners | Views | Unique visitors |
 |---|---|---|---|---|
+| 2026-10-28 | 28 | 8 | 50 | 12 |
 | 2026-10-27 | 6 | 4 | 20 | 7 |
 | 2026-10-26 | 3 | 3 | 2 | 2 |
 | 2026-10-25 | 19 | 10 | 3 | 1 |
@@ -56,12 +57,12 @@ Updated on 2026-10-28 by the Repository stats workflow on main (`.github/workflo
 | 2026-10-06 | 0 | 0 | 14 | 4 |
 | 2026-10-05 | 0 | 0 | 3 | 2 |
 
-## Where visitors came from (the 14 days to 2026-10-28)
+## Where visitors came from (the 14 days to 2026-10-29)
 
 | Site | Views | Unique visitors |
 |---|---|---|
-| github.com | 3 | 3 |
-| linkedin.com | 3 | 3 |
+| linkedin.com | 8 | 7 |
+| github.com | 5 | 4 |
 | com.linkedin.android | 2 | 2 |
 | lnkd.in | 2 | 1 |
 
