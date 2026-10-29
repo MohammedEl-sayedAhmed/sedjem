@@ -1,21 +1,23 @@
 # Speaker labels
 
 None of the speech-to-text models in the project's tests label speakers, so telling speakers apart
-(diarization) is a separate step that runs locally, in `speakers.py`.
+(diarization) is a separate step that runs locally, in `speakers.py`. The papers, data sets and
+models named here are listed with their licences under [References](#references).
 
 ## How it works
 
-1. Find the speech. Silero VAD marks where anyone is talking.
+1. Find the speech. Silero VAD ([Silero Team 2024](#references)) marks where anyone is talking.
 2. Take voiceprints. A 1.5-second window slides over the speech every 0.75 s. On very long
    recordings the step grows so that there are at most 2,000 windows; if many short turns still
    exceed that, an evenly spaced subset is clustered and every other window joins the nearest
-   speaker. For each window a speaker-embedding model, by default NVIDIA TitaNet-small (40 MB,
-   trained with telephone speech among other data), produces a voiceprint that captures timbre and
-   pitch: what a voice sounds like, not what it says.
-3. Group by voice. Spectral clustering (NME-SC, Park et al. 2019) groups the voiceprints into N
-   speakers. The neighbour count is tuned for each recording, so a handful of odd windows (noise,
-   crosstalk, laughter) can't become a speaker of their own. N comes from `--speakers N`, and
-   `--speakers 0` estimates it from the eigengap.
+   speaker. For each window a speaker-embedding model, by default NVIDIA TitaNet-small
+   ([Koluguri, Park and Ginsburg 2022](#references); 40 MB, trained with telephone speech among other
+   data), produces a voiceprint that captures timbre and pitch: what a voice sounds like, not what it
+   says.
+3. Group by voice. Spectral clustering (NME-SC, [Park et al. 2020](#references)) groups the
+   voiceprints into N speakers. The neighbour count is tuned for each recording, so a handful of odd
+   windows (noise, crosstalk, laughter) can't become a speaker of their own. N comes from
+   `--speakers N`, and `--speakers 0` estimates it from the eigengap.
 4. Smooth. Within each speech segment, a window whose two neighbours agree with each other takes
    their speaker.
 5. Attribute the text. Whisper returns a timestamp for every word, so each word goes to the speaker
@@ -48,10 +50,12 @@ merge first.
 ## Accuracy on real meetings
 
 This was measured on the six 10-minute meeting excerpts, with 2–5 people each (see
-[the results](03-results.md#real-meetings)), as WDER: the share of words credited to the wrong
-person. Our words are aligned to the hand-corrected ElevenLabs reference, and our Speaker 1, 2 and
-so on are matched to the real people in the way that agrees best. `bench/compare_voiceprints.py`
-relabels the same Whisper words with each voiceprint model, so only the speaker step differs.
+[the results](03-results.md#real-meetings)), as WDER
+([El Shafey, Soltau and Shafran 2019](#references)): the share of words credited to the wrong
+person. Our words are aligned to the hand-corrected
+ElevenLabs reference, and our Speaker 1, 2 and so on are matched to the real people in the way that
+agrees best. `bench/compare_voiceprints.py` relabels the same Whisper words
+([Radford et al. 2023](#references)) with each voiceprint model, so only the speaker step differs.
 
 | Voiceprint model | Size | Wrong speaker, true count given | Wrong speaker, count estimated (`--speakers 0`) | Count estimated right |
 |---|---|---|---|---|
@@ -78,9 +82,11 @@ people, and remain weak on larger meetings.
 
 *Per excerpt, TitaNet-small against ElevenLabs' raw labels, both scored against the hand corrections; the ElevenLabs figures per excerpt are in [the results](03-results.md#real-meetings).*
 
-The two voiceprint families trained on VoxCeleb (celebrity interviews) do worst, and the models
-trained with telephone and large multi-speaker data (TitaNet, 3D-Speaker) do best, as the research
-predicted. With TitaNet the estimate missed only on the 5-person excerpt. There it found fewer
+The two WeSpeaker models ([Wang, Liang et al. 2023](#references); their ResNet34-LM and ResNet152-LM
+versions), trained on VoxCeleb2 alone ([Chung, Nagrani and Zisserman 2018](#references); celebrity
+interviews), do worst, and the models trained with telephone and large multi-speaker data (TitaNet,
+and 3D-Speaker's CAM++, [Wang, Zheng et al. 2023](#references)) do best, as the research predicted.
+With TitaNet the estimate missed only on the 5-person excerpt. There it found fewer
 speakers than were present (2 of 5 with TitaNet-small, 3 with TitaNet-large) and still scored better
 than clustering into the true 5 (21.6% against 38.4%, and 16.0% against 41.0%). So on larger
 meetings `--speakers 0` is a reasonable choice even when the headcount is known. The other models
@@ -89,17 +95,22 @@ people on one excerpt and scored worse there (19.0% against 17.0% with the true 
 
 ## NVIDIA Nemotron-3-Diarization
 
-NVIDIA's Nemotron-3-Diarization (September 2026, about 100M parameters, OpenMDW 1.1 licence, which
-allows commercial use) replaces all of the steps above with one model. Every 10 ms it gives the
-probability that each of up to 8 speakers is talking, so it also hears when two people talk at once.
-Arabic is not among the languages its model card lists. It can be chosen instead of TitaNet-small in
+NVIDIA's Nemotron-3-Diarization ([NVIDIA 2026](#references); released in September 2026, about
+100M parameters, OpenMDW 1.1 licence, which allows commercial use) replaces all of the steps above
+with one model. Every 10 ms it gives the probability that each of up to 8 speakers is talking, so it
+also hears when two people talk at once. It is a Transformer that keeps the speaker cache of
+Streaming Sortformer ([Medennikov et al. 2025](#references)) and numbers the speakers by when they
+first speak, as Sortformer does ([Park et al. 2025](#references)). Its model card lists about
+10,000 hours of real conversations among its training data, AMI's training and development
+meetings among them, and Arabic is not among the languages it lists. It can be chosen instead of TitaNet-small in
 Settings → Models, or with `--voiceprint-model models/diarization/Nemotron-3-Diarization` on the
 command line.
 
 Sedjem runs NVIDIA's weights with NumPy alone (`nemotron.py`), following the Transformers
-implementation step by step: a log-mel spectrogram, 8 of its 10 ms frames stacked into one, then the
-recording in chunks of 27.2 s, each seen together with a cache of up to 264 earlier frames that keeps
-the clearest ones of every speaker, so the speaker numbers hold from one chunk to the next. On the six
+implementation ([Wolf et al. 2020](#references)) step by step: a log-mel spectrogram, 8 of its 10 ms
+frames stacked into one, then the recording in chunks of 27.2 s, each seen together with a cache of
+up to 264 earlier frames that keeps the clearest ones of every speaker, so the speaker numbers hold
+from one chunk to the next. On the six
 excerpts its probabilities stayed within 0.000007 of Transformers' on five and within 0.015 on the
 sixth, and not one 10 ms frame changed who was talking (`bench/check_nemotron.py`, which needs
 PyTorch and Transformers; `tests/test_nemotron.py` checks a tiny random model the same way without
@@ -122,6 +133,10 @@ It counted the people right on all six excerpts, including the 5-person one wher
 wrong person, against 38.4% for TitaNet-small with the true count and 21.6% with its estimate. On the
 five excerpts of two or three people the two are level at 9.0% pooled: per excerpt 2.7%, 8.4%,
 10.0%, 3.2% and 17.7% for Nemotron, against 4.6%, 7.8%, 10.4%, 2.6% and 16.5%.
+
+![Paired horizontal bars for each meeting excerpt, m1 to m6, and two pooled rows, of the share of words given to the wrong speaker by TitaNet-small and by Nemotron-3-Diarization, with TitaNet-small's estimate of the count added where it differs from the true count](images/charts/nemotron-excerpts.svg)
+
+*Per excerpt, TitaNet-small given the true number of people against Nemotron, which estimated it right on all six. On m6, the 5-person excerpt, TitaNet-small's own estimate (2 people) is shown too.*
 
 It hears two or more people at once in 4.0% of the speech (0.6–8.0% per excerpt). Sedjem gives every
 word one speaker, and so does the reference, so this is not an advantage yet: of the 169 words said
@@ -146,17 +161,19 @@ The meeting excerpts above are private, so the speaker models were also scored o
 that anyone can download, with `bench/compare_arzen.py` and `bench/compare_ami.py`
 ([how to run them](05-command-line.md#benchmark)):
 
-- ArzEn (Hamed, Vu and Abdennadher, LREC 2020; CC BY-SA 4.0): 38 informal interviews held at the
-  German University in Cairo, 12.1 hours of Egyptian Arabic mixed with English, at 16 kHz. Each has
-  one interviewee and the same two interviewers, a man and a woman (two recordings have only one of
+- ArzEn ([Hamed, Vu and Abdennadher 2020](#references); CC BY-SA 4.0): 38 informal interviews held
+  at the German University in Cairo, 12.1 hours of Egyptian Arabic mixed with English, at 16 kHz.
+  Each has one interviewee and the same two interviewers, a man and a woman (two recordings have only one of
   them). The corpus marks who speaks only through its transcription's segments, which never overlap
   and run from one cut to the next, so the pauses inside them, and often the silence before the next
   speaker, count as speech.
-- AMI (CC BY 4.0): English meetings, many of the speakers not native. Its standard test set is 16
-  meetings, 9.1 hours, 15 of them of four people and one of three, from headset microphones mixed
-  into one channel, with the reference turns taken from the word timings (the `ihm` set of
-  `diarizers-community/ami` on Hugging Face, at a pinned revision). Two or more people talk at once
-  in 14.6% of the speech, which is 27.0% of the speaker time.
+- AMI ([Carletta et al. 2006](#references); CC BY 4.0): English meetings, many of the speakers not
+  native. Its standard test set, that of its Full-corpus-ASR partition, is 16 meetings, 9.1 hours,
+  15 of them of four people and one of three, from headset microphones mixed into one channel, with
+  the reference turns taken from the word timings. The audio and the turns are the `ihm` set of
+  `diarizers-community/ami` on Hugging Face ([Akesbi and Gandhi 2024](#references)), at a pinned
+  revision, made from the AMI diarization setup of [Landini et al. 2022](#references). Two or more
+  people talk at once in 14.6% of the speech, which is 27.0% of the speaker time.
 
 Both are scored on 10 ms frames, with each model's speakers matched one to one to the real people in
 the way that agrees best, by two measures:
@@ -166,7 +183,8 @@ the way that agrees best, by two measures:
   also where the speaker model heard no one. So every 10 ms of the reference's speech is labelled
   that way, and this is the share of it that goes to someone who isn't talking then. It is the
   time-based counterpart of the words on the wrong person above.
-- DER (diarization error rate), the usual measure: the share of the reference's speaker time that
+- DER (diarization error rate, as NIST's Rich Transcription evaluations score it;
+  [Fiscus et al. 2006](#references)), the usual measure: the share of the reference's speaker time that
   is missed, falsely detected or given to the wrong person, summed over the speakers, so an overlap
   of two people counts twice. Nothing is forgiven around the turns (no collar) and overlaps are
   scored, the strictest setup; published AMI figures use several others, so compare them with care.
@@ -228,18 +246,85 @@ With the count given, the voiceprint models put 4.5% (TitaNet-small), 5.4% (Tita
 (CAM++) of the speech on the wrong person, and Nemotron 2.3% again. Every model got the count wrong
 on one or two meetings.
 
-### What the public sets show
+Nemotron has heard meetings like these before. Its model card lists AMI's training and development
+meetings, though not these 16, among its training data, while TitaNet's cards list no meetings
+(VoxCeleb, Fisher, Switchboard and LibriSpeech, and NIST's speaker recognition sets for
+TitaNet-large), so part of its lead here may come from that. The card also gives
+Nemotron a DER of 9.25% on the same 16 meetings, scored against references made by forced alignment
+instead of the word timings used here; the two figures can't be compared.
 
-They agree with the meeting excerpts. With the count estimated, Nemotron put the least speech on the
-wrong person on all three: 10.0% of the words on the excerpts against 10.2% for TitaNet-small, 2.2%
-of the speech on ArzEn against 2.5%, and 2.3% on AMI against 5.3%. Its lead grows with the number of
-people and the overlap, from about level on interviews and on meetings of two or three people to
-about half the errors on AMI's meetings of four, and it is the only model that hears overlap.
-Against that, it takes four to six times as long as TitaNet-small, and its count of the people was
-right less often on the public sets (29 of 38 interviews and 14 of 16 meetings, against 38 and 15
-for TitaNet-small), though it counted the 5-person excerpt right where TitaNet-small found 2. So
-TitaNet-small stays the default, and Nemotron is the better choice for meetings of four or more
-people, and where people often talk over each other.
+![Stacked horizontal bars of DER split into missed speech, false alarm and confusion for the speaker models on ArzEn and on AMI, and bars of the share of AMI's overlapping speaker time that each one misses](images/charts/speaker-der.svg)
+
+*DER on both public sets, split into its parts. Missed speech is most of every model's DER. Nemotron as the app misses more of the speech and confuses people less; with its overlaps kept, it has the lowest DER on AMI and misses a third of the speaker time in overlaps instead of more than half.*
+
+## Conclusions
+
+![Three panels of horizontal bars, one per test set, of the share given to the wrong person by TitaNet-small, TitaNet-large, 3D-Speaker CAM++ and Nemotron-3-Diarization, with Nemotron the lowest on all three](images/charts/speaker-models.svg)
+
+*The share of the words (meeting excerpts) or of the speech (ArzEn and AMI) given to the wrong person, with the number of people estimated by each model, as the app does by default.*
+
+The four speaker models that Settings offers were scored on three sets: the six private meeting
+excerpts in Egyptian Arabic and English (an hour, two to five people each), ArzEn's 38 interviews in
+the same languages (12.1 hours, three people in most), and AMI's 16 English meetings (9.1 hours,
+mostly four people, with much overlap). They agree on these points:
+
+- Nemotron-3-Diarization put the least on the wrong person on all three, with the number of people
+  estimated: 10.0% of the words on the excerpts against 10.2% for TitaNet-small, 2.2% of the speech
+  on ArzEn against 2.5%, and 2.3% on AMI against 4.2–5.3% for the voiceprint models.
+- Its lead grows with the number of people. It is about level with TitaNet-small on meetings of two
+  or three people (9.0% each) and on the interviews, puts less than half as much on the wrong person
+  on AMI's meetings of four, and on the 5-person excerpt gives 19.4% of the words to the wrong person,
+  against 21.6% with TitaNet-small's estimate of the count and 38.4% with the true count.
+- It is the only one of the four that hears two people talking at once. On AMI it heard 48.3% of
+  the overlapping speech and was right 91.5% of the time when it heard an overlap, and with its
+  overlaps kept it has the lowest DER (26.0%, against 28.5–29.3%). The app does not use this yet:
+  every word gets one speaker.
+- DER ranks the models differently. As the app uses it, Nemotron hears no one in more of the speech
+  than Silero VAD does, so its DER is the highest on both public sets (21.4% against 13.4–13.5% on
+  ArzEn, 31.6% against 28.5–29.3% on AMI). The app still gives every word there a speaker, which is
+  why the wrong-speaker share is closer to what a reader of the transcript sees.
+- Its count of the people was right on all six excerpts but less often on the public sets: 29 of 38
+  interviews and 14 of 16 meetings, against 38 and 15 for TitaNet-small. On ArzEn the misses were a
+  fourth voice heard for a few seconds.
+- It costs more: 397 MB against 40 MB, and 29–34 s for 10 minutes of audio against 6–8 s on the
+  public sets (30 s against 5 s on the excerpts), with at most 0.65 GB of memory. Both are small
+  next to transcription, which took about 320 s per 10-minute excerpt with whisper-medium in the
+  performance mode.
+- The three voiceprint models are within about a point of each other on every set. TitaNet-large
+  is a little ahead of TitaNet-small with the count estimated (4.2% against 5.3% on AMI) and behind
+  with it given (5.4% against 4.5%), at two to three times the size and time. CAM++ counted the
+  people right less often (4 of 6 excerpts, 14 of 16 meetings).
+
+![Horizontal bars of the seconds each speaker model takes for ten minutes of audio on ArzEn and on AMI, and of the size of each model's files in MB](images/charts/speaker-cost.svg)
+
+*The speaker step alone, with the number of people estimated; transcription takes far longer.*
+
+The sets are small and were run on one laptop. The meeting excerpts are an hour of private audio,
+with reference labels corrected by hand from ElevenLabs' output. ArzEn's reference counts pauses as
+speech, marks no overlap, has the same two interviewers throughout and, judging by R14, some
+mislabelled turns. AMI is in English, and Nemotron was trained on its other meetings. The excerpts
+were scored word by word, ArzEn and AMI on 10 ms
+frames without a collar, and the times are from the balanced power mode. Arabic is not among the
+languages of Nemotron's model card, and it still put the least on the wrong person on the two sets in
+Egyptian Arabic.
+
+## Recommendation
+
+TitaNet-small stays the default. It is a tenth of Nemotron's size and four to six times faster, its
+count of the people was right more often on the public sets, and on interviews and on meetings of
+two or three people Nemotron is only about level with it.
+
+Choose Nemotron-3-Diarization in Settings → Models for meetings of four or more people, and for
+recordings where people often talk over each other. On AMI's meetings of four it put less than half
+as much of the speech on the wrong person as TitaNet-small, and it counted the people of the 5-person
+excerpt right where TitaNet-small found 2. It hears at most 8 speakers.
+
+TitaNet-large and 3D-Speaker CAM++ gained nothing consistent over TitaNet-small on these sets, and
+both take longer.
+
+The overlaps that Nemotron hears are not used yet. Transcribing each voice of an overlap on its own
+would show what they are worth ([next steps](07-recommendation.md#next-steps)), and a public set of
+Egyptian Arabic meetings with the overlaps marked would test it better than ArzEn's interviews can.
 
 ## Forced alignment (experimental)
 
@@ -247,9 +332,10 @@ Cutting Cohere's audio at every speaker change means each piece is transcribed w
 around it. The alternative is to transcribe the whole pause-delimited chunk and then find where each
 word falls in the audio, which is what forced alignment does. `align.py` does this with
 [ctc-forced-aligner](https://github.com/MahmoudAshraf97/ctc-forced-aligner) and the MMS-300m
-forced-aligner model (`MahmoudAshraf/mms-300m-1130-forced-aligner`, 1,130 languages, 1.26 GB). The
-model reads romanized text, so the Arabic and the English words mixed into it are both romanized
-with uroman first. Each word then gets the speaker whose voice is active at its midpoint, as with
+forced-aligner model (`MahmoudAshraf/mms-300m-1130-forced-aligner`, 1,130 languages, 1.26 GB; MMS
+is [Pratap et al. 2024](#references)). The model reads romanized text, so the Arabic and the English
+words mixed into it are both romanized with uroman ([Hermjakob, May and Knight 2018](#references))
+first. Each word then gets the speaker whose voice is active at its midpoint, as with
 Whisper. A chunk where the voice timeline shows a single speaker skips the alignment, because every
 word in it gets that speaker anyway. If an alignment fails, the chunk's words are spread evenly over
 it.
@@ -288,8 +374,144 @@ its start, end and speaker, so speaker models can be compared without transcribi
 
 ## Known upgrades, not tested by the project
 
-- pyannote `speaker-diarization-community-1` with `num_speakers`: 26.7% DER on CALLHOME (no
-  collar). It needs PyTorch (the CPU build is about 184 MB) and a free Hugging Face token.
-- NVIDIA Sortformer v2.1: 5.68% DER on 2-speaker CALLHOME (0.25 s collar) through NeMo-Speech.cpp.
-  It can't be told the number of speakers.
+- pyannote `speaker-diarization-community-1` with `num_speakers`: 26.7% DER on part 2 of CALLHOME
+  ([Przybocki and Martin 2001](#references)), with no collar and overlaps scored, by its model card.
+  It needs PyTorch (the CPU build is about 184 MB) and a free Hugging Face token, with its conditions
+  accepted on the model's page.
+- NVIDIA Streaming Sortformer v2.1 (`diar_streaming_sortformer_4spk-v2.1`): 5.65% DER on the
+  2-speaker recordings of CALLHOME's part 2 (0.25 s collar, overlaps scored, 30.4 s latency), by its
+  model card, through NeMo-Speech.cpp. It detects at most 4 speakers.
 - Hosted: ElevenLabs Scribe has diarization built in, and pyannoteAI offers a free trial month.
+
+## References
+
+The papers, data sets, models and software behind the methods and the test sets above, with the
+licences their publishers give. The meeting excerpts are private and are not listed.
+
+### Data sets
+
+- Akesbi, K. and Gandhi, S. (2024). Diarizers: A repository for fine-tuning speaker diarization
+  models. [github.com/huggingface/diarizers](https://github.com/huggingface/diarizers). Its data set
+  [diarizers-community/ami](https://huggingface.co/datasets/diarizers-community/ami) (CC BY 4.0)
+  holds the AMI audio and reference turns used here.
+- Carletta, J., Ashby, S., Bourban, S. et al. (2006). The AMI Meeting Corpus: A Pre-announcement. In
+  Machine Learning for Multimodal Interaction (MLMI 2005), LNCS 3869, pp. 28–39. Springer.
+  [doi.org/10.1007/11677482_3](https://doi.org/10.1007/11677482_3). The corpus:
+  [groups.inf.ed.ac.uk/ami/corpus](https://groups.inf.ed.ac.uk/ami/corpus/), CC BY 4.0.
+- Chung, J. S., Nagrani, A. and Zisserman, A. (2018). VoxCeleb2: Deep Speaker Recognition. In Proc.
+  Interspeech 2018, pp. 1086–1090.
+  [doi.org/10.21437/Interspeech.2018-1929](https://doi.org/10.21437/Interspeech.2018-1929).
+- Hamed, I., Vu, N. T. and Abdennadher, S. (2020). ArzEn: A Speech Corpus for Code-switched Egyptian
+  Arabic-English. In Proceedings of the 12th Language Resources and Evaluation Conference (LREC
+  2020), pp. 4237–4246. European Language Resources Association.
+  [aclanthology.org/2020.lrec-1.523](https://aclanthology.org/2020.lrec-1.523/). The corpus (release
+  1.0, 2023) is downloaded after a form at
+  [sites.google.com/view/arzen-corpus](https://sites.google.com/view/arzen-corpus/resources), CC BY-SA
+  4.0.
+- Landini, F., Profant, J., Diez, M. and Burget, L. (2022). Bayesian HMM clustering of x-vector
+  sequences (VBx) in speaker diarization: Theory, implementation and analysis on standard tasks.
+  Computer Speech & Language 71, 101254.
+  [doi.org/10.1016/j.csl.2021.101254](https://doi.org/10.1016/j.csl.2021.101254). Its AMI
+  diarization setup, [BUTSpeechFIT/AMI-diarization-setup](https://github.com/BUTSpeechFIT/AMI-diarization-setup)
+  (forked as [pyannote/AMI-diarization-setup](https://github.com/pyannote/AMI-diarization-setup),
+  both Apache-2.0), gives the reference turns, from the word timings of AMI's manual annotations.
+- Nagrani, A., Chung, J. S. and Zisserman, A. (2017). VoxCeleb: A Large-Scale Speaker Identification
+  Dataset. In Proc. Interspeech 2017, pp. 2616–2620.
+  [doi.org/10.21437/Interspeech.2017-950](https://doi.org/10.21437/Interspeech.2017-950).
+- Przybocki, M. and Martin, A. (2001). 2000 NIST Speaker Recognition Evaluation, LDC2001S97.
+  Linguistic Data Consortium. [catalog.ldc.upenn.edu/LDC2001S97](https://catalog.ldc.upenn.edu/LDC2001S97).
+  Its CALLHOME part is the CALLHOME of the figures under Known upgrades; licensed by the LDC.
+
+### Models
+
+- ElevenLabs. Scribe v2 speech to text. [elevenlabs.io/speech-to-text](https://elevenlabs.io/speech-to-text).
+  Its transcripts and speaker labels, corrected by hand, are the reference for the meeting excerpts.
+- Koluguri, N. R., Park, T. and Ginsburg, B. (2022). TitaNet: Neural Model for Speaker Representation
+  with 1D Depth-Wise Separable Convolutions and Global Context. In ICASSP 2022, pp. 8102–8106.
+  [doi.org/10.1109/ICASSP43922.2022.9746806](https://doi.org/10.1109/ICASSP43922.2022.9746806).
+  TitaNet-small ([NGC](https://catalog.ngc.nvidia.com/orgs/nvidia/teams/nemo/models/titanet_small))
+  comes under the NeMo toolkit's licence, Apache-2.0, and TitaNet-large
+  ([Hugging Face](https://huggingface.co/nvidia/speakerverification_en_titanet_large)) under CC BY
+  4.0. Sedjem runs both as the ONNX files of sherpa-onnx's
+  [speaker recognition models](https://github.com/k2-fsa/sherpa-onnx/releases/tag/speaker-recongition-models).
+- NVIDIA (2026). Nemotron 3 Diarization. Model card, Hugging Face, released 23 September 2026.
+  [huggingface.co/nvidia/Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization).
+  OpenMDW License Agreement 1.1 ([openmdw.ai/license/1-1](https://openmdw.ai/license/1-1/)).
+- NVIDIA. Streaming Sortformer v2.1, model card.
+  [huggingface.co/nvidia/diar_streaming_sortformer_4spk-v2.1](https://huggingface.co/nvidia/diar_streaming_sortformer_4spk-v2.1).
+  NVIDIA Open Model License.
+- pyannote. speaker-diarization-community-1, model card.
+  [huggingface.co/pyannote/speaker-diarization-community-1](https://huggingface.co/pyannote/speaker-diarization-community-1).
+  CC BY 4.0.
+- Pratap, V., Tjandra, A., Shi, B. et al. (2024). Scaling Speech Technology to 1,000+ Languages.
+  Journal of Machine Learning Research 25(97), pp. 1–52.
+  [jmlr.org/papers/v25/23-1318.html](https://jmlr.org/papers/v25/23-1318.html). The forced-aligner
+  model made from it,
+  [MahmoudAshraf/mms-300m-1130-forced-aligner](https://huggingface.co/MahmoudAshraf/mms-300m-1130-forced-aligner),
+  is CC BY-NC 4.0.
+- Radford, A., Kim, J. W., Xu, T. et al. (2023). Robust Speech Recognition via Large-Scale Weak
+  Supervision. In Proceedings of the 40th International Conference on Machine Learning (ICML 2023),
+  PMLR 202, pp. 28492–28518.
+  [proceedings.mlr.press/v202/radford23a.html](https://proceedings.mlr.press/v202/radford23a.html).
+  The words of the meeting excerpts come from Whisper, in the
+  [whisper-medium code-switching fine-tune](https://huggingface.co/Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2).
+- Silero Team (2024). Silero VAD: pre-trained enterprise-grade Voice Activity Detector (VAD), Number
+  Detector and Language Classifier. [github.com/snakers4/silero-vad](https://github.com/snakers4/silero-vad).
+  MIT.
+- Wang, H., Liang, C., Wang, S. et al. (2023). Wespeaker: A Research and Production Oriented Speaker
+  Embedding Learning Toolkit. In ICASSP 2023.
+  [doi.org/10.1109/ICASSP49357.2023.10096626](https://doi.org/10.1109/ICASSP49357.2023.10096626).
+  The toolkit, [wenet-e2e/wespeaker](https://github.com/wenet-e2e/wespeaker), is Apache-2.0; by its
+  documentation, its ResNet34-LM and ResNet152-LM models, trained on VoxCeleb2, follow VoxCeleb's
+  licence, CC BY 4.0.
+- Wang, H., Zheng, S., Chen, Y. et al. (2023). CAM++: A Fast and Efficient Network for Speaker
+  Verification Using Context-Aware Masking. In Proc. Interspeech 2023, pp. 5301–5305.
+  [doi.org/10.21437/Interspeech.2023-1513](https://doi.org/10.21437/Interspeech.2023-1513). The model
+  used is 3D-Speaker's
+  [speech_campplus_sv_zh_en_16k-common_advanced](https://modelscope.cn/models/iic/speech_campplus_sv_zh_en_16k-common_advanced),
+  trained on Chinese and English speech, Apache-2.0.
+
+### Methods and measures
+
+- El Shafey, L., Soltau, H. and Shafran, I. (2019). Joint Speech Recognition and Speaker Diarization
+  via Sequence Transduction. In Proc. Interspeech 2019, pp. 396–400.
+  [doi.org/10.21437/Interspeech.2019-1943](https://doi.org/10.21437/Interspeech.2019-1943). It
+  defines WDER.
+- Fiscus, J. G., Ajot, J., Michel, M. and Garofolo, J. S. (2006). The Rich Transcription 2006 Spring
+  Meeting Recognition Evaluation. In Machine Learning for Multimodal Interaction (MLMI 2006), LNCS
+  4299, pp. 309–322. Springer. [doi.org/10.1007/11965152_28](https://doi.org/10.1007/11965152_28).
+  DER as NIST scores it, with md-eval from [SCTK](https://github.com/usnistgov/SCTK); the benchmark
+  here computes it with its own code, on 10 ms frames.
+- Medennikov, I., Park, T., Wang, W. et al. (2025). Streaming Sortformer: Speaker Cache-Based Online
+  Speaker Diarization with Arrival-Time Ordering. In Proc. Interspeech 2025, pp. 5238–5242.
+  [doi.org/10.21437/Interspeech.2025-2244](https://doi.org/10.21437/Interspeech.2025-2244).
+- Park, T. J., Han, K. J., Kumar, M. and Narayanan, S. (2020). Auto-Tuning Spectral Clustering for
+  Speaker Diarization Using Normalized Maximum Eigengap. IEEE Signal Processing Letters 27,
+  pp. 381–385. [doi.org/10.1109/LSP.2019.2961071](https://doi.org/10.1109/LSP.2019.2961071).
+- Park, T., Medennikov, I., Dhawan, K. et al. (2025). Sortformer: A Novel Approach for
+  Permutation-Resolved Speaker Supervision in Speech-to-Text Systems. In Proceedings of the 42nd
+  International Conference on Machine Learning (ICML 2025), PMLR 267, pp. 48153–48169.
+  [proceedings.mlr.press/v267/park25h.html](https://proceedings.mlr.press/v267/park25h.html).
+
+### Software
+
+- Chen, Y., Zheng, S., Wang, H. et al. (2025). 3D-Speaker-Toolkit: An Open-Source Toolkit for
+  Multimodal Speaker Verification and Diarization. In ICASSP 2025.
+  [doi.org/10.1109/ICASSP49660.2025.10888389](https://doi.org/10.1109/ICASSP49660.2025.10888389). The
+  toolkit, [modelscope/3D-Speaker](https://github.com/modelscope/3D-Speaker), is Apache-2.0.
+- [ctc-forced-aligner](https://github.com/MahmoudAshraf97/ctc-forced-aligner), by Mahmoud Ashraf.
+  BSD-2-Clause.
+- [faster-whisper](https://github.com/SYSTRAN/faster-whisper), by SYSTRAN, which runs Whisper. MIT.
+- Hermjakob, U., May, J. and Knight, K. (2018). Out-of-the-box Universal Romanization Tool uroman.
+  In Proceedings of ACL 2018, System Demonstrations, pp. 13–18.
+  [doi.org/10.18653/v1/P18-4003](https://doi.org/10.18653/v1/P18-4003). The tool:
+  [isi-nlp/uroman](https://github.com/isi-nlp/uroman).
+- [sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx), by k2-fsa, which runs the voiceprint models.
+  Apache-2.0.
+- Wolf, T., Debut, L., Sanh, V. et al. (2020). Transformers: State-of-the-Art Natural Language
+  Processing. In Proceedings of the 2020 Conference on Empirical Methods in Natural Language
+  Processing: System Demonstrations, pp. 38–45.
+  [doi.org/10.18653/v1/2020.emnlp-demos.6](https://doi.org/10.18653/v1/2020.emnlp-demos.6).
+  Apache-2.0. `nemotron.py` follows its
+  [Nemotron 3 Diarization](https://huggingface.co/docs/transformers/en/model_doc/nemotron3_diarization)
+  implementation.

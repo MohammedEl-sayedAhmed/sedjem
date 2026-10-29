@@ -1,8 +1,9 @@
 """Tests for the charts in the docs (docs/charts.py). The charts are redrawn and must equal the
 committed SVG files and be well-formed XML. Every number drawn, every bar and whisker must match its
-source: results/summary.json for the public sets, docs/charts-data.json for the real meetings. The
-summary.json numbers must be the ones in the docs' tables, and charts-data.json must hold the numbers
-the docs publish. The generator reads nothing else, so it never touches the private meeting data.
+source: results/summary.json and results/*-diarization.json for the public sets, docs/charts-data.json
+for the real meetings. The public numbers must be the ones in the docs' tables, and charts-data.json
+must hold the numbers the docs publish. The generator reads nothing else, so it never touches the
+private meeting data.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
@@ -22,12 +23,14 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 CHART_DIR = ROOT / "docs" / "images" / "charts"
 SUMMARY_PATH = ROOT / "results" / "summary.json"
+ARZEN_PATH, AMI_PATH = ROOT / "results" / "arzen-diarization.json", ROOT / "results" / "ami-diarization.json"
 DATA_PATH = ROOT / "docs" / "charts-data.json"
 SVG = "{http://www.w3.org/2000/svg}"
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
 # Names in the charts that contain digits without being results
 NAMES = re.compile(r"large-v3|Qwen3-ASR-1\.7B|R2T2|Audar-ASR-V1-Turbo|ResNet(?:34|152)|3D-Speaker|\bm[1-6]\b"
-                   r"|\b(?:16|8) kHz\b|G\.711|95%")
+                   r"|\b(?:16|8) kHz\b|G\.711|95%|Nemotron-3-Diarization")
+PUBLIC = ("summary/", "arzen/", "ami/")  # the kinds of data-ref whose numbers the docs' tables publish
 
 _spec = importlib.util.spec_from_file_location("charts", ROOT / "docs" / "charts.py")
 charts = importlib.util.module_from_spec(_spec)
@@ -35,13 +38,43 @@ _spec.loader.exec_module(charts)
 
 SUMMARY = {(r["set"], r["audio"], r["model"], r["config"]): r
            for r in json.loads(SUMMARY_PATH.read_text(encoding="utf-8"))}
+SPEAKER_SCORES = {"arzen": json.loads(ARZEN_PATH.read_text(encoding="utf-8"))["scores"],
+                  "ami": json.loads(AMI_PATH.read_text(encoding="utf-8"))}
 DATA = json.loads(DATA_PATH.read_text(encoding="utf-8"), parse_float=Decimal)
+
+
+def pooled(corpus, system, metric, collar=0.0):
+    """A speaker-label number pooled over a public set's recordings as bench/compare_ami.py and
+    bench/compare_arzen.py print it for the tables, with the number of people estimated: the value in
+    the chart's units (percent for shares) and the text shown."""
+    rows = [r for r in SPEAKER_SCORES[corpus]
+            if r["system"] == system and r["mode"] == "estimated" and r.get("collar_s", 0.0) == collar]
+    total = lambda key: sum(r[key] for r in rows)
+    if metric == "count_right":
+        right = sum(r["found"] == r["people"] for r in rows)
+        return right, str(right)
+    if metric == "seconds":
+        value = total("seconds") / total("audio_s") * 600
+        return value, f"{value:.0f}"
+    if metric == "der":
+        part, whole = sum(r["missed"] + r["false_alarm"] + r["confusion"] for r in rows), total("total")
+    elif metric == "wrong_on_speech":
+        part, whole = total("wrong_on_speech"), total("speech")
+    elif metric == "overlap_missed":
+        part, whole = total("overlap_missed"), max(1, total("overlap_speaker"))
+    else:  # a part of DER
+        part, whole = total(metric), total("total")
+    share = part / whole
+    return share * 100, format(share, ".1%")[:-1]
 
 
 def resolve(ref):
     """The value in the chart's units and the text shown, for a data-ref: summary numbers rounded as
-    in the docs' tables (bench/score.py), charts-data.json numbers as written there."""
+    in the docs' tables (bench/score.py), ArzEn and AMI numbers pooled as in theirs, charts-data.json
+    numbers as written there."""
     kind, *path = ref.split("/")
+    if kind in SPEAKER_SCORES:
+        return pooled(kind, *path)
     if kind == "summary":
         row = SUMMARY[tuple(path[:4])]
         metric, index = path[4], path[5:]
@@ -142,7 +175,7 @@ class ChartsTest(unittest.TestCase):
         for name, root in self.roots.items():
             for el in root.iter():
                 ref, where = el.get("data-ref") or el.get("data-lo") or "", el.get("data-doc")
-                if el.tag == SVG + "path" or not ref.startswith("summary/"):
+                if el.tag == SVG + "path" or not ref.startswith(PUBLIC):
                     continue
                 with self.subTest(name, ref=ref):
                     self.assertTrue(where, "a public number without the place the docs publish it")
@@ -176,8 +209,10 @@ class ChartsTest(unittest.TestCase):
                         tag, tick = el.tag[len(SVG):], el.get("data-tick")
                         if tag == "path" and el.get("data-ref"):
                             xs = [float(x) for x, _ in re.findall(r"(-?[\d.]+),(-?[\d.]+)", el.get("d"))]
-                            self.assertAlmostEqual(min(xs), at(0), delta=0.02)
-                            self.assertAlmostEqual(max(xs), at(resolve(el.get("data-ref"))[0]), delta=0.02)
+                            # a part of a stacked bar starts where the parts before it end
+                            base = sum(resolve(r)[0] for r in el.get("data-stack", "").split("|") if r)
+                            self.assertAlmostEqual(min(xs), at(base), delta=0.02)
+                            self.assertAlmostEqual(max(xs), at(base + resolve(el.get("data-ref"))[0]), delta=0.02)
                             in_panels += 1
                         elif tag == "line" and el.get("data-lo"):
                             self.assertAlmostEqual(float(el.get("x1")), at(resolve(el.get("data-lo"))[0]), delta=0.02)
@@ -236,7 +271,31 @@ class ChartsTest(unittest.TestCase):
         with mock.patch.object(Path, "read_text", spy), \
                 mock.patch("builtins.open", side_effect=AssertionError("unexpected open()")):
             charts.build()
-        self.assertEqual(set(read), {SUMMARY_PATH, DATA_PATH})
+        self.assertEqual(set(read), {SUMMARY_PATH, ARZEN_PATH, AMI_PATH, DATA_PATH})
+
+    def test_speaker_label_tables_are_the_pooled_results(self):
+        """Every number of the ArzEn and AMI tables in docs/04-speaker-labels.md, pooled again from
+        the scores that bench/compare_arzen.py and bench/compare_ami.py keep in results/."""
+        systems = {row: system for system, row in charts.SPEAKER_ROWS.items()}
+        for corpus, place in charts.SPEAKER_TABLES.items():
+            doc, _, heading = place.partition("#")
+            (table,) = tables(doc, heading)
+            self.assertEqual([row[0] for row in table[1:]], list(systems))
+            for row in table[1:]:
+                system = systems[row[0]]
+                show = lambda metric, collar=0.0: pooled(corpus, system, metric, collar)[1]
+                recordings = len({r.get("recording") or r["meeting"] for r in SPEAKER_SCORES[corpus]})
+                expected = {  # each column's cell, worked out only for the columns the table has
+                    "Wrong speaker on speech": lambda: "" if "overlap" in system else f"{show('wrong_on_speech')}%",
+                    "DER": lambda: f"{show('der')}%",
+                    "Missed / false alarm / confusion": lambda: " / ".join(
+                        f"{show(part)}%" for part in ("missed", "false_alarm", "confusion")),
+                    "DER with a 0.25 s collar": lambda: f"{show('der', 0.25)}%",
+                    "Speaker time missed in overlaps": lambda: f"{show('overlap_missed')}%",
+                    "Count estimated right": lambda: f"{show('count_right')} of {recordings}",
+                    "Seconds per 10 minutes": lambda: show("seconds")}
+                with self.subTest(corpus, system=system):
+                    self.assertEqual(dict(zip(table[0][1:], row[1:])), {c: expected[c]() for c in table[0][1:]})
 
     def test_result_tables_are_written_from_summary_json(self):
         spec = importlib.util.spec_from_file_location("score", ROOT / "bench" / "score.py")

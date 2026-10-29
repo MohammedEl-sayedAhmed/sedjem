@@ -30,7 +30,10 @@ Speaker labels by voice worked well locally. With the TitaNet-small voiceprint m
 words went to the wrong person across the six meetings, and 8–9% across the five with two or three
 people (2–11% on four of them, 17% on one where ElevenLabs' own labels were 27% off). ElevenLabs'
 own labels were about 6% off overall. The number of speakers was estimated correctly in five of
-the six meetings.
+the six meetings. NVIDIA's Nemotron-3-Diarization, which can be chosen instead, put the least on the
+wrong person on these meetings and on two public sets, ArzEn's interviews and AMI's English
+meetings, most clearly in meetings of four or more people. It is ten times the size and four to six
+times slower, so it is the choice for larger meetings, and TitaNet-small stays the default.
 
 Also tried, and not usable for this: R2T2, the model the project started from, tried first (47.1%
 on the public Egyptian set with the whole clip, and most English terms written in Arabic letters),
@@ -63,6 +66,17 @@ length. The meeting figures come from 10-minute excerpts run through `transcribe
 labels, pauses included; the Perle clips are 4 to 12 seconds long, so the fixed cost per chunk
 weighs more there.
 
+| Speaker labels | Meeting excerpts, words on the wrong person | ArzEn interviews, speech on the wrong person | AMI meetings, speech on the wrong person | Count estimated right (excerpts / ArzEn / AMI) | Seconds per 10 minutes | Size |
+|---|---|---|---|---|---|---|
+| TitaNet-small voiceprints (default) | 10.2% | 2.5% | 5.3% | 5 of 6 / 38 of 38 / 15 of 16 | 5–8 | 40 MB |
+| Nemotron-3-Diarization | 10.0% | 2.2% | 2.3% | 6 of 6 / 29 of 38 / 14 of 16 | 29–34 | 397 MB |
+
+These are the shares given to the wrong person (lower is better) with the number of people
+estimated, as the app does by default. ArzEn (Egyptian Arabic–English interviews) and AMI (English
+meetings, with much overlap) are public sets, scored on 10 ms frames. The time is for the speaker
+step alone. The other two speaker models, TitaNet-large and 3D-Speaker CAM++, the error rates by
+the usual measure (DER) and the charts are in [speaker labels](04-speaker-labels.md#conclusions).
+
 ## Contents
 
 | Document | What's in it |
@@ -70,7 +84,7 @@ weighs more there.
 | [Use case](01-use-case.md) | what the transcripts are for, the test audio, the original question |
 | [Trials and issues](02-trials-and-issues.md) | every experiment in order (38 of them, in two rounds): what broke and how it was fixed |
 | [Results](03-results.md) | method, the Perle benchmark, phone audio, real meetings, ArzEn, the test call, long recordings, caveats |
-| [Speaker labels](04-speaker-labels.md) | how voices are told apart, the bugs found, five voiceprint models compared, forced alignment |
+| [Speaker labels](04-speaker-labels.md) | how voices are told apart, the bugs found, the speaker models compared on the meetings, ArzEn and AMI, conclusions and a recommendation, forced alignment, references |
 | [Command line](05-command-line.md) | setup, options, what happens inside, speed and memory |
 | [Market research](06-market-research.md) | hosted and open options, free tiers, privacy terms ([full report](research/market-research-report.md), [second pass on hosted APIs](research/hosted-apis-report.md)) |
 | [Recommendation](07-recommendation.md) | what to use when, and what to try next |
@@ -85,7 +99,8 @@ weighs more there.
 The [research](research/) folder keeps the raw material: the two market-research reports, their
 source data, and the handoff note the project started from.
 
-The charts in these notes are drawn by `docs/charts.py` from `results/summary.json` and, for the
-private meetings, from the published numbers copied into `docs/charts-data.json`. After the results
-change, redraw them with `python docs/charts.py`; `tests/test_charts.py` checks that every number
-drawn matches its table.
+The charts in these notes are drawn by `docs/charts.py` from `results/summary.json`, from the
+speaker-label scores in `results/arzen-diarization.json` and `results/ami-diarization.json` and, for
+the private meetings, from the published numbers copied into `docs/charts-data.json`. After the
+results change, redraw them with `python docs/charts.py`; `tests/test_charts.py` checks that every
+number drawn matches its table.

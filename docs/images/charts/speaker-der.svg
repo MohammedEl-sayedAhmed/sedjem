@@ -1,0 +1,140 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Speaker labels on the public sets: DER and its parts</title>
+<rect x="0.5" y="0.5" width="799" height="559" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Speaker labels on the public sets: DER and its parts</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">The speaker time missed, falsely detected or given to the wrong person, with the number</text>
+<text x="24" y="76" font-size="12" fill="#4b5563">of people estimated. Nemotron as the app gives one speaker at a time.</text>
+<rect x="24" y="92" width="12" height="12" rx="3" fill="#aab2bd"/>
+<text x="42" y="102" font-size="12" fill="#4b5563">Missed speech</text>
+<rect x="151.2" y="92" width="12" height="12" rx="3" fill="#5f6b7a"/>
+<text x="169.2" y="102" font-size="12" fill="#4b5563">False alarm</text>
+<rect x="260.4" y="92" width="12" height="12" rx="3" fill="#9b3fb5"/>
+<text x="278.4" y="102" font-size="12" fill="#4b5563">Wrong person (confusion)</text>
+<text x="236" y="132" font-size="13" fill="#1f2937" font-weight="600">DER and its parts, %</text>
+<text x="236" y="147" font-size="11" fill="#6b7280">lower is better</text>
+<text x="596" y="132" font-size="13" fill="#1f2937" font-weight="600">Missed in overlaps, %</text>
+<text x="596" y="147" font-size="11" fill="#6b7280">share of the speaker time</text>
+<text x="24" y="180" font-size="11" fill="#6b7280" font-weight="600">ArzEn interviews, no overlap marked</text>
+<text x="212" y="207.5" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-small</text>
+<text x="212" y="237.5" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-large</text>
+<text x="212" y="267.5" font-size="13" fill="#1f2937" text-anchor="end">3D-Speaker CAM++</text>
+<text x="212" y="297.5" font-size="13" fill="#1f2937" text-anchor="end">Nemotron, as the app</text>
+<text x="212" y="327.5" font-size="13" fill="#1f2937" text-anchor="end">Nemotron, with overlaps</text>
+<line x1="24" y1="344" x2="776" y2="344" stroke="#e5e7eb"/>
+<text x="24" y="360" font-size="11" fill="#6b7280" font-weight="600">AMI meetings</text>
+<text x="212" y="387.5" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-small</text>
+<text x="212" y="417.5" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-large</text>
+<text x="212" y="447.5" font-size="13" fill="#1f2937" text-anchor="end">3D-Speaker CAM++</text>
+<text x="212" y="477.5" font-size="13" fill="#1f2937" text-anchor="end">Nemotron, as the app</text>
+<text x="212" y="507.5" font-size="13" fill="#1f2937" text-anchor="end">Nemotron, with overlaps</text>
+<g data-axis="x" data-scale="0 35 236 516">
+<line x1="236" y1="188" x2="236" y2="338" stroke="#9ca3af" data-tick="0"/>
+<line x1="236" y1="368" x2="236" y2="518" stroke="#9ca3af" data-tick="0"/>
+<text x="236" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="276" y1="188" x2="276" y2="338" stroke="#e5e7eb" data-tick="5"/>
+<line x1="276" y1="368" x2="276" y2="518" stroke="#e5e7eb" data-tick="5"/>
+<text x="276" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="5">5</text>
+<line x1="316" y1="188" x2="316" y2="338" stroke="#e5e7eb" data-tick="10"/>
+<line x1="316" y1="368" x2="316" y2="518" stroke="#e5e7eb" data-tick="10"/>
+<text x="316" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="356" y1="188" x2="356" y2="338" stroke="#e5e7eb" data-tick="15"/>
+<line x1="356" y1="368" x2="356" y2="518" stroke="#e5e7eb" data-tick="15"/>
+<text x="356" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="15">15</text>
+<line x1="396" y1="188" x2="396" y2="338" stroke="#e5e7eb" data-tick="20"/>
+<line x1="396" y1="368" x2="396" y2="518" stroke="#e5e7eb" data-tick="20"/>
+<text x="396" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="436" y1="188" x2="436" y2="338" stroke="#e5e7eb" data-tick="25"/>
+<line x1="436" y1="368" x2="436" y2="518" stroke="#e5e7eb" data-tick="25"/>
+<text x="436" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<line x1="476" y1="188" x2="476" y2="338" stroke="#e5e7eb" data-tick="30"/>
+<line x1="476" y1="368" x2="476" y2="518" stroke="#e5e7eb" data-tick="30"/>
+<text x="476" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<line x1="516" y1="188" x2="516" y2="338" stroke="#e5e7eb" data-tick="35"/>
+<line x1="516" y1="368" x2="516" y2="518" stroke="#e5e7eb" data-tick="35"/>
+<text x="516" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="35">35</text>
+<path d="M236,195 L314.63,195 Q314.63,195 314.63,195 L314.63,211 Q314.63,211 314.63,211 L236,211 Z" fill="#aab2bd" data-ref="arzen/TitaNet-small/missed"/>
+<path d="M314.63,195 L332.94,195 Q332.94,195 332.94,195 L332.94,211 Q332.94,211 332.94,211 L314.63,211 Z" fill="#5f6b7a" data-ref="arzen/TitaNet-small/false_alarm" data-stack="arzen/TitaNet-small/missed"/>
+<path d="M332.94,195 L339.5,195 Q343.5,195 343.5,199 L343.5,207 Q343.5,211 339.5,211 L332.94,211 Z" fill="#9b3fb5" data-ref="arzen/TitaNet-small/confusion" data-stack="arzen/TitaNet-small/missed|arzen/TitaNet-small/false_alarm"/>
+<line x1="314.63" y1="194.5" x2="314.63" y2="211.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="332.94" y1="194.5" x2="332.94" y2="211.5" stroke="#ffffff" stroke-width="2"/>
+<text x="349.5" y="207.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/TitaNet-small/der" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|TitaNet-small voiceprints (default)|DER">13.4</tspan>%</text>
+<path d="M236,225 L314.63,225 Q314.63,225 314.63,225 L314.63,241 Q314.63,241 314.63,241 L236,241 Z" fill="#aab2bd" data-ref="arzen/TitaNet-large/missed"/>
+<path d="M314.63,225 L332.94,225 Q332.94,225 332.94,225 L332.94,241 Q332.94,241 332.94,241 L314.63,241 Z" fill="#5f6b7a" data-ref="arzen/TitaNet-large/false_alarm" data-stack="arzen/TitaNet-large/missed"/>
+<path d="M332.94,225 L339.45,225 Q343.45,225 343.45,229 L343.45,237 Q343.45,241 339.45,241 L332.94,241 Z" fill="#9b3fb5" data-ref="arzen/TitaNet-large/confusion" data-stack="arzen/TitaNet-large/missed|arzen/TitaNet-large/false_alarm"/>
+<line x1="314.63" y1="224.5" x2="314.63" y2="241.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="332.94" y1="224.5" x2="332.94" y2="241.5" stroke="#ffffff" stroke-width="2"/>
+<text x="349.45" y="237.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/TitaNet-large/der" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|TitaNet-large voiceprints|DER">13.4</tspan>%</text>
+<path d="M236,255 L314.63,255 Q314.63,255 314.63,255 L314.63,271 Q314.63,271 314.63,271 L236,271 Z" fill="#aab2bd" data-ref="arzen/3D-Speaker CAM++/missed"/>
+<path d="M314.63,255 L332.94,255 Q332.94,255 332.94,255 L332.94,271 Q332.94,271 332.94,271 L314.63,271 Z" fill="#5f6b7a" data-ref="arzen/3D-Speaker CAM++/false_alarm" data-stack="arzen/3D-Speaker CAM++/missed"/>
+<path d="M332.94,255 L339.73,255 Q343.73,255 343.73,259 L343.73,267 Q343.73,271 339.73,271 L332.94,271 Z" fill="#9b3fb5" data-ref="arzen/3D-Speaker CAM++/confusion" data-stack="arzen/3D-Speaker CAM++/missed|arzen/3D-Speaker CAM++/false_alarm"/>
+<line x1="314.63" y1="254.5" x2="314.63" y2="271.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="332.94" y1="254.5" x2="332.94" y2="271.5" stroke="#ffffff" stroke-width="2"/>
+<text x="349.73" y="267.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/3D-Speaker CAM++/der" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|3D-Speaker CAM++ voiceprints|DER">13.5</tspan>%</text>
+<path d="M236,285 L385.03,285 Q385.03,285 385.03,285 L385.03,301 Q385.03,301 385.03,301 L236,301 Z" fill="#aab2bd" data-ref="arzen/Nemotron, as the app/missed"/>
+<path d="M385.03,285 L400.15,285 Q400.15,285 400.15,285 L400.15,301 Q400.15,301 400.15,301 L385.03,301 Z" fill="#5f6b7a" data-ref="arzen/Nemotron, as the app/false_alarm" data-stack="arzen/Nemotron, as the app/missed"/>
+<path d="M400.15,285 L403.8,285 Q407.45,285 407.45,288.65 L407.45,297.35 Q407.45,301 403.8,301 L400.15,301 Z" fill="#9b3fb5" data-ref="arzen/Nemotron, as the app/confusion" data-stack="arzen/Nemotron, as the app/missed|arzen/Nemotron, as the app/false_alarm"/>
+<line x1="385.03" y1="284.5" x2="385.03" y2="301.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="400.15" y1="284.5" x2="400.15" y2="301.5" stroke="#ffffff" stroke-width="2"/>
+<text x="413.45" y="297.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/Nemotron, as the app/der" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|Nemotron, one speaker at a time (as the app)|DER">21.4</tspan>%</text>
+<path d="M236,315 L385.95,315 Q385.95,315 385.95,315 L385.95,331 Q385.95,331 385.95,331 L236,331 Z" fill="#aab2bd" data-ref="arzen/Nemotron, overlap included/missed"/>
+<path d="M385.95,315 L401.85,315 Q401.85,315 401.85,315 L401.85,331 Q401.85,331 401.85,331 L385.95,331 Z" fill="#5f6b7a" data-ref="arzen/Nemotron, overlap included/false_alarm" data-stack="arzen/Nemotron, overlap included/missed"/>
+<path d="M401.85,315 L405.46,315 Q409.06,315 409.06,318.61 L409.06,327.39 Q409.06,331 405.46,331 L401.85,331 Z" fill="#9b3fb5" data-ref="arzen/Nemotron, overlap included/confusion" data-stack="arzen/Nemotron, overlap included/missed|arzen/Nemotron, overlap included/false_alarm"/>
+<line x1="385.95" y1="314.5" x2="385.95" y2="331.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="401.85" y1="314.5" x2="401.85" y2="331.5" stroke="#ffffff" stroke-width="2"/>
+<text x="415.06" y="327.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/Nemotron, overlap included/der" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|Nemotron, overlaps included|DER">21.6</tspan>%</text>
+<path d="M236,375 L430.85,375 Q430.85,375 430.85,375 L430.85,391 Q430.85,391 430.85,391 L236,391 Z" fill="#aab2bd" data-ref="ami/TitaNet-small/missed"/>
+<path d="M430.85,375 L444.82,375 Q444.82,375 444.82,375 L444.82,391 Q444.82,391 444.82,391 L430.85,391 Z" fill="#5f6b7a" data-ref="ami/TitaNet-small/false_alarm" data-stack="ami/TitaNet-small/missed"/>
+<path d="M444.82,375 L466.49,375 Q470.49,375 470.49,379 L470.49,387 Q470.49,391 466.49,391 L444.82,391 Z" fill="#9b3fb5" data-ref="ami/TitaNet-small/confusion" data-stack="ami/TitaNet-small/missed|ami/TitaNet-small/false_alarm"/>
+<line x1="430.85" y1="374.5" x2="430.85" y2="391.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="444.82" y1="374.5" x2="444.82" y2="391.5" stroke="#ffffff" stroke-width="2"/>
+<text x="476.49" y="387.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/TitaNet-small/der" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|TitaNet-small voiceprints (default)|DER">29.3</tspan>%</text>
+<path d="M236,405 L430.85,405 Q430.85,405 430.85,405 L430.85,421 Q430.85,421 430.85,421 L236,421 Z" fill="#aab2bd" data-ref="ami/TitaNet-large/missed"/>
+<path d="M430.85,405 L444.82,405 Q444.82,405 444.82,405 L444.82,421 Q444.82,421 444.82,421 L430.85,421 Z" fill="#5f6b7a" data-ref="ami/TitaNet-large/false_alarm" data-stack="ami/TitaNet-large/missed"/>
+<path d="M444.82,405 L459.95,405 Q463.95,405 463.95,409 L463.95,417 Q463.95,421 459.95,421 L444.82,421 Z" fill="#9b3fb5" data-ref="ami/TitaNet-large/confusion" data-stack="ami/TitaNet-large/missed|ami/TitaNet-large/false_alarm"/>
+<line x1="430.85" y1="404.5" x2="430.85" y2="421.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="444.82" y1="404.5" x2="444.82" y2="421.5" stroke="#ffffff" stroke-width="2"/>
+<text x="469.95" y="417.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/TitaNet-large/der" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|TitaNet-large voiceprints|DER">28.5</tspan>%</text>
+<path d="M236,435 L430.85,435 Q430.85,435 430.85,435 L430.85,451 Q430.85,451 430.85,451 L236,451 Z" fill="#aab2bd" data-ref="ami/3D-Speaker CAM++/missed"/>
+<path d="M430.85,435 L444.82,435 Q444.82,435 444.82,435 L444.82,451 Q444.82,451 444.82,451 L430.85,451 Z" fill="#5f6b7a" data-ref="ami/3D-Speaker CAM++/false_alarm" data-stack="ami/3D-Speaker CAM++/missed"/>
+<path d="M444.82,435 L463.86,435 Q467.86,435 467.86,439 L467.86,447 Q467.86,451 463.86,451 L444.82,451 Z" fill="#9b3fb5" data-ref="ami/3D-Speaker CAM++/confusion" data-stack="ami/3D-Speaker CAM++/missed|ami/3D-Speaker CAM++/false_alarm"/>
+<line x1="430.85" y1="434.5" x2="430.85" y2="451.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="444.82" y1="434.5" x2="444.82" y2="451.5" stroke="#ffffff" stroke-width="2"/>
+<text x="473.86" y="447.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/3D-Speaker CAM++/der" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|3D-Speaker CAM++ voiceprints|DER">29.0</tspan>%</text>
+<path d="M236,465 L480.01,465 Q480.01,465 480.01,465 L480.01,481 Q480.01,481 480.01,481 L236,481 Z" fill="#aab2bd" data-ref="ami/Nemotron, as the app/missed"/>
+<path d="M480.01,465 L484.44,465 Q484.44,465 484.44,465 L484.44,481 Q484.44,481 484.44,481 L480.01,481 Z" fill="#5f6b7a" data-ref="ami/Nemotron, as the app/false_alarm" data-stack="ami/Nemotron, as the app/missed"/>
+<path d="M484.44,465 L486.63,465 Q488.83,465 488.83,467.19 L488.83,478.81 Q488.83,481 486.63,481 L484.44,481 Z" fill="#9b3fb5" data-ref="ami/Nemotron, as the app/confusion" data-stack="ami/Nemotron, as the app/missed|ami/Nemotron, as the app/false_alarm"/>
+<line x1="480.01" y1="464.5" x2="480.01" y2="481.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="484.44" y1="464.5" x2="484.44" y2="481.5" stroke="#ffffff" stroke-width="2"/>
+<text x="494.83" y="477.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/Nemotron, as the app/der" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|Nemotron, one speaker at a time (as the app)|DER">31.6</tspan>%</text>
+<path d="M236,495 L428.36,495 Q428.36,495 428.36,495 L428.36,511 Q428.36,511 428.36,511 L236,511 Z" fill="#aab2bd" data-ref="ami/Nemotron, overlap included/missed"/>
+<path d="M428.36,495 L437.76,495 Q437.76,495 437.76,495 L437.76,511 Q437.76,511 437.76,511 L428.36,511 Z" fill="#5f6b7a" data-ref="ami/Nemotron, overlap included/false_alarm" data-stack="ami/Nemotron, overlap included/missed"/>
+<path d="M437.76,495 L440.7,495 Q443.64,495 443.64,497.94 L443.64,508.06 Q443.64,511 440.7,511 L437.76,511 Z" fill="#9b3fb5" data-ref="ami/Nemotron, overlap included/confusion" data-stack="ami/Nemotron, overlap included/missed|ami/Nemotron, overlap included/false_alarm"/>
+<line x1="428.36" y1="494.5" x2="428.36" y2="511.5" stroke="#ffffff" stroke-width="2"/>
+<line x1="437.76" y1="494.5" x2="437.76" y2="511.5" stroke="#ffffff" stroke-width="2"/>
+<text x="449.64" y="507.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/Nemotron, overlap included/der" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|Nemotron, overlaps included|DER">26.0</tspan>%</text>
+</g>
+<g data-axis="x" data-scale="0 60 596 736">
+<line x1="596" y1="188" x2="596" y2="338" stroke="#9ca3af" data-tick="0"/>
+<line x1="596" y1="368" x2="596" y2="518" stroke="#9ca3af" data-tick="0"/>
+<text x="596" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="642.67" y1="188" x2="642.67" y2="338" stroke="#e5e7eb" data-tick="20"/>
+<line x1="642.67" y1="368" x2="642.67" y2="518" stroke="#e5e7eb" data-tick="20"/>
+<text x="642.67" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="689.33" y1="188" x2="689.33" y2="338" stroke="#e5e7eb" data-tick="40"/>
+<line x1="689.33" y1="368" x2="689.33" y2="518" stroke="#e5e7eb" data-tick="40"/>
+<text x="689.33" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="40">40</text>
+<line x1="736" y1="188" x2="736" y2="338" stroke="#e5e7eb" data-tick="60"/>
+<line x1="736" y1="368" x2="736" y2="518" stroke="#e5e7eb" data-tick="60"/>
+<text x="736" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="60">60</text>
+<path d="M596,375 L721.78,375 Q725.78,375 725.78,379 L725.78,387 Q725.78,391 721.78,391 L596,391 Z" fill="#aab2bd" data-ref="ami/TitaNet-small/overlap_missed"/>
+<text x="731.78" y="387.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/TitaNet-small/overlap_missed" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|TitaNet-small voiceprints (default)|Speaker time missed in overlaps">55.6</tspan>%</text>
+<path d="M596,405 L721.78,405 Q725.78,405 725.78,409 L725.78,417 Q725.78,421 721.78,421 L596,421 Z" fill="#aab2bd" data-ref="ami/TitaNet-large/overlap_missed"/>
+<text x="731.78" y="417.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/TitaNet-large/overlap_missed" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|TitaNet-large voiceprints|Speaker time missed in overlaps">55.6</tspan>%</text>
+<path d="M596,435 L721.78,435 Q725.78,435 725.78,439 L725.78,447 Q725.78,451 721.78,451 L596,451 Z" fill="#aab2bd" data-ref="ami/3D-Speaker CAM++/overlap_missed"/>
+<text x="731.78" y="447.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/3D-Speaker CAM++/overlap_missed" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|3D-Speaker CAM++ voiceprints|Speaker time missed in overlaps">55.6</tspan>%</text>
+<path d="M596,465 L728.3,465 Q732.3,465 732.3,469 L732.3,477 Q732.3,481 728.3,481 L596,481 Z" fill="#aab2bd" data-ref="ami/Nemotron, as the app/overlap_missed"/>
+<text x="738.3" y="477.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/Nemotron, as the app/overlap_missed" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|Nemotron, one speaker at a time (as the app)|Speaker time missed in overlaps">58.4</tspan>%</text>
+<path d="M596,495 L672.71,495 Q676.71,495 676.71,499 L676.71,507 Q676.71,511 672.71,511 L596,511 Z" fill="#aab2bd" data-ref="ami/Nemotron, overlap included/overlap_missed"/>
+<text x="682.71" y="507.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/Nemotron, overlap included/overlap_missed" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|Nemotron, overlaps included|Speaker time missed in overlaps">34.6</tspan>%</text>
+</g>
+</svg>

@@ -2,14 +2,17 @@
 """Draw the charts in the docs as SVG files in docs/images/charts/: python docs/charts.py
 
 Standard library only; the SVG is written by hand. Public test-set numbers come from
-results/summary.json, which bench/score.py writes. The real meetings are private, so their
-numbers are never read from results/meetings/ or data/: docs/charts-data.json holds the
-aggregate numbers already published in docs/03-results.md and docs/04-speaker-labels.md.
+results/summary.json, which bench/score.py writes, and for speaker labels from
+results/arzen-diarization.json and results/ami-diarization.json, which bench/compare_arzen.py and
+bench/compare_ami.py write. The real meetings are private, so their numbers are never read from
+results/meetings/ or data/: docs/charts-data.json holds the aggregate numbers already published in
+docs/03-results.md and docs/04-speaker-labels.md.
 
-Every number drawn names its source in a data-ref attribute, and numbers from summary.json also
-name the docs table cell or sentence that publishes them (data-doc). Each panel records its scale
-(data-scale), so tests/test_charts.py can check the labels, the bar lengths and the whiskers
-against the sources and the docs. The folder docs/images/charts/ is written by this script only.
+Every number drawn names its source in a data-ref attribute, and public numbers also name the docs
+table cell or sentence that publishes them (data-doc). Each panel records its scale (data-scale), and
+each part of a stacked bar the parts before it (data-stack), so tests/test_charts.py can check the
+labels, the bar lengths and the whiskers against the sources and the docs. The folder
+docs/images/charts/ is written by this script only.
 """
 import json
 from decimal import Decimal
@@ -18,12 +21,15 @@ from xml.sax.saxutils import escape, quoteattr
 
 ROOT = Path(__file__).resolve().parent.parent
 SUMMARY = ROOT / "results" / "summary.json"
+ARZEN, AMI = ROOT / "results" / "arzen-diarization.json", ROOT / "results" / "ami-diarization.json"
 DATA = ROOT / "docs" / "charts-data.json"
 OUT = ROOT / "docs" / "images" / "charts"
 # Where the docs publish the public numbers: "file#heading", the section that holds the table
-RESULTS, README = "docs/03-results.md", "README.md"
+RESULTS, README, SPEAKERS = "docs/03-results.md", "README.md", "docs/04-speaker-labels.md"
 PERLE_TABLE, PHONE_TABLE = f"{RESULTS}#Public benchmark: Perle at 16 kHz", f"{RESULTS}#Phone audio"
 MODELS_TABLE = f"{README}#Models"
+SPEAKER_TABLES = {"arzen": f"{SPEAKERS}#ArzEn: interviews in Egyptian Arabic and English",
+                  "ami": f"{SPEAKERS}#AMI: English meetings with much overlap"}
 
 WIDTH = 800
 FONT = '-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'
@@ -34,6 +40,8 @@ WHISPER = "#2563eb"
 OTHER, OTHER_PALE = "#8a94a3", "#aeb5c0"                     # the other models; paler: whole clip
 SLATE, SLATE_PALE = "#4b5563", "#aab2bd"                     # voiceprint models
 ELEVENLABS = "#b4524a"
+NEMOTRON = "#5e8c14"                                         # NVIDIA's green, darkened to read on white
+MISSED, FALSE_ALARM, CONFUSION = SLATE_PALE, "#5f6b7a", "#9b3fb5"  # the parts of DER
 HALO = dict(stroke="#ffffff", stroke_width=3, stroke_linejoin="round", paint_order="stroke")  # lines stop short of values
 
 COHERE_MODEL = "cohere-transcribe-arabic-07-2026-Q4_K_M"
@@ -52,6 +60,23 @@ LEADING = [
 ]
 # The models that were also tried (R2T2, Qwen3-ASR, Audar) stay in the tables, not in the charts
 EXCERPTS = ["m1", "m2", "m3", "m4", "m5", "m6"]
+# The speaker models of Settings → Models: chart label, colour, their rows in docs/04-speaker-labels.md
+# (the voiceprint and Nemotron tables on the meeting excerpts) and their system in
+# results/*-diarization.json, which the ArzEn and AMI tables name in the docs' rows of SPEAKER_ROWS
+SPEAKER_MODELS = [
+    dict(label="TitaNet-small (default)", color=SLATE, meetings=("voiceprints", "TitaNet-small (default)"),
+         system="TitaNet-small"),
+    dict(label="TitaNet-large", color=SLATE_PALE, meetings=("voiceprints", "TitaNet-large"),
+         system="TitaNet-large"),
+    dict(label="3D-Speaker CAM++", color=SLATE_PALE, meetings=("voiceprints", "3D-Speaker CAM++ (Chinese and English)"),
+         system="3D-Speaker CAM++"),
+    dict(label="Nemotron-3-Diarization", color=NEMOTRON, meetings=("nemotron", "Nemotron-3-Diarization"),
+         system="Nemotron, as the app"),
+]
+SPEAKER_ROWS = {"TitaNet-small": "TitaNet-small voiceprints (default)", "TitaNet-large": "TitaNet-large voiceprints",
+                "3D-Speaker CAM++": "3D-Speaker CAM++ voiceprints",
+                "Nemotron, as the app": "Nemotron, one speaker at a time (as the app)",
+                "Nemotron, overlap included": "Nemotron, overlaps included"}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -71,11 +96,14 @@ class Num:
 
 
 class Sources:
-    """The numbers the charts may draw: results/summary.json and docs/charts-data.json."""
+    """The numbers the charts may draw: results/summary.json, the two speaker-label sets in
+    results/*-diarization.json, and docs/charts-data.json."""
 
     def __init__(self):
         rows = json.loads(SUMMARY.read_text(encoding="utf-8"))
         self.summary = {(r["set"], r["audio"], r["model"], r["config"]): r for r in rows}
+        self.speakers = {"arzen": json.loads(ARZEN.read_text(encoding="utf-8"))["scores"],
+                         "ami": json.loads(AMI.read_text(encoding="utf-8"))}
         self.data = json.loads(DATA.read_text(encoding="utf-8"), parse_float=Decimal)
 
     def perle(self, audio, model, config, metric, doc):
@@ -89,6 +117,31 @@ class Sources:
         if name == "rtf":
             return Num(raw, f"{raw:.2f}", ref, doc)
         return Num(raw * 100, format(raw, ".1%" if name == "wer" else ".0%")[:-1], ref, doc)
+
+    def speaker(self, corpus, system, metric, column):
+        """A number of the ArzEn or AMI speaker-label table ("arzen" or "ami"), pooled over the
+        recordings with the number of people estimated and no collar, as bench/compare_arzen.py and
+        bench/compare_ami.py pool it for the tables. Shares are drawn in percent; "seconds" is the
+        time per 10 minutes of audio and "count_right" the recordings whose count was right. The
+        docs publish it in the table's row for the system, in the given column."""
+        rs = [r for r in self.speakers[corpus]
+              if r["system"] == system and r["mode"] == "estimated" and not r.get("collar_s")]
+        ref, doc = "/".join((corpus, system, metric)), f"{SPEAKER_TABLES[corpus]}|{SPEAKER_ROWS[system]}|{column}"
+        if metric == "count_right":
+            right = sum(r["found"] == r["people"] for r in rs)
+            return Num(right, str(right), ref, doc)
+        if metric == "seconds":
+            v = sum(r["seconds"] for r in rs) / sum(r["audio_s"] for r in rs) * 600
+            return Num(v, f"{v:.0f}", ref, doc)
+        if metric == "der":
+            v = sum(r["missed"] + r["false_alarm"] + r["confusion"] for r in rs) / sum(r["total"] for r in rs)
+        elif metric == "wrong_on_speech":
+            v = sum(r["wrong_on_speech"] for r in rs) / sum(r["speech"] for r in rs)
+        elif metric == "overlap_missed":
+            v = sum(r["overlap_missed"] for r in rs) / max(1, sum(r["overlap_speaker"] for r in rs))
+        else:  # a part of DER: missed, false_alarm or confusion
+            v = sum(r[metric] for r in rs) / sum(r["total"] for r in rs)
+        return Num(v * 100, format(v, ".1%")[:-1], ref, doc)
 
     def published(self, block, row, column=None):
         """A number from charts-data.json, shown as written there: a table block's row and column,
@@ -125,13 +178,31 @@ def line(x1, y1, x2, y2, stroke=GRID, **kw):
     return f"<line{attrs(x1=x1, y1=y1, x2=x2, y2=y2, stroke=stroke, **kw)}/>"
 
 
-def bar(x0, x1, y, h, fill, ref):
-    """A horizontal bar from x0 to x1: square at the baseline, rounded at the value's end."""
-    r = min(4, (x1 - x0) / 2, h / 2)
+def bar(x0, x1, y, h, fill, ref, rounded=True, **kw):
+    """A horizontal bar from x0 to x1: square at the baseline, rounded at the value's end (unless it
+    is a part of a stacked bar that another part follows)."""
+    r = min(4, (x1 - x0) / 2, h / 2) if rounded else 0
     p = lambda x, y_: f"{num(x)},{num(y_)}"
     d = (f"M{p(x0, y)} L{p(x1 - r, y)} Q{p(x1, y)} {p(x1, y + r)} L{p(x1, y + h - r)} "
          f"Q{p(x1, y + h)} {p(x1 - r, y + h)} L{p(x0, y + h)} Z")
-    return f"<path{attrs(d=d, fill=fill, data_ref=ref)}/>"
+    return f"<path{attrs(d=d, fill=fill, data_ref=ref, **kw)}/>"
+
+
+def stacked(s, parts, y, h):
+    """A bar made of parts (dicts with n and color) laid end to end from 0, each part separated from
+    the next by a 2 px gap in the background colour. Each part names the parts before it (data-stack)."""
+    out, below, base = [], [], 0
+    for k, part in enumerate(parts):
+        end = base + part["n"].value
+        out.append(bar(s(base), s(end), y, h, part["color"], part["n"].ref, rounded=k == len(parts) - 1,
+                       data_stack="|".join(below) or None))
+        below.append(part["n"].ref)
+        base = end
+    base = 0
+    for part in parts[:-1]:
+        base += part["n"].value
+        out.append(line(s(base), y - 0.5, s(base), y + h + 0.5, "#ffffff", stroke_width=2))
+    return out
 
 
 def text_width(s, size):
@@ -201,9 +272,10 @@ def bar_chart(title, lines, rows, panels, legend_items=(), label_x=196):
     panel), unit (after each value), mark ((value, label): a dashed line across the rows) and
     axis (a label under the ticks); or text=True and x for a column of text.
     rows: dicts with label, sub (markup under the label), group (a heading before the row),
-    rule (a line before it) and cells, one per panel: a list of bars, each a dict with n (Num),
-    color and optionally lo and hi (Num, a whisker), tag (a label left of the bar) and after
-    (markup after the value); or markup, for a text panel.
+    rule (a line before it) and cells, one per panel: a list of bars (empty for none), each a dict
+    with n (Num), color and optionally lo and hi (Num, a whisker), tag (a label left of the bar),
+    after (markup after the value) and parts (dicts with n and color: a stacked bar, n its total);
+    or markup, for a text panel.
     """
     out, y = header(title, lines)
     if legend_items:
@@ -245,9 +317,12 @@ def bar_chart(title, lines, rows, panels, legend_items=(), label_x=196):
                 continue
             s = p["scale"]
             for j, b in enumerate(cell):
-                top = y + pad + j * (h + gap)
+                top = y + pad + (j + (n - len(cell)) / 2) * (h + gap)  # fewer bars than the row has: centred
                 mid_bar, end = top + h / 2, s(b["n"].value)
-                mark.append(bar(s(0), end, top, h, b["color"], b["n"].ref))
+                if b.get("parts"):
+                    mark += stacked(s, b["parts"], top, h)
+                else:
+                    mark.append(bar(s(0), end, top, h, b["color"], b["n"].ref))
                 if b.get("lo"):
                     lo, hi = s(b["lo"].value), s(b["hi"].value)
                     mark.append(line(lo, mid_bar, hi, mid_bar, WHISKER, stroke_width=1.5,
@@ -458,6 +533,96 @@ def speakers_chart(src):
                                     (ELEVENLABS, "ElevenLabs' own labels")], label_x=140)
 
 
+def nemotron_excerpts_chart(src):
+    """docs/04-speaker-labels.md, NVIDIA Nemotron-3-Diarization: TitaNet-small against Nemotron per excerpt."""
+    titanet, estimated, nemotron = (lambda n, c=c: dict(n=n, color=c) for c in (SLATE, SLATE_PALE, NEMOTRON))
+    rows = []
+    for m in EXCERPTS:
+        bars = [titanet(src.published("meetings", m, "whisper_wrong_speaker"))]
+        if m == "m6":  # the one excerpt where TitaNet-small's estimate of the count was wrong
+            bars += [estimated(src.published("nemotron_largest_excerpt", "titanet_small_estimated")),
+                     nemotron(src.published("nemotron_largest_excerpt", "nemotron"))]
+        else:
+            bars.append(nemotron(src.published("nemotron_per_excerpt", m)))
+        rows.append(dict(label=m, sub=src.published("meetings", m, "people").tag(" people"), cells=[bars]))
+    pooled = lambda column, row="TitaNet-small voiceprints and clustering": src.published("nemotron", row, column)
+    rows += [dict(label="Pooled", sub="two or three people", rule=True, cells=[[
+                 titanet(src.published("meetings_two_or_three_people", "whisper_wrong_speaker")),
+                 nemotron(src.published("nemotron_per_excerpt", "pooled_two_or_three"))]]),
+             dict(label="Pooled", sub="all six", cells=[[
+                 titanet(pooled("wrong_speaker_true_count")), estimated(pooled("wrong_speaker_estimated_count")),
+                 nemotron(pooled("wrong_speaker_estimated_count", "Nemotron-3-Diarization"))]])]
+    panels = [percent_panel(156, 636, 40, 10, "Words given to the wrong speaker, %", "lower is better")]
+    return bar_chart("Meeting excerpts: TitaNet-small and Nemotron-3-Diarization",
+                     ["Nemotron counted the people right on every excerpt. TitaNet-small's estimate of the count",
+                      "was wrong only on m6, where it found fewer people than were there."],
+                     rows, panels, [(SLATE, "TitaNet-small, true number of people"),
+                                    (SLATE_PALE, "TitaNet-small, number estimated"),
+                                    (NEMOTRON, "Nemotron-3-Diarization")], label_x=140)
+
+
+def speaker_models_chart(src):
+    """docs/04-speaker-labels.md, Conclusions: what each speaker model gives to the wrong person on
+    the meeting excerpts, ArzEn and AMI, with the number of people estimated."""
+    column = "Wrong speaker on speech"
+    rows = [dict(label=m["label"], cells=[
+        [dict(n=src.published(*m["meetings"], "wrong_speaker_estimated_count"), color=m["color"])],
+        [dict(n=src.speaker("arzen", m["system"], "wrong_on_speech", column), color=m["color"])],
+        [dict(n=src.speaker("ami", m["system"], "wrong_on_speech", column), color=m["color"])]])
+        for m in SPEAKER_MODELS]
+    panel = lambda p0, title, note: percent_panel(p0, p0 + 150, 12, 4, title, note)
+    panels = [panel(212, "Meeting excerpts", "share of the words, %"),
+              panel(412, "ArzEn interviews", "share of the speech, %"),
+              panel(612, "AMI meetings", "share of the speech, %")]
+    return bar_chart("Speaker labels on three test sets: given to the wrong person",
+                     ["Lower is better. Each model estimates the number of people, and Nemotron gives one",
+                      "speaker at a time, as the app uses it."], rows, panels, label_x=188)
+
+
+def speaker_der_chart(src):
+    """docs/04-speaker-labels.md, the public sets: DER split into its parts on ArzEn and AMI, and the
+    speaker time missed where people overlap on AMI."""
+    systems = [("TitaNet-small", "TitaNet-small"), ("TitaNet-large", "TitaNet-large"),
+               ("3D-Speaker CAM++", "3D-Speaker CAM++"), ("Nemotron, as the app", "Nemotron, as the app"),
+               ("Nemotron, with overlaps", "Nemotron, overlap included")]
+    rows = []
+    for corpus, group in (("arzen", "ArzEn interviews, no overlap marked"), ("ami", "AMI meetings")):
+        for label, system in systems:
+            get = lambda metric, column: src.speaker(corpus, system, metric, column)
+            parts = [dict(n=get(metric, "Missed / false alarm / confusion"), color=color) for metric, color in
+                     (("missed", MISSED), ("false_alarm", FALSE_ALARM), ("confusion", CONFUSION))]
+            overlap = [dict(n=get("overlap_missed", "Speaker time missed in overlaps"), color=MISSED)] \
+                if corpus == "ami" else []
+            rows.append(dict(label=label, group=group if system == systems[0][1] else None,
+                             cells=[[dict(n=get("der", "DER"), parts=parts)], overlap]))
+    panels = [dict(scale=Scale(0, 35, 236, 516), ticks=range(0, 36, 5), title="DER and its parts, %",
+                   note="lower is better", unit="%"),
+              dict(scale=Scale(0, 60, 596, 736), ticks=range(0, 61, 20), title="Missed in overlaps, %",
+                   note="share of the speaker time", unit="%")]
+    return bar_chart("Speaker labels on the public sets: DER and its parts",
+                     ["The speaker time missed, falsely detected or given to the wrong person, with the number",
+                      "of people estimated. Nemotron as the app gives one speaker at a time."],
+                     rows, panels, [(MISSED, "Missed speech"), (FALSE_ALARM, "False alarm"),
+                                    (CONFUSION, "Wrong person (confusion)")], label_x=212)
+
+
+def speaker_cost_chart(src):
+    """docs/04-speaker-labels.md, Conclusions: each speaker model's time on the public sets and its size."""
+    rows = []
+    for m in SPEAKER_MODELS:
+        time = [dict(n=src.speaker(corpus, m["system"], "seconds", "Seconds per 10 minutes"), color=m["color"],
+                     tag=tag) for corpus, tag in (("arzen", "ArzEn"), ("ami", "AMI"))]
+        rows.append(dict(label=m["label"], cells=[time, [dict(n=src.published(*m["meetings"], "size_mb"),
+                                                               color=m["color"])]]))
+    panels = [dict(scale=Scale(0, 40, 262, 482), ticks=range(0, 41, 10), title="Seconds for ten minutes of audio",
+                   note="the whole speaker step, lower is faster", unit=" s"),
+              dict(scale=Scale(0, 400, 556, 736), ticks=range(0, 401, 100), title="Size, MB",
+                   note="the model files", unit=" MB")]
+    return bar_chart("Speaker labels: time and size",
+                     ["On the test laptop's processor with four threads, in the balanced power mode."],
+                     rows, panels, label_x=188)
+
+
 CHARTS = {
     "models.svg": models_chart,
     "perle-16k.svg": perle_chart,
@@ -467,6 +632,10 @@ CHARTS = {
     "cohere-variations.svg": variations_chart,
     "voiceprints.svg": voiceprints_chart,
     "speakers-per-excerpt.svg": speakers_chart,
+    "nemotron-excerpts.svg": nemotron_excerpts_chart,
+    "speaker-models.svg": speaker_models_chart,
+    "speaker-der.svg": speaker_der_chart,
+    "speaker-cost.svg": speaker_cost_chart,
 }
 
 

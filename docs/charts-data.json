@@ -44,5 +44,23 @@
    "WeSpeaker ResNet34 (the first default)": [26, 25.7, 22.9, 2, 6],
    "WeSpeaker ResNet152": [79, 36.9, 29.9, 3, 6]
   }
+ },
+ "nemotron": {
+  "published": "docs/04-speaker-labels.md, section NVIDIA Nemotron-3-Diarization: the table",
+  "columns": ["size_mb", "wrong_speaker_true_count", "wrong_speaker_estimated_count", "count_right", "excerpts", "seconds_per_excerpt"],
+  "rows": {
+   "TitaNet-small voiceprints and clustering": [40, 11.7, 10.2, 5, 6, 5],
+   "Nemotron-3-Diarization": [397, 10.0, 10.0, 6, 6, 30]
+  }
+ },
+ "nemotron_per_excerpt": {
+  "published": "docs/04-speaker-labels.md, section NVIDIA Nemotron-3-Diarization: the paragraph on the five excerpts of two or three people",
+  "quote": "the two are level at 9.0% pooled: per excerpt 2.7%, 8.4%, 10.0%, 3.2% and 17.7% for Nemotron",
+  "values": {"pooled_two_or_three": 9.0, "m1": 2.7, "m2": 8.4, "m3": 10.0, "m4": 3.2, "m5": 17.7}
+ },
+ "nemotron_largest_excerpt": {
+  "published": "docs/04-speaker-labels.md, section NVIDIA Nemotron-3-Diarization: the paragraph on the 5-person excerpt, m6",
+  "quote": "On that excerpt it put 19.4% of the words on the wrong person, against 38.4% for TitaNet-small with the true count and 21.6% with its estimate.",
+  "values": {"nemotron": 19.4, "titanet_small_estimated": 21.6}
  }
 }

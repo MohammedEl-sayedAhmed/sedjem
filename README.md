@@ -139,6 +139,23 @@ the wrong person, against 6% for ElevenLabs' own labels. Treat the local transcr
 drafts. For minutes that people will rely on, a hosted model is still more accurate. The method and
 every number are in [the results](docs/03-results.md).
 
+### Speaker labels
+
+Four speaker models can be chosen in *Settings → Models*: the voiceprint models TitaNet-small (the
+default, 40 MB), TitaNet-large and 3D-Speaker CAM++, and NVIDIA's Nemotron-3-Diarization (397 MB),
+which does the whole job in one model and also hears when two people talk at once. On the meeting
+excerpts and on two public sets, ArzEn's Egyptian Arabic–English interviews and AMI's English
+meetings, Nemotron gave the least to the wrong person.
+
+![Three panels of horizontal bars, one per test set, of the share given to the wrong person by TitaNet-small, TitaNet-large, 3D-Speaker CAM++ and Nemotron-3-Diarization, with Nemotron the lowest on all three](docs/images/charts/speaker-models.svg)
+
+*The share of the words (meeting excerpts) or of the speech (ArzEn and AMI) given to the wrong person, with the number of people estimated.*
+
+TitaNet-small stays the default: it is level with Nemotron on meetings of two or three people, a
+tenth of its size and four to six times faster. Nemotron is the better choice for meetings of four or
+more people and for heavy crosstalk. The method, the tables, the conclusions and the sources are in
+[speaker labels](docs/04-speaker-labels.md#conclusions).
+
 ### Hosted services
 
 Each one needs your own API key, entered in *Settings → Hosted services*. Apart from ElevenLabs'
@@ -296,7 +313,7 @@ was tried first and is not usable for this: it wrote most English terms in Arabi
 | [Use case](docs/01-use-case.md) | the recordings, the test audio and the original question |
 | [Trials and issues](docs/02-trials-and-issues.md) | every experiment in order, what broke and how it was fixed |
 | [Results](docs/03-results.md) | method, public benchmark, phone audio, real meetings, caveats |
-| [Speaker labels](docs/04-speaker-labels.md) | how voices are told apart, and five voiceprint models compared |
+| [Speaker labels](docs/04-speaker-labels.md) | how voices are told apart, the speaker models compared on real meetings, ArzEn and AMI, and which to use |
 | [Command line](docs/05-command-line.md) | setup, options, speed and memory |
 | [Market research](docs/06-market-research.md) | hosted services and open models, free tiers, privacy terms |
 | [Recommendation](docs/07-recommendation.md) | what to use for which job |
@@ -331,10 +348,13 @@ Cohere Transcribe Arabic (the
 [GGUF build](https://huggingface.co/handy-computer/cohere-transcribe-arabic-07-2026-gguf) from
 handy-computer, run with transcribe.cpp), OpenAI Whisper through
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and CTranslate2,
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with NVIDIA TitaNet,
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with NVIDIA TitaNet and 3D-Speaker CAM++,
 [NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) (run with NumPy), Silero VAD, PyAV,
-[pywebview](https://pywebview.flowrl.com/), PyInstaller and Inno Setup. The benchmark uses the
-[Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch) and ArzEn test sets.
+[pywebview](https://pywebview.flowrl.com/), PyInstaller and Inno Setup. The benchmarks use the
+[Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch),
+[ArzEn](https://aclanthology.org/2020.lrec-1.523/) and [AMI](https://groups.inf.ed.ac.uk/ami/corpus/)
+test sets; the papers and licences behind the speaker labels are listed in
+[their references](docs/04-speaker-labels.md#references).
 
 ## Licence
 
@@ -352,7 +372,8 @@ and the commercial licence.
 
 The models keep their own licences: the whisper-medium fine-tune and Whisper large-v3 are MIT (check
 the fine-tune's card for its training data), Cohere Transcribe Arabic and the Whisper tokenizer are
-Apache-2.0, NVIDIA TitaNet through sherpa-onnx is CC-BY-4.0, 3D-Speaker CAM++ is Apache-2.0, and
+Apache-2.0, NVIDIA TitaNet-small comes under the NeMo toolkit's Apache-2.0 licence and TitaNet-large
+is CC-BY-4.0, 3D-Speaker CAM++ is Apache-2.0, and
 NVIDIA Nemotron-3-Diarization is under the OpenMDW 1.1 licence, which allows commercial use. The desktop build bundles
 third-party packages under their own licences, including the FFmpeg libraries that come with PyAV
 (LGPL). The hosted services are used under their own terms. The full-colour logos of the models,

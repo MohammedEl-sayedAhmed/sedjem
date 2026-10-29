@@ -40,12 +40,14 @@ For speaker labels, the local voice clustering with TitaNet-small (the default) 
 meetings of two or three people: 2–11% of words went to the wrong person on four of five, and 17% on
 the fifth, a 2-person excerpt where ElevenLabs' own labels were 27% off. `--speakers 0` estimated the
 number of people correctly in 5 of 6 meetings. Larger meetings remain weak (38% on a 5-person one).
-NVIDIA's Nemotron-3-Diarization, which can be chosen in Settings since, halves that to 19% and counted
+NVIDIA's Nemotron-3-Diarization, which can be chosen in Settings, halves that to 19% and counted
 the people right in all 6 ([speaker labels](04-speaker-labels.md#nvidia-nemotron-3-diarization)).
 On two public sets it also put the least speech on the wrong person: 2.2% against 2.5% for
 TitaNet-small on ArzEn's Egyptian Arabic–English interviews, and 2.3% against 5.3% on AMI's English
 meetings of four, at four to six times the time and with a count of the people that was right less
-often ([public sets](04-speaker-labels.md#public-test-sets-arzen-and-ami)).
+often ([public sets](04-speaker-labels.md#public-test-sets-arzen-and-ami)). So keep TitaNet-small
+for meetings of two or three people, and choose Nemotron for four or more people or heavy crosstalk
+([conclusions](04-speaker-labels.md#conclusions)).
 pyannote `community-1`, which needs PyTorch and a free Hugging Face token, is untested.
 
 ## Real meetings are much harder than the benchmarks
