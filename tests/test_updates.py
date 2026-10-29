@@ -300,6 +300,16 @@ class UpdatesCase(unittest.TestCase):
             setattr(self, name, patcher.start())
             self.addCleanup(patcher.stop)
         self.spawn.return_value.poll.return_value = None  # the process it starts keeps running
+        self.addCleanup(self.finish_install)  # cleanups run in reverse: this one while the stand-ins are still there
+
+    def finish_install(self):
+        """Wait for an Update now that is still at work. Its state says "restarting" before the restart is done,
+        and a restart after the stand-ins are gone would start a real process (this test runner again), writing
+        to a log in the folder about to be deleted, which Windows won't delete while the log is open."""
+        for thread in threading.enumerate():
+            if thread.name == "sedjem-update":
+                thread.join(timeout=30)
+                self.assertFalse(thread.is_alive(), "Update now didn't finish")
 
     def make(self, **kw):
         """Updates for this data folder; kw says what runs (root, frozen, stamp, executable, platform)."""
@@ -1215,6 +1225,31 @@ class ApiTests(UpdatesCase):
         self.gh.mode = "offline"
         status, st = self.call("POST", "/api/updates/check")
         self.assertEqual((status, st["error"], st["checking"]), (200, "offline", False))
+
+
+class CleanupTests(unittest.TestCase):
+    def test_a_slow_update_now_is_finished_before_its_stand_ins_go(self):
+        """On a busy Windows runner a test once ended while Update now was still restarting; the restart then used
+        the real spawn, started this test runner again and kept the log open in the folder being deleted. A test
+        that ends early now waits for Update now, so the real spawn (a recorder here) is never reached."""
+        late, progress = [], updates.Updates.progress
+
+        def record(cmd, **kw):
+            late.append(cmd)
+            return mock.Mock(**{"poll.return_value": None})
+
+        def slow(up, **values):  # Update now pauses after saying "restarting", before it restarts
+            progress(up, **values)
+            if values.get("state") == "restarting":
+                time.sleep(0.5)
+
+        with mock.patch.object(updates, "spawn", side_effect=record), \
+                mock.patch.object(updates.Updates, "progress", slow):
+            result = unittest.TestResult()
+            SourceTests("test_stable_moves_to_the_release_commit").run(result)
+            time.sleep(1.0)  # long enough for a restart left running to reach spawn
+        self.assertTrue(result.wasSuccessful(), result.errors + result.failures)
+        self.assertEqual(late, [], "Update now restarted after the test had ended")
 
 
 if __name__ == "__main__":
