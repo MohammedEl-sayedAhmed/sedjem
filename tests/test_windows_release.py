@@ -389,11 +389,11 @@ class Workflow(unittest.TestCase):
         by_name = steps(self.jobs["build"])
         run = by_name["Version resource (Windows)"]["run"]
         self.assertIn("(Get-Item dist\\Sedjem\\Sedjem.exe).VersionInfo", run)
-        self.assertIn('$info.ProductName -ne "Sedjem" -or $info.ProductVersion -ne $env:VERSION', run)
+        self.assertIn('"$($info.ProductName)".Trim() -ne "Sedjem" -or "$($info.ProductVersion)".Trim() -ne $env:VERSION', run)
         step = by_name["Installer version resource (Windows)"]
         self.assertEqual(step["if"], "runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''")
         self.assertIn('(Get-Item "dist\\Sedjem-${env:VERSION}-setup.exe").VersionInfo', step["run"])
-        self.assertIn('$info.ProductName -ne "Sedjem" -or $info.ProductVersion -ne $env:VERSION', step["run"])
+        self.assertIn('"$($info.ProductName)".Trim() -ne "Sedjem" -or "$($info.ProductVersion)".Trim() -ne $env:VERSION', step["run"])
 
     def test_the_update_test_covers_silent_installations_and_the_switch(self):
         run = steps(self.jobs["build"])["Installer update mode (Windows)"]["run"]

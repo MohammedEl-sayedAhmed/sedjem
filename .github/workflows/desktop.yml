@@ -138,7 +138,7 @@ jobs:
         run: |
           $info = (Get-Item dist\Sedjem\Sedjem.exe).VersionInfo
           $info | Format-List ProductName, ProductVersion, FileVersion, FileDescription, CompanyName, LegalCopyright, OriginalFilename
-          if ($info.ProductName -ne "Sedjem" -or $info.ProductVersion -ne $env:VERSION) {
+          if ("$($info.ProductName)".Trim() -ne "Sedjem" -or "$($info.ProductVersion)".Trim() -ne $env:VERSION) {
             throw "Sedjem.exe names itself $($info.ProductName) $($info.ProductVersion), not Sedjem $env:VERSION"
           }
 
@@ -187,7 +187,8 @@ jobs:
           & $iscc desktop\installer.iss
 
       - name: Installer version resource (Windows)
-        # the same product and version as Sedjem.exe's
+        # the same product and version as Sedjem.exe's. Inno Setup pads its version strings with spaces, so they
+        # are compared trimmed (as Sedjem.exe's are, for the same check in both places)
         if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
         shell: pwsh
         env:
@@ -195,7 +196,7 @@ jobs:
         run: |
           $info = (Get-Item "dist\Sedjem-${env:VERSION}-setup.exe").VersionInfo
           $info | Format-List ProductName, ProductVersion, FileVersion, FileDescription, CompanyName, LegalCopyright
-          if ($info.ProductName -ne "Sedjem" -or $info.ProductVersion -ne $env:VERSION) {
+          if ("$($info.ProductName)".Trim() -ne "Sedjem" -or "$($info.ProductVersion)".Trim() -ne $env:VERSION) {
             throw "the installer names itself $($info.ProductName) $($info.ProductVersion), not Sedjem $env:VERSION"
           }
 
