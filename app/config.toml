@@ -33,7 +33,7 @@ api = "https://api.github.com"
 # Anonymous usage counts (app/usage.py, docs/13-usage-counts.md), sent to Aptabase: the app key of Sedjem's app
 # there. An A-EU- key sends to Aptabase's EU region, an A-US- key to its US region; host is only for a self-hosted
 # Aptabase (an A-SH- key). Without a key nothing is counted or sent. The switch is in Settings → About.
-app_key = ""
+app_key = "A-EU-6918990781"
 host = ""
 
 [local]
