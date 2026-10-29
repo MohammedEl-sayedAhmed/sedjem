@@ -1,28 +1,37 @@
 """Public totals of Sedjem's anonymous usage counts (app/usage.py, docs/13-usage-counts.md), from Aptabase's
-monthly export.
+monthly exports.
 
-Once a month, early in the month:
-  1. In Aptabase (eu.aptabase.com), open Sedjem's Export page and download last month's Release events as CSV.
-  2. python tools/usage_totals.py path/to/sedjem-release-2026-11-01.csv
+Once a month, a few days into it:
+  1. In Aptabase (eu.aptabase.com), open Sedjem's Export page and download the Release events of last month, and of
+     this month so far, as CSV. An event is stamped when it is sent, so one sent late (after a few days offline)
+     is in this month's export although it counts for last month.
+  2. python tools/usage_totals.py path/to/last-month.csv path/to/this-month.csv
   3. Read the changes to docs/usage.json, README.md and docs/13-usage-counts.md, and commit them.
-  4. Delete the export. It has every event with its daily user hash and session id, so it never goes into the
+  4. Delete the exports. They have every event with its daily user hash and session id, so they never go into the
      repository.
 
-The script adds that month's totals to docs/usage.json (run again for the same month, it replaces them), and writes
-the newest month into README.md and every month into docs/13-usage-counts.md, between their
-<!-- usage-totals:start --> and <!-- usage-totals:end --> lines. Only totals are written. A country is listed only
-when at least 3 installs were active there that month, and so is a system, a version of a system or a version of
-Sedjem; the rest are added up as "other", so that no one install can be picked out.
+The script totals one month, last month by default: the active_month events of that month (their "month"), the
+week_summary events of its weeks (a week counts in the month that holds its Thursday), and the install events
+sent in it. Events without a month or week, from versions before 0.3.1, count by their time. It adds the month to
+docs/usage.json (run again for the same month, it replaces it), and writes the newest month into README.md and
+every month into docs/13-usage-counts.md, between their <!-- usage-totals:start --> and <!-- usage-totals:end -->
+lines.
 
-The export's columns are found by their names, in any order and letter case: timestamp, event_name, os_name,
-os_version, app_version, country_code, and string_props with numeric_props (or one props column). The props may
-be JSON with single quotes in place of double ones. A missing column stops the script with its name. Rows of other
-months and other events are skipped. Anyone can post events with the app key, which is public, so what Sedjem
-never sends is left out too: a week_summary whose numbers aren't whole numbers up to what a week can hold is
-skipped, and a value that isn't one Sedjem sends (or isn't plain text, for the versions) counts as "other".
+Only totals are written: counts, sums, shares and averages. A country is listed only when at least 3 installs were
+active there that month, and so is a region, a system, a version of a system or of Sedjem, and a locale; the rest
+are added up as "other", so that no one install can be picked out.
 
-Options: --month 2026-11 (when the export has rows of more than one month), --exported 2026-12-01 (the day of the
-export; default today), --root (the repository to write into; default this one). Standard library only.
+The exports' columns are found by their names, in any order and letter case: timestamp, event_name, os_name,
+os_version, app_version, country_code, and string_props with numeric_props (or one props column); region_name and
+locale are read when they are there. The props may be JSON with single quotes in place of double ones. A missing
+column stops the script with its name. Anyone can post events with the app key, which is public, so what Sedjem
+never sends is left out: a week_summary whose numbers aren't whole numbers up to what a week can hold is skipped,
+and a value Sedjem never sends (or a name that isn't plain text) counts as "unknown" or "other".
+
+Options: --month 2026-11 (the month to total; default the month before --exported), --exported 2026-12-03 (the
+day of the exports; default today), --root (the repository to write into; default this one).
+Standard library only; the lists of what Sedjem sends are copies of app/usage.py's, which tests/test_usage.py
+compares.
 """
 import argparse
 import csv
@@ -37,34 +46,63 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("docs/usage.json")
 PAGES = {"readme": Path("README.md"), "docs": Path("docs/13-usage-counts.md")}
 START, END = "<!-- usage-totals:start -->", "<!-- usage-totals:end -->"
-LEAST = 3  # installs a country (or a version) needs that month to be listed by name
+LEAST = 3  # installs a country (or a region, a version, a locale) needs that month to be listed by name
 
 # The columns, by the names an export may give them (compared in lower case, with - and spaces as _)
 COLUMNS = {"timestamp": ("timestamp",), "event": ("event_name", "eventname"), "os": ("os_name", "osname"),
            "os_version": ("os_version", "osversion"), "app_version": ("app_version", "appversion"),
-           "country": ("country_code", "countrycode"), "string_props": ("string_props", "stringprops"),
-           "numeric_props": ("numeric_props", "numericprops"), "props": ("props", "properties")}
+           "country": ("country_code", "countrycode"), "region": ("region_name", "regionname"), "locale": ("locale",),
+           "string_props": ("string_props", "stringprops"), "numeric_props": ("numeric_props", "numericprops"),
+           "props": ("props", "properties")}
 REQUIRED = ("timestamp", "event", "os", "os_version", "app_version", "country")
 
-# What Sedjem sends (app/usage.py)
+# What Sedjem sends (copies of app/usage.py's lists)
 ENGINES = ("cohere", "whisper_medium", "whisper_large", "other_local", "hosted")
+SERVICES = ("elevenlabs", "speechmatics", "gemini", "deepgram", "assemblyai", "azure", "openai", "groq", "mistral")
+SPEAKER_MODELS = ("titanet_small", "titanet_large", "campp", "nemotron")
 FORMATS = ("txt", "srt", "vtt", "md", "json")
-FEATURES = ("speakers", "nemotron", "youtube", "compares", "failed")
-WEEK = ("transcriptions", "minutes", *ENGINES, *FEATURES, *FORMATS)
-MOST = {"minutes": 2 * 7 * 24 * 60}  # a week of the local and the hosted queue both busy, in minutes
-MOST_RUNS = 10_000                  # any other count, in one week
+LENGTHS = {"runs_under_5": "under 5", "runs_5_30": "5-30", "runs_30_60": "30-60", "runs_over_60": "over 60"}
+LANGUAGES = ("ar", "en", "auto")
+FAILURES = ("failed_read", "failed_model", "failed_hosted", "failed_download")
+EDITS = ("edit_sessions", "renames", "merges", "branches", "restores")
+SUMMARY = ("transcriptions", "minutes", *ENGINES, *SERVICES, "speakers", "speakers_given", "speakers_estimated",
+           *SPEAKER_MODELS[:3], "nemotron", *LENGTHS, *(f"lang_{x}" for x in LANGUAGES), "cpu_runs", "gpu_runs",
+           "gpu_fallbacks", *(f"min_{e}" for e in ENGINES), *(f"proc_{e}" for e in ENGINES), "failed", *FAILURES,
+           "cancelled", "youtube", "youtube_captions", "courses_created", "compares", "combines", *EDITS, *FORMATS,
+           "copies", "days_used", "starts", "assistant_requests", "assistant_saves", "model_downloads",
+           "update_installs")
 VALUES = {"kind": ("installer", "linux-build", "source", "other"), "ui": ("desktop", "browser"),
-          "gpu": ("none", "intel", "amd", "nvidia", "other"), "ram": ("under 8", "8-16", "16-32", "over 32"),
-          "cores": ("under 4", "4-8", "8-16", "over 16")}
-NAMES = {"cohere": "Cohere Transcribe Arabic", "whisper_medium": "whisper-medium", "whisper_large": "Whisper large-v3",
-         "other_local": "other local models", "hosted": "hosted services"}
+          "install_age": ("0", "1", "2", "3-5", "6-11", "12+"),
+          "channel": ("stable", "latest"), "update_check": ("on", "off", "unasked"),
+          "language": ("ar", "en", "auto", "other"),
+          "speaker_model": ("titanet_small", "titanet_large", "campp", "nemotron", "other"),
+          "device": ("auto", "cpu"), "mcp_write": ("on", "off"),
+          "cpu": ("intel", "amd", "arm", "other"), "gpu": ("none", "intel", "amd", "nvidia", "other"),
+          "gpu_vram": ("none", "under 4", "4-8", "8-16", "over 16"), "cuda": ("yes", "no"), "vulkan": ("yes", "no"),
+          "ram": ("under 8", "8-16", "16-32", "over 32"), "cores": ("under 4", "4-8", "8-16", "over 16"),
+          "power": ("power-saver", "balanced", "performance", "unknown"),
+          "disk_free": ("under 10", "10-50", "50-200", "over 200"),
+          "library": ("0", "1-9", "10-49", "50-199", "200+"), "courses": ("0", "1-4", "5-19", "20+")}
+MODELS = ("cohere", "whisper_medium", "whisper_large", "other_local", "titanet_large", "campp", "nemotron")
+FLAGS = (*(f"has_{m}" for m in MODELS), *(f"key_{s}" for s in SERVICES))
+SETTINGS = ("channel", "update_check", "language", "speaker_model", "device", "mcp_write")
+HARDWARE = ("kind", "ui", "cpu", "gpu", "gpu_vram", "cuda", "vulkan", "ram", "cores", "power", "disk_free")
+# The most a week can hold: the times in minutes (a week of the local and the hosted queue both busy), the days of
+# use, and any other count
+MOST = {**{k: 2 * 7 * 24 * 60 for k in ("minutes", *(f"min_{e}" for e in ENGINES), *(f"proc_{e}" for e in ENGINES))},
+        "days_used": 7}
+MOST_RUNS = 10_000
+FEATURES = {"youtube": ("youtube",), "editing": EDITS, "compare": ("compares",), "combine": ("combines",),
+            "export": FORMATS, "copy": ("copies",), "assistants": ("assistant_requests",)}
 PLAIN = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .()_/+-]{0,59}")  # a system's or Sedjem's version as it may be published
+PLACE = re.compile(r"[^\W\d_][\w .,'()/-]{0,59}")  # a region's name, in any alphabet
+MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
           "November", "December")
 
 
 class ExportError(Exception):
-    """The export can't be read: what is wrong, in plain words."""
+    """An export can't be read: what is wrong, in plain words."""
 
 
 def column_key(name):
@@ -111,37 +149,43 @@ def whole(value, most):
     return int(number) if number.is_integer() and 0 <= number <= most else None
 
 
-def read(path):
-    """The export's rows: {"month", "event", "os", "os_version", "app_version", "country", "props"}."""
+def week_month(week):
+    """The month that holds an ISO week's Thursday ("2026-W44" → "2026-10"), or None for what isn't a week."""
+    m = re.fullmatch(r"(\d{4})-W(\d\d)", str(week or ""))
     try:
-        with open(path, newline="", encoding="utf-8-sig") as f:
-            rows = list(csv.reader(f))
-    except OSError as e:
-        raise ExportError(f"can't read {path}: {e.strerror or e}") from None
-    if not rows:
-        raise ExportError(f"{path} is empty")
-    cols = find_columns(rows[0])
+        return date.fromisocalendar(int(m[1]), int(m[2]), 4).strftime("%Y-%m") if m else None
+    except ValueError:
+        return None
+
+
+def read(paths):
+    """The exports' rows: {"month" (the month it counts for), "event", "os", "os_version", "app_version", "country",
+    "region", "locale", "props"}."""
     out = []
-    for row in rows[1:]:
-        if not any(cell.strip() for cell in row):
-            continue
-        cell = lambda name: row[cols[name]].strip() if name in cols and cols[name] < len(row) else ""  # noqa: E731
-        merged = {**props(cell("string_props")), **props(cell("numeric_props")), **props(cell("props"))}
-        out.append({"month": cell("timestamp")[:7], "event": cell("event"), "os": cell("os"),
-                    "os_version": cell("os_version"), "app_version": cell("app_version"),
-                    "country": cell("country").upper(), "props": merged})
+    for path in [paths] if isinstance(paths, (str, Path)) else paths:
+        try:
+            with open(path, newline="", encoding="utf-8-sig") as f:
+                rows = list(csv.reader(f))
+        except OSError as e:
+            raise ExportError(f"can't read {path}: {e.strerror or e}") from None
+        if not rows:
+            raise ExportError(f"{path} is empty")
+        cols = find_columns(rows[0])
+        for row in rows[1:]:
+            if not any(cell.strip() for cell in row):
+                continue
+            cell = lambda name: row[cols[name]].strip() if name in cols and cols[name] < len(row) else ""  # noqa: E731,B023
+            merged = {**props(cell("string_props")), **props(cell("numeric_props")), **props(cell("props"))}
+            event, sent = cell("event"), cell("timestamp")[:7]
+            month = sent
+            if event == "active_month" and MONTH.fullmatch(str(merged.get("month") or "")):
+                month = merged["month"]
+            elif event == "week_summary":
+                month = week_month(merged.get("week")) or sent
+            out.append({"month": month, "event": event, "os": cell("os"), "os_version": cell("os_version"),
+                        "app_version": cell("app_version"), "country": cell("country").upper(),
+                        "region": cell("region"), "locale": cell("locale").lower(), "props": merged})
     return out
-
-
-def pick_month(rows, month=None):
-    months = sorted({r["month"] for r in rows if re.fullmatch(r"\d{4}-\d\d", r["month"])})
-    if month:
-        if month not in months:
-            raise ExportError(f"the export has no rows of {month} (it has {', '.join(months) or 'none'})")
-        return month
-    if len(months) != 1:
-        raise ExportError(f"the export has rows of {', '.join(months) or 'no month'}; choose one with --month")
-    return months[0]
 
 
 def fold(counts, least=LEAST):
@@ -151,37 +195,95 @@ def fold(counts, least=LEAST):
     return {**shown, **({"other": rest} if rest else {})}
 
 
-def totals(rows, month, exported):
-    """That month's totals: only sums and counts, with the rare countries and versions added up as "other"."""
-    rows = [r for r in rows if r["month"] == month]
-    active = [r for r in rows if r["event"] == "active_month"]
-    weeks, skipped = [], 0
+def share(part, whole_):
+    return round(part / whole_, 3) if whole_ else None
+
+
+def ratio(part, whole_):
+    return round(part / whole_, 2) if whole_ else None
+
+
+def spread(rows, key):
+    """How many active installs had each value of a prop, in the order Sedjem's values have; "unknown" for a missing
+    value (from 0.3.0) or one Sedjem never sends."""
+    found = Counter(r["props"].get(key) if r["props"].get(key) in VALUES[key] else "unknown" for r in rows)
+    return {v: found[v] for v in (*VALUES[key], "unknown") if found[v]}
+
+
+def week_summaries(rows):
+    """The week summaries that hold only what Sedjem sends, as {prop: whole number} with the props they have (a
+    summary from 0.3.0 has fewer), and how many were left out."""
+    good, skipped = [], 0
     for r in rows:
-        if r["event"] != "week_summary":
-            continue
-        numbers = {k: whole(r["props"].get(k), MOST.get(k, MOST_RUNS)) for k in WEEK}
-        if None in numbers.values() or not re.fullmatch(r"\d{4}-W\d\d", str(r["props"].get("week") or "")):
+        numbers = {k: whole(r["props"][k], MOST.get(k, MOST_RUNS)) for k in SUMMARY if k in r["props"]}
+        if None in numbers.values() or "transcriptions" not in numbers or week_month(r["props"].get("week")) is None:
             skipped += 1
         else:
-            weeks.append(numbers)
-    sums = {k: sum(w[k] for w in weeks) for k in WEEK}
+            good.append({**numbers, "week": r["props"]["week"]})
+    return good, skipped
+
+
+def totals(rows, month, exported):
+    """That month's totals: counts, sums, shares and averages only, with the rare countries, regions, versions and
+    locales added up as "other"."""
+    rows = [r for r in rows if r["month"] == month]
+    active = [r for r in rows if r["event"] == "active_month"]
+    weeks, skipped = week_summaries([r for r in rows if r["event"] == "week_summary"])
+    sums = {k: sum(w.get(k, 0) for w in weeks) for k in SUMMARY}
     runs = sum(sums[k] for k in ENGINES)
-    countries = Counter(r["country"] if re.fullmatch(r"[A-Z]{2}", r["country"]) else "other" for r in active)
     plain = lambda text: text if PLAIN.fullmatch(text) else "other"  # noqa: E731
+    countries = Counter(r["country"] if re.fullmatch(r"[A-Z]{2}", r["country"]) else "other" for r in active)
+    regions = Counter(f"{r['country']}: {r['region']}" if re.fullmatch(r"[A-Z]{2}", r["country"])
+                      and PLACE.fullmatch(r["region"]) else "other" for r in active)
+    locales = Counter(r["locale"] if re.fullmatch(r"[a-z]{2}(-[a-z]{2})?", r["locale"]) else "other" for r in active)
+    flagged = lambda key: [r["props"][key] for r in active if r["props"].get(key) in (0, 1)  # noqa: E731
+                           and not isinstance(r["props"].get(key), bool)]
+    having = lambda key: [w for w in weeks if key in w]  # noqa: E731
+    days = [w["days_used"] for w in weeks if w.get("days_used")]
+    starts = having("starts")
+    ended = sums["transcriptions"] + sums["youtube_captions"] + sums["failed"] + sums["cancelled"]
+    tried = sums["gpu_runs"] + sums["gpu_fallbacks"]
+    hours = round(sums["minutes"] / 60, 1)
     return {
         "month": month, "exported": exported,
-        "active_installs": len(active), "new_installs": sum(1 for r in rows if r["event"] == "install"),
-        "countries": {"count": len([c for c in countries if c != "other"]), "installs": fold(countries)},
-        "systems": fold(Counter(plain(r["os"]) for r in active)),
-        "system_versions": fold(Counter(plain(f"{r['os']} {r['os_version']}".strip()) for r in active)),
-        "versions": fold(Counter(plain(r["app_version"]) for r in active)),
-        "installs": {k: dict(Counter(r["props"].get(k) if r["props"].get(k) in values else "other" for r in active))
-                     for k, values in VALUES.items()},
-        "weeks": len(weeks), "transcriptions": sums["transcriptions"], "hours": round(sums["minutes"] / 60, 1),
-        "models": {k: sums[k] for k in ENGINES},
-        "hosted_share": round(sums["hosted"] / runs, 3) if runs else None,
-        **{k: sums[k] for k in FEATURES},
-        "exports": {k: sums[k] for k in FORMATS},
+        "installs": {"active": len(active), "new": sum(1 for r in rows if r["event"] == "install"),
+                     "countries": {"count": len([c for c in countries if c != "other"]), "installs": fold(countries)},
+                     "regions": fold(regions), "systems": fold(Counter(plain(r["os"]) for r in active)),
+                     "system_versions": fold(Counter(plain(f"{r['os']} {r['os_version']}".strip()) for r in active)),
+                     "versions": fold(Counter(plain(r["app_version"]) for r in active)), "locales": fold(locales)},
+        "retention": {"install_age": spread(active, "install_age")},
+        "settings": {**{k: {v: share(n, len(active)) for v, n in spread(active, k).items()} for k in SETTINGS},
+                     "update_check_on": share(sum(1 for r in active if r["props"].get("update_check") == "on"),
+                                              sum(1 for r in active if r["props"].get("update_check") in VALUES["update_check"]))},
+        "hardware": {k: spread(active, k) for k in HARDWARE},
+        "library": {k: spread(active, k) for k in ("library", "courses")},
+        "adoption": {"models": {m: share(sum(flagged(f"has_{m}")), len(flagged(f"has_{m}"))) for m in MODELS},
+                     "hosted_keys": {s: share(sum(flagged(f"key_{s}")), len(flagged(f"key_{s}"))) for s in SERVICES}},
+        "weekly": {"active_installs": dict(sorted(Counter(w["week"] for w in weeks).items())),
+                   "days_used": ratio(sum(days), len(days)),
+                   "starts": ratio(sum(w["starts"] for w in starts), len(starts)),
+                   "transcriptions": ratio(sums["transcriptions"], len(weeks)), "hours": ratio(hours, len(weeks))},
+        "runs": {"transcriptions": sums["transcriptions"], "hours": hours,
+                 "models": {e: sums[e] for e in ENGINES}, "hosted_share": share(sums["hosted"], runs),
+                 "hosted_services": {s: sums[s] for s in SERVICES},
+                 "speaker_models": {s: sums[s] for s in SPEAKER_MODELS},
+                 "speakers": {"labelled": sums["speakers"], "given": sums["speakers_given"],
+                              "estimated": sums["speakers_estimated"]},
+                 "lengths": {name: sums[k] for k, name in LENGTHS.items()},
+                 "languages": {x: sums[f"lang_{x}"] for x in LANGUAGES}},
+        "devices": {"cpu_runs": sums["cpu_runs"], "gpu_runs": sums["gpu_runs"], "gpu_fallbacks": sums["gpu_fallbacks"],
+                    "gpu_share": share(sums["gpu_runs"], sums["gpu_runs"] + sums["cpu_runs"]),
+                    "fallback_rate": share(sums["gpu_fallbacks"], tried),
+                    "real_time_factor": {e: ratio(sums[f"proc_{e}"], sums[f"min_{e}"]) for e in ENGINES}},
+        "rates": {"ended": ended, **{k: share(sums[k], ended) for k in ("failed", *FAILURES, "cancelled")}},
+        "features": {"weeks_using": {name: share(sum(1 for w in weeks if all(k in w for k in keys)
+                                                     and any(w[k] for k in keys)),
+                                                 sum(1 for w in weeks if all(k in w for k in keys)))
+                                     for name, keys in FEATURES.items()},
+                     **{k: sums[k] for k in ("youtube", "youtube_captions", "courses_created", "compares", "combines",
+                                             *EDITS, "copies", "assistant_requests", "assistant_saves",
+                                             "model_downloads", "update_installs")},
+                     "exports": {k: sums[k] for k in FORMATS}},
         "skipped": skipped,
     }
 
@@ -195,18 +297,25 @@ def month_name(month):
     return f"{MONTHS[int(m) - 1]} {year}"
 
 
+def last_month(day):
+    """The month before a day ("2026-12-03" → "2026-11")."""
+    year, month = int(day[:4]), int(day[5:7])
+    return f"{year - 1}-12" if month == 1 else f"{year}-{month - 1:02d}"
+
+
 def plural(n, word, words=None):
     return f"{n:,} {word if n == 1 else words or word + 's'}"
 
 
 def readme_block(t):
     """The newest month, in two sentences, for README.md."""
-    where = f", in {plural(t['countries']['count'], 'country', 'countries')}" if t["countries"]["count"] else ""
-    share = f", {round(t['hosted_share'] * 100)}% of them with hosted services" if t["hosted_share"] is not None else ""
-    return (f"In {month_name(t['month'])}, {plural(t['active_installs'], 'install')} ran Sedjem{where}, and "
-            f"{t['new_installs']:,} {'was' if t['new_installs'] == 1 else 'were'} new. They made "
-            f"{plural(t['transcriptions'], 'transcription')} of {t['hours']:,} hours of audio{share}. Every month's "
-            "totals are in [docs/usage.json](docs/usage.json).")
+    i, runs = t["installs"], t["runs"]
+    where = f", in {plural(i['countries']['count'], 'country', 'countries')}" if i["countries"]["count"] else ""
+    hosted = f", {round(runs['hosted_share'] * 100)}% of them with hosted services" if runs["hosted_share"] is not None else ""
+    return (f"In {month_name(t['month'])}, {plural(i['active'], 'install')} ran Sedjem{where}, and "
+            f"{i['new']:,} {'was' if i['new'] == 1 else 'were'} new. They made "
+            f"{plural(runs['transcriptions'], 'transcription')} of {runs['hours']:,} hours of audio{hosted}. Every "
+            "month's totals are in [docs/usage.json](docs/usage.json).")
 
 
 def docs_block(months):
@@ -214,12 +323,13 @@ def docs_block(months):
     lines = ["| Month | Active installs | New installs | Countries | Transcriptions | Hours | Hosted |",
              "|---|---|---|---|---|---|---|"]
     for t in sorted(months.values(), key=lambda t: t["month"], reverse=True):
-        share = f"{round(t['hosted_share'] * 100)}%" if t["hosted_share"] is not None else "none"
-        lines.append(f"| {month_name(t['month'])} | {t['active_installs']:,} | {t['new_installs']:,} | "
-                     f"{t['countries']['count']} | {t['transcriptions']:,} | {t['hours']:,} | {share} |")
+        i, runs = t["installs"], t["runs"]
+        hosted = f"{round(runs['hosted_share'] * 100)}%" if runs["hosted_share"] is not None else "none"
+        lines.append(f"| {month_name(t['month'])} | {i['active']:,} | {i['new']:,} | {i['countries']['count']} | "
+                     f"{runs['transcriptions']:,} | {runs['hours']:,} | {hosted} |")
     lines.append("")
-    lines.append("The countries, systems, versions, models, features and exports of each month are in "
-                 "[docs/usage.json](usage.json).")
+    lines.append("Each month's other totals (retention, settings, hardware, the models downloaded, weekly use, the "
+                 "runs, speed, failures and features) are in [docs/usage.json](usage.json).")
     return "\n".join(lines)
 
 
@@ -242,7 +352,7 @@ def write(root, t):
     months = old.get("months") if isinstance(old.get("months"), dict) else {}
     months = dict(sorted({**months, t["month"]: t}.items()))
     data = {"about": "Monthly totals of Sedjem's anonymous usage counts, made by tools/usage_totals.py from "
-                     "Aptabase's export; see docs/13-usage-counts.md", "months": months}
+                     "Aptabase's exports; see docs/13-usage-counts.md", "months": months}
     pages = {}
     for key, page in PAGES.items():
         text = (root / page).read_text(encoding="utf-8")
@@ -256,25 +366,30 @@ def write(root, t):
 
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("export", type=Path, help="Aptabase's export of one month's Release events, as CSV")
-    ap.add_argument("--month", help="the month to total, as 2026-11 (needed when the export has several)")
-    ap.add_argument("--exported", default=date.today().isoformat(), help="the day the export was made (default today)")
+    ap.add_argument("exports", type=Path, nargs="+", help="Aptabase's exports of Release events, as CSV")
+    ap.add_argument("--month", help="the month to total, as 2026-11 (default: the month before --exported)")
+    ap.add_argument("--exported", default=date.today().isoformat(), help="the day of the exports (default today)")
     ap.add_argument("--root", type=Path, default=ROOT, help="the repository to write into (default this one)")
     args = ap.parse_args(argv)
     try:
-        if args.month and not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", args.month):
+        if args.month and not MONTH.fullmatch(args.month):
             raise ExportError(f"--month {args.month} isn't a month like 2026-11")
-        if not re.fullmatch(r"\d{4}-\d\d-\d\d", args.exported):
-            raise ExportError(f"--exported {args.exported} isn't a day like 2026-12-01")
-        rows = read(args.export)
-        t = totals(rows, pick_month(rows, args.month), args.exported)
+        if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])-\d\d", args.exported):
+            raise ExportError(f"--exported {args.exported} isn't a day like 2026-12-03")
+        month = args.month or last_month(args.exported)
+        rows = read(args.exports)
+        if not any(r["month"] == month for r in rows):
+            found = sorted({r["month"] for r in rows if MONTH.fullmatch(r["month"])})
+            raise ExportError(f"the exports have nothing for {month} (they have {', '.join(found) or 'no month'}); "
+                              "choose the month with --month")
+        t = totals(rows, month, args.exported)
         write(args.root, t)
     except ExportError as e:
         sys.exit(f"usage_totals: {e}")
-    print(f"{month_name(t['month'])}: {t['active_installs']} active installs, {t['new_installs']} new, "
-          f"{t['countries']['count']} countries, {t['transcriptions']} transcriptions, {t['hours']} hours"
-          + (f"; {t['skipped']} week summaries left out" if t["skipped"] else ""))
-    print(f"Wrote {OUT.as_posix()}, README.md and docs/13-usage-counts.md. Delete the export now.")
+    print(f"{month_name(t['month'])}: {t['installs']['active']} active installs, {t['installs']['new']} new, "
+          f"{t['installs']['countries']['count']} countries, {t['runs']['transcriptions']} transcriptions, "
+          f"{t['runs']['hours']} hours" + (f"; {t['skipped']} week summaries left out" if t["skipped"] else ""))
+    print(f"Wrote {OUT.as_posix()}, README.md and docs/13-usage-counts.md. Delete the exports now.")
 
 
 if __name__ == "__main__":

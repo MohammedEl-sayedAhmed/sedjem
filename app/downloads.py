@@ -26,8 +26,9 @@ class Cancelled(Exception):
 
 
 class Downloads:
-    def __init__(self, cfg):
+    def __init__(self, cfg, done=None):
         self.cfg = cfg
+        self.on_done = done or (lambda item_id: None)  # a download finished: the usage counts (app/usage.py)
         self.lock = threading.Lock()
         self.jobs = {}        # item id -> {"state", "done", "total", "error", "file"}
         self.cancelled = set()
@@ -154,10 +155,17 @@ class Downloads:
                     job.update(state="converting", file=None)
                     convert(self.cfg, item["convert"], lambda: item_id in self.cancelled)
                 job.update(state="done", file=None)
+                self.finished(item_id)
             except Cancelled:
                 job.update(state="cancelled", file=None)
             except Exception as e:  # shown next to the model in the app
                 job.update(state="error", error=str(e) or type(e).__name__, file=None)
+
+    def finished(self, item_id):
+        try:
+            self.on_done(item_id)
+        except Exception:  # noqa: BLE001 — counting is never a reason for a download to fail
+            pass
 
     def fetch(self, f, job, cancelled):
         dest, part = self.cfg.path(f["path"]), self.part_path(f)

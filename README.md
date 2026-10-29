@@ -108,10 +108,11 @@ recording on your machine unless you choose a hosted service.
 - Has a dark theme, and contacts nothing on the internet except the model downloads, YouTube for the
   links you add, the hosted services you choose, GitHub to check for updates when allowed, and
   Aptabase for the usage counts below.
-- Sends a few anonymous usage counts a month to Aptabase, in the EU: the version, the system in broad
-  terms, and how many transcriptions were made with which models; never recordings, transcripts or
-  names, and no identifier. They are on by default, the first start says so, and the switch in
-  *Settings → About* or `DO_NOT_TRACK=1` turns them off. See [usage counts](docs/13-usage-counts.md).
+- Sends anonymous usage counts to Aptabase, in the EU, a few times a month: the version, the system and
+  the computer in broad terms, some settings, which models are downloaded, and how many transcriptions,
+  exports and other actions there were, with which models; never recordings, transcripts or names, and
+  no identifier. They are on by default, the first start says so, and the switch in *Settings → About*
+  or `DO_NOT_TRACK=1` turns them off. See [usage counts](docs/13-usage-counts.md).
 - Tells when a newer version is out, from stable releases or the latest tested changes, and updates
   itself when asked: a git checkout by fast-forward, the Windows app through its installer. See
   [updates](docs/12-updates.md).

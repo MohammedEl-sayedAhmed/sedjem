@@ -654,16 +654,21 @@ the speaker step with a stand-in model process).
   day when the first-start question was answered with yes, or when *Check now* is clicked. GitHub sees
   the IP address and, for some checks, the commit that is running ([updates](12-updates.md)).
 - Anonymous usage counts go to Aptabase, in its EU region in Germany, about six times a month: once
-  for a new install, once a month with the kind of install and the computer in broad ranges (the
-  graphics card's maker, the memory, the processor threads), and once for each week of use with how
-  many transcriptions and minutes of audio there were, by model, and how many exports, compares,
-  YouTube videos and failures. Each event also names the system and its version, the language and
-  region set on it, and the versions of Sedjem and Python. No recording, transcript, title, name, file
-  name, path, link, key or error message is sent, and no identifier. Aptabase sees the IP address; by
-  its terms it uses it only in memory, for the country and region and a daily pseudonymous hash, and
-  doesn't store it. The counts are on by default, but nothing is sent before the first-start dialog
-  has said so; its switch, the one in *Settings → About*, `DO_NOT_TRACK=1` or `SEDJEM_NO_USAGE=1`
-  turns them off ([usage counts](13-usage-counts.md)).
+  for a new install; once a month with the kind of install, some settings (the update channel and
+  check, the default language, the speaker model, the graphics card switch, assistants' saving), the
+  computer in broad ranges (the makers of the processor and graphics card, the graphics memory, the
+  memory, threads, power profile and free disk space), the size of the library, and which models are
+  downloaded and which hosted services have a key (whether there is one, never the key); and once for
+  each week of use with the days used and the starts, how many runs there were by model, service,
+  speaker model, length, language and device, with their minutes of audio and processing, the
+  failures and cancels, and how many exports, copies, compares, edits, YouTube videos, downloads and
+  assistant requests. Each event also names the system and its version, the language and region set
+  on it, and the versions of Sedjem and Python. No recording, transcript, title, name, file name, path,
+  link, key, error message or anything an assistant asked is sent, and no identifier. Aptabase sees
+  the IP address; by its terms it uses it only in memory, for the country and region and a daily
+  pseudonymous hash, and doesn't store it. The counts are on by default, but nothing is sent before
+  the first-start dialog has said so; its switch, the one in *Settings → About*, `DO_NOT_TRACK=1` or
+  `SEDJEM_NO_USAGE=1` turns them off ([usage counts](13-usage-counts.md)).
 - An assistant connected over MCP reads the transcripts that *Settings → Assistants* lets it see, and
   what it reads goes to the assistant's model, usually on its maker's servers. It never gets the
   audio, the keys or the settings ([assistants](11-assistants.md)).

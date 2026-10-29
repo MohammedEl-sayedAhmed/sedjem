@@ -17,8 +17,8 @@ from unittest import mock
 from ui_support import UiTestCase
 
 DOC = "https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/13-usage-counts.md"
-WHAT = ("A few numbers a month, such as the version, the system and how many transcriptions with which models; "
-        "never recordings, transcripts or names.")
+WHAT = ("Counts a few times a month, such as the version, the system, the settings and how many transcriptions with "
+        "which models; never recordings, transcripts or names.")
 
 
 class UsageCounts(UiTestCase):
@@ -198,6 +198,31 @@ class UsageCounts(UiTestCase):
         sw = self.page.locator("#usageAsk").bounding_box()
         self.assertLessEqual(sw["x"] + sw["width"], box["x"] + box["width"], "the switch is inside the dialog")
         self.assertFalse(self.page.evaluate("() => document.documentElement.scrollWidth > innerWidth"))
+
+
+class OtherTestsMeetNoDialog(UiTestCase):
+    """The other browser tests run with ui_support's default settings and the key that ships in app/config.toml. With
+    neither DO_NOT_TRACK nor SEDJEM_NO_USAGE set, as on a developer's computer (and in CI's test job), those settings
+    answer the first-start dialog, so it never covers their pages."""
+    jobs = ({"jid": "20261020-100000-a001", "title": "Sprint planning", "created": "2026-10-20T10:00:00+03:00"},)
+
+    def setUp(self):
+        super().setUp()
+        env = mock.patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        for var in ("DO_NOT_TRACK", "SEDJEM_NO_USAGE"):
+            os.environ.pop(var, None)
+
+    def test_no_first_start_dialog(self):
+        self.assertEqual(self.app.usage.url(), "https://eu.aptabase.com/api/v0/events", "the key that ships")
+        self.open()
+        usage, update = (self.api("GET", "/api/status")["json"][k] for k in ("usage", "update"))
+        self.assertEqual((usage["available"], usage["blocked"], usage["ask"], update["ask"]), (True, None, False, False))
+        self.page.evaluate("() => refreshStatus()")
+        self.assertFalse(self.page.is_visible("#updAsk"))
+        self.open_settings("about")  # the page takes clicks
+        self.assertFalse(self.page.is_checked("#usageSwitch"), "answered: off, and the tests never send anyway")
 
 
 if __name__ == "__main__":

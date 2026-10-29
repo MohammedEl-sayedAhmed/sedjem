@@ -200,7 +200,7 @@ class Runner:
     def __init__(self, store, cfg, gpus=None, ended=None):
         self.store, self.cfg = store, cfg
         self.gpus = gpus or (lambda: None)  # the graphics cards the app found, for the job details
-        self.on_end = ended or (lambda job, lines: None)  # the anonymous usage counts (app/usage.py)
+        self.on_end = ended or (lambda job, lines, stage: None)  # the anonymous usage counts (app/usage.py)
         self.queues = {"download": queue.Queue(), "prepare": queue.Queue(), "video": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
         self.cancelled = set()
         self.procs = {}  # job id -> running transcribe.py process
@@ -238,10 +238,13 @@ class Runner:
                 self.queue_video(job["id"])
 
     def cancel(self, jid):
+        first = jid not in self.cancelled
         self.cancelled.add(jid)
         job = self.store.get(jid)
         if job and job["status"] in ("preparing", "queued"):
             self.store.update(jid, status="cancelled", stage=None, finished=now())
+        if first and job and job["status"] in ACTIVE:  # cancelled by the user (once, however often it is asked)
+            self.ended(jid, stage="cancelled")
 
     def shutdown(self):
         """Stop running local models (they run in their own process group)."""
@@ -257,12 +260,13 @@ class Runner:
             except Exception as e:  # never let one job kill the worker
                 if name != "video":  # (the video is extra: make_video says why it has none)
                     self.store.update(jid, status="failed", stage=None, error=f"{type(e).__name__}: {e}", finished=now())
-                    self.ended(jid)
+                    self.ended(jid, stage={"prepare": "read", "local": "model"}.get(name, name))
 
-    def ended(self, jid, lines=None):
-        """A job finished or failed: the usage counts take their numbers from it (app/usage.py)."""
+    def ended(self, jid, lines=None, stage=None):
+        """A job finished, failed or was cancelled: the usage counts take their numbers from it (app/usage.py).
+        stage: where a failed job stopped (read, model, hosted or download), or "cancelled"."""
         try:
-            self.on_end(self.store.get(jid), lines)
+            self.on_end(self.store.get(jid), lines, stage)
         except Exception:  # noqa: BLE001 — counting is never a reason for a job to fail
             pass
 
@@ -300,7 +304,7 @@ class Runner:
         except youtube.YouTubeError as e:
             self.store.update(jid, status="failed", stage=None, done=None, total=None, error=f"YouTube: {e}",
                               finished=now())
-            self.ended(jid)
+            self.ended(jid, stage="download")
             return
         if jid in self.cancelled or self.store.get(jid) is None:  # cancelled or deleted meanwhile
             return
@@ -405,7 +409,7 @@ class Runner:
             self.store.update(jid, status="cancelled", stage=None, finished=now())
         except Exception as e:
             self.store.update(jid, status="failed", stage=None, error=str(e) or type(e).__name__, finished=now())
-            self.ended(jid)
+            self.ended(jid, stage="model" if kind == "local" else "hosted")
         finally:
             self.procs.pop(jid, None)
             self.cancelled.discard(jid)

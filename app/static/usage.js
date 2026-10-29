@@ -5,7 +5,7 @@
 "use strict";
 
 const USAGE_DOC = "https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/13-usage-counts.md";
-const USAGE_TEXT = "A few numbers a month, such as the version, the system and how many transcriptions with which models; never recordings, transcripts or names.";
+const USAGE_TEXT = "Counts a few times a month, such as the version, the system, the settings and how many transcriptions with which models; never recordings, transcripts or names.";
 
 // Settings → About: the switch, off and disabled when the environment turns the counts off
 function usageRow() {

@@ -52,7 +52,7 @@ class App:
         self.usage = usage.Usage(cfg, version=lambda: self.updates.running()["version"], facts=self.usage_facts)
         self.runner = Runner(self.store, cfg, gpus=self.gpu_names, ended=self.usage.job_ended)
         self.runner.recover()
-        self.downloads = Downloads(cfg)
+        self.downloads = Downloads(cfg, done=self.usage.downloaded)
         self.server = None
         self.desktop = False    # set by the desktop app
         self.on_quit = None     # the desktop app closes its window instead of just stopping the server
@@ -87,11 +87,18 @@ class App:
 
     def usage_facts(self):
         """active_month's props (app/usage.py), once the GPU check has an answer (it waits up to two minutes, in the
-        usage counts' thread): the kind of install, the window, and this computer in broad ranges."""
+        usage counts' thread): the kind of install, the window, this computer in broad ranges, some settings, the
+        library's size, and which models are downloaded and which hosted services have a key."""
         end = time.monotonic() + 120
         while self.gpu is None and time.monotonic() < end:
             time.sleep(0.5)
-        return usage.facts(self.updates.running()["kind"], self.desktop, self.gpu)
+        try:
+            free = shutil.disk_usage(self.cfg.storage).free
+        except OSError:
+            free = None
+        return {**usage.facts(self.updates.running()["kind"], self.desktop, self.gpu, power=power_profile(), free=free),
+                **usage.settings_facts(self.cfg), **usage.library_facts(self.store.list()),
+                **usage.adoption_facts(self.cfg)}
 
     def gpu_names(self):
         """The graphics cards the check found, for the job details; None until it has run (or if it failed)."""
@@ -561,6 +568,8 @@ class Handler(BaseHTTPRequestHandler):
         course = None
         if found["kind"] == "playlist":
             course = {"id": found["id"], "title": found["title"], "url": found["url"], "count": found["count"]}
+            if not any((j.get("course") or {}).get("id") == course["id"] for j in store.list()):
+                self.app.usage.count(courses_created=1)  # a playlist added for the first time
             course["folder"] = courses.folder_name(store, course)
         jobs = []
         for e in entries:
@@ -640,11 +649,14 @@ class Handler(BaseHTTPRequestHandler):
         with history.locked(store, jid):  # one change at a time, so versions are numbered in the order they are saved
             change, kind, merge = self.change_from(self.job(jid), p)
             try:
-                history.save(store, jid, change, kind, p.get("message"), cfg=self.app.cfg, merge=merge, base_version=base)
+                saved = history.save(store, jid, change, kind, p.get("message"), cfg=self.app.cfg, merge=merge,
+                                     base_version=base)
             except history.Stale as e:
                 now_at = f"version {e.latest} is the latest" if e.latest is not None else "it has no versions yet"
                 raise ApiError(409, f"The transcript changed after version {base}: {now_at}. Nothing was saved.",
                                version=e.latest)
+        if saved and kind in usage.EDITS:  # an edit, a rename or a merge, in the usage counts
+            self.app.usage.count(**{usage.EDITS[kind]: 1})
         self.changed(jid)
         self.get_job({}, jid)
 
@@ -758,7 +770,9 @@ class Handler(BaseHTTPRequestHandler):
         shown, lines, edited = self.at_version(job, n)
         details = None if params.get("details") == "0" else report.details(shown, lines, edited)
         body = fn(shown, lines, details).encode()
-        if self.command == "GET" and params.get("details") != "0":  # an export (Copy asks for the bare text)
+        if self.command == "GET" and params.get("details") == "0":  # the text that Copy asks for, without the details
+            self.app.usage.count(copies=1)
+        elif self.command == "GET":  # an export
             self.app.usage.exported(fmt)
         tag = f"-v{n}" if n else ""
         name = f"{slug(job.get('title'))}{tag}.{fmt}"
@@ -808,6 +822,7 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "no such version")
         except ValueError as e:  # the list of hidden transcriptions is full
             raise ApiError(400, str(e))
+        self.app.usage.count(branches=1)
         self.changed(new["id"], new)
         self.json(summary(new), 201)
 
@@ -841,7 +856,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def combine_jobs(self, _params):
         """The picked parts saved as a new version of the base transcript; answers like GET /api/jobs/<id>."""
-        base, _ = compare.save_combined(self.app.store, self.body_json(), self.app.cfg)
+        base, saved = compare.save_combined(self.app.store, self.body_json(), self.app.cfg)
+        if saved:
+            self.app.usage.count(combines=1)
         self.changed(base)
         self.get_job({}, base)
 
@@ -890,9 +907,11 @@ class Handler(BaseHTTPRequestHandler):
         self.job(jid)
         message = self.body_json().get("message")
         try:
-            history.restore(self.app.store, jid, int(n), message, self.app.cfg)
+            restored = history.restore(self.app.store, jid, int(n), message, self.app.cfg)
         except KeyError:
             raise ApiError(404, "no such version")
+        if restored:
+            self.app.usage.count(restores=1)
         self.changed(jid)
         self.get_job({}, jid)
 
@@ -1090,6 +1109,7 @@ class Handler(BaseHTTPRequestHandler):
             self.app.updates.start_install(jobs_active=active)
         except updates.Refused as e:
             raise ApiError(409, str(e))
+        self.app.usage.count(update_installs=1)
         self.json(self.app.updates.state())
 
     def quit(self, _params):

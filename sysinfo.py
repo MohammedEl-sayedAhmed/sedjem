@@ -5,7 +5,8 @@ the graphics cards the caller found (the app passes its own GPU check; nothing i
 recording() describes an audio or video file through PyAV: container, codec, sample rate, channels,
 bit rate, size and length. Neither ever raises; whatever can't be found is None. transcribe.py writes
 both into its .meta.json and the app keeps them with each job. Nothing here is sent anywhere; the
-anonymous usage counts (app/usage.py) send only the memory and the number of threads, in broad ranges.
+anonymous usage counts (app/usage.py) send only the processor's maker, the memory and the number of threads, in
+broad ranges.
 """
 import functools
 import os
