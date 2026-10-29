@@ -442,8 +442,12 @@ class Disabled(UsageCase):
         self.assertFalse(self.u.tick(T))
         self.assertEqual(self.state()["weeks"], {})
 
+    def test_the_shipped_key_sends_to_the_eu_region(self):
+        self.config("")  # nothing in the data folder's config.toml: app/config.toml's key applies
+        self.assertEqual(self.usage().url(), "https://eu.aptabase.com/api/v0/events")
+
     def test_without_a_key(self):
-        for toml in ("", '[usage]\napp_key = ""\n', '[usage]\napp_key = "A-SH-1234567890"\n',
+        for toml in ('[usage]\napp_key = ""\n', '[usage]\napp_key = "A-SH-1234567890"\n',
                      '[usage]\napp_key = "A-SH-1234567890"\nhost = "http://analytics.example.com"\n',
                      '[usage]\napp_key = "B-EU-1234567890"\n', '[usage]\napp_key = "A-EU-12345 67890"\n',
                      '[usage]\napp_key = "A-EU-"\n'):
