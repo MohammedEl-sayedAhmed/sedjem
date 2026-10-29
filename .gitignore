@@ -12,6 +12,8 @@ results/*
 !results/arzen.*
 !results/mixat.*
 !results/summary.json
+!results/ami-diarization.json
+!results/arzen-diarization.json
 
 # Private: never commit the meetings dataset or anything derived from it (the dataset's own
 # name pattern is kept in .git/info/exclude, which is not shared)

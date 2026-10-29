@@ -140,6 +140,107 @@ Nemotron on meetings of two or three people. Nemotron is the better choice for l
 it counted the people right and put half as many words on the wrong person. It hears at most 8
 speakers.
 
+## Public test sets: ArzEn and AMI
+
+The meeting excerpts above are private, so the speaker models were also scored on two public sets
+that anyone can download, with `bench/compare_arzen.py` and `bench/compare_ami.py`
+([how to run them](05-command-line.md#benchmark)):
+
+- ArzEn (Hamed, Vu and Abdennadher, LREC 2020; CC BY-SA 4.0): 38 informal interviews held at the
+  German University in Cairo, 12.1 hours of Egyptian Arabic mixed with English, at 16 kHz. Each has
+  one interviewee and the same two interviewers, a man and a woman (two recordings have only one of
+  them). The corpus marks who speaks only through its transcription's segments, which never overlap
+  and run from one cut to the next, so the pauses inside them, and often the silence before the next
+  speaker, count as speech.
+- AMI (CC BY 4.0): English meetings, many of the speakers not native. Its standard test set is 16
+  meetings, 9.1 hours, 15 of them of four people and one of three, from headset microphones mixed
+  into one channel, with the reference turns taken from the word timings (the `ihm` set of
+  `diarizers-community/ami` on Hugging Face, at a pinned revision). Two or more people talk at once
+  in 14.6% of the speech, which is 27.0% of the speaker time.
+
+Both are scored on 10 ms frames, with each model's speakers matched one to one to the real people in
+the way that agrees best, by two measures:
+
+- Wrong speaker on speech, which is closest to how Sedjem uses the labels. The speech model
+  transcribes wherever anyone talks, and each word gets the speaker of the timeline at that moment,
+  also where the speaker model heard no one. So every 10 ms of the reference's speech is labelled
+  that way, and this is the share of it that goes to someone who isn't talking then. It is the
+  time-based counterpart of the words on the wrong person above.
+- DER (diarization error rate), the usual measure: the share of the reference's speaker time that
+  is missed, falsely detected or given to the wrong person, summed over the speakers, so an overlap
+  of two people counts twice. Nothing is forgiven around the turns (no collar) and overlaps are
+  scored, the strictest setup; published AMI figures use several others, so compare them with care.
+  ArzEn's turns include pauses, so its DER is also given with a 0.25 s collar: the frames within
+  0.25 s of a speaker starting or stopping are not scored, which leaves 96% of its speech.
+
+Nemotron has two rows. As the app uses it, it gives one speaker at a time (the timeline described
+above). Its own output, everyone above 0.5, includes the overlaps but gives no single speaker for a
+word, so it has no wrong-speaker figure. The tables are for the count estimated (`--speakers 0`).
+The time is for the whole speaker step, per 10 minutes of audio, with 4 threads on the test laptop
+in the balanced power mode, on 29 October 2026.
+
+### ArzEn: interviews in Egyptian Arabic and English
+
+| Speaker labels | Wrong speaker on speech | DER | Missed / false alarm / confusion | DER with a 0.25 s collar | Count estimated right | Seconds per 10 minutes |
+|---|---|---|---|---|---|---|
+| TitaNet-small voiceprints (default) | 2.5% | 13.4% | 9.8% / 2.3% / 1.3% | 11.3% | 38 of 38 | 8 |
+| TitaNet-large voiceprints | 2.5% | 13.4% | 9.8% / 2.3% / 1.3% | 11.3% | 38 of 38 | 19 |
+| 3D-Speaker CAM++ voiceprints | 2.6% | 13.5% | 9.8% / 2.3% / 1.3% | 11.3% | 38 of 38 | 11 |
+| Nemotron, one speaker at a time (as the app) | 2.2% | 21.4% | 18.6% / 1.9% / 0.9% | 19.2% | 29 of 38 | 29 |
+| Nemotron, overlaps included | | 21.6% | 18.7% / 2.0% / 0.9% | 19.4% | 29 of 38 | 29 |
+
+The three voiceprint models score alike, count the people right in every interview, and score the
+same with the count given. Nemotron put a little less of the speech on the wrong person (2.2%
+against 2.5%, and 1.5% against 1.7% with the collar) and confused people less (0.9% against 1.3%).
+Its DER is higher because it hears no one in 18.7% of the reference's speech, where Silero VAD,
+which finds the speech for the voiceprints, hears no one in 9.8%. The reference counts pauses as
+speech, so part of that is pauses, and the app still gives every word there a speaker. In 9
+interviews it heard a fourth voice, for 0.6 to 5 seconds, which makes the count wrong but changes
+little else.
+
+One interview, R14, holds 10–12% of every model's wrong-speaker time. TitaNet-small and Nemotron
+each put about 13% of its speech on someone other than the reference does, and they agree with each
+other on 99% of it: mostly, both give to an interviewer what the reference gives to the interviewee.
+That points to mistakes in the reference rather than in the models; without R14, TitaNet-small is at
+2.3% and Nemotron at 2.0%. The interviews also share their interviewers, so the set has 40 voices,
+and every recording asks the same of the models: two interviewers, a man and a woman, and one
+interviewee. ArzEn marks no overlap, so it can't show what Nemotron's overlap is worth. AMI can.
+
+### AMI: English meetings with much overlap
+
+| Speaker labels | Wrong speaker on speech | DER | Missed / false alarm / confusion | Speaker time missed in overlaps | Count estimated right | Seconds per 10 minutes |
+|---|---|---|---|---|---|---|
+| TitaNet-small voiceprints (default) | 5.3% | 29.3% | 24.4% / 1.7% / 3.2% | 55.6% | 15 of 16 | 6 |
+| TitaNet-large voiceprints | 4.2% | 28.5% | 24.4% / 1.7% / 2.4% | 55.6% | 15 of 16 | 15 |
+| 3D-Speaker CAM++ voiceprints | 4.8% | 29.0% | 24.4% / 1.7% / 2.9% | 55.6% | 14 of 16 | 9 |
+| Nemotron, one speaker at a time (as the app) | 2.3% | 31.6% | 30.5% / 0.6% / 0.5% | 58.4% | 14 of 16 | 34 |
+| Nemotron, overlaps included | | 26.0% | 24.0% / 1.2% / 0.7% | 34.6% | 14 of 16 | 34 |
+
+Overlap is what makes AMI hard. A timeline with one speaker at a time misses at least one voice
+wherever two people talk, and that is most of what the voiceprint models miss: 15.0% of the speaker
+time, against 9.3% where one person talks. As the app uses it, Nemotron put about half as much of
+the speech on the wrong person as the voiceprint models (2.3% against 4.2–5.3%), with about a fifth
+of their confusion, but it misses more of the speech where one person talks (14.7% of the speaker
+time, against 9.3%), so its DER is the highest. Its own output, overlaps included, has the lowest
+DER, 26.0%, and misses a third of the speaker time in overlaps instead of more than half: when it
+hears two or more people at once it is right 91.5% of the time, and it hears 48.3% of the overlap.
+With the count given, the voiceprint models put 4.5% (TitaNet-small), 5.4% (TitaNet-large) and 4.8%
+(CAM++) of the speech on the wrong person, and Nemotron 2.3% again. Every model got the count wrong
+on one or two meetings.
+
+### What the public sets show
+
+They agree with the meeting excerpts. With the count estimated, Nemotron put the least speech on the
+wrong person on all three: 10.0% of the words on the excerpts against 10.2% for TitaNet-small, 2.2%
+of the speech on ArzEn against 2.5%, and 2.3% on AMI against 5.3%. Its lead grows with the number of
+people and the overlap, from about level on interviews and on meetings of two or three people to
+about half the errors on AMI's meetings of four, and it is the only model that hears overlap.
+Against that, it takes four to six times as long as TitaNet-small, and its count of the people was
+right less often on the public sets (29 of 38 interviews and 14 of 16 meetings, against 38 and 15
+for TitaNet-small), though it counted the 5-person excerpt right where TitaNet-small found 2. So
+TitaNet-small stays the default, and Nemotron is the better choice for meetings of four or more
+people, and where people often talk over each other.
+
 ## Forced alignment (experimental)
 
 Cutting Cohere's audio at every speaker change means each piece is transcribed without the words

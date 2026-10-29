@@ -42,6 +42,10 @@ the fifth, a 2-person excerpt where ElevenLabs' own labels were 27% off. `--spea
 number of people correctly in 5 of 6 meetings. Larger meetings remain weak (38% on a 5-person one).
 NVIDIA's Nemotron-3-Diarization, which can be chosen in Settings since, halves that to 19% and counted
 the people right in all 6 ([speaker labels](04-speaker-labels.md#nvidia-nemotron-3-diarization)).
+On two public sets it also put the least speech on the wrong person: 2.2% against 2.5% for
+TitaNet-small on ArzEn's Egyptian Arabic–English interviews, and 2.3% against 5.3% on AMI's English
+meetings of four, at four to six times the time and with a count of the people that was right less
+often ([public sets](04-speaker-labels.md#public-test-sets-arzen-and-ami)).
 pyannote `community-1`, which needs PyTorch and a free Hugging Face token, is untested.
 
 ## Real meetings are much harder than the benchmarks
@@ -64,12 +68,15 @@ labels.
    spot-checked.
 3. Try a hybrid (untested): Cohere for Arabic and whisper-medium for stretches that are mostly
    English, with a language-ID step per chunk picking the engine.
-4. Score the speaker models on a public set of recordings too, so that others can check the numbers.
+4. Make use of the overlap Nemotron hears (untested). On AMI it found about half of the speech where
+   two or more people talk, and was right 92% of the time when it heard that. Each voice of an
+   overlap would have to be transcribed on its own.
 5. Give Whisper a team's jargon with `--prompt` (plausible, untested).
 6. Reclaim disk space: delete Audar (1.9 GB), the speaker models you don't use (Settings → Models
    deletes the ones it offers; the WeSpeaker models serve only `bench/compare_voiceprints.py`), the
-   environment of `bench/check_nemotron.py` (`.venv-bench/`, 1.8 GB), and whichever of the two local
-   engines you don't use.
+   environment of `bench/check_nemotron.py` (`.venv-bench/`, 2.0 GB), the public speaker-label sets
+   (`data/ami/` and `data/arzen-corpus/`, 3.3 GB), and whichever of the two local engines you don't
+   use.
 
 ## For a product later
 

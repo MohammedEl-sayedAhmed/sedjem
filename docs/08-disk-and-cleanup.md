@@ -14,8 +14,10 @@ public-set results is ignored by git.
 | `models/Audar-ASR-V1-Turbo/` | 1.9 GB | Audar Turbo Q4_K_M and its BF16 audio encoder |
 | `models/diarization/` | 0.3 GB, 0.7 GB with Nemotron | speaker models. `--speakers` needs only TitaNet-small (the default). TitaNet-large and 3D-Speaker CAM++ can also be chosen in the app (*Settings → Models*), which downloads Nemotron-3-Diarization into `Nemotron-3-Diarization/` here when asked; WeSpeaker ResNet34 (the first default) and ResNet152 are used only by `bench/compare_voiceprints.py`; there is also an unused pyannote segmentation model |
 | `models/mms-300m-1130-forced-aligner/` | 1.3 GB | the optional forced-aligner model for `--align` |
-| `.venv-bench/` | 1.8 GB | an environment with PyTorch and Transformers, used only by `bench/check_nemotron.py` to compare `nemotron.py` with NVIDIA's own implementation |
-| `data/` | about 0.4 GB | public test clips (Perle, ArzEn, Mixat) in three audio conditions, chunks of the test calls, and the 10-minute meeting excerpts |
+| `.venv-bench/` | 2.0 GB | an environment with PyTorch and Transformers, used by `bench/check_nemotron.py` to compare `nemotron.py` with NVIDIA's own implementation, and with pyarrow added, by the speaker models' public-set benchmarks (`bench/compare_ami.py`, `bench/compare_arzen.py`) |
+| `data/` | about 0.4 GB without the two folders below | public test clips (Perle, ArzEn, Mixat) in three audio conditions, chunks of the test calls, and the 10-minute meeting excerpts |
+| `data/ami/` | 1.9 GB | AMI's 16 test meetings for `bench/compare_ami.py`: the audio (1.0 GB), the files downloaded from Hugging Face (`download/`, 0.9 GB, needed only until the meetings are unpacked) and Nemotron's saved probabilities (`nemotron/`, 50 MB) |
+| `data/arzen-corpus/` | 1.4 GB | the ArzEn corpus for `bench/compare_arzen.py`, with Nemotron's saved probabilities (`nemotron/`, 67 MB). The zip it comes in (1.1 GB) isn't needed once it is unzipped |
 | `results/poc/`, `results/meetings/` | small | transcripts of the private calls and meetings |
 | `app_data/` | about 50 MB per hour of recordings | the app's transcriptions (16 kHz audio copies, transcripts, logs) and saved API keys. Delete a transcription in the app, or the whole folder |
 
