@@ -117,8 +117,10 @@ class UiTestCase(unittest.TestCase):
             raise unittest.SkipTest("Playwright is not installed (pip install -r requirements-dev.txt)")
         cls.home = Path(tempfile.mkdtemp(prefix="sedjem-ui-"))
         (cls.home / "app_data").mkdir()
-        # The first-start question about updates (a dialog over the page) is answered: no automatic checks
-        (cls.home / "app_data" / "settings.json").write_text(json.dumps({"update_check": False}), encoding="utf-8")
+        # The first-start dialog over the page is answered: no automatic checks for updates, and (since a key ships in
+        # app/config.toml) no usage counts, which the tests never send anyway
+        (cls.home / "app_data" / "settings.json").write_text(json.dumps({"update_check": False, "usage_counts": False}),
+                                                             encoding="utf-8")
         if cls.config:
             (cls.home / "app_data" / "config.toml").write_text(cls.config, encoding="utf-8")
         for job in cls.jobs:
