@@ -341,7 +341,7 @@ class UnpackTests(unittest.TestCase):
         self.assertEqual((folder / "libcublasLt.so.12").read_bytes(), LT)
         self.assertTrue(dl.status("cuda")["installed"])
         dl.remove("cuda")
-        self.assertEqual(list(folder.iterdir()), [])
+        self.assertFalse(folder.exists(), "nothing is left: the emptied folder goes too")
 
     def test_a_member_of_the_wrong_size_fails_cleanly(self):
         self.cuda_item(lt_size=len(LT) + 1)
@@ -381,6 +381,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_defaults_come_from_the_config(self):
         self.assertEqual(self.cfg.settings(), {"performance_while_running": False, "device": "auto", "threads": 10,
+                                               "speaker_model": "titanet-small",
                                                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
                                                "mcp_write": False,  # assistants only read until the user says
                                                "update_check": None, "update_channel": "stable", "update_skip": None})
@@ -389,6 +390,7 @@ class SettingsTests(unittest.TestCase):
         self.cfg.save_settings(device="cpu", threads=2, performance_while_running=True)
         again = Config(home=self.home)
         self.assertEqual(again.settings(), {"performance_while_running": True, "device": "cpu", "threads": 2,
+                                            "speaker_model": "titanet-small",
                                             "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [], "mcp_write": False,
                                             "update_check": None, "update_channel": "stable", "update_skip": None})
 

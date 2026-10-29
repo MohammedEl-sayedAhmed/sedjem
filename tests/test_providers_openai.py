@@ -313,8 +313,9 @@ class Flow(unittest.TestCase):
         (cls.tmp / "voiceprints.onnx").write_bytes(b"stand-in")  # so speaker labels count as ready
         cls.fake = cls.tmp / "fake_worker.py"
         cls.fake.write_text(FAKE_WORKER, encoding="utf-8")
-        (storage / "config.toml").write_text(
-            f'[local]\nvoiceprint_model = "{(cls.tmp / "voiceprints.onnx").as_posix()}"\n\n'
+        (storage / "config.toml").write_text(  # the speaker model in use: the stand-in, as TitaNet-small
+            f'[local]\nspeaker_models = [{{ id = "titanet-small", title = "TitaNet-small", '
+            f'path = "{(cls.tmp / "voiceprints.onnx").as_posix()}" }}]\n\n'
             f'[[models]]\nid = "openai"\nbase_url = "{url}/openai/v1"\nmax_part_s = 20\n\n'
             f'[[models]]\nid = "groq"\nbase_url = "{url}/groq/openai/v1"\nmax_part_mb = 0.05\n\n'
             f'[[models]]\nid = "mistral"\nbase_url = "{url}/mistral/v1"\n')
@@ -546,7 +547,7 @@ class Flow(unittest.TestCase):
 
 
 class VoiceStep(unittest.TestCase):
-    """Speaker labels from the voiceprints on this computer, for the models that give none."""
+    """Speaker labels from the speaker model on this computer, for the models that give none."""
 
     @classmethod
     def setUpClass(cls):
@@ -554,8 +555,10 @@ class VoiceStep(unittest.TestCase):
         sf.write(cls.tmp / "audio.flac", recording(10.0), SR, subtype="PCM_16", format="FLAC")
         cls.fake = cls.tmp / "fake_worker.py"
         cls.fake.write_text(FAKE_WORKER, encoding="utf-8")
-        cls.cfg = types.SimpleNamespace(local={"voiceprint_model": str(cls.tmp / "voiceprints.onnx")},
-                                        speakers_ready=lambda: True, path=Path, setting=lambda key: 10)
+        cls.cfg = Config(home=cls.tmp)  # with a stand-in for TitaNet-small, the speaker model chosen at first
+        cls.titanet = cls.tmp / "models" / "diarization" / "nemo_en_titanet_small.onnx"
+        cls.titanet.parent.mkdir(parents=True)
+        cls.titanet.write_bytes(b"stand-in")
 
     @classmethod
     def tearDownClass(cls):
@@ -594,8 +597,26 @@ class VoiceStep(unittest.TestCase):
         self.assertEqual((timeline.speaker(0, 10), timeline.speaker(30, 40)), ("1", "2"))
         argv = json.loads((self.tmp / "log.txt").read_text(encoding="utf-8").splitlines()[0])["argv"]
         self.assertEqual(argv, ["--speaker-timeline", str(self.tmp / "audio.flac"), "--speakers", "3",
-                                "--voiceprint-model", str(self.tmp / "voiceprints.onnx"), "--threads", "4"])
+                                "--voiceprint-model", str(self.titanet), "--threads", "4"])
+        self.assertEqual(timeline.model, "nemo_en_titanet_small.onnx")
+        self.assertEqual(H.result([], [], "whisper-large-v3", timeline)["meta"]["voiceprint_model"], "nemo_en_titanet_small.onnx")
         self.assertIsNone(H.voice_timeline(self.cfg, self.tmp, {"speakers": "none"}, print, lambda: False))
+
+    def test_voice_step_with_the_speaker_model_chosen(self):
+        """Nemotron-3-Diarization chosen in Settings: the step gets its folder, and at most 8 speakers."""
+        folder = self.tmp / "models" / "diarization" / "Nemotron-3-Diarization"
+        folder.mkdir(parents=True, exist_ok=True)
+        self.addCleanup(self.cfg.save_settings, speaker_model="titanet-small")
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        for name in ("config.json", "processor_config.json", "model.safetensors"):
+            (folder / name).write_bytes(b"{}")
+        self.cfg.save_settings(speaker_model="nemotron-3-diarization")
+        (self.tmp / "log.txt").unlink(missing_ok=True)
+        with mock.patch.object(engines, "worker_command", lambda cfg: [sys.executable, str(self.fake)]):
+            timeline = H.voice_timeline(self.cfg, self.tmp, {"speakers": 12}, lambda p: None, lambda: False)
+        argv = json.loads((self.tmp / "log.txt").read_text(encoding="utf-8").splitlines()[0])["argv"]
+        self.assertEqual(argv[2:6], ["--speakers", "8", "--voiceprint-model", str(folder)])
+        self.assertEqual(H.result([], [], "whisper-large-v3", timeline)["meta"]["voiceprint_model"], "Nemotron-3-Diarization")
 
     def test_voice_step_failure_and_cancel(self):
         with self.assertRaises(EngineError) as e:

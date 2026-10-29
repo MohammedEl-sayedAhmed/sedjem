@@ -20,6 +20,9 @@ from pathlib import Path
 FROZEN = bool(getattr(sys, "frozen", False))  # running from a PyInstaller build
 ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_CONFIG = ROOT / "app" / "config.toml"
+# The speaker model used while the one chosen isn't downloaded, and the download its file has always had
+FALLBACK_SPEAKER_MODEL = "titanet-small"
+SPEAKER_DOWNLOADS = {FALLBACK_SPEAKER_MODEL: "voiceprints"}
 
 
 def home_dir():
@@ -120,6 +123,7 @@ class Config:
     # Settings changed in the app (Settings → Speed) are saved to <storage>/settings.json and win over
     # the same keys in [local].
     SETTINGS = {"performance_while_running": False, "device": "auto", "threads": 10,
+                "speaker_model": FALLBACK_SPEAKER_MODEL,  # Settings → Models: an id of [[local.speaker_models]]
                 "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],  # assistants (app/assistants.py)
                 "mcp_write": False,  # assistants may save new versions of transcripts (off until the user turns it on)
                 # updates (app/updates.py): check by itself (None: not asked yet), the channel, a version or
@@ -146,6 +150,8 @@ class Config:
                     and 1 <= value <= max(1, os.cpu_count() or 1):
                 continue
             if key in ("mcp_courses", "mcp_recordings", "mcp_write") and isinstance(value, bool):
+                continue
+            if key == "speaker_model" and isinstance(value, str) and value in self.speaker_models():
                 continue
             if key == "mcp_hidden":
                 from .assistants import check_hidden  # (it imports this module)
@@ -220,16 +226,65 @@ class Config:
             return (True, None) if self.path(model["cohere_model"]).exists() else (False, "not downloaded")
         return False, f"unknown engine {model['engine']}"
 
+    # Speaker models (Settings → Models, [[local.speaker_models]]): the one chosen labels the speakers once it is
+    # downloaded, TitaNet-small until then, and without either there are no speaker labels.
+    def speaker_models(self):
+        """The speaker models by id, in the config's order, each with its `files` ([] if none) and `item`, the id
+        of its download."""
+        out = {}
+        for m in self.local.get("speaker_models", []):
+            m = {**m, "files": m.get("files") or [], "item": SPEAKER_DOWNLOADS.get(m["id"], m["id"])}
+            if m["id"] == FALLBACK_SPEAKER_MODEL and self.local.get("voiceprint_model"):
+                m["path"] = self.local["voiceprint_model"]  # a personal config from before the choice names its file
+            out[m["id"]] = m
+        return out
+
+    def speaker_model_ready(self, m):
+        """Whether a speaker model is on disk: its file, or every file of its folder."""
+        p = self.path(m["path"])
+        if p.is_dir():
+            return all(self.path(f["path"]).is_file() for f in m["files"])
+        return p.is_file()
+
+    def speaker_model_choice(self, models=None):
+        """The id of the speaker model chosen in Settings (else the config's, else TitaNet-small); None without any."""
+        models = self.speaker_models() if models is None else models
+        for mid in (self.setting("speaker_model"), self.local.get("speaker_model"), FALLBACK_SPEAKER_MODEL):
+            if isinstance(mid, str) and mid in models:
+                return mid
+        return next(iter(models), None)
+
+    def speaker_model(self):
+        """The speaker model in use: the one chosen if it is downloaded, else TitaNet-small if that is, else None."""
+        models = self.speaker_models()
+        for mid in (self.speaker_model_choice(models), FALLBACK_SPEAKER_MODEL):
+            if mid in models and self.speaker_model_ready(models[mid]):
+                return models[mid]
+        return None
+
     def speakers_ready(self):
-        return self.path(self.local["voiceprint_model"]).exists()
+        return self.speaker_model() is not None
+
+    def speaker_args(self, speakers):
+        """The speaker step's arguments for the speakers option ("none", "auto" or a number): the number (0 estimates
+        it; a model with max_speakers gets at most that many) and the path of the speaker model in use. [] when
+        labels are off or no speaker model is downloaded."""
+        m = None if speakers == "none" else self.speaker_model()
+        if m is None:
+            return []
+        n = 0 if speakers == "auto" else int(speakers)
+        if m.get("max_speakers"):
+            n = min(n, int(m["max_speakers"]))
+        return ["--speakers", str(n), "--voiceprint-model", str(self.path(m["path"]))]
 
     def download_items(self):
         """Everything the app can download: {id: {"title", "files": [{url, path, size, sha256}], "convert"}}
         (convert: a Transformers checkpoint turned into a faster-whisper model after the download)."""
         items = {mid: {"title": m["title"], "files": m["files"], "convert": m.get("convert")}
                  for mid, m in self.models.items() if m["kind"] == "local" and m.get("files")}
-        if self.local.get("voiceprint_files"):
-            items["voiceprints"] = {"title": "Voiceprint model (speaker labels)", "files": self.local["voiceprint_files"]}
+        for m in self.speaker_models().values():  # TitaNet-small's is "voiceprints", the others go by their id
+            if m["files"]:
+                items.setdefault(m["item"], {"title": f"{m['title']} (speaker labels)", "files": m["files"]})
         platform = "win32" if os.name == "nt" else sys.platform
         cuda = [f for f in self.local.get("cuda_files", []) if f.get("platform") == platform]
         if cuda:

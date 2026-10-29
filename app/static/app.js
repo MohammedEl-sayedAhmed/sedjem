@@ -169,8 +169,11 @@ const EXPORT_TYPES = { txt: ["Text", "text/plain"], srt: ["Subtitles", "applicat
 // the same file name the server suggests (server.py slug): letters, digits, _ and -, spaces to -
 const fileSlug = (t) => (t || "").replace(/[^\p{L}\p{N}_\s-]/gu, "").trim().replace(/\s+/g, "-").slice(0, 80) || "transcript";
 const DL_ACTIVE = new Set(["queued", "downloading", "verifying", "unpacking", "converting"]);
+// The speaker models (Settings → Models), and the one that labels the speakers now (null: none is downloaded)
+const speakerModels = () => S.status?.speaker_models?.models || [];
+const speakerModelUsed = () => speakerModels().find((x) => x.id === S.status.speaker_models.used) || null;
 const downloading = () => (S.status?.models || []).some((m) => m.download && DL_ACTIVE.has(m.download.state))
-  || [S.status?.voiceprints, S.status?.cuda, S.status?.deno].some((d) => d && DL_ACTIVE.has(d.state));
+  || [S.status?.voiceprints, S.status?.cuda, S.status?.deno, ...speakerModels().map((x) => x.download)].some((d) => d && DL_ACTIVE.has(d.state));
 // "Intel(R) Iris(R) Xe Graphics (ADL GT2)" -> "Intel Iris Xe Graphics"; short: "Iris Xe"
 const gpuName = (n) => (n || "").replace(/\((R|TM)\)/gi, "").replace(/\s*\([^)]*\)\s*$/, "").replace(/\s+/g, " ").trim();
 const gpuShort = (n) => gpuName(n).replace(/\b(Intel|NVIDIA|AMD|Radeon\(TM\)|Graphics|Laptop|GPU)\b/gi, "").replace(/\s+/g, " ").trim() || gpuName(n);
@@ -321,6 +324,14 @@ function speakerHint(m, speakers) {
   if (m?.id === "elevenlabs" && speakers !== "auto") return "ElevenLabs treats the number as the most speakers to find.";
   return "Labels Speaker 1, Speaker 2… by voice. Give the real number of people if you know it; auto-detect works well for larger meetings.";
 }
+// What a local model's speaker labels will be short of: no speaker model downloaded, or one that tells apart fewer
+// people than were asked for (the server gives it no more than that)
+function speakerLimits(m, speakers) {
+  if (m?.kind !== "local" || speakers === "none") return "";
+  if (!S.status.speakers_ready) return " <b>No speaker model is downloaded, so local models will skip speaker labels.</b>";
+  const sm = speakerModelUsed(), most = Number(sm?.max_speakers);
+  return most > 0 && /^\d+$/.test(speakers) && +speakers > most ? ` ${esc(sm.title)} tells at most ${most} people apart, so it labels up to ${most}.` : "";
+}
 
 function modelCard(m) {
   const f = S.form, sel = f.model === m.id;
@@ -398,7 +409,7 @@ function renderNew() {
     <div class="field">
       <span class="field-label">Speakers</span>
       <div class="segmented" id="spk">${speakerOpts.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.speakers === v}">${t}</button>`).join("")}<input type="number" id="spkN" min="1" max="20" placeholder="7+" value="${custom ? esc(f.speakers) : ""}" aria-label="Number of speakers"></div>
-      <p class="hint">${speakerHint(m, f.speakers)}${!st.speakers_ready && m?.kind === "local" ? " <b>The voiceprint model is not downloaded, so local models will skip speaker labels.</b>" : ""}</p>
+      <p class="hint" id="spkHint">${speakerHint(m, f.speakers)}${speakerLimits(m, f.speakers)}</p>
     </div>
     <div class="grid2">
       <div class="field">
@@ -508,7 +519,14 @@ function bindNew() {
   bindModelCards();
   $$("#spk button").forEach((b) => (b.onclick = () => { f.speakers = b.dataset.v; renderNew(); }));
   const spkN = $("#spkN");
-  spkN.oninput = () => { const n = parseInt(spkN.value, 10); if (n >= 1 && n <= 20) { f.speakers = String(n); $$("#spk button").forEach((b) => b.setAttribute("aria-pressed", "false")); } };
+  spkN.oninput = () => {
+    const n = parseInt(spkN.value, 10);
+    if (!(n >= 1 && n <= 20)) return;
+    f.speakers = String(n);
+    $$("#spk button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    const m = model(f.model);  // the hint follows the number without redrawing the field being typed in
+    $("#spkHint").innerHTML = speakerHint(m, f.speakers) + speakerLimits(m, f.speakers);
+  };
   $$("#lang button").forEach((b) => (b.onclick = () => { f.language = b.dataset.v; renderNew(); }));
   const title = $("#titleInput");
   if (title) title.oninput = (e) => (f.title = e.target.value);
@@ -1798,12 +1816,12 @@ function renderSettings(focus) {
   const hosted = st.models.filter((m) => m.kind === "hosted");
   const local = st.models.filter((m) => m.kind === "local" && m.download);
   const items = [...local.map((m) => ({ id: m.id, title: m.title, d: m.download, hub: m.hub, m })),
-    ...(st.voiceprints ? [{ id: "voiceprints", title: "Voiceprint model", d: st.voiceprints, note: "Tells the speakers apart by voice" }] : []),
     ...(st.deno ? [{ id: "deno", title: "Deno", d: st.deno, icon: YT_ICON.video,
       note: st.youtube?.runtime && !st.deno.installed ? `For YouTube links; ${st.youtube.runtime.name} is used for now` : "Answers YouTube's check, for YouTube links" }] : [])];
-  const readyLocal = items.filter((x) => x.d.installed || model(x.id)?.ready).length;
+  const speakers = speakerModels().length ? 1 : 0;  // the speaker models count as one, ready while one labels the speakers
+  const readyLocal = items.filter((x) => x.d.installed || model(x.id)?.ready).length + (speakers && speakerModelUsed() ? 1 : 0);
   const keys = hosted.filter((m) => m.key_source).length;
-  const counts = { models: `${readyLocal} of ${items.length}`, hosted: `${keys} of ${hosted.length}`, updates: st.update?.available ? "New" : "" };
+  const counts = { models: `${readyLocal} of ${items.length + speakers}`, hosted: `${keys} of ${hosted.length}`, updates: st.update?.available ? "New" : "" };
   if (!SET_TABS.some(([t]) => t === SET.tab)) SET.tab = "models";
 
   const nav = `<nav class="set-nav" role="tablist" aria-label="Settings sections">${SET_TABS.map(([t, icon, label]) =>
@@ -1858,8 +1876,51 @@ function modelsPanel(items) {
   }).join("");
   return `<h3>Models on this computer</h3>
     <div class="set-items">${rows || '<p class="hint">No downloadable models are configured.</p>'}</div>
+    ${speakerGroup()}
     <p class="hint">Downloads resume if the connection drops and are checked against a pinned checksum before use.
       <button type="button" class="linkish" data-set-tab="add">Find more models</button></p>`;
+}
+
+// Speaker labels: the speaker models, one row each with a radio button for the one that labels the speakers (saved at
+// once, like the switches) and its download. The one chosen is used once it is downloaded; until then the server uses
+// TitaNet-small if it is there (S.status.speaker_models.used), and the chosen row says so. Each row is named by its
+// title and described by its line and that note.
+const SPEAKER_DOCS = "https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/04-speaker-labels.md";
+function speakerGroup() {
+  const sp = S.status.speaker_models, list = speakerModels();
+  if (!list.length) return "";
+  const used = speakerModelUsed(), fallback = list.find((x) => x.id === sp.fallback);
+  const instead = used ? `${used.title} is used` : "there are no speaker labels";
+  const rows = list.map((x) => {
+    const id = esc(x.id), d = x.download, busy = !!d && DL_ACTIVE.has(d.state), chosen = x.id === sp.chosen;
+    let status = "", size = "", actions = "";
+    if (busy) size = "Downloading";
+    else if (d?.installed) {
+      status = setStatus("ok", "Downloaded", ICON.check);
+      size = `${bytes(d.on_disk || d.size)} on this computer`;
+      actions = `<button type="button" class="btn btn-sm btn-ghost btn-danger" data-dl-remove="${esc(x.item)}">Delete</button>`;
+    } else if (d) {
+      status = d.state === "error" ? setStatus("error", "Download failed") : setStatus("none", "Not downloaded");
+      size = `${bytes(d.size)} to download`;
+      actions = downloadBlock(x.item, d, true);
+    } else status = x.ready ? setStatus("ok", "On this computer", ICON.check) : setStatus("none", "Not on this computer");
+    const sub = [x.note, x.max_speakers ? `up to ${x.max_speakers} speakers` : "", size].filter(Boolean).join(" · ");
+    const note = chosen && !x.ready ? (busy ? `Downloading: ${instead} until it is done.` : `Not downloaded: ${instead} until it is.`) : "";
+    return `<div class="set-item${chosen ? " spk-chosen" : ""}">
+      <div class="set-item-row spk-row">
+        <input type="radio" class="spk-radio" name="speaker-model" id="spk-${id}" value="${id}" data-setting="speaker_model"${chosen ? " checked" : ""}
+          aria-labelledby="spk-${id}-name" aria-describedby="spk-${id}-sub${note ? ` spk-${id}-note` : ""}">
+        ${logoTile(x.maker || "", ICON.users, true)}
+        <label class="set-item-text" for="spk-${id}"><b id="spk-${id}-name">${esc(x.title)}</b><span id="spk-${id}-sub">${esc(sub)}</span>
+          ${note ? `<span class="spk-note" id="spk-${id}-note">${esc(note)}</span>` : ""}</label>
+        ${status}<div class="set-item-actions">${actions}</div></div>
+      ${busy ? `<div class="set-item-more">${downloadBlock(x.item, d, true)}</div>` : ""}</div>`;
+  }).join("");
+  return `<h3 class="set-group-head" id="spk-head">Speaker labels</h3>
+    <p class="hint spk-hint">The model that tells the speakers apart, for the local models and for hosted ones without labels of
+      their own. The one chosen is used once it is downloaded${fallback ? `, and ${esc(fallback.title)} until then` : ""}.
+      ${extLink(SPEAKER_DOCS, "How they compared on the project's meetings")}</p>
+    <div class="set-items spk-models" role="radiogroup" aria-labelledby="spk-head">${rows}</div>`;
 }
 
 function addPanel() {
@@ -2004,7 +2065,8 @@ function bindSettings(focus) {
   }));
   $$("input[data-setting]").forEach((el) => (el.onchange = async () => {
     const key = el.dataset.setting;
-    const value = key === "device" ? (el.checked ? "auto" : "cpu") : key === "threads" ? parseInt(el.value, 10) : el.checked;
+    const value = el.type === "radio" ? el.value  // the speaker model (Settings → Models)
+      : key === "device" ? (el.checked ? "auto" : "cpu") : key === "threads" ? parseInt(el.value, 10) : el.checked;
     if (key === "threads" && !(value >= 1 && value <= cores)) { el.value = threads; return; }
     try { S.status = await api.post("/api/settings", { [key]: value }); renderTop(); renderSettings(); if (S.route.name === "new") renderModelGrid(); toast("Saved"); }
     catch (e) { toast(e.message, "error"); }
@@ -2285,8 +2347,9 @@ async function refreshStatus() {
   try { S.status = await api.get("/api/status"); renderTop(); updStatus(); } catch (e) { /* server restarting */ }
 }
 
-// What the model cards and Settings show of each model: whether it is ready, and how its download stands
-const modelsShown = () => JSON.stringify((S.status?.models || []).map((m) => [m.id, m.ready, m.download?.state, m.download?.installed]));
+// What the model cards and Settings show of each model and speaker model: whether it is ready, and how its download stands
+const modelsShown = () => JSON.stringify([...(S.status?.models || []), ...speakerModels()]
+  .map((m) => [m.id, m.ready, m.download?.state, m.download?.installed]).concat([S.status?.speaker_models?.used]));
 
 let statusTimer = null;
 function scheduleStatus() {

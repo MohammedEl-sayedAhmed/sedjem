@@ -304,7 +304,7 @@ def groups(d):
           ("Started", when(run.get("started")), True),
           ("Finished", when(run.get("finished")), True),
           ("Peak memory", memory(run.get("peak_memory_mb")), True),
-          ("Voiceprints", run.get("voiceprint_model"), True),
+          ("Speaker model", run.get("voiceprint_model"), True),  # its file, or its folder (Nemotron-3-Diarization)
           ("App", version and f"Sedjem {version}", True))
     def found(value):  # a computer detail the app looked for but couldn't read
         return value or (NOT_DETECTED if run.get("computer_recorded") else None)

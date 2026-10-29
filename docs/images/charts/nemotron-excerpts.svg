@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="560" viewBox="0 0 800 560" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Meeting excerpts: TitaNet-small and Nemotron-3-Diarization</title>
+<rect x="0.5" y="0.5" width="799" height="559" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Meeting excerpts: TitaNet-small and Nemotron-3-Diarization</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">Nemotron counted the people right on every excerpt. TitaNet-small's estimate of the count</text>
+<text x="24" y="76" font-size="12" fill="#4b5563">was wrong only on m6, where it found fewer people than were there.</text>
+<rect x="24" y="92" width="12" height="12" rx="3" fill="#4b5563"/>
+<text x="42" y="102" font-size="12" fill="#4b5563">TitaNet-small, true number of people</text>
+<rect x="274.32" y="92" width="12" height="12" rx="3" fill="#aab2bd"/>
+<text x="292.32" y="102" font-size="12" fill="#4b5563">TitaNet-small, number estimated</text>
+<rect x="501.84" y="92" width="12" height="12" rx="3" fill="#5e8c14"/>
+<text x="519.84" y="102" font-size="12" fill="#4b5563">Nemotron-3-Diarization</text>
+<text x="156" y="132" font-size="13" fill="#1f2937" font-weight="600">Words given to the wrong speaker, %</text>
+<text x="156" y="147" font-size="11" fill="#6b7280">lower is better</text>
+<text x="140" y="176" font-size="13" fill="#1f2937" text-anchor="end">m1</text>
+<text x="140" y="190" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m1/people">2</tspan> people</text>
+<text x="140" y="216" font-size="13" fill="#1f2937" text-anchor="end">m2</text>
+<text x="140" y="230" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m2/people">3</tspan> people</text>
+<text x="140" y="256" font-size="13" fill="#1f2937" text-anchor="end">m3</text>
+<text x="140" y="270" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m3/people">3</tspan> people</text>
+<text x="140" y="296" font-size="13" fill="#1f2937" text-anchor="end">m4</text>
+<text x="140" y="310" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m4/people">3</tspan> people</text>
+<text x="140" y="336" font-size="13" fill="#1f2937" text-anchor="end">m5</text>
+<text x="140" y="350" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m5/people">2</tspan> people</text>
+<text x="140" y="383" font-size="13" fill="#1f2937" text-anchor="end">m6</text>
+<text x="140" y="397" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m6/people">5</tspan> people</text>
+<line x1="24" y1="418" x2="776" y2="418" stroke="#e5e7eb"/>
+<text x="140" y="442" font-size="13" fill="#1f2937" text-anchor="end">Pooled</text>
+<text x="140" y="456" font-size="11" fill="#6b7280" text-anchor="end">two or three people</text>
+<text x="140" y="489" font-size="13" fill="#1f2937" text-anchor="end">Pooled</text>
+<text x="140" y="503" font-size="11" fill="#6b7280" text-anchor="end">all six</text>
+<g data-axis="x" data-scale="0 40 156 636">
+<line x1="156" y1="158" x2="156" y2="412" stroke="#9ca3af" data-tick="0"/>
+<line x1="156" y1="424" x2="156" y2="518" stroke="#9ca3af" data-tick="0"/>
+<text x="156" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="276" y1="158" x2="276" y2="412" stroke="#e5e7eb" data-tick="10"/>
+<line x1="276" y1="424" x2="276" y2="518" stroke="#e5e7eb" data-tick="10"/>
+<text x="276" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="396" y1="158" x2="396" y2="412" stroke="#e5e7eb" data-tick="20"/>
+<line x1="396" y1="424" x2="396" y2="518" stroke="#e5e7eb" data-tick="20"/>
+<text x="396" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="516" y1="158" x2="516" y2="412" stroke="#e5e7eb" data-tick="30"/>
+<line x1="516" y1="424" x2="516" y2="518" stroke="#e5e7eb" data-tick="30"/>
+<text x="516" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<line x1="636" y1="158" x2="636" y2="412" stroke="#e5e7eb" data-tick="40"/>
+<line x1="636" y1="424" x2="636" y2="518" stroke="#e5e7eb" data-tick="40"/>
+<text x="636" y="534" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="40">40</text>
+<path d="M156,165 L207.2,165 Q211.2,165 211.2,169 L211.2,173 Q211.2,177 207.2,177 L156,177 Z" fill="#4b5563" data-ref="data/meetings/m1/whisper_wrong_speaker"/>
+<text x="217.2" y="174.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/whisper_wrong_speaker">4.6</tspan>%</text>
+<path d="M156,179 L184.4,179 Q188.4,179 188.4,183 L188.4,187 Q188.4,191 184.4,191 L156,191 Z" fill="#5e8c14" data-ref="data/nemotron_per_excerpt/m1"/>
+<text x="194.4" y="188.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_per_excerpt/m1">2.7</tspan>%</text>
+<path d="M156,205 L245.6,205 Q249.6,205 249.6,209 L249.6,213 Q249.6,217 245.6,217 L156,217 Z" fill="#4b5563" data-ref="data/meetings/m2/whisper_wrong_speaker"/>
+<text x="255.6" y="214.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/whisper_wrong_speaker">7.8</tspan>%</text>
+<path d="M156,219 L252.8,219 Q256.8,219 256.8,223 L256.8,227 Q256.8,231 252.8,231 L156,231 Z" fill="#5e8c14" data-ref="data/nemotron_per_excerpt/m2"/>
+<text x="262.8" y="228.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_per_excerpt/m2">8.4</tspan>%</text>
+<path d="M156,245 L276.8,245 Q280.8,245 280.8,249 L280.8,253 Q280.8,257 276.8,257 L156,257 Z" fill="#4b5563" data-ref="data/meetings/m3/whisper_wrong_speaker"/>
+<text x="286.8" y="254.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/whisper_wrong_speaker">10.4</tspan>%</text>
+<path d="M156,259 L272,259 Q276,259 276,263 L276,267 Q276,271 272,271 L156,271 Z" fill="#5e8c14" data-ref="data/nemotron_per_excerpt/m3"/>
+<text x="282" y="268.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_per_excerpt/m3">10.0</tspan>%</text>
+<path d="M156,285 L183.2,285 Q187.2,285 187.2,289 L187.2,293 Q187.2,297 183.2,297 L156,297 Z" fill="#4b5563" data-ref="data/meetings/m4/whisper_wrong_speaker"/>
+<text x="193.2" y="294.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/whisper_wrong_speaker">2.6</tspan>%</text>
+<path d="M156,299 L190.4,299 Q194.4,299 194.4,303 L194.4,307 Q194.4,311 190.4,311 L156,311 Z" fill="#5e8c14" data-ref="data/nemotron_per_excerpt/m4"/>
+<text x="200.4" y="308.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_per_excerpt/m4">3.2</tspan>%</text>
+<path d="M156,325 L350,325 Q354,325 354,329 L354,333 Q354,337 350,337 L156,337 Z" fill="#4b5563" data-ref="data/meetings/m5/whisper_wrong_speaker"/>
+<text x="360" y="334.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/whisper_wrong_speaker">16.5</tspan>%</text>
+<path d="M156,339 L364.4,339 Q368.4,339 368.4,343 L368.4,347 Q368.4,351 364.4,351 L156,351 Z" fill="#5e8c14" data-ref="data/nemotron_per_excerpt/m5"/>
+<text x="374.4" y="348.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_per_excerpt/m5">17.7</tspan>%</text>
+<path d="M156,365 L612.8,365 Q616.8,365 616.8,369 L616.8,373 Q616.8,377 612.8,377 L156,377 Z" fill="#4b5563" data-ref="data/meetings/m6/whisper_wrong_speaker"/>
+<text x="622.8" y="374.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/whisper_wrong_speaker">38.4</tspan>%</text>
+<path d="M156,379 L411.2,379 Q415.2,379 415.2,383 L415.2,387 Q415.2,391 411.2,391 L156,391 Z" fill="#aab2bd" data-ref="data/nemotron_largest_excerpt/titanet_small_estimated"/>
+<text x="421.2" y="388.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_largest_excerpt/titanet_small_estimated">21.6</tspan>%</text>
+<path d="M156,393 L384.8,393 Q388.8,393 388.8,397 L388.8,401 Q388.8,405 384.8,405 L156,405 Z" fill="#5e8c14" data-ref="data/nemotron_largest_excerpt/nemotron"/>
+<text x="394.8" y="402.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_largest_excerpt/nemotron">19.4</tspan>%</text>
+<path d="M156,431 L260,431 Q264,431 264,435 L264,439 Q264,443 260,443 L156,443 Z" fill="#4b5563" data-ref="data/meetings_two_or_three_people/whisper_wrong_speaker"/>
+<text x="270" y="440.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings_two_or_three_people/whisper_wrong_speaker">9.0</tspan>%</text>
+<path d="M156,445 L260,445 Q264,445 264,449 L264,453 Q264,457 260,457 L156,457 Z" fill="#5e8c14" data-ref="data/nemotron_per_excerpt/pooled_two_or_three"/>
+<text x="270" y="454.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron_per_excerpt/pooled_two_or_three">9.0</tspan>%</text>
+<path d="M156,471 L292.4,471 Q296.4,471 296.4,475 L296.4,479 Q296.4,483 292.4,483 L156,483 Z" fill="#4b5563" data-ref="data/nemotron/TitaNet-small voiceprints and clustering/wrong_speaker_true_count"/>
+<text x="302.4" y="480.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron/TitaNet-small voiceprints and clustering/wrong_speaker_true_count">11.7</tspan>%</text>
+<path d="M156,485 L274.4,485 Q278.4,485 278.4,489 L278.4,493 Q278.4,497 274.4,497 L156,497 Z" fill="#aab2bd" data-ref="data/nemotron/TitaNet-small voiceprints and clustering/wrong_speaker_estimated_count"/>
+<text x="284.4" y="494.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron/TitaNet-small voiceprints and clustering/wrong_speaker_estimated_count">10.2</tspan>%</text>
+<path d="M156,499 L272,499 Q276,499 276,503 L276,507 Q276,511 272,511 L156,511 Z" fill="#5e8c14" data-ref="data/nemotron/Nemotron-3-Diarization/wrong_speaker_estimated_count"/>
+<text x="282" y="508.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron/Nemotron-3-Diarization/wrong_speaker_estimated_count">10.0</tspan>%</text>
+</g>
+</svg>

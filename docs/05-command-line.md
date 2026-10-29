@@ -37,10 +37,13 @@ Other models:
 
 - Stock Whisper large-v3 (`--whisper-model large-v3`) loads from the Hugging Face cache and is not
   downloaded automatically: `.venv/bin/hf download Systran/faster-whisper-large-v3` (3 GB).
-- The other voiceprint models are needed only by `bench/compare_voiceprints.py`, which skips any that
-  are missing: `wespeaker_en_voxceleb_resnet34_LM.onnx`, `wespeaker_en_voxceleb_resnet152_LM.onnx`,
-  `nemo_en_titanet_large.onnx` and `3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx`,
-  from the same release as TitaNet-small, into `models/diarization/`.
+- The other speaker models: TitaNet-large, 3D-Speaker CAM++ and NVIDIA Nemotron-3-Diarization can be
+  downloaded and chosen in the app (Settings → Models); on the command line, pass the file or, for
+  Nemotron, the folder with `--voiceprint-model`, for example
+  `--voiceprint-model models/diarization/Nemotron-3-Diarization`. The WeSpeaker models
+  (`wespeaker_en_voxceleb_resnet34_LM.onnx`, `wespeaker_en_voxceleb_resnet152_LM.onnx`, from the same
+  release as TitaNet-small, into `models/diarization/`) are used only by `bench/compare_voiceprints.py`,
+  which skips any model that is missing.
 - The Qwen3-ASR family (R2T2, Qwen3-ASR, Audar) needs llama.cpp's server. Unpack
   `llama-b11165-bin-ubuntu-x64.tar.gz` from the
   [llama.cpp releases](https://github.com/ggml-org/llama.cpp/releases/tag/b11165) into `tools/llama/`,
@@ -205,9 +208,31 @@ Private meeting recordings with reference transcripts (the expected layout is de
 .venv/bin/python transcribe.py data/private-meetings/mK.wav --engine cohere --out results/meetings/cohere-plain
 .venv/bin/python bench/score_meetings.py        # scores every folder in results/meetings/ as one engine
 .venv/bin/python bench/compare_voiceprints.py   # relabels the whisper words with each voiceprint model
+.venv/bin/python bench/compare_nemotron.py      # and with Nemotron-3-Diarization, against TitaNet-small
 ```
 
+`bench/compare_nemotron.py` uses the model the app downloads (Settings → Models).
+`bench/check_nemotron.py` compares `nemotron.py` with NVIDIA's Transformers implementation, so it
+needs PyTorch and Transformers, in an environment of its own, `.venv-bench/`; its first lines say how
+to set it up.
+
 Their audio, transcripts and results stay in the git-ignored `data/` and `results/meetings/`.
+
+The speaker models are also scored on two public sets, so that others can check the numbers
+([results](04-speaker-labels.md#public-test-sets-arzen-and-ami)). `bench/compare_ami.py` downloads the
+16 meetings of AMI's test set (0.9 GB, from Hugging Face at a pinned revision) into `data/ami/`, and
+needs pyarrow to read them. `bench/compare_arzen.py` reads the ArzEn corpus, a download after a form
+on [its site](https://sites.google.com/view/arzen-corpus/resources), unzipped into
+`data/arzen-corpus/`. Both run in `.venv-bench/`, score the three voiceprint models and Nemotron
+(which they take from `models/diarization/`, where the app downloads them), and write
+`results/ami-diarization.json` and `results/arzen-diarization.json`. They keep Nemotron's
+probabilities next to the data, so `--reuse` scores them again without running it:
+
+```sh
+uv pip install --python .venv-bench pyarrow
+.venv-bench/bin/python bench/compare_ami.py      # about an hour; --meetings N for the first N only
+.venv-bench/bin/python bench/compare_arzen.py    # about 85 minutes; --recordings N for the first N only
+```
 
 ## Files
 
@@ -215,11 +240,13 @@ Their audio, transcripts and results stay in the git-ignored `data/` and `result
 |---|---|
 | `transcribe.py` | the command line: engines, chunking, gap-fill, speaker attribution, checkpoints |
 | `speakers.py` | voice-based speaker separation |
+| `nemotron.py` | NVIDIA Nemotron-3-Diarization in NumPy, the speaker model that can replace the voiceprints |
 | `sysinfo.py` | this computer and the input file's format, for the `.meta.json` (the app uses it too) |
 | `align.py` | forced alignment for engines without word times (experimental) |
 | `bench/serve.sh` | starts llama-server (127.0.0.1 only) for r2t2, qwen3asr or audar |
 | `bench/prepare_data.py`, `run_bench.py`, `run_configs.sh`, `score.py` | the public-set benchmark |
-| `bench/prepare_private_meetings.py`, `score_meetings.py`, `eval_meetings.py`, `compare_voiceprints.py` | scoring on private meetings with reference transcripts (data and results stay git-ignored) |
+| `bench/prepare_private_meetings.py`, `score_meetings.py`, `eval_meetings.py`, `compare_voiceprints.py`, `compare_nemotron.py`, `check_nemotron.py` | scoring on private meetings with reference transcripts (data and results stay git-ignored) |
+| `bench/compare_ami.py`, `compare_arzen.py` | the speaker models on the public AMI meetings and ArzEn interviews (data git-ignored, scores in `results/`) |
 | `bench/fetch_models.py` | resumable, checksum-verified model downloader (`bench/run_bench.py --device gpu` benchmarks on the GPU) |
 | `bench/samples/` | the pinned clip lists of the public test sets |
 | `tests/` | unit tests (`.venv/bin/python -m unittest discover -s tests -v`) |

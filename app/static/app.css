@@ -789,6 +789,15 @@ label.set-row { cursor: pointer; }
 .set-item-more .row .region { flex: 0 1 11em; min-width: 7em; }
 .set-item-more .dl { margin: 0; }
 
+/* Speaker labels (Models): a radio button for the speaker model used, before its logo, and on the chosen row what is
+   used while it isn't downloaded */
+.set-panel > h3.set-group-head { margin-top: 24px; }
+.spk-radio { flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer; }
+.spk-row label.set-item-text { cursor: pointer; }
+.set-item-text .spk-note { color: var(--warn); font-weight: 550; }
+.spk-models .set-item.spk-chosen { background: color-mix(in srgb, var(--accent) 4%, var(--surface)); }
+.spk-models .set-item-more { padding-left: 84px; }
+
 /* a row's key facts, and everything known about the model once the row is opened */
 .set-item-row:has(> .set-facts) { flex-wrap: wrap; row-gap: 0; }
 .set-facts { flex: 1 0 calc(100% - 40px); min-width: 0; margin: -3px 0 0 40px; font-size: 12px; color: var(--muted);
@@ -843,7 +852,9 @@ label.set-row { cursor: pointer; }
   .set-facts { order: 1; margin-top: -6px; }
   .set-item-row > .status, .set-item-actions { order: 2; }
   .set-item-actions { margin-left: auto; }
-  .set-item-more { padding-left: 14px; }
+  .set-item-more, .spk-models .set-item-more { padding-left: 14px; }
+  .spk-row .set-item-text { flex-basis: calc(100% - 82px); }  /* the radio button and the logo before it */
+  .spk-row > .status { margin-left: 70px; }
   .set-item-more .row { flex-wrap: wrap; }
   .set-item-more .row input[type="password"] { flex-basis: 100%; }
   .set-details { padding-left: 14px; }

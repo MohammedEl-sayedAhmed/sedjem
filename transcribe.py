@@ -141,14 +141,14 @@ def speaker_lines(engine, audio, timeline, on_chunk=None):
                 items = engine.words(chunk)
             for ws, we, word in items:
                 s, e = a / SR + ws, a / SR + we
-                speaker = timeline.speaker_at((s + e) / 2)
+                speaker = timeline.speaker_over(s, e)
                 add(s, e, speaker, word)
                 words.append([round(s, 2), round(e, 2), word, speaker])
         else:
             for x, y in speaker_pieces(audio, a, b, timeline):
                 text = engine(np.concatenate([audio[x:y], TAIL]))
                 if text:
-                    add(x / SR, y / SR, timeline.speaker_at((x + y) / 2 / SR), text)
+                    add(x / SR, y / SR, timeline.speaker_over(x / SR, y / SR), text)
         if on_chunk:
             on_chunk(i, len(chunks), lines)
     return lines, words
@@ -499,7 +499,8 @@ def main():
     ap.add_argument("--speakers", type=int, metavar="N",
                     help="label speakers: the number of speakers, or 0 to estimate it")
     ap.add_argument("--voiceprint-model", default=str(speakers.MODEL),
-                    help="speaker-embedding ONNX model for --speakers (default: TitaNet-small)")
+                    help="speaker model for --speakers: a speaker-embedding ONNX file (default: TitaNet-small) "
+                         "or the Nemotron-3-Diarization folder")
     ap.add_argument("--out", default=str(Path(__file__).resolve().parent / "results" / "poc"),
                     help="output folder (default: results/poc)")
     ap.add_argument("--threads", type=int, default=10)

@@ -20,9 +20,9 @@ The public sets were downloaded, never uploaded. The clips used are pinned in `b
 
 | Set | What | Clips | Notes |
 |---|---|---|---|
-| Perle (`Perle-ai/ASR_Code_Switch`, Egyptian rows) | Egyptian Arabic–English sentences about tech, work and daily life | 40 random (seed 42), 4.3 min, 648 reference words | The closest to the target meetings, and the main public test. Taken from the dataset's only split, *train*, and published in May 2026, so models released later may have trained on it |
+| Perle (`Perle-ai/ASR_Code_Switch`, Egyptian rows) | Egyptian Arabic–English sentences about tech, work and daily life ([Perle's paper](https://arxiv.org/abs/2605.19069)) | 40 random (seed 42), 4.3 min, 648 reference words | The closest to the target meetings, and the main public test. Taken from the dataset's only split, *train*, and published in May 2026, so models released later may have trained on it |
 | Real meetings | 10-minute excerpts of 6 real work meetings, with ElevenLabs references | 60 min | The in-domain test, described [below](#real-meetings) |
-| ArzEn (validation split) | Egyptian Arabic–English conversational interviews | 40 random, 6.5 min (37 contain English words; 3 are Arabic apart from tags like `[HES]`) | Conversational Egyptian. Several Arabic fine-tunes were trained on it ([below](#arzen-conversations)) |
+| ArzEn (validation split) | Egyptian Arabic–English conversational interviews ([Hamed, Vu and Abdennadher 2020](https://aclanthology.org/2020.lrec-1.523/), CC BY-SA 4.0) | 40 random, 6.5 min (37 contain English words; 3 are Arabic apart from tags like `[HES]`) | Conversational Egyptian. Several Arabic fine-tunes were trained on it ([below](#arzen-conversations)) |
 | The test call | a 2-minute 8 kHz call with 2 speakers, no reference | 1 | Judged by reading |
 
 Every public clip was run in three audio conditions: `wav16k` (the original at 16 kHz), `phone`

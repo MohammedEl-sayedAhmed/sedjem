@@ -48,7 +48,8 @@ recording on your machine unless you choose a hosted service.
   chosen, or read in place from a path on the computer.
 - Runs three models on your computer: Cohere Transcribe Arabic, a whisper-medium fine-tune for
   Arabic–English code-switching, and Whisper large-v3 with an Egyptian style hint.
-- Labels speakers by their voiceprints. Give the number of people, or let it estimate.
+- Labels speakers by voice, with the speaker model chosen in Settings: TitaNet-small by default, or
+  another such as NVIDIA's Nemotron-3-Diarization. Give the number of people, or let it estimate.
 - Or sends the recording to one of nine hosted services with your own API key: ElevenLabs,
   Speechmatics, Google Gemini, Deepgram, AssemblyAI, Azure AI Speech, OpenAI, Groq and Mistral.
   A recording is uploaded only after you tick the box that allows it, every time.
@@ -138,6 +139,23 @@ the wrong person, against 6% for ElevenLabs' own labels. Treat the local transcr
 drafts. For minutes that people will rely on, a hosted model is still more accurate. The method and
 every number are in [the results](docs/03-results.md).
 
+### Speaker labels
+
+Four speaker models can be chosen in *Settings → Models*: the voiceprint models TitaNet-small (the
+default, 40 MB), TitaNet-large and 3D-Speaker CAM++, and NVIDIA's Nemotron-3-Diarization (397 MB),
+which does the whole job in one model and also hears when two people talk at once. On the meeting
+excerpts and on two public sets, ArzEn's Egyptian Arabic–English interviews and AMI's English
+meetings, Nemotron gave the least to the wrong person.
+
+![Three panels of horizontal bars, one per test set, of the share given to the wrong person by TitaNet-small, TitaNet-large, 3D-Speaker CAM++ and Nemotron-3-Diarization, with Nemotron the lowest on all three](docs/images/charts/speaker-models.svg)
+
+*The share of the words (meeting excerpts) or of the speech (ArzEn and AMI) given to the wrong person, with the number of people estimated.*
+
+TitaNet-small stays the default: it is level with Nemotron on meetings of two or three people, a
+tenth of its size and four to six times faster. Nemotron is the better choice for meetings of four or
+more people and for heavy crosstalk. The method, the tables, the conclusions and the sources are in
+[speaker labels](docs/04-speaker-labels.md#conclusions).
+
 ### Hosted services
 
 Each one needs your own API key, entered in *Settings → Hosted services*. Apart from ElevenLabs'
@@ -150,7 +168,7 @@ published figure, none of them has been measured on Egyptian speech by the proje
 | Google Gemini | Gemini 3.5 Transcribe | code-switching | built in |
 | AssemblyAI | Universal-3.5 Pro | code-switching | built in |
 | OpenAI | gpt-transcribe, or gpt-4o-transcribe-diarize for labels | told to expect both | built in |
-| Groq | Whisper large-v3 with the Egyptian hint | like the local Whisper large-v3 | from voiceprints on your computer |
+| Groq | Whisper large-v3 with the Egyptian hint | like the local Whisper large-v3 | from the speaker model on your computer |
 | Mistral | Voxtral Mini Transcribe 2 | detects the language | built in |
 | Deepgram | Nova-3, `ar-EG` | one language per recording | built in |
 | Azure AI Speech | fast transcription, `ar-EG` | one language per recording | built in |
@@ -245,7 +263,8 @@ The [latest release](https://github.com/MohammedEl-sayedAhmed/sedjem/releases/la
 build (`Sedjem-<version>-linux-x64.tar.gz`): unpack it and run `Sedjem/Sedjem`.
 
 On first start, open *Settings → Models* and download whisper-medium (778 MB) or
-Cohere (1.6 GB). The voiceprint model for speaker labels (40 MB) comes with the first one.
+Cohere (1.6 GB). TitaNet-small, the speaker model for speaker labels (40 MB), comes with the first
+one; the other speaker models can be chosen and downloaded under *Speaker labels* on the same tab.
 
 ### The desktop app
 
@@ -257,8 +276,10 @@ the server, for any browser to use. The details are in [the desktop notes](docs/
 ## How it works
 
 The recording is cut at pauses (Silero VAD) into pieces of up to 25 seconds, and each piece goes to
-the speech model. Separately, a voiceprint model (NVIDIA TitaNet-small) describes what the voice
-sounds like every 0.75 seconds, and spectral clustering groups those voiceprints into speakers.
+the speech model. Separately, a voiceprint model (NVIDIA TitaNet-small by default) describes what the
+voice sounds like every 0.75 seconds, and spectral clustering groups those voiceprints into speakers.
+NVIDIA's Nemotron-3-Diarization, which can be chosen instead in Settings, does this in one model: it
+gives every speaker's probability every 10 ms, and on the test meetings it did better with five people.
 Whisper gives every word a time, so each word gets the speaker whose voice is heard at that
 moment; for Cohere, which gives no word times, the pieces are cut where the voice changes.
 It all runs on the processor, or on a graphics card when one works.
@@ -292,7 +313,7 @@ was tried first and is not usable for this: it wrote most English terms in Arabi
 | [Use case](docs/01-use-case.md) | the recordings, the test audio and the original question |
 | [Trials and issues](docs/02-trials-and-issues.md) | every experiment in order, what broke and how it was fixed |
 | [Results](docs/03-results.md) | method, public benchmark, phone audio, real meetings, caveats |
-| [Speaker labels](docs/04-speaker-labels.md) | how voices are told apart, and five voiceprint models compared |
+| [Speaker labels](docs/04-speaker-labels.md) | how voices are told apart, the speaker models compared on real meetings, ArzEn and AMI, and which to use |
 | [Command line](docs/05-command-line.md) | setup, options, speed and memory |
 | [Market research](docs/06-market-research.md) | hosted services and open models, free tiers, privacy terms |
 | [Recommendation](docs/07-recommendation.md) | what to use for which job |
@@ -327,9 +348,13 @@ Cohere Transcribe Arabic (the
 [GGUF build](https://huggingface.co/handy-computer/cohere-transcribe-arabic-07-2026-gguf) from
 handy-computer, run with transcribe.cpp), OpenAI Whisper through
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) and CTranslate2,
-[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with NVIDIA TitaNet, Silero VAD, PyAV,
-[pywebview](https://pywebview.flowrl.com/), PyInstaller and Inno Setup. The benchmark uses the
-[Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch) and ArzEn test sets.
+[sherpa-onnx](https://github.com/k2-fsa/sherpa-onnx) with NVIDIA TitaNet and 3D-Speaker CAM++,
+[NVIDIA Nemotron-3-Diarization](https://huggingface.co/nvidia/Nemotron-3-Diarization) (run with NumPy), Silero VAD, PyAV,
+[pywebview](https://pywebview.flowrl.com/), PyInstaller and Inno Setup. The benchmarks use the
+[Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch),
+[ArzEn](https://aclanthology.org/2020.lrec-1.523/) and [AMI](https://groups.inf.ed.ac.uk/ami/corpus/)
+test sets; the papers and licences behind the speaker labels are listed in
+[their references](docs/04-speaker-labels.md#references).
 
 ## Licence
 
@@ -347,7 +372,9 @@ and the commercial licence.
 
 The models keep their own licences: the whisper-medium fine-tune and Whisper large-v3 are MIT (check
 the fine-tune's card for its training data), Cohere Transcribe Arabic and the Whisper tokenizer are
-Apache-2.0, and NVIDIA TitaNet through sherpa-onnx is CC-BY-4.0. The desktop build bundles
+Apache-2.0, NVIDIA TitaNet-small comes under the NeMo toolkit's Apache-2.0 licence and TitaNet-large
+is CC-BY-4.0, 3D-Speaker CAM++ is Apache-2.0, and
+NVIDIA Nemotron-3-Diarization is under the OpenMDW 1.1 licence, which allows commercial use. The desktop build bundles
 third-party packages under their own licences, including the FFmpeg libraries that come with PyAV
 (LGPL). The hosted services are used under their own terms. The full-colour logos of the models,
 services and some systems are the brands' own files, taken from their brand pages and sites (and one

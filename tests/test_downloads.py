@@ -74,7 +74,7 @@ class DownloadTests(unittest.TestCase):
         f = {"url": self.url + path, "path": "models/test/model.bin", "size": len(PAYLOAD),
              "sha256": sha or hashlib.sha256(PAYLOAD).hexdigest()}
         self.cfg.models = {"t": {"id": "t", "kind": "local", "title": "Test", "files": [f]}}
-        self.cfg.local = {**self.cfg.local, "voiceprint_files": []}
+        self.cfg.local = {**self.cfg.local, "speaker_models": []}
         return f
 
     def wait(self, dl, item_id="t", until=("done", "error", "cancelled")):
