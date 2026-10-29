@@ -416,7 +416,13 @@ class Wiring(unittest.TestCase):
         self.assertTrue(update.endswith("Check: IsUpdate"))
         self.assertIn("ExpandConstant('{param:UPDATE|0}') = '1'", iss)
         self.assertRegex(iss, r'\[InstallDelete\]\n(;.*\n)*Type: filesandordirs; Name: "\{app\}\\_internal"\n')
-        self.assertNotIn("localappdata", iss.lower().split("[setup]")[1], "setup never touches the data folder")
+        # setup deletes nothing of the data folder, and writes only the Privacy page's choice, beside Sedjem.exe
+        deletes = re.findall(r"^\[(?:Install|Uninstall)Delete\]\n(.*?)(?=^\[)", iss, re.S | re.M)
+        self.assertNotIn("localappdata", "".join(deletes).lower(), "setup never deletes from the data folder")
+        code = iss.split("\n[Code]\n")[1]
+        for call in ("DeleteFile(", "DelTree(", "RenameFile(", "RemoveDir(", "SaveStringsTo"):
+            self.assertNotIn(call, code)
+        self.assertEqual(code.count("SaveStringToFile("), 1)
 
 
 if __name__ == "__main__":

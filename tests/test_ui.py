@@ -150,6 +150,7 @@ class SettingsDialog(UiTestCase):
         self.assertIn("AGPL-3.0", about.inner_text())
         links = about.locator("a").evaluate_all("els => els.map(a => a.href)")
         self.assertIn("https://github.com/MohammedEl-sayedAhmed/sedjem", links)
+        self.assertIn("https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md", links)
 
     def test_one_tab_at_a_time_and_the_keyboard_moves_between_them(self):
         self.open()

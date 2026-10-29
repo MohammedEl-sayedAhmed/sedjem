@@ -7,10 +7,23 @@
 ; Update mode, used by Sedjem's own updates: installs over the existing installation without a question and
 ; starts the new Sedjem when it is done, although setup is silent:
 ;   Sedjem-<version>-setup.exe /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /UPDATE=1
+;
+; Installed by hand, setup shows a Privacy page with the box for the anonymous usage counts (see [Code]). A silent
+; installation (winget, Sedjem's own updates) never shows it and never changes the setting, unless /USAGECOUNTS=0
+; asks it to turn the counts off:
+;   Sedjem-<version>-setup.exe /VERYSILENT /SUPPRESSMSGBOXES /NORESTART /USAGECOUNTS=0
 
 #define AppVersion GetEnv("SEDJEM_VERSION")
 #if AppVersion == ""
   #define AppVersion "0.3.1"
+#endif
+
+; the version as the four numbers of setup's own version resource: 0.3.1-preview.20261030 is 0.3.1.0
+#define NumericVersion Pos("-", AppVersion) ? Copy(AppVersion, 1, Pos("-", AppVersion) - 1) : AppVersion
+
+; the Privacy page's link (TNewLinkLabel) came with Inno Setup 6.3
+#if Ver < EncodeVer(6, 3, 0)
+  #error Inno Setup 6.3 or later is needed
 #endif
 
 [Setup]
@@ -22,6 +35,15 @@ AppPublisher=Mohammed El-sayed Ahmed
 AppPublisherURL=https://github.com/MohammedEl-sayedAhmed
 AppSupportURL=https://github.com/MohammedEl-sayedAhmed/sedjem
 AppCopyright=Copyright (C) 2026 Mohammed El-sayed Ahmed
+; setup's version resource, which Windows shows in the file's properties: the same product name and version as
+; Sedjem.exe's (desktop/build.py), the version in full as text and as four numbers
+VersionInfoProductName=Sedjem
+VersionInfoProductTextVersion={#AppVersion}
+VersionInfoProductVersion={#NumericVersion}
+VersionInfoVersion={#NumericVersion}
+VersionInfoCompany=Mohammed El-sayed Ahmed
+VersionInfoDescription=Sedjem Setup
+VersionInfoCopyright=Copyright (C) 2026 Mohammed El-sayed Ahmed
 LicenseFile=..\LICENSE
 DefaultDirName={autopf}\Sedjem
 DefaultGroupName=Sedjem
@@ -46,6 +68,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 ; package's metadata, for one) would be loaded beside the new ones. The data folder is elsewhere.
 Type: filesandordirs; Name: "{app}\_internal"
 
+[UninstallDelete]
+; the Privacy page's choice, if Sedjem never started to take it (see [Code])
+Type: files; Name: "{app}\installer.json"
+
 [Files]
 Source: "..\dist\Sedjem\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
@@ -66,4 +92,137 @@ Filename: "{app}\Sedjem.exe"; Flags: nowait runasoriginaluser; Check: IsUpdate
 function IsUpdate: Boolean;
 begin
   Result := ExpandConstant('{param:UPDATE|0}') = '1';
+end;
+
+// The Privacy page, after the licence in an installation by hand: what Sedjem sends, a link to the privacy policy,
+// and the box for the anonymous usage counts (docs/privacy.md, docs/13-usage-counts.md), which counts as Sedjem's
+// first-start notice. The choice is left beside Sedjem.exe in installer.json, {"usage_counts": the box, "changed":
+// whether it was changed from how the page showed it}, and Sedjem applies it at its next start to whichever data folder
+// it uses, SEDJEM_HOME included, then deletes it (app/config.py, Config.apply_installer_choice). Setup never writes to
+// the data folder.
+const
+  PrivacyPolicy = 'https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md';
+
+var
+  UsageBox: TNewCheckBox;
+  UsageWasOff: Boolean;  // settings.json already has the counts off, so the box starts unticked
+
+// Where the installed Sedjem keeps its data, found as app/config.py finds it, only to start the box as it is set:
+// %LOCALAPPDATA%\Sedjem, or the Tafrigh folder of an older version that Sedjem hasn't renamed yet. '' when SEDJEM_HOME
+// or TAFRIGH_HOME is set here, since Sedjem may be started with other values: the box then starts ticked, and leaving
+// it so never turns back on counts that were off (see "changed").
+function DataFolder: String;
+var
+  Base: String;
+begin
+  Result := '';
+  if (GetEnv('SEDJEM_HOME') <> '') or (GetEnv('TAFRIGH_HOME') <> '') then
+    exit;
+  Base := GetEnv('LOCALAPPDATA');
+  if Base = '' then
+    Base := ExpandConstant('{localappdata}');
+  Result := AddBackslash(Base) + 'Sedjem';
+  if not DirExists(Result) and DirExists(AddBackslash(Base) + 'Tafrigh') then
+    Result := AddBackslash(Base) + 'Tafrigh';
+end;
+
+// Whether settings.json has the counts turned off, as Sedjem writes it: "usage_counts": false
+function UsageCountsOffBefore: Boolean;
+var
+  Folder: String;
+  Saved: AnsiString;
+  Settings: String;
+begin
+  Result := False;
+  Folder := DataFolder;
+  if (Folder <> '') and LoadStringFromFile(AddBackslash(Folder) + 'app_data\settings.json', Saved) then begin
+    Settings := Saved;
+    StringChangeEx(Settings, ' ', '', True);
+    StringChangeEx(Settings, #9, '', True);
+    StringChangeEx(Settings, #13, '', True);
+    StringChangeEx(Settings, #10, '', True);
+    Result := Pos('"usage_counts":false', Settings) > 0;
+  end;
+end;
+
+// /USAGECOUNTS=0: the counts off, in a silent installation too
+function UsageCountsOffParam: Boolean;
+begin
+  Result := ExpandConstant('{param:USAGECOUNTS|1}') = '0';
+end;
+
+function JsonBool(Value: Boolean): String;
+begin
+  if Value then
+    Result := 'true'
+  else
+    Result := 'false';
+end;
+
+// installer.json beside Sedjem.exe, for Sedjem's next start (see above)
+procedure LeaveUsageChoice(Value, Changed: Boolean);
+begin
+  SaveStringToFile(ExpandConstant('{app}\installer.json'),
+    '{"usage_counts": ' + JsonBool(Value) + ', "changed": ' + JsonBool(Changed) + '}', False);
+end;
+
+procedure OpenLink(Sender: TObject; const Link: String; LinkType: TSysLinkType);
+var
+  ErrorCode: Integer;
+begin
+  ShellExecAsOriginalUser('open', Link, '', '', SW_SHOWNORMAL, ewNoWait, ErrorCode);
+end;
+
+procedure InitializeWizard;
+var
+  Page: TWizardPage;
+  Summary: TNewStaticText;
+  Link: TNewLinkLabel;
+begin
+  UsageWasOff := UsageCountsOffBefore;
+  Page := CreateCustomPage(wpLicense, 'Privacy', 'What Sedjem sends, and the anonymous usage counts');
+
+  Summary := TNewStaticText.Create(Page);
+  Summary.AutoSize := False;
+  Summary.WordWrap := True;
+  Summary.Width := Page.SurfaceWidth;
+  Summary.Caption :=
+    'Sedjem works on this computer: recordings, transcripts and keys stay in its data folder, and there is no ' +
+    'account. It goes online only for what you ask of it: the models you download, the YouTube links you add, ' +
+    'the hosted services you choose with your own keys, and update checks when you allow them.' + #13#10#13#10 +
+    'It also sends anonymous usage counts to Aptabase, in the EU, a few times a month: the version, the system ' +
+    'and the computer in broad terms, some settings, which models are downloaded, and how Sedjem is used, such ' +
+    'as how many transcriptions were made with which models. Never recordings, transcripts, names, file names ' +
+    'or keys, and no identifier. Settings > About in Sedjem turns them on or off at any time.';
+  Summary.Parent := Page.Surface;
+  Summary.AdjustHeight;
+
+  Link := TNewLinkLabel.Create(Page);
+  Link.AutoSize := False;
+  Link.Top := Summary.Top + Summary.Height + ScaleY(12);
+  Link.Width := Page.SurfaceWidth;
+  Link.Caption := 'The <a href="' + PrivacyPolicy + '">privacy policy</a> has everything Sedjem sends, to whom ' +
+    'and when.';
+  Link.OnLinkClick := @OpenLink;
+  Link.Parent := Page.Surface;
+  Link.AdjustHeight;
+
+  UsageBox := TNewCheckBox.Create(Page);
+  UsageBox.Top := Link.Top + Link.Height + ScaleY(16);
+  UsageBox.Width := Page.SurfaceWidth;
+  UsageBox.Height := ScaleY(17);
+  UsageBox.Caption := '&Send anonymous usage counts';
+  UsageBox.Checked := not (UsageWasOff or UsageCountsOffParam);
+  UsageBox.Parent := Page.Surface;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+begin
+  if CurStep <> ssPostInstall then
+    exit;
+  if not WizardSilent then
+    // changed: the box differs from what the page showed by itself, ticked unless the counts were off
+    LeaveUsageChoice(UsageBox.Checked, UsageBox.Checked = UsageWasOff)
+  else if UsageCountsOffParam then
+    LeaveUsageChoice(False, True);
 end;

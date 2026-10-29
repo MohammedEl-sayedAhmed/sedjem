@@ -2017,7 +2017,8 @@ function aboutPanel() {
           <span>By Mohammed El-sayed Ahmed. Free software under the AGPL-3.0; commercial licences are available.</span>
           <span class="links"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem" target="_blank" rel="noopener noreferrer">${ICON.external} Source code</a>
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases" target="_blank" rel="noopener noreferrer">${ICON.external} Releases</a>
-            <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">${ICON.external} Licence</a></span>
+            <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">${ICON.external} Licence</a>
+            <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md" target="_blank" rel="noopener noreferrer">${ICON.external} Privacy policy</a></span>
         </div>
       </div>
       <div class="set-list">

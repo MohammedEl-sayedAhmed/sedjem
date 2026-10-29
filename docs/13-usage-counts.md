@@ -143,6 +143,8 @@ country and region, are kept for up to five years.
 Any of these turns them off:
 
 - the switch *Send anonymous usage counts*, in *Settings → About* and in the first-start dialog
+- the same box on the Privacy page of the Windows installer, which then counts as the first-start notice, or
+  `/USAGECOUNTS=0` for a silent installation ([the desktop notes](10-desktop.md#the-installers-privacy-page))
 - `DO_NOT_TRACK=1` in the environment Sedjem is started from (any value but `0` or `false` counts)
 - `SEDJEM_NO_USAGE=1`, the same for Sedjem alone
 

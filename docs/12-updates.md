@@ -108,8 +108,10 @@ Sedjem downloads `Sedjem-<version>-setup.exe` from the release into the `updates
 folder, checks it against the release's `SHA256SUMS.txt` (a download that doesn't match is deleted),
 and runs it with `/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /UPDATE=1`. Sedjem quits, the
 installer installs the new version over the old one, and then starts it. The transcriptions, keys and
-models in `%LOCALAPPDATA%\Sedjem` are not touched. The installer isn't signed yet, so Windows
-SmartScreen may warn about it. The downloaded installer is deleted the next time Sedjem starts.
+models in `%LOCALAPPDATA%\Sedjem` are not touched. Sedjem downloads the installer itself rather than through
+a browser, so the file doesn't carry the mark that browsers add to downloads (the Mark of the Web), and Windows
+SmartScreen doesn't warn about it, although it isn't signed. The installer shows no page when it runs this way,
+and leaves the usage counts' setting as it is. The downloaded installer is deleted the next time Sedjem starts.
 
 ### The Linux build
 

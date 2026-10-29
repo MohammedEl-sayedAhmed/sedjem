@@ -176,6 +176,33 @@ class Config:
         replace_file(tmp, self.settings_path)
         return self.settings()
 
+    def apply_installer_choice(self, path=None):
+        """The usage counts' box on the Windows installer's Privacy page (desktop/installer.iss), which leaves
+        installer.json beside Sedjem.exe: {"usage_counts": the box, "changed": whether it was changed from how the page
+        showed it}. Saved into this data folder, whichever it is, when it was changed or when nothing was chosen yet
+        (the page counts as the first-start notice), so that a box left ticked never turns back on counts that were
+        turned off. The file is deleted first, so it is applied once. In an installation for all users it can't be
+        deleted from Program Files: then it only turns the counts off, for each user who hasn't chosen yet. Returns the
+        value saved, or None; never raises."""
+        path = path or installer_choice()
+        if path is None or not path.is_file():
+            return None
+        choice = _read_json(path)
+        try:
+            path.unlink()
+            once = True
+        except OSError:
+            once = False
+        value, unset = choice.get("usage_counts"), self.setting("usage_counts") is None
+        take = (choice.get("changed") is True or unset) if once else (value is False and unset)
+        if not isinstance(value, bool) or not take:
+            return None
+        try:
+            self.save_settings(usage_counts=value)
+        except OSError:
+            return None
+        return value
+
     def api_key(self, model):
         env = os.environ.get(model.get("key_env", ""), "").strip()
         return env or self.secrets().get(model["id"], "").strip()
@@ -301,6 +328,11 @@ class Config:
         """Where the NVIDIA libraries are unpacked (transcribe.py --cuda-libs)."""
         files = self.download_items().get("cuda", {}).get("files")
         return self.path(files[0]["path"]).parent if files else self.path("models/nvidia-cuda")
+
+
+def installer_choice(frozen=FROZEN, executable=sys.executable):
+    """Where the Windows installer leaves the choice of its Privacy page: beside Sedjem.exe. None from source."""
+    return Path(executable).resolve().parent / "installer.json" if frozen else None
 
 
 def _read_json(path):

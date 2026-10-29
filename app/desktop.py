@@ -290,6 +290,7 @@ def main(argv=None):
         sys.exit(run(window=args.window, report=args.report, models=args.models))
 
     cfg = Config()
+    cfg.apply_installer_choice()  # the usage counts' box of the Windows installer, once (desktop/installer.iss)
     install_launcher()
     if sys.stderr is None:  # a windowed build has no console: keep messages in a log file
         cfg.storage.mkdir(parents=True, exist_ok=True)

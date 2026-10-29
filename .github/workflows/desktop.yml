@@ -6,6 +6,8 @@
 #   vX.Y.Z                       a release; X.Y.Z must match app/__init__.py (git tag v0.3.0 && git push origin v0.3.0)
 #   vX.Y.Z-preview.YYYYMMDD[.N]  a pre-release, normally from preview.yml; X.Y.Z must be the next patch after
 #                                the newest release
+# A release (never a preview or a build by hand) is also sent to winget once the WINGET_TOKEN secret exists
+# (docs/10-desktop.md).
 name: Desktop build
 
 on:
@@ -41,6 +43,7 @@ jobs:
       base: ${{ steps.version.outputs.base }}
       commit: ${{ steps.version.outputs.commit }}
       publish: ${{ steps.version.outputs.publish }}
+      winget: ${{ steps.winget.outputs.winget }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,6 +71,17 @@ jobs:
             echo "commit=$(git rev-parse HEAD)"
             echo "publish=$publish"
           } >> "$GITHUB_OUTPUT"
+
+      - name: winget
+        # A release being published goes to winget once the WINGET_TOKEN secret exists. Only whether it exists is
+        # read here, never the secret itself; a preview gets no secrets anyway.
+        id: winget
+        if: steps.version.outputs.publish == 'true' && steps.version.outputs.channel == 'stable'
+        env:
+          WINGET: ${{ secrets.WINGET_TOKEN != '' }}
+        run: |
+          echo "sent to winget: $WINGET"
+          echo "winget=$WINGET" >> "$GITHUB_OUTPUT"
 
   build:
     needs: version
@@ -115,6 +129,19 @@ jobs:
           SEDJEM_VERSION: ${{ needs.version.outputs.version }}
           SEDJEM_CHANNEL: ${{ needs.version.outputs.channel }}
 
+      - name: Version resource (Windows)
+        # what Windows shows in the file's properties (desktop/build.py writes it)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $info = (Get-Item dist\Sedjem\Sedjem.exe).VersionInfo
+          $info | Format-List ProductName, ProductVersion, FileVersion, FileDescription, CompanyName, LegalCopyright, OriginalFilename
+          if ($info.ProductName -ne "Sedjem" -or $info.ProductVersion -ne $env:VERSION) {
+            throw "Sedjem.exe names itself $($info.ProductName) $($info.ProductVersion), not Sedjem $env:VERSION"
+          }
+
       - name: Self-test the build (Linux)
         if: runner.os == 'Linux'
         run: dist/Sedjem/Sedjem --self-test --report selftest-build.json
@@ -159,10 +186,25 @@ jobs:
           if (-not (Test-Path $iscc)) { choco install innosetup --no-progress -y; }
           & $iscc desktop\installer.iss
 
+      - name: Installer version resource (Windows)
+        # the same product and version as Sedjem.exe's
+        if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          $info = (Get-Item "dist\Sedjem-${env:VERSION}-setup.exe").VersionInfo
+          $info | Format-List ProductName, ProductVersion, FileVersion, FileDescription, CompanyName, LegalCopyright
+          if ($info.ProductName -ne "Sedjem" -or $info.ProductVersion -ne $env:VERSION) {
+            throw "the installer names itself $($info.ProductName) $($info.ProductVersion), not Sedjem $env:VERSION"
+          }
+
       - name: Installer update mode (Windows)
         # The installer into a temporary folder, then again over itself the way Sedjem's own updates run it. The
         # update must replace the program (leaving none of the old files), keep the data folder, start the new
-        # Sedjem from the installed folder, and leave an uninstaller that works.
+        # Sedjem from the installed folder, and leave an uninstaller that works. Silent, setup shows no Privacy page
+        # and leaves the usage counts' setting alone, unless /USAGECOUNTS=0 turns them off, which the next start of
+        # Sedjem takes from beside Sedjem.exe, once.
         if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
         timeout-minutes: 15
         shell: pwsh
@@ -174,6 +216,8 @@ jobs:
           $exe = Join-Path $dir "Sedjem.exe"
           $data = Join-Path $env:LOCALAPPDATA "Sedjem"
           $portFile = Join-Path $data "app_data\port"
+          $settings = Join-Path $data "app_data\settings.json"
+          $choice = Join-Path $dir "installer.json"  # the Privacy page's choice, beside Sedjem.exe for its next start
           $entry = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3C2E9A-4B71-4D5C-9A2E-8B1F0C7D3E45}_is1"
           function Invoke-Setup([string]$file, [string[]]$arguments) {
             # not Start-Process -Wait, which would also wait for the Sedjem that setup starts
@@ -183,17 +227,48 @@ jobs:
             if ($p.ExitCode -ne 0) { throw "$file $arguments exited with $($p.ExitCode)" }
           }
           function Get-Installed { Get-Process -Name Sedjem -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }
+          function Wait-Sedjem([string]$failure) {
+            # the address of the Sedjem that answers at the port it noted
+            foreach ($i in 1..120) {
+              try {  # the port file may not be there yet, or be half written
+                $port = "$(Get-Content -Raw -ErrorAction Stop $portFile)".Trim()
+                $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" -TimeoutSec 5
+                if ($status.app -eq "sedjem") { "Sedjem $($status.version) answered at port $port" | Out-Host; return "http://127.0.0.1:$port" }
+              } catch { }
+              Start-Sleep -Seconds 1
+            }
+            $log = Join-Path $data "app_data\sedjem.log"
+            if (Test-Path $log) { Get-Content $log -Tail 40 | Out-Host }
+            throw "${failure}: nothing answered at the port in $portFile"
+          }
+          function Stop-Sedjem([string]$url) {
+            $running = @(Get-Installed)
+            Invoke-RestMethod -Method Post "$url/api/quit" -Headers @{ "X-Sedjem" = "1" } | Out-Null
+            foreach ($p in $running) {
+              if (-not $p.WaitForExit(30000)) {
+                "::warning::Sedjem was still running 30 s after /api/quit; stopping it" | Out-Host
+                Stop-Process -Id $p.Id -Force
+              }
+            }
+          }
+          function Assert-Untouched([string]$when) {
+            if (Test-Path $choice) { throw "$when left $choice" }
+            if ((Get-Content -Raw $settings) -ne $kept) { throw "$when changed settings.json: $(Get-Content -Raw $settings)" }
+          }
 
           # the data folder, which neither the update nor the uninstaller may touch
-          New-Item -ItemType Directory -Force -Path $data | Out-Null
+          New-Item -ItemType Directory -Force -Path (Join-Path $data "app_data") | Out-Null
           Set-Content -Path (Join-Path $data "keep.txt") -Value "kept"
-          Remove-Item -Force -ErrorAction SilentlyContinue $portFile
+          $kept = '{"update_check": false}'
+          Set-Content -Path $settings -Value $kept -NoNewline
+          Remove-Item -Force -ErrorAction SilentlyContinue $portFile, $choice
 
           "1. A silent installation into $dir"
           Invoke-Setup $setup @("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=`"$dir`"")
           if (-not (Test-Path $exe)) { throw "no Sedjem.exe after the installation" }
           Start-Sleep -Seconds 3
           if (@(Get-Installed).Count -gt 0) { throw "a silent installation without /UPDATE=1 started Sedjem" }
+          Assert-Untouched "a silent installation"
           Set-Content -Path (Join-Path $dir "_internal\left-by-the-old-version.txt") -Value "old"
 
           "2. The update, as Sedjem runs it (no /DIR: setup finds the installation itself)"
@@ -205,38 +280,32 @@ jobs:
           if ((Get-Content -Raw (Join-Path $data "keep.txt")).Trim() -ne "kept") { throw "the data folder was changed" }
 
           "3. The new Sedjem started from $dir"
-          $url = $null
-          foreach ($i in 1..120) {
-            try {  # the port file may not be there yet, or be half written
-              $port = "$(Get-Content -Raw -ErrorAction Stop $portFile)".Trim()
-              $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" -TimeoutSec 5
-              if ($status.app -eq "sedjem") { $url = "http://127.0.0.1:$port"; break }
-            } catch { }
-            Start-Sleep -Seconds 1
-          }
-          if (-not $url) {
-            $log = Join-Path $data "app_data\sedjem.log"
-            if (Test-Path $log) { Get-Content $log -Tail 40 }
-            throw "Sedjem didn't start after the update: nothing answered at the port in $portFile"
-          }
+          $url = Wait-Sedjem "Sedjem didn't start after the update"
           $running = @(Get-Installed)
           if ($running.Count -eq 0) { throw "what answers at $url is not $exe" }
-          "Sedjem $($status.version) answered at $url (process $($running.Id -join ', '))"
-          Invoke-RestMethod -Method Post "$url/api/quit" -Headers @{ "X-Sedjem" = "1" } | Out-Null
-          foreach ($p in $running) {
-            if (-not $p.WaitForExit(30000)) {
-              "::warning::Sedjem was still running 30 s after /api/quit; stopping it"
-              Stop-Process -Id $p.Id -Force
-            }
-          }
+          "process $($running.Id -join ', ') is $exe"
+          Stop-Sedjem $url
+          Assert-Untouched "the update, or the Sedjem it started,"
 
-          "4. The uninstaller"
+          "4. A silent installation with /USAGECOUNTS=0, and the next start of Sedjem"
+          Invoke-Setup $setup @("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/USAGECOUNTS=0")
+          $left = Get-Content -Raw -ErrorAction Stop $choice | ConvertFrom-Json
+          if ($left.usage_counts -ne $false -or $left.changed -ne $true) { throw "/USAGECOUNTS=0 left $(Get-Content -Raw $choice)" }
+          Remove-Item -Force -ErrorAction SilentlyContinue $portFile
+          Start-Process -FilePath $exe -ArgumentList "--server" | Out-Null
+          $url = Wait-Sedjem "Sedjem didn't start after the installation with /USAGECOUNTS=0"
+          if (Test-Path $choice) { throw "Sedjem kept $choice after applying it" }
+          $now = Get-Content -Raw $settings | ConvertFrom-Json
+          if ($now.usage_counts -ne $false -or $now.update_check -ne $false) { throw "settings.json is $(Get-Content -Raw $settings)" }
+          Stop-Sedjem $url
+
+          "5. The uninstaller"
           Invoke-Setup (Join-Path $dir "unins000.exe") @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
           foreach ($i in 1..60) { if (-not (Test-Path $exe) -and -not (Test-Path $entry)) { break }; Start-Sleep -Seconds 1 }
           if (Test-Path $exe) { throw "the uninstaller left Sedjem.exe" }
           if (Test-Path $entry) { throw "the uninstaller left the entry in Installed apps" }
           if (-not (Test-Path (Join-Path $data "keep.txt"))) { throw "the uninstaller removed the data folder" }
-          "The update installed $env:VERSION over itself, kept the data and started Sedjem; the uninstaller works"
+          "The update installed $env:VERSION over itself, kept the data and started Sedjem; silent installations left the usage counts' setting alone and /USAGECOUNTS=0 turned it off; the uninstaller works"
 
       - name: Self-test reports
         if: always()
@@ -315,7 +384,50 @@ jobs:
             gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" \
               --prerelease --target "$COMMIT" --notes-file ../preview-notes.md
           else
+            # every release page links the privacy policy
+            privacy="[Privacy policy](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/privacy.md)"
             notes="../.github/release-notes/$tag.md"
-            if [ -f "$notes" ]; then set -- --notes-file "$notes"; else set -- --generate-notes; fi
+            if [ -f "$notes" ]; then
+              { cat "$notes"; printf '\n---\n\n%s\n' "$privacy"; } > ../release-notes.md
+              set -- --notes-file ../release-notes.md
+            else
+              set -- --generate-notes --notes "$privacy"  # put before GitHub's notes
+            fi
             gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" "$@"
           fi
+
+  winget:
+    # A release, once published, goes to winget as a pull request to microsoft/winget-pkgs (winget install
+    # MohammedElsayedAhmed.Sedjem). wingetcreate starts from the newest version winget has, so the first version was
+    # sent by hand, from packaging/winget/; the WINGET_TOKEN secret, a classic token with the public_repo scope, is
+    # added once winget has accepted it. Skipped for previews, builds by hand, and while the secret is missing.
+    if: needs.version.outputs.winget == 'true'
+    needs: [version, release]
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Send the release to winget
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          # wingetcreate reads its token from here, so it never appears on a command line
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGET_TOKEN }}
+        run: |
+          # the release's installer: its one file whose name ends in -setup.exe
+          $assets = (gh release view "v$env:VERSION" --repo $env:GITHUB_REPOSITORY --json assets | ConvertFrom-Json).assets
+          $setup = @($assets | Where-Object { $_.name -match '-setup\.exe$' })
+          if ($setup.Count -ne 1) { throw "v$env:VERSION has $($setup.Count) files named *-setup.exe" }
+          # wingetcreate, a fixed version, checked against its SHA-256
+          $wingetcreate = Join-Path $env:RUNNER_TEMP "wingetcreate.exe"
+          Invoke-WebRequest "https://github.com/microsoft/winget-create/releases/download/v1.12.13.0/wingetcreate.exe" -OutFile $wingetcreate
+          if ((Get-FileHash $wingetcreate -Algorithm SHA256).Hash -ne "24042BD37915805615E6CF969AC57C6439124C3FE85823327F5F3FB24BD9FFEA") {
+            throw "wingetcreate.exe isn't the file expected"
+          }
+          # x64 and the current user, as in the manifests: Inno Setup's own program is 32-bit, which wingetcreate
+          # would otherwise take for the app's architecture
+          & $wingetcreate update MohammedElsayedAhmed.Sedjem --version $env:VERSION --urls "$($setup[0].url)|x64|user" `
+            --release-notes-url "https://github.com/$env:GITHUB_REPOSITORY/releases/tag/v$env:VERSION" --submit --no-open
+          if ($LASTEXITCODE -ne 0) { throw "wingetcreate exited with $LASTEXITCODE" }

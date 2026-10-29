@@ -6,8 +6,9 @@ It is the same code, the local server and the web interface, shown in a native w
 feature works the same way in the browser and on the desktop.
 
 It builds, installs and runs on both systems, and the checks below pass. It can update itself
-([updates](12-updates.md)). Code signing, updating the Linux build in place and Linux packages are not
-done yet (see the end of this page).
+([updates](12-updates.md)). Publishing on winget is set up and waits for winget to accept the package
+([winget](#winget)). Code signing, updating the Linux build in place and Linux packages are not done yet (see the
+end of this page).
 
 ## Run it
 
@@ -67,6 +68,17 @@ app-mode browser window is used, which works just as well apart from the native 
 | macOS build | `~/Library/Application Support/Sedjem` |
 
 `SEDJEM_HOME=<folder>` overrides it. Uninstalling keeps this folder.
+
+## Uninstall
+
+- Windows: in *Settings → Apps → Installed apps* (*Apps & features* on Windows 10), choose *Uninstall* beside
+  Sedjem, or right-click Sedjem in the Start menu and choose *Uninstall*; once Sedjem is on winget,
+  `winget uninstall MohammedElsayedAhmed.Sedjem` does the same. This removes the program and its shortcuts. The data
+  folder, `%LOCALAPPDATA%\Sedjem`, stays with the transcriptions, keys and models; delete it to remove them too.
+- Linux build: delete the unpacked `Sedjem` folder and `~/.local/share/applications/sedjem.desktop`, the menu entry
+  that Sedjem keeps. The data folder, `~/.local/share/sedjem`, stays until it is deleted.
+- From source: delete the project folder, which holds the data too
+  ([disk space and cleanup](08-disk-and-cleanup.md)).
 
 ## Models are downloaded in the app
 
@@ -131,6 +143,11 @@ channel (`stable` for a release, `preview` for a nightly preview) and when it wa
 one; from source, Sedjem reads the commit from `.git`. The workflow sets the version and the channel
 with `SEDJEM_VERSION` and `SEDJEM_CHANNEL`; without them they come from `app/__init__.py`.
 
+On Windows, `desktop/build.py` also gives `Sedjem.exe` a version resource, which Windows shows in the file's
+properties: Sedjem as the product, the author, the copyright, and the version in full (`0.3.1-preview.20261030`
+for a preview) and as the four numbers an .exe holds (0.3.1.0). `desktop/installer.iss` gives the installer the
+same product and version, and the workflow checks both files.
+
 The Windows installer has an update mode for Sedjem's own updates:
 `Sedjem-<version>-setup.exe /SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /UPDATE=1`
 installs over the existing installation without asking anything, closes Sedjem if it is still
@@ -155,6 +172,26 @@ preview tag pushed by hand is published the same way, once the Desktop build wor
 that it follows the newest release. The script that decides all this,
 [`.github/scripts/preview_plan.py`](../.github/scripts/preview_plan.py), describes the rules at its
 top.
+
+## The installer's Privacy page
+
+Installed by hand, the installer shows a Privacy page after the licence: what Sedjem sends, a link to the
+[privacy policy](privacy.md), and the box *Send anonymous usage counts*, ticked unless the counts were turned off
+before. The page counts as Sedjem's first-start notice. Its choice goes into `installer.json` beside `Sedjem.exe`,
+which Sedjem applies on its next start to whichever data folder it uses (`SEDJEM_HOME` included), then deletes:
+unticked, the counts are turned off; left ticked, they are on unless a choice was made before. In an installation
+for all users the file stays in *Program Files*, where it can only turn the counts off, for each user who hasn't
+chosen yet. A silent installation, as winget and *Update now* run it, shows no page and changes nothing, unless
+`/USAGECOUNTS=0` turns the counts off.
+
+## winget
+
+Sedjem is to be published on winget, Windows' package manager, as `MohammedElsayedAhmed.Sedjem`. Until winget has
+accepted the package, Sedjem installs only from the release page.
+[`packaging/winget/`](../packaging/winget/) has the manifests of 0.3.1 for the first submission, written by
+`packaging/winget/make.py` from the version and the installer's SHA-256. After that, the Desktop build workflow's
+winget job sends each release to winget with wingetcreate, as a pull request to microsoft/winget-pkgs. The job runs
+only once the `WINGET_TOKEN` secret exists, a classic token with the `public_repo` scope, and never for a preview.
 
 ## Self-test
 
@@ -207,8 +244,9 @@ hand.
 
 ## Not done yet
 
-- Code signing. Unsigned installers trigger a Windows SmartScreen warning ("Windows protected your
-  PC"; choose *More info*, then *Run anyway*).
+- Code signing. The installer isn't signed, so when it comes from a browser, Windows SmartScreen warns that its
+  publisher is unknown ("Windows protected your PC"); *More info*, then *Run anyway*, installs it. Sedjem's own
+  updates don't show this warning ([updates](12-updates.md#the-windows-installer)).
 - Smaller updates. Each update downloads the whole installer or archive, not only the files that
   changed ([updates](12-updates.md)).
 - Updating in place on Linux. *Update now* runs the new installer on Windows, but on Linux it unpacks the

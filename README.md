@@ -231,8 +231,16 @@ The transcripts in the screenshots are made up, and so are the names.
 ### Windows
 
 Download `Sedjem-<version>-setup.exe` from the [latest release](https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest).
-It installs for your user, without admin rights (about 80 MB). It isn't signed yet, so Windows
-SmartScreen warns about an unknown publisher; choose *More info*, then *Run anyway*.
+It installs for your user, without admin rights (about 80 MB). The installer isn't signed, so when it comes from
+a browser, Windows SmartScreen warns that its publisher is unknown; choose *More info*, then *Run anyway*.
+Sedjem's own updates don't show this warning. Installed by hand, the installer has a Privacy page with the box
+for the anonymous usage counts, and the [privacy policy](docs/privacy.md) lists everything Sedjem sends.
+
+Another way to install is coming: once winget has accepted the package, this will install Sedjem too:
+
+```powershell
+winget install MohammedElsayedAhmed.Sedjem
+```
 
 From source, install Python 3.12 and [Git](https://git-scm.com/), then in PowerShell (the terminal of
 VS Code and Windows Terminal) or the Command Prompt:
@@ -277,7 +285,8 @@ one; the other speaker models can be chosen and downloaded under *Speaker labels
 The desktop app opens Sedjem in a native window (Edge WebView2 on Windows, GTK WebKit or Qt on
 Linux) with native open and save dialogs. Where that isn't available it uses an app-mode browser
 window, then a browser tab. `--browser` goes straight to the browser window, and `--server` runs only
-the server, for any browser to use. The details are in [the desktop notes](docs/10-desktop.md).
+the server, for any browser to use. The details are in [the desktop notes](docs/10-desktop.md), and so is
+[how to uninstall it](docs/10-desktop.md#uninstall) on Windows and Linux.
 
 ## How it works
 
@@ -329,6 +338,7 @@ was tried first and is not usable for this: it wrote most English terms in Arabi
 | [Assistants](docs/11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, and what they may see |
 | [Updates](docs/12-updates.md) | the two channels, what is sent to GitHub, and updating from the app or by hand |
 | [Usage counts](docs/13-usage-counts.md) | what is sent to Aptabase and when, what never is, turning it off, and the public totals |
+| [Privacy policy](docs/privacy.md) | everything Sedjem contacts and when, what stays on the computer, and turning the usage counts off |
 
 ## Name and logo
 
