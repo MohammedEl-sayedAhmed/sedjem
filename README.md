@@ -106,7 +106,12 @@ recording on your machine unless you choose a hosted service.
 - Settings has tabs for Models, Add models, Hosted services, Speed, Assistants and About.
 - Downloads resume if the connection drops and are checked against pinned checksums.
 - Has a dark theme, and contacts nothing on the internet except the model downloads, YouTube for the
-  links you add, the hosted services you choose, and GitHub to check for updates when allowed.
+  links you add, the hosted services you choose, GitHub to check for updates when allowed, and
+  Aptabase for the usage counts below.
+- Sends a few anonymous usage counts a month to Aptabase, in the EU: the version, the system in broad
+  terms, and how many transcriptions were made with which models; never recordings, transcripts or
+  names, and no identifier. They are on by default, the first start says so, and the switch in
+  *Settings → About* or `DO_NOT_TRACK=1` turns them off. See [usage counts](docs/13-usage-counts.md).
 - Tells when a newer version is out, from stable releases or the latest tested changes, and updates
   itself when asked: a git checkout by fast-forward, the Windows app through its installer. See
   [updates](docs/12-updates.md).
@@ -322,6 +327,7 @@ was tried first and is not usable for this: it wrote most English terms in Arabi
 | [Desktop app](docs/10-desktop.md) | running, building and testing on Windows and Linux |
 | [Assistants](docs/11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, and what they may see |
 | [Updates](docs/12-updates.md) | the two channels, what is sent to GitHub, and updating from the app or by hand |
+| [Usage counts](docs/13-usage-counts.md) | what is sent to Aptabase and when, what never is, turning it off, and the public totals |
 
 ## Name and logo
 
@@ -339,6 +345,16 @@ in [docs/brand](docs/brand/README.md).
 
 The stats workflow redraws these charts every day from GitHub's own numbers. The tables behind them are in
 [the stats summary](https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme).
+
+### Usage
+
+Totals from the app's anonymous usage counts, published once a month
+([how they are made](docs/13-usage-counts.md#public-totals)):
+
+<!-- usage-totals:start -->
+No totals yet: the counts start with Sedjem 0.3.0, and the first month's totals will be here once that month has
+been exported.
+<!-- usage-totals:end -->
 
 ## Thanks
 

@@ -11,6 +11,10 @@ on:
 permissions:
   contents: read
 
+# A Sedjem started here never sends anonymous usage counts (app/usage.py; the tests themselves never can)
+env:
+  SEDJEM_NO_USAGE: "1"
+
 concurrency:
   group: tests-${{ github.ref }}
   cancel-in-progress: true

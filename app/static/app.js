@@ -2026,6 +2026,7 @@ function aboutPanel() {
             <code class="mono path">${esc(st.storage.dir)}</code></div>
           <button type="button" class="btn btn-sm" id="openFolder">${ICON.folder} Open folder</button>
         </div>
+        ${usageRow()}
       </div>
       <p class="hint">Models are kept in <code class="mono">${esc(st.home)}/models</code>. The transcripts of YouTube videos and courses are saved as files in <code class="mono">${esc(st.youtube?.courses || "")}</code>. The port, defaults and model list are set in <code class="mono">app/config.toml</code>; your own changes can go in <code class="mono">${esc(st.storage.dir)}/config.toml</code>.</p>`;
 }

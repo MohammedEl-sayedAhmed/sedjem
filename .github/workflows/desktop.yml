@@ -26,6 +26,10 @@ on:
 permissions:
   contents: read
 
+# A Sedjem started here (the self-tests, the installed build) never sends anonymous usage counts (app/usage.py)
+env:
+  SEDJEM_NO_USAGE: "1"
+
 jobs:
   version:
     # What is built, from which commit, and whether it is published; a version that doesn't fit stops here.

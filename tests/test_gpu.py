@@ -384,7 +384,8 @@ class SettingsTests(unittest.TestCase):
                                                "speaker_model": "titanet-small",
                                                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
                                                "mcp_write": False,  # assistants only read until the user says
-                                               "update_check": None, "update_channel": "stable", "update_skip": None})
+                                               "update_check": None, "update_channel": "stable", "update_skip": None,
+                                               "usage_counts": None})
 
     def test_saved_settings_win_and_survive_a_restart(self):
         self.cfg.save_settings(device="cpu", threads=2, performance_while_running=True)
@@ -392,7 +393,8 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(again.settings(), {"performance_while_running": True, "device": "cpu", "threads": 2,
                                             "speaker_model": "titanet-small",
                                             "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [], "mcp_write": False,
-                                            "update_check": None, "update_channel": "stable", "update_skip": None})
+                                            "update_check": None, "update_channel": "stable", "update_skip": None,
+                                            "usage_counts": None})
 
     def test_bad_values_are_refused(self):
         for bad in ({"device": "tpu"}, {"threads": 0}, {"threads": 10_000}, {"threads": True},

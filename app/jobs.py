@@ -197,9 +197,10 @@ def lower_priority():
 
 
 class Runner:
-    def __init__(self, store, cfg, gpus=None):
+    def __init__(self, store, cfg, gpus=None, ended=None):
         self.store, self.cfg = store, cfg
         self.gpus = gpus or (lambda: None)  # the graphics cards the app found, for the job details
+        self.on_end = ended or (lambda job, lines: None)  # the anonymous usage counts (app/usage.py)
         self.queues = {"download": queue.Queue(), "prepare": queue.Queue(), "video": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
         self.cancelled = set()
         self.procs = {}  # job id -> running transcribe.py process
@@ -256,6 +257,14 @@ class Runner:
             except Exception as e:  # never let one job kill the worker
                 if name != "video":  # (the video is extra: make_video says why it has none)
                     self.store.update(jid, status="failed", stage=None, error=f"{type(e).__name__}: {e}", finished=now())
+                    self.ended(jid)
+
+    def ended(self, jid, lines=None):
+        """A job finished or failed: the usage counts take their numbers from it (app/usage.py)."""
+        try:
+            self.on_end(self.store.get(jid), lines)
+        except Exception:  # noqa: BLE001 — counting is never a reason for a job to fail
+            pass
 
     # ---- steps ----------------------------------------------------------------------------------
     def source(self, job, folder):
@@ -291,6 +300,7 @@ class Runner:
         except youtube.YouTubeError as e:
             self.store.update(jid, status="failed", stage=None, done=None, total=None, error=f"YouTube: {e}",
                               finished=now())
+            self.ended(jid)
             return
         if jid in self.cancelled or self.store.get(jid) is None:  # cancelled or deleted meanwhile
             return
@@ -352,6 +362,7 @@ class Runner:
         from . import history  # imported here because it uses this module's helpers
         history.current(self.store, jid, self.cfg)  # version 0: the captions as YouTube has them
         courses.try_refresh(self.store, self.cfg, self.store.get(jid))
+        self.ended(jid)
 
     def work(self, jid, kind):
         job = self.store.get(jid)
@@ -389,10 +400,12 @@ class Runner:
             from . import history  # imported here because it uses this module's helpers
             history.current(self.store, jid, self.cfg)  # starts the history: version 0 is the model's output
             courses.try_refresh(self.store, self.cfg, self.store.get(jid))  # a YouTube job's files
+            self.ended(jid, result["lines"])
         except engines.Cancelled:
             self.store.update(jid, status="cancelled", stage=None, finished=now())
         except Exception as e:
             self.store.update(jid, status="failed", stage=None, error=str(e) or type(e).__name__, finished=now())
+            self.ended(jid)
         finally:
             self.procs.pop(jid, None)
             self.cancelled.discard(jid)

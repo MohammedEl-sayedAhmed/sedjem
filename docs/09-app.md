@@ -19,13 +19,14 @@ Local models that aren't on the computer yet can be downloaded from the app, fro
 or from *Settings → Models*. Downloads resume after a dropped connection and are checked against a
 pinned checksum.
 
-*Settings* has six tabs. *Models* lists the models on the computer, with their downloads and
+*Settings* has seven tabs. *Models* lists the models on the computer, with their downloads and
 removal, and under *Speaker labels* the speaker models, with the choice of the one that labels the
 speakers ([speaker models](#speaker-models)). *Add models* has two views: *Recommended* and *From
 Hugging Face*. *Hosted services* holds the API keys, *Speed* the graphics card, power mode and
 processor threads, *Assistants* what assistants connected over MCP may see, how to connect them and
-what they asked ([assistants](11-assistants.md)), and *About* the version, the licence and the
-folder where the app keeps its data.
+what they asked ([assistants](11-assistants.md)), *About* the version, the licence, the folder where
+the app keeps its data and the switch for the anonymous usage counts ([usage counts](13-usage-counts.md)),
+and *Updates* the version that runs and what is newer ([updates](12-updates.md)).
 
 Each model or service in *Models*, *Recommended* and *Hosted services* has a line of key facts under
 its name: who made it, the engine, the licence and which graphics cards it can use, or for a service
@@ -80,7 +81,8 @@ including mp3 and m4a files with an album cover, get no video.
 Exports are plain text, SRT and WebVTT subtitles, Markdown and JSON, with your names and edits
 applied, or you can copy the text. Arabic lines are laid out right to left automatically. There are
 light and dark themes, the layout works in a narrow window, and the page loads nothing from outside
-(no CDN, web fonts or analytics).
+(no CDN, web fonts or analytics scripts; the app's anonymous usage counts are sent by its server, as
+[privacy](#privacy) says).
 
 Each transcription keeps a record of how it was made: the recording (name, format, codec, sample
 rate, channels, bit rate, size, length), the model (its engine and file, or the service and API
@@ -637,7 +639,7 @@ the speaker step with a stand-in model process).
 - The server listens on 127.0.0.1 only, answers only requests addressed to that host, and refuses
   changes that don't carry the app's own header, so other websites open in the same browser can't
   use it.
-- With local models, nothing leaves the computer.
+- With local models, the recording and its transcript never leave the computer.
 - Checking or adding a model from Hugging Face asks huggingface.co for that model's details and
   files, and nothing else.
 - Checking or adding a YouTube link asks YouTube, through yt-dlp, for that video or playlist and its
@@ -651,6 +653,17 @@ the speaker step with a stand-in model process).
 - Checking for updates asks GitHub's API about this repository's releases and tested commits, once a
   day when the first-start question was answered with yes, or when *Check now* is clicked. GitHub sees
   the IP address and, for some checks, the commit that is running ([updates](12-updates.md)).
+- Anonymous usage counts go to Aptabase, in its EU region in Germany, about six times a month: once
+  for a new install, once a month with the kind of install and the computer in broad ranges (the
+  graphics card's maker, the memory, the processor threads), and once for each week of use with how
+  many transcriptions and minutes of audio there were, by model, and how many exports, compares,
+  YouTube videos and failures. Each event also names the system and its version, the language and
+  region set on it, and the versions of Sedjem and Python. No recording, transcript, title, name, file
+  name, path, link, key or error message is sent, and no identifier. Aptabase sees the IP address; by
+  its terms it uses it only in memory, for the country and region and a daily pseudonymous hash, and
+  doesn't store it. The counts are on by default, but nothing is sent before the first-start dialog
+  has said so; its switch, the one in *Settings → About*, `DO_NOT_TRACK=1` or `SEDJEM_NO_USAGE=1`
+  turns them off ([usage counts](13-usage-counts.md)).
 - An assistant connected over MCP reads the transcripts that *Settings → Assistants* lets it see, and
   what it reads goes to the assistant's model, usually on its maker's servers. It never gets the
   audio, the keys or the settings ([assistants](11-assistants.md)).
@@ -659,7 +672,8 @@ the speaker step with a stand-in model process).
   everything.
 - The details kept with each transcription name this computer's maker and model, operating system,
   processor, memory and graphics cards. They are only shown to you and written into your exports
-  (all but SRT; add `?details=0` to an export's address to leave them out). Nothing sends them anywhere.
+  (all but SRT; add `?details=0` to an export's address to leave them out). Nothing sends them anywhere;
+  the usage counts have their own, coarser view of the computer, described above.
 
 ## Speed
 
@@ -686,6 +700,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
+| `app/usage.py` | the anonymous usage counts and their sending to Aptabase ([usage counts](13-usage-counts.md)) |
 | `app/transcript.py` | lines from words, and the exports |
 | `app/compare.py` | transcriptions of one recording: grouping them, their main transcript and labels, lining them up by time, and combining them into a new version |
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
@@ -701,7 +716,8 @@ Every change needs the header `X-Sedjem: 1`.
 
 | Call | What |
 |---|---|
-| `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space |
+| `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
+| `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
 | `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&confirm_upload=` | the body is the file |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |

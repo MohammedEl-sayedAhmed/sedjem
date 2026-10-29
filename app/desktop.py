@@ -164,6 +164,7 @@ class Api:
             return None
         details = report.details(job, lines, edited)  # as the browser download
         Path(path).write_text(T.EXPORTS[fmt][0](job, lines, details), encoding="utf-8")
+        self._app.usage.exported(fmt)  # one more export of this format in the usage counts (app/usage.py)
         return str(path)
 
     def open_url(self, url):
@@ -308,6 +309,7 @@ def main(argv=None):
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     threading.Thread(target=server.serve_forever, daemon=True, name="sedjem-server").start()
     app.updates.start()  # checks for updates in the background, if the user agreed to it
+    app.usage.start()  # sends the anonymous usage counts, while they are allowed (app/usage.py)
     port_file = cfg.storage / "port"  # so that starting it again finds this one, whichever port it has
     try:
         port_file.write_text(str(server.server_address[1]), encoding="utf-8")

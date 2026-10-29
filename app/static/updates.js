@@ -59,13 +59,13 @@ function updPill() {
   return `<button class="pill accent" data-open-settings="updates" title="See what's new">${ICON.update} ${esc(u.label)}</button>`;
 }
 
-// After each status check (app.js refreshStatus): the first-start question while it is due, else the notice
+// After each status check (app.js refreshStatus): the first-start dialog while it is due, else the notice
 // once for something new. Neither opens over another dialog; the next check after it is closed tries again.
 function updStatus() {
   if (!UPD.started) { UPD.started = true; updAfterRestart(); }
   const u = S.status?.update;
   if (!u || UPD.restart) return;
-  if (u.ask && !UPD.asked) { updAsk(); return; }
+  if ((u.ask || S.status.usage?.ask) && !UPD.asked) { updAsk(); return; }
   if (!u.available) { UPD.seen = null; return; }
   if (UPD.seen === u.label || $("dialog[open]")) return;
   UPD.seen = u.label;
@@ -75,37 +75,47 @@ function updStatus() {
   });
 }
 
-// Answered, the question doesn't come back (Settings → Updates changes the answer); put away with Escape, it
-// is asked again at the next start.
+// The first-start dialog asks the question about updates and says that the anonymous usage counts are on, with
+// their switch (usage.js); after an update that brought the counts, it says only that. Answered, it doesn't come
+// back (Settings → Updates and Settings → About change the answers); put away with Escape, it is shown again at the
+// next start, but a switch that was turned stays as it was turned.
 function updAsk() {
-  let dlg = $("#updAsk");
-  if (dlg?.open || $("dialog[open]")) return;
-  if (!dlg) {
-    document.body.insertAdjacentHTML("beforeend", `<dialog id="updAsk" class="upd-ask" aria-labelledby="updAskTitle" aria-describedby="updAskText">
-      <div class="dlg-head"><h2 id="updAskTitle">Check for updates automatically?</h2></div>
-      <div class="dlg-body"><p id="updAskText">Once a day, Sedjem can ask GitHub whether a newer version is out. GitHub sees
-        this computer's IP address; nothing else is sent. You can change this in Settings → Updates, where Check now
-        always works.</p></div>
-      <div class="dlg-foot"><button type="button" class="btn" id="updAskNo">No</button>
-        <button type="button" class="btn btn-primary" id="updAskYes">Yes, check daily</button></div></dialog>`);
-    dlg = $("#updAsk");
+  if ($("#updAsk")?.open || $("dialog[open]")) return;
+  $("#updAsk")?.remove();
+  const updates = !!S.status?.update?.ask, usage = !!S.status?.usage?.ask;
+  document.body.insertAdjacentHTML("beforeend", `<dialog id="updAsk" class="upd-ask" aria-labelledby="updAskTitle" aria-describedby="${updates ? "updAskText" : "usageAskText"}">
+    <div class="dlg-head"><h2 id="updAskTitle">${updates ? "Check for updates automatically?" : "Anonymous usage counts"}</h2></div>
+    <div class="dlg-body">${updates ? `<p id="updAskText">Once a day, Sedjem can ask GitHub whether a newer version is out. GitHub sees
+      this computer's IP address; nothing else is sent. You can change this in Settings → Updates, where Check now
+      always works.</p>` : ""}${usage ? usageNotice() : ""}</div>
+    <div class="dlg-foot">${updates ? `<button type="button" class="btn" id="updAskNo" autofocus>No</button>
+      <button type="button" class="btn btn-primary" id="updAskYes">Yes, check daily</button>`
+      : '<button type="button" class="btn btn-primary" id="updAskOk" autofocus>OK</button>'}</div></dialog>`);
+  const dlg = $("#updAsk");
+  if (updates) {
     $("#updAskYes").onclick = () => updAnswer(true);
     $("#updAskNo").onclick = () => updAnswer(false);
-    dlg.addEventListener("cancel", () => (UPD.asked = true));
-  }
+  } else $("#updAskOk").onclick = () => updAnswer(null);
+  bindUsageNotice();
+  dlg.addEventListener("cancel", () => (UPD.asked = true));
   dlg.showModal();
 }
 
+// Yes or No (on: true or false) to the question, or OK to the notice alone (on: null). The usage counts' switch, as
+// it is, is the answer to the notice.
 async function updAnswer(on) {
-  const b = $(on ? "#updAskYes" : "#updAskNo");
+  const b = $(on === null ? "#updAskOk" : on ? "#updAskYes" : "#updAskNo"), usage = $("#usageAsk");
   if (b.getAttribute("aria-disabled") === "true") return;
   b.setAttribute("aria-disabled", "true");
-  try { updSetData(await api.post("/api/updates/settings", { enabled: on })); }
-  catch (e) { toast(e.message, "error"); b.removeAttribute("aria-disabled"); return; }
+  try {
+    if (on !== null) updSetData(await api.post("/api/updates/settings", { enabled: on }));
+    if (usage) await usageSave(usage.checked, false);
+  } catch (e) { toast(e.message, "error"); b.removeAttribute("aria-disabled"); return; }
   UPD.asked = true;
-  if (S.status?.update) S.status.update.ask = false;
+  if (S.status?.update && on !== null) S.status.update.ask = false;
+  if (S.status?.usage && usage) S.status.usage.ask = false;
   $("#updAsk").close();
-  toast(on ? "Sedjem checks for updates once a day" : "No automatic checks. Settings → Updates can check now");
+  if (on !== null) toast(on ? "Sedjem checks for updates once a day" : "No automatic checks. Settings → Updates can check now");
 }
 
 // The notice, once for each new version or commit (remembered in this browser), and not for a skipped one.

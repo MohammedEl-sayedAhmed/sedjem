@@ -1,9 +1,12 @@
 /* Sedjem: updates (updates.js): the first-start question, the notice, Settings → Updates and the wait while
    Sedjem restarts. Colours come from app.css, so both themes follow. */
 
-/* ---------- the first-start question ---------- */
+/* ---------- the first-start dialog: the question, and the usage counts' notice with its switch (usage.js) ---------- */
 .upd-ask { width: min(460px, calc(100vw - 32px)); }
 .upd-ask .dlg-body p { margin: 0; font-size: 14.5px; line-height: 1.55; }
+.usage-ask .set-row { padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; align-items: flex-start; }
+.usage-ask .switch { margin-top: 2px; }
+.upd-ask p + .usage-ask { margin-top: 16px; }
 
 /* ---------- the notice, with the toasts: a card that stays until it is answered ---------- */
 .toast.upd-notice {

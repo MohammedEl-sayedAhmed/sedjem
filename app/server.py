@@ -20,7 +20,7 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, engines, hub, report, updates, video, youtube
+from . import assistants, compare, courses, engines, hub, report, updates, usage, video, youtube
 from . import transcript as T
 from . import history
 from .config import FALLBACK_SPEAKER_MODEL, FROZEN, power_profile, set_power_profile
@@ -48,7 +48,9 @@ class App:
     def __init__(self, cfg):
         self.cfg = cfg
         self.store = Store(cfg.storage)
-        self.runner = Runner(self.store, cfg, gpus=self.gpu_names)
+        # the anonymous usage counts (app/usage.py); like updates, they send only once an entry point starts them
+        self.usage = usage.Usage(cfg, version=lambda: self.updates.running()["version"], facts=self.usage_facts)
+        self.runner = Runner(self.store, cfg, gpus=self.gpu_names, ended=self.usage.job_ended)
         self.runner.recover()
         self.downloads = Downloads(cfg)
         self.server = None
@@ -82,6 +84,14 @@ class App:
             finally:
                 self.gpu_probing = False
         threading.Thread(target=run, daemon=True, name="sedjem-gpu").start()
+
+    def usage_facts(self):
+        """active_month's props (app/usage.py), once the GPU check has an answer (it waits up to two minutes, in the
+        usage counts' thread): the kind of install, the window, and this computer in broad ranges."""
+        end = time.monotonic() + 120
+        while self.gpu is None and time.monotonic() < end:
+            time.sleep(0.5)
+        return usage.facts(self.updates.running()["kind"], self.desktop, self.gpu)
 
     def gpu_names(self):
         """The graphics cards the check found, for the job details; None until it has run (or if it failed)."""
@@ -185,6 +195,8 @@ class App:
             "settings": settings,
             # the first-start question about checking for updates, and the top bar's pill (app/updates.py)
             "update": self.updates.summary(settings),
+            # the switch for the anonymous usage counts, and whether the first-start dialog is to tell of them
+            "usage": self.usage.summary(settings),
             "cpu_threads": os.cpu_count(),
             "speakers_ready": self.cfg.speakers_ready(),
             "power": power_profile(),
@@ -746,6 +758,8 @@ class Handler(BaseHTTPRequestHandler):
         shown, lines, edited = self.at_version(job, n)
         details = None if params.get("details") == "0" else report.details(shown, lines, edited)
         body = fn(shown, lines, details).encode()
+        if self.command == "GET" and params.get("details") != "0":  # an export (Copy asks for the bare text)
+            self.app.usage.exported(fmt)
         tag = f"-v{n}" if n else ""
         name = f"{slug(job.get('title'))}{tag}.{fmt}"
         ascii_name = re.sub(r"[^A-Za-z0-9._-]", "", name)
@@ -820,7 +834,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def compare_jobs(self, params):
         ids = [x for x in str(params.get("ids") or "").split(",") if x]
-        self.json(compare.view(self.app.store, ids, params.get("base")))
+        found = compare.view(self.app.store, ids, params.get("base"))
+        if not params.get("base"):  # the compare view opened (it names the base when another one is chosen)
+            self.app.usage.compared()
+        self.json(found)
 
     def combine_jobs(self, _params):
         """The picked parts saved as a new version of the base transcript; answers like GET /api/jobs/<id>."""
@@ -912,10 +929,12 @@ class Handler(BaseHTTPRequestHandler):
         p = self.body_json()
         values = {k: p[k] for k in self.app.cfg.SETTINGS if k in p}
         with self.app.settings_lock:
+            before = self.app.cfg.settings()
             try:
                 self.app.cfg.save_settings(**values)
             except ValueError as e:
                 raise ApiError(400, str(e))
+        self.app.usage.settings_changed(before, self.app.cfg.settings())  # turned off: what was kept goes at once
         self.json(self.app.status())
 
     # Assistants over MCP (app/assistants.py; app/mcp.py is the server they start): Settings → Assistants. The

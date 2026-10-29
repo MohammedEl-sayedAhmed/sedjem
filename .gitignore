@@ -56,7 +56,8 @@ docs/images/make/out/
 
 # Large or machine-specific (see docs/08-disk-and-cleanup.md to recreate)
 models/
-tools/
+tools/*
+!tools/usage_totals.py
 .venv/
 .venv-bench/
 __pycache__/

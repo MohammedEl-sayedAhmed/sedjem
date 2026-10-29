@@ -28,7 +28,8 @@ The desktop app knows its own version and commit: the build stamps them into the
 On first start Sedjem asks once: *Check for updates automatically?* *Yes, check daily* lets it check in
 the background, and with *No* it checks only when asked. The answer is the switch *Check for updates
 automatically* in *Settings → Updates*, which can change it later. *Check now* in the same place works
-either way.
+either way. The same dialog says that Sedjem sends anonymous usage counts, which have nothing to do with
+GitHub, and has their switch ([usage counts](13-usage-counts.md)).
 
 With the switch on, Sedjem checks about ten seconds after it starts (so starting stays fast) and then
 once a day while it runs. A check that fails because the computer is offline is tried again an hour

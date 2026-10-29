@@ -104,8 +104,10 @@ def launch(playwright):
 
 class UiTestCase(unittest.TestCase):
     """One Sedjem server and one browser per test class; a fresh page per test. A test fails if the page
-    logs a JavaScript error. Subclasses list demo jobs as `jobs = ({"jid": ..., ...}, ...)`."""
+    logs a JavaScript error. Subclasses list demo jobs as `jobs = ({"jid": ..., ...}, ...)`, and may give
+    `config`, TOML for the data folder's config.toml (a stand-in key for the usage counts, say)."""
     jobs = ()
+    config = ""
 
     @classmethod
     def setUpClass(cls):
@@ -117,6 +119,8 @@ class UiTestCase(unittest.TestCase):
         (cls.home / "app_data").mkdir()
         # The first-start question about updates (a dialog over the page) is answered: no automatic checks
         (cls.home / "app_data" / "settings.json").write_text(json.dumps({"update_check": False}), encoding="utf-8")
+        if cls.config:
+            (cls.home / "app_data" / "config.toml").write_text(cls.config, encoding="utf-8")
         for job in cls.jobs:
             demo_job(cls.home, **job)
         cls.gpu = mock.patch.object(engines, "gpu_info", return_value=GPU)

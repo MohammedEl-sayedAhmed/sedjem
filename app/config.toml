@@ -29,6 +29,13 @@ language = "ar"             # "ar", "en" or "auto"
 repo = "MohammedEl-sayedAhmed/sedjem"
 api = "https://api.github.com"
 
+[usage]
+# Anonymous usage counts (app/usage.py, docs/13-usage-counts.md), sent to Aptabase: the app key of Sedjem's app
+# there. An A-EU- key sends to Aptabase's EU region, an A-US- key to its US region; host is only for a self-hosted
+# Aptabase (an A-SH- key). Without a key nothing is counted or sent. The switch is in Settings → About.
+app_key = ""
+host = ""
+
 [local]
 # python = ""               # interpreter for local runs; default: the one running the app
 threads = 10                # CPU threads for the local models
