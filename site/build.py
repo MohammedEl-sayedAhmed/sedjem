@@ -8,8 +8,8 @@ Arabic page gives the speakers Arabic names. The ear beside the hero is the bran
 pictures of the app are the captures in site/captures/, made by
 docs/images/make/screenshots.py (its "site" shot) and shrink.py, each in a desktop and a phone form, light and dark,
 as lossless WebP with a PNG for browsers without WebP. Next to the pages go the stylesheet, the scripts, the 404 page and only the files they use: the logo from docs/brand/, the
-captures, the social card from docs/images/, the font files the stylesheet names from docs/video/fonts/ with their
-licence, and the app's icon. Each page counts its visits anonymously with counts.js, which sends to Aptabase only
+captures, each page's share picture from site/images/ (made by docs/images/make/og.py), the font files the
+stylesheet names from docs/video/fonts/ with their licence, and the app's icon. Each page counts its visits anonymously with counts.js, which sends to Aptabase only
 from the published host (COUNTS_HOST), so a local preview sends nothing; without a key (COUNTS_KEY) the build
 leaves it out. Standard library only.
 
@@ -66,7 +66,8 @@ FILES = {
     "brand/sedjem-logo-colour-dark.svg": "docs/brand/sedjem-logo-colour-dark.svg",
     "icon.svg": "app/static/icon.svg",
     "icon-192.png": "app/static/icon-192.png",
-    "images/social-preview.png": "docs/images/social-preview.png",
+    "images/og-en.png": "site/images/og-en.png",  # each page's share picture, made by docs/images/make/og.py
+    "images/og-ar.png": "site/images/og-ar.png",
     "fonts/OFL-IBM-Plex.txt": "docs/video/fonts/OFL-IBM-Plex.txt",
 }
 FONTS = "docs/video/fonts"

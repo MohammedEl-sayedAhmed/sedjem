@@ -4,7 +4,8 @@ every file they link or load is in the build and nothing is loaded from another 
 stylesheet is one of the palette's, images have alt text and their real proportions, Arabic is marked as Arabic and
 the Arabic page reads right to left, the copy keeps the repository's style, the transcript and the speakers' shares
 come from docs/images/make/content.py and the version from app/__init__.py, the measured numbers are the docs',
-the two pages carry the same sections, numbers and images and point to each other, the theme button is named in each
+the two pages carry the same sections, numbers and images and point to each other, each page shares its own picture
+of 1200 x 630 described in its language, the theme button is named in each
 language and the dark theme is one set of tokens, the transcript, the download and the menu are whole without
 JavaScript, the speakers' names are in colours that read on the card, the pictures of the app keep every pixel and
 are set at their own size, and the first view stays small. The anonymous counts go only to Aptabase, only from the
@@ -655,6 +656,50 @@ class SiteTest(unittest.TestCase):
                                           and n.attrs.get("type") == "image/svg+xml"))
                 if lang == "ar":
                     self.assertTrue(ARABIC.search(title.text()) and ARABIC.search(meta["description"]))
+
+    def test_each_page_shares_its_own_picture(self):
+        """A link to a page shows that page's own picture: og: and twitter: tags with the same absolute https
+        address, a PNG in the build of exactly the size they give, 1200 x 630, and its description in the page's
+        language."""
+        shared = set()
+        for lang, root in self.homes.items():
+            with self.subTest(lang):
+                meta = {n.attrs.get("name") or n.attrs.get("property"): n.attrs.get("content")
+                        for n in root.find(lambda n: n.tag == "meta")}
+                url = f"{build.URL}images/og-{lang}.png"
+                self.assertTrue(url.startswith("https://"))
+                self.assertEqual((meta["og:image"], meta["twitter:image"]), (url, url))
+                self.assertEqual(image_size(self.out / url[len(build.URL):]), (1200, 630))
+                self.assertEqual((meta["og:image:width"], meta["og:image:height"], meta["og:image:type"]),
+                                 ("1200", "630", "image/png"))
+                self.assertEqual(meta["twitter:card"], "summary_large_image")
+                self.assertEqual((meta["twitter:title"], meta["twitter:description"]), (meta["og:title"], meta["og:description"]))
+                alt = meta["og:image:alt"]
+                self.assertEqual(meta["twitter:image:alt"], alt)
+                self.assertGreaterEqual(len(alt.split()), 10)
+                arabic, latin = len(ARABIC.findall(alt)), len(re.findall("[A-Za-z]", alt))
+                if lang == "ar":
+                    self.assertGreater(arabic, 2 * latin, alt)
+                else:
+                    self.assertEqual(arabic, 0, alt)
+                shared.add(url)
+        self.assertEqual(len(shared), len(HOMES))
+
+    def test_the_share_pictures_come_from_their_generator(self):
+        """The share pictures are made by docs/images/make/og.py at 1200 x 630, kept inside the middle 1100 x 560
+        that some apps crop to, and saved in full colour, losslessly packed, small enough for the apps that fetch
+        them."""
+        generator = (ROOT / "docs" / "images" / "make" / "og.py").read_text(encoding="utf-8")
+        for line in ("W, H = 1200, 630", "SAFE = (50, 35, 1150, 595)", 'OUT / f"og-{lang}.png"', "optimize=True"):
+            self.assertIn(line, generator)
+        self.assertNotIn("quantize", generator)
+        self.assertEqual(sorted(p.name for p in (ROOT / "site" / "images").iterdir()), ["og-ar.png", "og-en.png"])
+        for lang in HOMES:
+            with self.subTest(lang):
+                self.assertEqual(build.FILES[f"images/og-{lang}.png"], f"site/images/og-{lang}.png")
+                data = (ROOT / "site" / "images" / f"og-{lang}.png").read_bytes()
+                self.assertEqual((data[24], data[25]), (8, 2))  # 8 bits, RGB: every colour, not a palette
+                self.assertLess(len(data), 300_000)
 
     def test_the_transcript_comes_from_content_py(self):
         m = self.meeting

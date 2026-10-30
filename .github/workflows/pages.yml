@@ -11,7 +11,6 @@ on:
     paths:
       - "site/**"
       - "docs/images/make/content.py"
-      - "docs/images/social-preview.png"
       - "docs/brand/sedjem-*.svg"
       - "docs/video/fonts/*"
       - "app/__init__.py"
