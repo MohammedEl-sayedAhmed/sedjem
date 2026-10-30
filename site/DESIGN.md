@@ -235,7 +235,8 @@ as a thin teal line, taken from docs/brand at build time rather than redrawn, an
 headline leads.
 
 Each section makes one claim and proves it beside itself: the claim on five columns, the proof on the seven next to
-it, a hairline between sections. The proof is the app (a capture), a measurement (the table) or a fact (the list).
+it, a hairline between sections. The proof is the app (a capture), a measurement (the benchmarks) or a fact (the
+list).
 
 ## Four principles
 
@@ -335,16 +336,15 @@ everything is one column, the claim first, then the proof, then its caption.
             English words stay English   As some models write it   (the wave in slate)
             (claim, lede)                As Sedjem writes it       (the teal wash and line)
             -------------------------------------------------------------------------------- rule
-            Checked on a public test set Model | WER | English kept (bar) | 1 h takes
-            (claim, lede, body, link)    caption: measured on Perle ...
-            -------------------------------------------------------------------------------- rule
             Every voice gets its own     [capture: the lines and the Speakers panel]
-            name                         caption
+            name, a pointer to the benchmarks  caption
             ... Your recording stays on your computer [Settings, Models: the models and their sizes], ending with Privacy
             ... Click a line to hear it [the line being heard]
             ... Every fix is a new version [the diff before saving]
             ... Two models, the better line from each [one line, two models, Kept]
-            ... Runs on an ordinary laptop [the facts: a spec sheet on a tonal plate]
+            ... Runs on an ordinary laptop [the facts: a spec sheet on a tonal plate], a pointer to the benchmarks
+            ... Benchmarks [the claim and the honest line over six figure cards with bars, three to a row: the public
+                sets, then the private meetings; the test sets and the docs under them]
             ... Sedjem in numbers [the claim over a grid of figure cards, three to a row, the sources under it]
             Get Sedjem                   From source
             Free and open source ...     [ git clone ... ]   (scrolls sideways if it must)
@@ -382,10 +382,10 @@ without JavaScript, and holds the docs, GitHub, the other language and, with Jav
 Below 1000 px the ear is 96 px tall and sits over the headline, one row gap (32 px) above it at every width, its end
 on the column's end (the left on the Arabic page, the drawing unflipped), so the headline keeps its whole measure.
 Each capture has a phone form, taken from a phone-sized window of the app, so the phone never shows a desktop
-window shrunk. The table turns into one block per model; the commands scroll sideways in a box that takes the
-keyboard's focus and has a name, and its end edge fades them out while more of them is to the side. The subtitles
-beside the hero's transcript are left out below 700 px, as their cues would wrap raggedly there, and so are the
-caption's words about them.
+window shrunk. The benchmarks' cards stand one under the other, each figure over its words where the card is
+narrower than 320 px. The commands scroll sideways in a box that takes the keyboard's focus and has a name, and its
+end edge fades them out while more of them is to the side. The subtitles beside the hero's transcript are left out
+below 700 px, as their cues would wrap raggedly there, and so are the caption's words about them.
 
 ## Pictures of the app
 
@@ -475,24 +475,60 @@ build.py reads the numbers from files (the stats branch's, which pages.yml downl
 docs/usage.json) and fetches nothing; Pages rebuilds after each day's stats. A file it can't read leaves its cards
 out, and the section is left out when it has nothing to show.
 
-## The table
+## The benchmarks
 
-It is the page's centre of credibility, so it is set rather than left as a default: one line of column names, each
-over a small "lower is better" or "higher is better" in caption style; tabular figures in Plex Mono; a "default"
-pill on the default model; and beside English kept, the claim, a thin bar of the mark teal with the figure at its
-tip, growing from the column's start over a track of the full 100%. One series, so no legend; the figure is printed,
-so no tooltip. The Perle paragraph is the table's caption. tests/test_site.py checks every figure against
-docs/03-results.md.
+"Benchmarks" (نتايج الاختبارات) puts every result the docs publish that a visitor would ask about in one place, after the
+facts, which point to it, as do the speaker labels' section: how accurate the transcripts are, how well the English
+terms are kept, how fast it is on an ordinary laptop and how well the speakers are told apart, each against what the
+project measured it against. It took the place of a table of three models on Perle and of the numbers in the speaker
+labels' and the facts' sections, so the page says each number once. The owner asked for it concise, with the repository
+for the details.
+
+The claim is the title, a lede with the conditions (public test sets and a private set of recorded meetings, on a
+laptop with an Intel Core i5-1245U and no NVIDIA card) and the honest line: a local transcript of a real meeting is a
+draft, and a hosted service is still more accurate. Under it, six of the numbers' figure cards, three to a row from
+1000 px: on the first row the public test sets (the word error rate on Perle, the English terms kept on Perle, and the
+speech TitaNet-small and Nemotron-3-Diarization give to the wrong speaker on ArzEn and AMI), on the second the private
+meetings (the words that differ from ElevenLabs' transcript, the minutes for an hour with speaker labels, and the words
+TitaNet-small and ElevenLabs' own labels give to the wrong speaker on meetings of two or three people). Under the grid,
+one paragraph names each public test set with a link to where it is downloaded and the licence the docs give it (Perle,
+MIT; ArzEn, CC BY-SA 4.0; AMI, CC BY 4.0), says the meetings are a private set, and links the results, the speaker
+labels and the tables in the repository. The private meetings are only ever that set, with pooled numbers: no meeting,
+excerpt or file is named, and the build reads only their pooled rows.
+
+A card's figure is the best of Sedjem's own bars, and the line under its title names that model, and the test set where
+the card has two. Under them, bars to compare: one grid for the whole chart, so every bar starts on the same zero line
+(on the right on the Arabic page), each row the model's short name, its bar and its value at its end, a heading over a
+group (the three models that were also tried, or a test set), and a note under the bars that says which way is better.
+Sedjem's own bars are the brand's teal, #14a3a1, and the others, the models also tried and ElevenLabs, the palette's grey,
+so colour marks Sedjem's as it does elsewhere; every bar is named, so nothing rests on colour. A share of the words runs
+to 100% and the minutes to an hour, drawn as a faint track behind the bar; the speaker labels' shares, all under a
+tenth, run to the largest of them, without a track. A bar is drawn to the number at its end, the docs' rounding. No
+new colour, so the palette and its validation in the numbers stand. A figure stands beside its words where the card
+has 320 px inside it, the card's own width deciding (a container query), so a row is laid out alike, and over them
+where it has less. The
+line puts the model first; a long name breaks between its words, never at a hyphen, and the line's last words are
+kept together, so it never ends on one word alone.
+
+Every number is the docs': build.py reads them with docs/charts.py's own sources, from results/summary.json
+(bench/score.py), results/arzen-diarization.json and results/ami-diarization.json (bench/compare_arzen.py and
+compare_ami.py) and docs/charts-data.json (the meetings' published aggregates), rounded as the docs round them; the
+minutes for an hour are the meetings' mean speed times 60. Nothing is typed into the copy, and pages.yml rebuilds the
+site when one of those files changes. tests/test_site.py checks each number against the docs' tables and sentences, the
+bars' lengths, the tables, the links and licences, both languages, and that no other section says a number again;
+tests/test_ui_site.py checks the layout at 320 to 1440 px in both themes. Each chart is hidden from screen readers and has
+a table of its numbers instead, with a caption that says which way is better, in a hidden box, as a table is never
+narrower than its words and a long caption would otherwise widen the page.
 
 ## Two pages, mirrored
 
 - One template and two sets of words: the sections, their ids, the transcript's lines and times, the registers, the
-  table's figures and the pictures are the same on both pages; only the copy, the captions, the alt text and the
+  benchmarks' figures and the pictures are the same on both pages; only the copy, the captions, the alt text and the
   speakers' names change. The Arabic page names them منى، كريم، عمر، نور. The tests compare the two pages.
 - The Arabic page is set for right to left, not flipped: lang="ar" and dir="rtl" on the root; logical properties
-  everywhere, so the grid, the table, the leaders and the menu mirror; the table's columns read from their start,
-  the right, with the figures of one width lining up on their points; model names never wrap inside Arabic, and the
-  Whisper hint sits on its own line; captions under their picture.
+  everywhere, so the grid, the bars, the leaders and the menu mirror; the bars start on the right; a model's name is
+  one left-to-right run that never breaks at a hyphen, and the preposition before it stays with it; captions under
+  their picture.
 - Every run of Latin words in the Arabic copy is wrapped in its own left-to-right span, marked as English and not to
   be translated, so names, terms, paths and numbers with their units keep their order inside the right-to-left
   line.
@@ -575,8 +611,8 @@ og:image:alt and twitter:image:alt describe it in the page's language.
 The same on both pages: a skip link, header, nav, main and footer landmarks, one h1 and no skipped levels; a 2 px
 focus ring in the mark teal with a 3 px offset; buttons 36 px tall and 44 px on a coarse pointer; lang="ar" and
 dir="rtl" on Arabic lines, dir="auto" on the line that starts in English, and lang on each run of the other language
-inside a line; translate="no" on the transcript, the registers, the commands and the product names; real table
-markup that keeps its roles on phones, with its caption; alt text for every picture, and for the Speakers panel the
+inside a line; translate="no" on the transcript, the registers, the commands and the product names; a table of
+numbers with its caption for every chart; alt text for every picture, and for the Speakers panel the
 shares themselves, worked out from content.py at build time; a named, focusable box for the commands that scroll;
 and a forced-colours fallback that draws the frames and buttons the theme drew with shadows.
 
@@ -602,8 +638,8 @@ Round 3 followed a fresh critique (4/10) and the lessons from uberdesigner, bkli
 - Two levels of type and long copy. The ramp has a lede between the claim and the body; claims are two lines at
   most and about thirty words, with the rest linked to the docs; names were ink with the app's colour on a dot; the
   made-up note is under the hero sample and in the footer only.
-- A default table, and the brand's teal on the errors. The table is set as described above; the other models'
-  words carry a slate wave.
+- A default table, and the brand's teal on the errors. The table was set with care (the benchmarks have since
+  taken its place); the other models' words carry a slate wave.
 - The Arabic page mirrored by the browser. Its columns read from their start, its model names never wrap inside
   Arabic, its captions sit under their pictures and say the app's interface is in English, and its sample has
   Arabic names.
@@ -635,9 +671,11 @@ After the site went live, the user asked for two more:
 - The theme button read backwards: following the system, its half-filled circle looked like the other theme. The
   icon is now the theme on show, a sun or a moon, and each press switches to the other theme, as above.
 - The ear was missing on phones. Below 1000 px it is back, smaller, over the headline on the end side.
+- The results and the benchmarks in one place, concise, with the repository for the details: the table of three models,
+  the speaker labels' sentence and the facts' hour became the benchmarks section above, and their sections point to it.
 
 Checked against the tells: no gradient but the logo tile's own, the commands' edge fade and the empty counts card's
 hatch, no glow, glass, blur, grain or orb; no cards in cards, icon tiles or coloured side strips, and a bento grid only
-for the numbers, where each card is a chart; no eyebrow labels, uppercase or monospace labels, or numbering; large
+for the benchmarks and the numbers, where each card is a chart; no eyebrow labels, uppercase or monospace labels, or numbering; large
 numbers only as a chart card's figure, over its chart; no coloured or italic word in a heading; no device frame or
 tilt; one motion; no arrows on links; and no claim or number that isn't in the docs or the data.

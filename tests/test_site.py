@@ -3,8 +3,7 @@ is built into a temporary folder and checked as GitHub Pages serves it, every ch
 every file they link or load is in the build and nothing is loaded from another site, every colour in the
 stylesheet is one of the palette's, images have alt text and their real proportions, Arabic is marked as Arabic and
 the Arabic page reads right to left, the copy keeps the repository's style, the transcript and the speakers' shares
-come from docs/images/make/content.py and the version from app/__init__.py, the measured numbers are the docs',
-the two pages carry the same sections, numbers and images and point to each other, each page shares its own picture
+come from docs/images/make/content.py and the version from app/__init__.py, the two pages carry the same sections, numbers and images and point to each other, each page shares its own picture
 of 1200 x 630 described in its language, the theme button is named in each
 language and the dark theme is one set of tokens, the transcript, the download and the menu are whole without
 JavaScript, the speakers' names are in colours that read on the card, the pictures of the app keep every pixel and
@@ -13,7 +12,11 @@ published site, never with Do Not Track or Global Privacy Control, and hold only
 The section of numbers, built from made-up stats files and totals (tests/site_support.py), is a grid of charts whose
 every number is its source's, each with a table of the same numbers; it is dated right, the same on both pages, says
 when the first totals come before there are any, leaves out what a missing or broken file would have given, and is
-all in the HTML: the build reads files and fetches nothing. The downloads are the latest release's files, with their
+all in the HTML: the build reads files and fetches nothing. The benchmarks are six figure cards over bars to compare,
+every number the one the docs publish, read through docs/charts.py from the files the bench scripts write and
+checked here against the docs' tables and sentences; the bars start at zero and say which way is better, each chart has
+a table of its numbers, the test sets are linked with their licences, the private meetings are only ever a private set
+with pooled numbers, and no other section says one of their numbers again. The downloads are the latest release's files, with their
 names, sizes and SHA256 as the release gives them, or the release's page and the general wording without its
 details. Offline, standard library only.
 Run: .venv/bin/python -m unittest discover -s tests -v
@@ -34,6 +37,7 @@ import tomllib
 import unittest
 from collections import Counter
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -96,9 +100,9 @@ COUNTED = {"page_view": {"page": ["en", "ar", "404"], "device": ["phone", "table
 SYSTEM_PROPS = ["locale", "appVersion", "isDebug", "sdkVersion", "osName"]
 ENDPOINT = "https://eu.aptabase.com/api/v0/event"
 PAGE_OF = {"index.html": "en", "ar/index.html": "ar", "404.html": "404"}  # each page's name in the counts
-# Numbers the Arabic copy spells out: "about 2 h" is حوالي ساعتين, two hours in the dual, and "1 h takes" is ساعة صوت
-# بتاخد, an hour of audio takes
-SPELLED = {"ساعتين": "2", "ساعة صوت بتاخد": "1"}
+# The files the benchmarks are read from: docs/charts.py and the data its sources read
+BENCH_FILES = ["docs/charts.py", "docs/charts-data.json", "results/summary.json", "results/arzen-diarization.json",
+               "results/ami-diarization.json"]
 
 
 class Node:
@@ -584,9 +588,6 @@ class SiteTest(unittest.TestCase):
         ids = lambda root: [n.attrs["id"] for n in root.iter() if "id" in n.attrs]
         self.assertEqual(ids(en), ids(ar))
         numbers = {lang: Counter(re.findall(r"\d+(?:\.\d+)*", squash(visible_text(root)))) for lang, root in self.homes.items()}
-        text_ar = visible_text(ar)
-        for word, number in SPELLED.items():
-            numbers["ar"][number] += text_ar.count(word)
         self.assertEqual(numbers["en"], numbers["ar"])
         self.assertEqual(self.images(HOMES["en"]), self.images(HOMES["ar"]))
         # the same transcript lines and times and register lines, character for character; only the speakers'
@@ -636,6 +637,10 @@ class SiteTest(unittest.TestCase):
         numbers |= {"numbers.months"} | {f"numbers.model_{engine}" for engine in build.ENGINES}
         numbers |= {f"numbers.{system}" for system in ("windows", "linux", "other")}
         numbers |= set(re.findall(r'words\["(get\.\w+)"\]', source))
+        numbers |= {f"benchmarks.{key}" for key in re.findall(r'tell\(["\'](\w+)["\'][,)]', source)}
+        cards, _ = build.measured(build.bench_sources())
+        numbers |= {f"benchmarks.{key}{end}" for key in build.BENCHMARKS for end in ("", "_line", "_table")}
+        numbers |= {f"benchmarks.{card['note']}" for card in cards.values()}
         numbers |= {key for key in tables["en"] if key.startswith("countries.")}
         self.assertEqual(used | set(build.SHOTS.values()) | numbers, tables["en"])
         self.assertTrue(all(re.fullmatch(r"countries\.[A-Z]{2}", key) for key in tables["en"] if key.startswith("countries.")))
@@ -927,23 +932,6 @@ class SiteTest(unittest.TestCase):
         script = (self.out / "site.js").read_text(encoding="utf-8")
         self.assertIn('label.getAttribute("data-os") !== "linux"', script)
 
-    def test_the_numbers_are_the_docs(self):
-        """The table's word error rates and English kept are docs/03-results.md's, model by model."""
-        docs = (ROOT / "docs" / "03-results.md").read_text(encoding="utf-8").split("## Public benchmark: Perle at 16 kHz")[1].split("\n## ")[0]
-        rows = {"Cohere Transcribe Arabic": "Cohere Transcribe Arabic (", "whisper-medium code-switching": "whisper-medium code-switching fine-tune",
-                "Whisper large-v3": "Whisper large-v3 + style hint"}
-        for lang, home in self.homes.items():
-            for tr in home.find(lambda n: n.tag == "tr" and n.find(lambda c: "model" in c.classes())):
-                (model,) = tr.find(lambda n: "model" in n.classes())
-                wer, kept = (n.text() for n in tr.find(lambda n: "fig" in n.classes()))
-                with self.subTest(lang, model=model.text()):
-                    (line,) = [x for x in docs.splitlines() if x.startswith("| " + rows[model.text()])]
-                    cells = [c.strip() for c in line.strip("|").split("|")]
-                    self.assertEqual(cells[1].split()[0], wer)
-                    self.assertEqual(cells[5], kept)
-                    (bar,) = tr.find(lambda n: "bar" in n.classes())
-                    self.assertEqual(bar.attrs["style"], f"--v: {kept[:-1]}")
-
     def test_the_pictures_of_the_app_come_from_its_generator(self):
         """Every picture of the app is a capture made by docs/images/make/screenshots.py's "site" shot, in a
         desktop and a phone form, light and dark, at the densities the page sets them at, and made into WebP and
@@ -1024,7 +1012,7 @@ class SiteTest(unittest.TestCase):
         paths = re.search(r"\n    paths:\n((?:      - .+\n)+)", workflow).group(1)
         patterns = [p.strip()[2:].strip('"') for p in paths.splitlines()]
         sources = ["site/index.html", "site/styles.css", "site/counts.js", "site/build.py", "site/copy/ar.toml", "docs/images/make/content.py",
-                   "app/__init__.py", *build.FILES.values(),
+                   "app/__init__.py", *build.FILES.values(), *BENCH_FILES,
                    *(f"{build.FONTS}/{Path(f).name}" for f in re.findall(r'url\("(fonts/[^"]+)"\)', self.css))]
         for source in sources:
             with self.subTest(source):
@@ -1510,6 +1498,288 @@ class NumbersTest(unittest.TestCase):
         design = (ROOT / "site" / "DESIGN.md").read_text(encoding="utf-8").split("## The numbers")[1].split("\n## ")[0]
         for words in ("#14a3a1", "#6dbeba", "#2f7f7c", "validate_palette.js"):
             self.assertIn(words, design)
+
+
+def docs_row(path, heading, first):
+    """The cells of the row that starts with first in the table under heading (## or ###) of a docs file."""
+    text = (ROOT / path).read_text(encoding="utf-8")
+    part = re.split(r"\n#{2,3} " + re.escape(heading) + "\n", text)[1]
+    (line,) = [x for x in re.split(r"\n#{2,3} ", part)[0].splitlines() if x.startswith("| " + first)]
+    return [c.strip() for c in line.strip().strip("|").split("|")]
+
+
+def docs_text(path):
+    return squash((ROOT / path).read_text(encoding="utf-8"))
+
+
+def text_outside(node, skip):
+    """The text a reader sees outside the elements skip picks."""
+    if node.tag in ("script", "style") or skip(node):
+        return ""
+    return "".join(c if isinstance(c, str) else text_outside(c, skip) for c in node.children)
+
+
+class BenchmarksTest(unittest.TestCase):
+    """The benchmarks: six figure cards, each over bars to compare, every number the one the docs publish. The build
+    reads them through docs/charts.py from results/summary.json, results/*-diarization.json and docs/charts-data.json;
+    this checks them against the docs' own tables and sentences."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        out = build.build(Path(cls.tmp.name) / "site")
+        cls.roots, cls.sections = {}, {}
+        for lang, page in HOMES.items():
+            root, errors = parse((out / page).read_text(encoding="utf-8"))
+            assert not errors, errors
+            cls.roots[lang] = root
+            (cls.sections[lang],) = root.find(lambda n: n.tag == "section" and n.attrs.get("aria-labelledby") == "benchmarks")
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    @staticmethod
+    def cards(section):
+        """Each card by its key: its figure (value, as shown), title and line, its chart's rows, each a heading's text or
+        (classes, name, value as shown, --v), the note under the chart, and its table's caption and rows."""
+        out = {}
+        for card in section.find(lambda n: "card" in n.classes()):
+            first = lambda node, test: node.find(test)[0]  # noqa: E731
+            data = first(first(card, lambda n: "kpi-figure" in n.classes()), lambda n: n.tag == "data")
+            rows = []
+            for li in card.find(lambda n: n.tag == "li" and "bar-list" in n.parent.classes()):
+                if "bar-head" in li.classes():
+                    rows.append(squash(li.text()))
+                    continue
+                fill = first(li, lambda n: "bar-fill" in n.classes())
+                rows.append((li.classes(), squash(first(li, lambda n: "bar-name" in n.classes()).text()),
+                             squash(first(li, lambda n: "bar-value" in n.classes()).text()),
+                             float(fill.attrs["style"].removeprefix("--v: "))))
+            table = first(card, lambda n: n.tag == "table")
+            out[card.attrs["id"].removeprefix("benchmarks-")] = {
+                "figure": (data.attrs["value"], squash(data.text())),
+                "title": squash(first(card, lambda n: n.tag == "h3").text()),
+                "line": squash(first(card, lambda n: "kpi-text" in n.classes()).find(lambda n: n.tag == "p")[0].text()),
+                "rows": rows, "note": squash(first(card, lambda n: "bar-note" in n.classes()).text()),
+                "caption": squash(first(table, lambda n: n.tag == "caption").text()),
+                "table": [[squash(c.text()) for c in tr.children if not isinstance(c, str)]
+                          for tr in table.find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")],
+                "hidden": [n.nearest("aria-hidden") for n in card.find(lambda n: "bars" in n.classes())],
+                "boxed": table.parent.classes(),
+            }
+        return out
+
+    @staticmethod
+    def expected():
+        """Each card's bars as the docs publish them, in order: (heading over it or None, name on the bar, the name in
+        full, value as shown), and which way is better."""
+        results, speakers = "docs/03-results.md", "docs/04-speaker-labels.md"
+        perle = {"Cohere": ("Cohere Transcribe Arabic", docs_row(results, "Public benchmark: Perle at 16 kHz", "Cohere Transcribe Arabic (")),
+                 "whisper-medium": ("whisper-medium code-switching", docs_row(results, "Public benchmark: Perle at 16 kHz", "whisper-medium")),
+                 "Whisper large-v3": ("Whisper large-v3", docs_row(results, "Public benchmark: Perle at 16 kHz", "Whisper large-v3 + style hint")),
+                 "Audar": ("Audar-ASR-V1-Turbo", docs_row(results, "Also tried", "Audar-ASR-V1-Turbo")),
+                 "R2T2": ("R2T2", docs_row(results, "Also tried", "R2T2")),
+                 "Qwen3-ASR": ("Qwen3-ASR-1.7B", docs_row(results, "Also tried", "Qwen3-ASR-1.7B"))}
+        tried = lambda name: "Also tried" if name in ("Audar", "R2T2", "Qwen3-ASR") else None  # noqa: E731
+        pooled = docs_row(results, "Real meetings", "pooled")
+        meetings = re.search(r"Other pooled numbers.*?speed with speaker labels [\d.]+–[\d.]+ times real time \(mean ([\d.]+)\) "
+                             r"and [\d.]+–[\d.]+ \(mean ([\d.]+)\)", docs_text(results)).groups()
+        minutes = [str(int((Decimal(m) * 60).quantize(Decimal(1), ROUND_HALF_UP))) for m in meetings]
+        two_or_three = re.search(r"and on ([\d.]+)% over the five 2–3-person excerpts, where TitaNet-small gets ([\d.]+)%",
+                                 docs_text(speakers)).groups()
+        on_speech = lambda heading, first: docs_row(speakers, heading, first)[1]  # noqa: E731
+        sets = {"ArzEn": "ArzEn: interviews in Egyptian Arabic and English", "AMI": "AMI: English meetings with much overlap"}
+        return {
+            "wer": ("lower", [(tried(k), k, full, cells[1].split()[0]) for k, (full, cells) in perle.items()]),
+            "english": ("higher", [(tried(k), k, full, cells[5]) for k, (full, cells) in perle.items()]),
+            "nemotron": ("lower", [(s, short, full, on_speech(heading, row)) for s, heading in sets.items()
+                                   for short, full, row in (("TitaNet-small", "TitaNet-small", "TitaNet-small voiceprints (default)"),
+                                                            ("Nemotron", "Nemotron-3-Diarization", "Nemotron, one speaker at a time"))]),
+            "meetings": ("lower", [(None, "Cohere", "Cohere Transcribe Arabic", pooled[2].split()[0]),
+                                   (None, "whisper-medium", "whisper-medium code-switching", pooled[3].split()[0])]),
+            "speed": ("lower", [(None, "Cohere", "Cohere Transcribe Arabic", f"{minutes[0]} min"),
+                                (None, "whisper-medium", "whisper-medium code-switching", f"{minutes[1]} min")]),
+            "speakers": ("lower", [(None, "TitaNet-small", "TitaNet-small", f"{two_or_three[1]}%"),
+                                   (None, "ElevenLabs", "ElevenLabs", f"{two_or_three[0]}%")]),
+        }
+
+    def test_every_number_is_the_docs(self):
+        """Each bar is the number the docs publish, in the docs' order: the word error rate and the English kept on
+        Perle of the three models Sedjem runs and the three also tried, the speech TitaNet-small and Nemotron give to
+        the wrong speaker on ArzEn and AMI, the recorded meetings' difference from ElevenLabs and their time for an hour
+        (their mean speed, times 60 minutes), and the words TitaNet-small and ElevenLabs give to the wrong speaker on
+        meetings of two or three people. A card's figure is the best of Sedjem's own bars, and its line names that
+        model, and the test set on the speaker labels' card."""
+        e = self.expected()
+        self.assertEqual((e["wer"][1][0][3], e["english"][1][1][3], e["speakers"][1][0][3]), ("13.4%", "90%", "9.0%"))
+        for lang, section in self.sections.items():
+            cards = self.cards(section)
+            self.assertEqual(list(cards), list(build.BENCHMARKS))
+            self.assertEqual(list(cards), ["wer", "english", "nemotron", "meetings", "speed", "speakers"])
+            for key, (better, bars) in e.items():
+                with self.subTest(lang, card=key):
+                    c, unit = cards[key], (lambda text: text.replace(" min", {"en": " min", "ar": " دقيقة"}[lang]))
+                    shown, heading = [], None
+                    for head, short, _, value in bars:
+                        if head and head != heading:
+                            shown.append({"Also tried": {"en": "Also tried", "ar": "اتجرّبوا كمان"}[lang]}.get(head, head))
+                        heading = head
+                        shown.append((short, unit(value)))
+                    self.assertEqual([r if isinstance(r, str) else (r[1], r[2]) for r in c["rows"]], shown)
+                    ours = [b for b in bars if b[1] not in ("Audar", "R2T2", "Qwen3-ASR", "ElevenLabs")]
+                    number = lambda b: float(b[3].split()[0].rstrip("%"))  # noqa: E731
+                    lead = (min if better == "lower" else max)(ours, key=number)
+                    value = lead[3].split()[0].rstrip("%")
+                    self.assertEqual(c["figure"], (value, unit(lead[3]) if "min" in lead[3] else lead[3]))
+                    self.assertIn(lead[2], c["line"])
+                    if key == "nemotron":
+                        self.assertIn(lead[0], c["line"])
+                    leads = [r[1] for r in c["rows"] if not isinstance(r, str) and "bar-lead" in r[0]]
+                    self.assertEqual(leads, [lead[1]])
+
+    def test_the_bars_start_at_zero_and_say_which_way_is_better(self):
+        """Every bar starts at zero and is as long as its number over the chart's whole: a share of the words over
+        100%, the minutes over an hour, and the speaker labels' small shares over the largest of them. Under each
+        chart a note says which way is better, and the figure is the best bar that way. Sedjem's own bars are the
+        brand's teal and the others grey, through their classes."""
+        notes = {"en": {"lower": "Lower is better", "higher": "Higher is better", "closer": "Lower is closer",
+                        "faster": "Lower is faster"},
+                 "ar": {"lower": "الأقل أحسن", "higher": "الأعلى أحسن", "closer": "الأقل أقرب", "faster": "الأقل أسرع"}}
+        wholes = {"wer": 100, "english": 100, "meetings": 100, "speed": 60, "nemotron": None, "speakers": None}
+        directions = {"wer": "lower", "english": "higher", "nemotron": "lower", "meetings": "closer", "speed": "faster",
+                      "speakers": "lower"}
+        for lang, section in self.sections.items():
+            for key, c in self.cards(section).items():
+                with self.subTest(lang, card=key):
+                    bars = [r for r in c["rows"] if not isinstance(r, str)]
+                    values = [float(r[2].split()[0].replace("%", "").replace(NBSP, "")) for r in bars]
+                    whole = wholes[key] or max(values)
+                    self.assertEqual([r[3] for r in bars], [float(f"{v / whole * 100:.1f}") for v in values])
+                    self.assertEqual(c["note"], notes[lang][directions[key]])
+                    for classes, name, _, _ in bars:
+                        ours = name in ("Cohere", "whisper-medium", "Whisper large-v3", "TitaNet-small", "Nemotron")
+                        self.assertIn("bar-sedjem" if ours else "bar-other", classes)
+        css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
+        self.assertRegex(css, r"\.bar-list \{[^}]*grid-template-columns: max-content minmax\(0, 1fr\) max-content;")
+        self.assertRegex(css, r"\.bar-list li \{ display: contents; \}")  # one grid, so every bar starts on one line
+        fill = re.search(r"\.bar-fill \{([^}]*)\}", css).group(1)
+        for rule in ("inset-inline-start: 0;", "width: calc(var(--v) * 1%);", "background: var(--series-1);"):
+            self.assertIn(rule, fill)
+        self.assertRegex(css, r"\.bar-other \.bar-fill \{ background: var\(--series-rest\); \}")
+
+    def test_each_chart_has_a_table_of_its_numbers(self):
+        """The bars are a picture, hidden from screen readers; each card has a table of the same numbers instead, with a
+        caption that says what they are and which way is better, in a hidden box so its long caption never widens the
+        page: a row for each bar with the model's full name, or for the speaker labels a row for each test set and a
+        column for each model."""
+        e = self.expected()
+        for lang, section in self.sections.items():
+            for key, c in self.cards(section).items():
+                with self.subTest(lang, card=key):
+                    self.assertEqual(c["hidden"], ["true"])
+                    self.assertEqual(c["boxed"], ["sr-only"])
+                    self.assertTrue(c["caption"])
+                    bars = [(r[1], r[2]) for r in c["rows"] if not isinstance(r, str)]
+                    if key == "nemotron":
+                        self.assertEqual(c["table"], [["ArzEn", bars[0][1], bars[1][1]], ["AMI", bars[2][1], bars[3][1]]])
+                        continue
+                    self.assertEqual([row[1] for row in c["table"]], [value for _, value in bars])
+                    for row, (_, _, full, _) in zip(c["table"], e[key][1]):
+                        self.assertIn(full, row[0])
+            self.assertFalse(section.find(lambda n: "tabindex" in n.attrs or n.tag in ("script", "svg", "img")))
+
+    def test_the_test_sets_and_the_docs_are_linked(self):
+        """Under the grid, each public test set is linked where it is downloaded, with the licence the docs give it next
+        to the same address, and the number of Perle clips the docs give; then the results, the speaker labels and the
+        tables in the repository."""
+        docs = build.DOCS
+        self.assertEqual(docs, "https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/")
+        for lang, section in self.sections.items():
+            with self.subTest(lang):
+                (sources,) = section.find(lambda n: "sources" in n.classes())
+                links = [(a.attrs["href"], squash(a.text())) for a in sources.find(lambda n: n.tag == "a")]
+                self.assertEqual(links[:3], [(url, name) for name, url in build.TEST_SETS.values()])
+                self.assertEqual([href for href, _ in links[3:]], [docs + "03-results.md", docs + "04-speaker-labels.md",
+                                                                  docs + "results-tables.md"])
+                text = squash(sources.text())
+                for licence in ("MIT", "CC BY-SA 4.0", "CC BY 4.0"):
+                    self.assertIn(licence, text)
+                self.assertIn("40", re.findall(r"\d+", text))
+        self.assertTrue(docs_row("docs/03-results.md", "Test sets", "Perle")[2].startswith("40 random"))
+        self.assertIn("(https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch), MIT", docs_text("docs/research/market-research-report.md"))
+        speakers = docs_text("docs/04-speaker-labels.md")
+        self.assertIn("(https://sites.google.com/view/arzen-corpus/resources), CC BY-SA 4.0", speakers)
+        self.assertIn("(https://groups.inf.ed.ac.uk/ami/corpus/), CC BY 4.0", speakers)
+        for path in ("docs/03-results.md", "docs/04-speaker-labels.md", "docs/results-tables.md"):
+            self.assertTrue((ROOT / path).is_file())
+
+    def test_the_private_meetings_are_only_pooled_numbers(self):
+        """The recorded meetings are private: the section calls them a private set of recorded meetings and names no
+        meeting, excerpt or file, and the build reads only their pooled numbers from docs/charts-data.json."""
+        src = build.bench_sources()
+        read, published = [], src.published
+        src.published = lambda block, row, column=None: read.append((block, row, column)) or published(block, row, column)
+        build.measured(src)
+        self.assertEqual(sorted({block for block, *_ in read}), ["meeting_speed", "meetings", "meetings_two_or_three_people"])
+        self.assertEqual({row for block, row, _ in read if block == "meetings"}, {"pooled"})
+        for lang, words in (("en", "a private set of recorded meetings"), ("ar", "مجموعة خاصة من اجتماعات متسجّلة")):
+            text = squash(visible_text(self.sections[lang]))
+            self.assertIn(words, text)
+            self.assertNotRegex(text, r"\bm[1-6]\b|excerpt|\.(?:wav|json|txt|srt)\b")
+
+    def test_no_number_is_said_twice(self):
+        """The benchmarks hold the page's measurements and say each once: no other section has a percentage or a time
+        for an hour, the old table's and sentences' ranges are gone, and the sections that had them point to the
+        benchmarks. In the section each bar is a different model on its card and test set, so the only number shown
+        twice is a card's figure, beside the bar it leads in the same card."""
+        for lang, root in self.roots.items():
+            with self.subTest(lang):
+                outside = squash(text_outside(root, lambda n: n.tag == "section" and n.attrs.get("aria-labelledby") in ("benchmarks", "numbers")))
+                self.assertNotRegex(outside, r"\d\s*%|\d\s*(?:min\b|minutes|دقيقة|دقايق)")
+                page = squash(visible_text(root))
+                for gone in ("8–25%", "77–90%", "8–9%", "30–45"):
+                    self.assertNotIn(gone, page)
+                for key in ("voices", "facts"):
+                    (sec,) = root.find(lambda n: n.tag == "section" and n.attrs.get("aria-labelledby") == key)
+                    self.assertEqual([a.attrs["href"] for a in sec.find(lambda n: n.tag == "a" and n.attrs["href"].startswith("#"))],
+                                     ["#benchmarks"])
+                self.assertFalse(root.find(lambda n: n.attrs.get("id") == "measured"))
+                cards = self.cards(self.sections[lang])
+                named = []
+                for key, c in cards.items():
+                    heading = None
+                    for r in c["rows"]:
+                        if isinstance(r, str):
+                            heading = r
+                        else:
+                            named.append((key, heading, r[1]))
+                self.assertEqual(len(named), len(set(named)))
+
+    def test_both_pages_have_the_same_numbers(self):
+        """The same figures and bars on both pages, in Western digits; only the words differ."""
+        cards = {lang: self.cards(section) for lang, section in self.sections.items()}
+        digits = lambda text: re.findall(r"\d+(?:\.\d+)?", text)  # noqa: E731
+        for key in build.BENCHMARKS:
+            en, ar = cards["en"][key], cards["ar"][key]
+            self.assertEqual(en["figure"][0], ar["figure"][0])
+            self.assertEqual([(r[1], digits(r[2]), r[3]) for r in en["rows"] if not isinstance(r, str)],
+                             [(r[1], digits(r[2]), r[3]) for r in ar["rows"] if not isinstance(r, str)])
+        self.assertFalse(re.search("[٠-٩۰-۹]", visible_text(self.sections["ar"])), "Arabic-Indic digits")
+
+    def test_the_section_follows_the_features_it_measures(self):
+        """The benchmarks come after the facts, which point to them, and before the numbers and the downloads, with
+        their own title; the build reads them through docs/charts.py, the same sources as the docs' charts."""
+        for lang, root in self.roots.items():
+            order = [n.attrs.get("aria-labelledby") for n in root.find(lambda n: n.tag == "section")]
+            self.assertEqual([s for s in order[order.index("facts"):] if s != "numbers"], ["facts", "benchmarks", "get"])
+            if "numbers" in order:
+                self.assertEqual(order.index("numbers"), order.index("benchmarks") + 1)
+            self.assertLess(order.index("voices"), order.index("benchmarks"))
+            (h2,) = self.sections[lang].find(lambda n: n.tag == "h2")
+            self.assertEqual((h2.attrs["id"], squash(h2.text())), ("benchmarks", {"en": "Benchmarks", "ar": "نتايج الاختبارات"}[lang]))
+        self.assertEqual(build.BENCH, ROOT / "docs" / "charts.py")
+        self.assertIn("class Sources:", build.BENCH.read_text(encoding="utf-8"))
 
 
 class ReleaseTest(unittest.TestCase):

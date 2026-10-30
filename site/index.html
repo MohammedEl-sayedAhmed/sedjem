@@ -129,50 +129,6 @@
     </div>
   </section>
 
-  <section class="sec" aria-labelledby="measured">
-    <div class="wrap sec-grid">
-      <div class="claim">
-        <h2 id="measured">{{measured.h2}}</h2>
-        <p class="lede">{{measured.lede}}</p>
-        <p>{{measured.body}}</p>
-        <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/03-results.md">{{measured.method}}</a></p>
-      </div>
-      <div class="proof">
-        <table class="results">
-          <caption>{{measured.caption}}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{{measured.model}}</th>
-              <th scope="col" class="num"><abbr title="{{measured.wer_alt}}">{{measured.wer}}</abbr><span class="hint">{{measured.lower}}</span></th>
-              <th scope="col" class="num kept">{{measured.kept}}<span class="hint">{{measured.higher}}</span></th>
-              <th scope="col" class="time">{{measured.hour}}<span class="hint">{{measured.laptop}}</span></th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <th scope="row"><span class="model">{{measured.cohere}}</span></th>
-              <td class="num"><span class="label" aria-hidden="true">{{measured.wer}}</span><span class="fig" dir="ltr">13.4%</span></td>
-              <td class="num kept"><span class="label" aria-hidden="true">{{measured.kept}}</span><span class="bar" style="--v: 77" aria-hidden="true"></span><span class="fig" dir="ltr">77%</span></td>
-              <td class="time"><span class="label" aria-hidden="true">{{measured.hour}}</span><span>{{measured.cohere_hour}}</span></td>
-            </tr>
-            <tr>
-              <th scope="row"><span class="model">{{measured.medium}}</span>&nbsp;<span class="pill">{{measured.default}}</span></th>
-              <td class="num"><span class="label" aria-hidden="true">{{measured.wer}}</span><span class="fig" dir="ltr">18.5%</span></td>
-              <td class="num kept"><span class="label" aria-hidden="true">{{measured.kept}}</span><span class="bar" style="--v: 90" aria-hidden="true"></span><span class="fig" dir="ltr">90%</span></td>
-              <td class="time"><span class="label" aria-hidden="true">{{measured.hour}}</span><span>{{measured.medium_hour}}</span></td>
-            </tr>
-            <tr>
-              <th scope="row"><span class="model">{{measured.large}}</span> <span class="note">{{measured.large_note}}</span></th>
-              <td class="num"><span class="label" aria-hidden="true">{{measured.wer}}</span><span class="fig" dir="ltr">20.8%</span></td>
-              <td class="num kept"><span class="label" aria-hidden="true">{{measured.kept}}</span><span class="bar" style="--v: 88" aria-hidden="true"></span><span class="fig" dir="ltr">88%</span></td>
-              <td class="time"><span class="label" aria-hidden="true">{{measured.hour}}</span><span>{{measured.large_hour}}</span></td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </section>
-
   <section class="sec" aria-labelledby="voices">
     <div class="wrap sec-grid sec-shot">
       <div class="claim">
@@ -286,6 +242,9 @@
       </div>
     </div>
   </section>
+
+  <!-- the benchmarks, made by build.py from the numbers of the docs' charts (docs/charts.py's sources) -->
+{{benchmarks}}
 
   <!-- the project's public numbers, made by build.py from the stats branch's files and docs/usage.json, and left out
        when there are none to show -->

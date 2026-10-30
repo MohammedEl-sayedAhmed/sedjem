@@ -13,6 +13,12 @@ stylesheet names from docs/video/fonts/ with their licence, and the app's icon. 
 from the published host (COUNTS_HOST), so a local preview sends nothing; without a key (COUNTS_KEY) the build
 leaves it out. Standard library only.
 
+"Benchmarks", after the facts, is a grid of the same figure cards over small charts of bars: the word error rate and
+the English terms kept on Perle, the speaker labels on ArzEn and AMI, and the private meetings' difference from
+ElevenLabs, speed and speaker labels. Its numbers are the docs', read with docs/charts.py's own sources
+(results/summary.json, results/*-diarization.json and docs/charts-data.json) and rounded as the docs round them, so the
+page and the docs can't drift; those files are the repository's, and one that can't be read stops the build.
+
 "Sedjem in numbers", near the end, is a grid of charts drawn here as SVG: GitHub's downloads, stars and page views
 from the files the Repository stats workflow keeps on the stats branch, read from a folder given with --stats, and
 the newest month of the anonymous counts' totals from docs/usage.json (tools/usage_totals.py). The downloads link the
@@ -49,6 +55,7 @@ import struct
 import sys
 import tomllib
 from datetime import date, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -95,6 +102,31 @@ DAILY = 35  # the most days a running total is drawn by the day; a longer one is
 # the Arabic copy does everywhere, grouped as Egypt groups them.
 NUMERALS = {"en": (",", "."), "ar": (",", ".")}
 
+# The benchmarks (docs/03-results.md and docs/04-speaker-labels.md): docs/charts.py, whose sources give each number of
+# the docs' charts as the docs round it; the docs the section's last line links; and the public test sets, each where
+# it is downloaded, with the licence the docs give (copy/*.toml names them)
+BENCH = ROOT / "docs" / "charts.py"
+DOCS = "https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/"
+TEST_SETS = {"perle": ("Perle", "https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch"),
+             "arzen": ("ArzEn", "https://sites.google.com/view/arzen-corpus/resources"),
+             "ami": ("AMI", "https://groups.inf.ed.ac.uk/ami/corpus/")}
+# The models on the bars: the name on a bar and the one in its table. Sedjem runs the first five, three to transcribe
+# and two to tell the speakers apart; the others are what they were measured against.
+MODELS = {"cohere": ("Cohere", "Cohere Transcribe Arabic"), "medium": ("whisper-medium", "whisper-medium code-switching"),
+          "large": ("Whisper large-v3", "Whisper large-v3"), "titanet": ("TitaNet-small", "TitaNet-small"),
+          "nemotron": ("Nemotron", "Nemotron-3-Diarization"), "audar": ("Audar", "Audar-ASR-V1-Turbo"),
+          "r2t2": ("R2T2", "R2T2"), "qwen": ("Qwen3-ASR", "Qwen3-ASR-1.7B"), "elevenlabs": ("ElevenLabs", "ElevenLabs")}
+IN_SEDJEM = ("cohere", "medium", "large", "titanet", "nemotron")
+# Each model's run on Perle at 16 kHz in results/summary.json, the rows of docs/03-results.md's Perle tables: Sedjem's
+# three as it runs them, then the three that were also tried, which aren't used
+PERLE = {"cohere": ("cohere-transcribe-arabic-07-2026-Q4_K_M", "ar"),
+         "medium": ("whisper-whisper-medium-arabic-codeswitched-ct2", "ar"), "large": ("whisper-large-v3", "ar-p3c2e92"),
+         "audar": ("Audar-ASR-V1-Turbo-Q4_K_M", "ar-prompt-clip"), "r2t2": ("Confucius4-R2T2-Q8_0", "ar-clip"),
+         "qwen": ("Qwen3-ASR-1.7B-Q8_0", "ar-clip")}
+SPEAKER_SYSTEMS = {"titanet": "TitaNet-small", "nemotron": "Nemotron, as the app"}  # in results/*-diarization.json
+# The cards in the page's order: the public test sets on the first row, the private meetings on the second
+BENCHMARKS = ("wer", "english", "nemotron", "meetings", "speed", "speakers")
+
 # Each language's page: its folder in the site, and the fonts its first view needs first
 LANGS = {
     "en": {"folder": "", "preload": ("ibm-plex-sans-latin-600", "ibm-plex-sans-latin-400", "ibm-plex-sans-arabic-arabic-400")},
@@ -138,6 +170,7 @@ LATIN_WORDS = re.compile(rf"(?:\d+(?:\.\d+)?[ {NBSP}](?=[A-Za-z]))?[A-Za-z][\w'�
                          rf"(?:(?:[ {NBSP}/]+|\s*→\s*)[A-Za-z0-9][\w'’-]*(?:\.\w+)*)*", re.ASCII)
 MARKUP = re.compile(r"(<[^>]*>|&\w+;|\{\{[\w.]+\}\})")  # tags, entities and placeholders, left as they are
 IN_LATIN = '<span lang="en" dir="ltr" translate="no">'
+NAME = '<span translate="no">'  # a product's name on the English page, as the copy marks one
 PLACEHOLDER = re.compile(r"\{\{([\w.]+)\}\}")
 
 
@@ -663,12 +696,15 @@ def parts(rows, total):
             f'<ul class="legend" aria-hidden="true">{legend}</ul></div>')
 
 
-def table(caption, heads, rows):
-    """The chart's numbers as a table for screen readers: its caption, its column heads and its rows."""
+def table(caption, heads, rows, boxed=False):
+    """The chart's numbers as a table for screen readers: its caption, its column heads and its rows. A table is never
+    narrower than its words, so one with a long caption goes in a hidden box instead (boxed), which keeps them from
+    widening the page."""
     head = "".join(f'<th scope="col">{h}</th>' for h in heads)
     body = "".join("<tr>" + "".join(f'<th scope="row">{r[0]}</th>' + "".join(f"<td>{c}</td>" for c in r[1:])) + "</tr>"
                    for r in rows)
-    return f'<table class="sr-only"><caption>{caption}</caption><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>'
+    whole = f"<caption>{caption}</caption><thead><tr>{head}</tr></thead><tbody>{body}</tbody></table>"
+    return f'<div class="sr-only"><table>{whole}</div>' if boxed else f'<table class="sr-only">{whole}'
 
 
 def stat(n, label, lang, size=""):
@@ -692,10 +728,10 @@ def card(key, title, body, span):
             f"        {body}\n      </div>")
 
 
-def figure_card(key, number, title, line, picture, span=1):
+def figure_card(key, number, title, line, picture, span=1, section="numbers"):
     """One card as a dashboard shows a figure: the number large, beside it its title and one line about it, and the
-    picture (a small line or a bar of parts) across the card under them."""
-    return (f'      <div class="card figure-card span-{span}" id="numbers-{key}">\n'
+    picture (a small line, a bar of parts or bars to compare) across the card under them."""
+    return (f'      <div class="card figure-card span-{span}" id="{section}-{key}">\n'
             f'        <div class="kpi"><p class="kpi-figure">{number}</p>'
             f'<div class="kpi-text"><h3>{title}</h3><p>{line}</p></div></div>\n'
             f"        {picture}\n      </div>")
@@ -812,6 +848,146 @@ def numbers(words, lang, gh, totals):
         "  </section>"])
 
 
+# ---- the benchmarks: the same figure cards, each over bars to compare, from the numbers of the docs' charts --------
+#
+# A card's figure is the best of Sedjem's own bars, its model and test set named in the line under its title. Under them
+# a bar for each model from one zero line, Sedjem's in the brand's teal and the rest in grey, each named, with its value
+# at its end; a heading over a group (the models also tried, or a test set); and which way is better. A share of the
+# words and the minutes for an hour run to the whole, 100% or an hour, drawn as the bar's track; the speaker labels'
+# shares, all small, to the largest of them. Each chart has a table of its numbers for screen readers.
+
+def bench_sources():
+    """docs/charts.py's Sources, read without importing it (so nothing is written next to it): the numbers the docs'
+    charts draw, from results/summary.json, results/*-diarization.json and docs/charts-data.json, each with the value
+    and the text the docs give it."""
+    names = {"__name__": "sedjem_charts", "__file__": str(BENCH)}
+    exec(compile(BENCH.read_text(encoding="utf-8"), str(BENCH), "exec"), names)
+    return names["Sources"]()
+
+
+def measured(src):
+    """Each card's numbers: which way is better, the note under its chart, the value its bars run to (None for the
+    largest), its unit, and its bars in order, each (model, the group heading over it or None, value, text), the value
+    the text as the docs round it, so a bar is drawn to the number at its end. Also the number of Perle clips, which
+    every run on Perle shares."""
+    def bar(model, n, group=None):
+        return (model, group, float(n.shown), n.shown)
+
+    def perle(model, metric):
+        return bar(model, src.perle("wav16k", *PERLE[model], metric, None), None if model in IN_SEDJEM else "tried")
+
+    def minutes(model, engine):  # the time for an hour of the meetings, from their speed: processing time / audio length
+        n = src.published("meeting_speed", f"{engine}_mean")
+        m = (Decimal(n.shown) * 60).quantize(Decimal(1), ROUND_HALF_UP)
+        return (model, None, float(m), str(m))
+
+    def speaker(model, corpus):
+        return bar(model, src.speaker(corpus, SPEAKER_SYSTEMS[model], "wrong_on_speech", "Wrong speaker on speech"), corpus)
+
+    clips = {src.summary[("perle", "wav16k", *run)]["clips"] for run in PERLE.values()}
+    if len(clips) != 1:
+        raise SystemExit(f"the Perle runs in results/summary.json have different numbers of clips: {sorted(clips)}")
+    two_or_three = "meetings_two_or_three_people"
+    cards = {
+        "wer": dict(better="lower", note="lower", top=100, unit="%", bars=[perle(m, "wer") for m in PERLE]),
+        "english": dict(better="higher", note="higher", top=100, unit="%", bars=[perle(m, "en_kept") for m in PERLE]),
+        "nemotron": dict(better="lower", note="lower", top=None, unit="%",
+                         bars=[speaker(m, corpus) for corpus in ("arzen", "ami") for m in ("titanet", "nemotron")]),
+        "meetings": dict(better="lower", note="closer", top=100, unit="%",
+                         bars=[bar("cohere", src.published("meetings", "pooled", "cohere_wer")),
+                               bar("medium", src.published("meetings", "pooled", "whisper_wer"))]),
+        "speed": dict(better="lower", note="faster", top=60, unit="min",
+                      bars=[minutes("cohere", "cohere"), minutes("medium", "whisper")]),
+        "speakers": dict(better="lower", note="lower", top=None, unit="%",
+                         bars=[bar("titanet", src.published(two_or_three, "whisper_wrong_speaker")),  # TitaNet-small's labels
+                               bar("elevenlabs", src.published(two_or_three, "elevenlabs_wrong_speaker"))]),
+    }
+    return cards, clips.pop()
+
+
+def lead(card):
+    """The bar a card's figure is: the best of Sedjem's own, the first of them on a tie."""
+    ours = [b for b in card["bars"] if b[0] in IN_SEDJEM]
+    return (min if card["better"] == "lower" else max)(ours, key=lambda b: b[2])
+
+
+def benchmarks(words, lang, cards, clips):
+    """The benchmarks: the claim, a grid of six figure cards, three to a row from 1000 px, and under them the test sets,
+    each linked to its source with its licence, and the docs that hold every number."""
+    tell = lambda key, **values: fill(words[f"benchmarks.{key}"], values)  # noqa: E731
+    # a name stays in Latin and is never translated; on the Arabic page it is its own left-to-right run, marked English
+    name = lambda text: f'{IN_LATIN if lang == "ar" else NAME}{html.escape(text)}</span>'  # noqa: E731
+
+    def words_of(text):
+        """A long name in a card's line, which may break between its words but never at a hyphen: each word kept
+        whole, and on the Arabic page the words one left-to-right run, so they keep their order."""
+        kept = " ".join(f"{NAME}{html.escape(w)}</span>" for w in text.split(" "))
+        return f'<bdi dir="ltr" lang="en">{kept}</bdi>' if lang == "ar" else kept
+
+    def called(model, heading):
+        """A model's name in a table: in full, with the hint it ran with, or as one also tried."""
+        full = name(MODELS[model][1])
+        if model == "large":
+            return tell("hint", model=full)
+        if model == "elevenlabs":
+            return tell("elevenlabs")
+        return tell("tried_row", model=full) if heading == "tried" else full
+
+    out = []
+    for key in BENCHMARKS:
+        card = cards[key]
+        if card["unit"] == "%":
+            unit = lambda text: f"{text}%"  # noqa: E731
+            figure = lambda text: f'<data value="{text}">{text}%</data>'  # noqa: E731
+        else:
+            unit = lambda text: f'{text}&nbsp;{tell("minute")}'  # noqa: E731
+            figure = lambda text: f'<data value="{text}">{text}<span class="kpi-unit">&nbsp;{tell("minute")}</span></data>'  # noqa: E731
+        first = lead(card)
+        top = card["top"] or max(b[2] for b in card["bars"])
+        rows, group = [], None
+        for b in card["bars"]:
+            model, heading, value, text = b
+            if heading != group and heading:
+                rows.append(f'<li class="bar-head">{tell("tried") if heading == "tried" else name(TEST_SETS[heading][0])}</li>')
+            group = heading
+            rows.append(f'<li class="bar-{"sedjem" if model in IN_SEDJEM else "other"}{" bar-lead" if b is first else ""}">'
+                        f'<span class="bar-name">{name(MODELS[model][0])}</span>'
+                        f'<span class="bar-track"><span class="bar-fill" style="--v: {value / top * 100:.1f}"></span></span>'
+                        f'<span class="bar-value">{unit(text)}</span></li>')
+        chart = (f'<div class="bars{" bars-whole" if card["top"] else ""}" aria-hidden="true">'
+                 f'<ol class="bar-list">{"".join(rows)}</ol><p class="bar-note">{tell(card["note"])}</p></div>')
+
+        sets = list(dict.fromkeys(b[1] for b in card["bars"] if b[1] in TEST_SETS))
+        if sets:  # a row for each test set, a column for each model
+            models = list(dict.fromkeys(b[0] for b in card["bars"]))
+            numbers = {(b[1], b[0]): unit(b[3]) for b in card["bars"]}
+            grid = table(tell(f"{key}_table"), [tell("test_set")] + [called(m, None) for m in models],
+                         [[name(TEST_SETS[s][0])] + [numbers[s, m] for m in models] for s in sets], boxed=True)
+        else:
+            grid = table(tell(f"{key}_table"), [tell("model"), tell(key)], [(called(b[0], b[1]), unit(b[3])) for b in card["bars"]],
+                         boxed=True)
+        line = tell(f"{key}_line", model=words_of(MODELS[first[0]][1]),
+                    set=name(TEST_SETS[first[1]][0]) if first[1] in TEST_SETS else "")
+        out.append(figure_card(key, figure(first[3]), tell(key), line, chart + grid, section="benchmarks"))
+    links = {k: url for k, (_, url) in TEST_SETS.items()}
+    sources = (tell("sets", clips=str(clips), **links) + " "
+               + tell("more", results=DOCS + "03-results.md", speakers=DOCS + "04-speaker-labels.md", tables=DOCS + "results-tables.md"))
+    return "\n".join([
+        '  <section class="sec benchmarks" aria-labelledby="benchmarks">',
+        '    <div class="wrap sec-grid">',
+        '      <div class="claim">',
+        f'        <h2 id="benchmarks">{tell("h2")}</h2>',
+        f'        <p class="lede">{tell("lede")}</p>',
+        f'        <p>{tell("draft")}</p>',
+        "      </div>",
+        '      <div class="bento">',
+        *out,
+        "      </div>",
+        f'      <p class="sources">{sources}</p>',
+        "    </div>",
+        "  </section>"])
+
+
 def latin_runs(text):
     """Arabic copy with each run of Latin words in its own left-to-right span, marked as English and not to be
     translated, so a name, a term or a path keeps its own order inside the right-to-left line."""
@@ -878,6 +1054,7 @@ def build(out=ROOT / "_site", counts_key=COUNTS_KEY, counts_host=COUNTS_HOST, st
     the folder with the latest release's details, None for the downloads' general wording and the release's page."""
     out = prepare(Path(out))
     m = meeting()
+    cards, clips = measured(bench_sources())
     gh, totals, rel = github(stats), monthly(usage), release(latest)
     offered = rel["version"] if rel else version()
     href = {k: (rel or {}).get("files", {}).get(k, {}).get("url", LATEST) for k in RELEASE_FILES}
@@ -895,7 +1072,7 @@ def build(out=ROOT / "_site", counts_key=COUNTS_KEY, counts_host=COUNTS_HOST, st
                       other_href=root + LANGS[other]["folder"], other_dir=words[other]["page.dir"],
                       other_locale=words[other]["page.locale"],
                       counts=counts(root + COUNTER, lang, counts_key, counts_host, offered),
-                      numbers=numbers(words[lang], lang, gh, totals),
+                      benchmarks=benchmarks(words[lang], lang, cards, clips), numbers=numbers(words[lang], lang, gh, totals),
                       file_windows=release_file(rel, "windows", words[lang], lang),
                       file_linux=release_file(rel, "linux", words[lang], lang))
         values.update({f"shot_{name}": shot(name, words[lang][alt], root) for name, alt in SHOTS.items()})
