@@ -4,7 +4,7 @@ timestamp: 2026-10-30T15:32:22Z
 agent: claude-code
 model: claude-opus-5-5
 trigger: user-prompt
-status: proposed
+status: executed
 ---
 
 # Small lines on the website's number cards, as monotone curves drawn at build time
@@ -45,8 +45,7 @@ screen readers, and `site/site.js` only adds a tooltip that reads the nearest da
 
 ## Artifacts
 
-- [PR #30](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/30), not merged at the time of writing: the commit
-  "Website: the numbers as figure cards, each a large number with a smooth line or a bar of parts under it" on the
-  branch site-numbers
-- On that branch: `tangents()`, `curve()` and `spark()` in `site/build.py`, the figure cards in `site/DESIGN.md`, and
+- [PR #30](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/30), merged as
+  [9823ccf](https://github.com/MohammedEl-sayedAhmed/sedjem/commit/9823ccf)
+- `tangents()`, `curve()` and `spark()` in `site/build.py`, the figure cards in `site/DESIGN.md`, and
   `tests/test_site.py`

@@ -39,8 +39,7 @@ it gets a new record with `supersedes`, and the old one's status becomes `supers
 The records below were written on 30 October 2026, after the decisions, from the commits, pull requests and docs
 they cite; each timestamp is that of the commit that carried the decision out, in UTC. Records 2 to 5 come from
 [PR #34](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/34) and record 6 from
-[PR #30](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/30), neither merged when they were written; record 6
-stays proposed until its code is on main.
+[PR #30](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/30); PR #30 merged the same day.
 
 ## Index
 
@@ -51,4 +50,4 @@ stays proposed until its code is on main.
 | AgDR-0003 | [GitHub's secret scanning instead of gitleaks](AgDR-0003-github-secret-scanning-instead-of-gitleaks.md) | executed | GitHub's own scanning and push protection cover leaked keys; gitleaks would mostly flag the tests' stand-in keys. |
 | AgDR-0004 | [No labeler, so no workflow runs on pull_request_target](AgDR-0004-no-labeler-and-no-pull-request-target.md) | executed | A fork's pull request never runs with the repository's secrets or a write token. |
 | AgDR-0005 | [No pip cache in the workflow that publishes](AgDR-0005-no-pip-cache-in-the-publishing-workflow.md) | executed | After CodeQL's cache-poisoning alert, the Desktop build downloads its packages afresh; the test jobs keep their cache. |
-| AgDR-0006 | [Small lines on the website's number cards, as monotone curves drawn at build time](AgDR-0006-monotone-sparklines-drawn-at-build-time.md) | proposed | A monotone cubic through the days never overshoots a value, and build.py draws it as SVG, so the page needs no chart script. |
+| AgDR-0006 | [Small lines on the website's number cards, as monotone curves drawn at build time](AgDR-0006-monotone-sparklines-drawn-at-build-time.md) | executed | A monotone cubic through the days never overshoots a value, and build.py draws it as SVG, so the page needs no chart script. |
