@@ -1,0 +1,43 @@
+name: Something doesn't work
+description: Sedjem does something wrong, or stops with an error
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What was done, what Sedjem did, and what was expected instead. Leave out anything private, such as what a recording says or an API key.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen again
+      placeholder: |
+        1. Open Settings, then Models
+        2. ...
+
+  - type: input
+    id: version
+    attributes:
+      label: Sedjem's version, and how it was installed
+      description: Settings, then About, shows the version.
+      placeholder: 0.3.1 with the Windows installer (or the Linux build, winget, or from source at a commit)
+    validations:
+      required: true
+
+  - type: input
+    id: system
+    attributes:
+      label: The system
+      placeholder: Windows 11, or Ubuntu 24.04 with KDE
+    validations:
+      required: true
+
+  - type: textarea
+    id: log
+    attributes:
+      label: The log
+      description: The end of sedjem.log in the data folder ([where things are kept](https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/10-desktop.md#where-things-are-kept)), or what the terminal showed. Check it for anything private first.
+      render: text
