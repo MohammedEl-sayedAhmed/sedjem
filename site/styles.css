@@ -349,8 +349,9 @@ figcaption, caption { color: var(--muted); font-size: var(--fs-small); line-heig
   flex: none; width: 20px; height: 20px;
   fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
 }
-.theme .icon-light { display: var(--view-light); }
-.theme .icon-dark { display: var(--view-dark); }
+/* the theme a press switches to, as the button's name says: a moon on a light page, a sun on a dark one */
+.theme .icon-light { display: var(--view-dark); }
+.theme .icon-dark { display: var(--view-light); }
 .can-switch-theme .theme-menu {
   display: flex; justify-content: flex-start; width: 100%; min-height: 44px; margin-top: 4px; padding: 8px 0;
   border-top: 1px solid var(--line); border-radius: 0; text-align: start;

@@ -305,16 +305,16 @@ class SiteInBrowserTest(unittest.TestCase):
                         page = self.open(path, width, system=system)
                         button = self.theme_button(page, width)
                         name = {to: button.get_attribute(f"data-to-{to}") for to in ("dark", "light")}
-                        self.assertEqual(self.switch(page, button), [None, BACKGROUND[system], ["icon-" + system], name[other], None])
+                        self.assertEqual(self.switch(page, button), [None, BACKGROUND[system], ["icon-" + other], name[other], None])
                         button.click()
-                        self.assertEqual(self.switch(page, button), [other, BACKGROUND[other], ["icon-" + other], name[system], other])
+                        self.assertEqual(self.switch(page, button), [other, BACKGROUND[other], ["icon-" + system], name[system], other])
                         button.click()  # back to the system's theme: the page follows the system again
-                        self.assertEqual(self.switch(page, button), [None, BACKGROUND[system], ["icon-" + system], name[other], None])
+                        self.assertEqual(self.switch(page, button), [None, BACKGROUND[system], ["icon-" + other], name[other], None])
                         button.click()
                         page.reload()
                         self.assertEqual(page.evaluate("window.themeAtBody"), [other, other])
                         button = self.theme_button(page, width)
-                        self.assertEqual(self.switch(page, button), [other, BACKGROUND[other], ["icon-" + other], name[system], other])
+                        self.assertEqual(self.switch(page, button), [other, BACKGROUND[other], ["icon-" + system], name[system], other])
                         self.assertEqual(page.errors, [])
 
     def test_the_button_follows_the_system_while_nothing_is_picked(self):
@@ -327,11 +327,11 @@ class SiteInBrowserTest(unittest.TestCase):
         drawn = "() => new Promise(done => requestAnimationFrame(() => requestAnimationFrame(done)))"
         page.emulate_media(color_scheme="dark")
         page.evaluate(drawn)
-        self.assertEqual(self.switch(page, button), [None, BACKGROUND["dark"], ["icon-dark"], name["light"], None])
+        self.assertEqual(self.switch(page, button), [None, BACKGROUND["dark"], ["icon-light"], name["light"], None])
         button.click()  # to light, now not the system's: kept
         page.emulate_media(color_scheme="light")
         page.evaluate(drawn)
-        self.assertEqual(self.switch(page, button), ["light", BACKGROUND["light"], ["icon-light"], name["dark"], "light"])
+        self.assertEqual(self.switch(page, button), ["light", BACKGROUND["light"], ["icon-dark"], name["dark"], "light"])
         self.assertEqual(page.errors, [])
 
     def theme_button(self, page, width):

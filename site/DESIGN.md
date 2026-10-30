@@ -436,8 +436,9 @@ docs/03-results.md.
 ## Light, dark and the reader's pick
 
 The page follows the system's light or dark setting until the reader switches with the theme button: an icon at the
-end of the header's row, or a row with its name in the phone's menu. The icon is the theme on show, a sun on a light
-page and the app's moon on a dark one, while the page follows the system too; the stylesheet draws it from
+end of the header's row, or a row with its name in the phone's menu. The icon is the theme a press switches to, the app's
+moon on a light page and a sun on a dark one, while the page follows the system too, so it says what the name says;
+the stylesheet draws it from
 --view-light and --view-dark, so it changes with the system's setting. Each press switches to the other theme, so
 every press changes what the page looks like. The name says what a press does, in the page's language: "Switch to
 the dark theme" and "Switch to the light theme", حوّل للمظهر الغامق and حوّل للمظهر الفاتح; it is also the button's title
@@ -511,7 +512,7 @@ Round 3 followed a fresh critique (4/10) and the lessons from uberdesigner, bkli
   Arabic, its captions sit under their pictures and say the app's interface is in English, and its sample has
   Arabic names.
 - The phone's two-row header and shrunk windows. One row with a menu that works without JavaScript; phone captures;
-  the commands scroll; the theme icon is half a circle, a sun or a moon.
+  the commands scroll; the theme icon is a moon or a sun, for the theme a press switches to.
 - Dark as an inversion. A surface scale that rises lighter, translucent borders, a lit edge, and the fill teal for
   the download.
 - One measure for Impeccable's text rules at 320 to 1440 px on both pages: no line over 80 characters, no one-word

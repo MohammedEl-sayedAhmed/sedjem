@@ -788,7 +788,7 @@ class SiteTest(unittest.TestCase):
     def test_the_theme_button(self):
         """The header's theme button is named for what a press does, switching to the dark theme or to the light one,
         in the page's language, with the same title and, in the phone's menu, the same name on show; its icons are a
-        sun and a moon, hidden from screen readers, and the stylesheet shows the one for the theme on show, from the
+        sun and a moon, hidden from screen readers, and the stylesheet shows the one a press switches to, from the
         tokens that show each theme's views. site.js and the 404 page keep the reader's pick under the same key."""
         names = {}
         for lang, home in self.homes.items():
@@ -811,7 +811,7 @@ class SiteTest(unittest.TestCase):
         self.assertEqual(names["en"], ["Switch to the dark theme", "Switch to the light theme"])
         self.assertTrue(all(ARABIC.search(name) for name in names["ar"]))
         css = re.sub(r"/\*.*?\*/", "", self.css, flags=re.S)
-        self.assertRegex(css, r"\n\.theme \.icon-light \{ display: var\(--view-light\); \}\n\.theme \.icon-dark \{ display: var\(--view-dark\); \}")
+        self.assertRegex(css, r"\n\.theme \.icon-light \{ display: var\(--view-dark\); \}\n\.theme \.icon-dark \{ display: var\(--view-light\); \}")
         self.assertNotIn("icon-system", css)
         script = (self.out / "site.js").read_text(encoding="utf-8")
         self.assertIn('button.getAttribute("data-to-" + other())', script)

@@ -2,8 +2,8 @@
    header (in the menu, on a phone). Each press switches to the other theme, so every press changes what the page
    looks like. A switch to the system's own theme is no pick: the page follows the system again and nothing is kept.
    Any other is kept in this browser under the site's own key and put on the page here, in the head, before the page
-   is first drawn, so the other theme never shows first. The button's icon is the theme on show (the stylesheet
-   draws it, so it follows the system too) and its name says what a press does. Without this file the page follows
+   is first drawn, so the other theme never shows first. The button's icon and its name both say what a press does: a
+   moon on a light page, a sun on a dark one (the stylesheet draws it, so it follows the system too). Without this file the page follows
    the system, and the button isn't shown. */
 (function () {
   "use strict";
