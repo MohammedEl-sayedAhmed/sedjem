@@ -43,33 +43,10 @@ models = "As some models write it"
 sedjem = 'As <span translate="no">Sedjem</span> writes it'
 caption = "One line, written both ways."
 
-[measured]
-h2 = "Checked on a public test set"
-lede = 'On 40 public Egyptian Arabic–English clips, several models kept only <span class="keep">8–25%</span> of the English terms in Latin script. The ones <span translate="no">Sedjem</span> runs kept&nbsp;<span class="keep">77–90%</span>.'
-body = "Real meetings are harder than any test set, so treat a local transcript as a draft. For minutes that people will rely on, a hosted service is still more accurate."
-method = "The method and every number"
-caption = 'Measured on Perle, a public set of 40 Egyptian Arabic–English clips, on the project’s test laptop: an Intel Core <span class="keep">i5-1245U</span> with no NVIDIA graphics card.'
-model = "Model"
-wer = "WER"
-wer_alt = "word error rate"
-kept = "English kept"
-hour = "1&nbsp;h takes"
-lower = "lower is&nbsp;better"
-higher = "higher is&nbsp;better"
-laptop = "on the test&nbsp;laptop"
-default = "default"
-cohere = '<span translate="no">Cohere Transcribe Arabic</span>'
-medium = '<span translate="no">whisper-medium</span> <span translate="no">code-switching</span>'
-large = '<span translate="no">Whisper large-v3</span>'
-large_note = "with an Egyptian style hint"
-cohere_hour = "about 20&nbsp;min"
-medium_hour = "30–45&nbsp;min"
-large_hour = "about 2&nbsp;h"
-
 [voices]
 h2 = "Every voice gets its own name"
 lede = "A voiceprint model tells the speakers apart and labels their lines; you name each one once."
-body = 'In the project’s tests on meetings of two or three people, <span class="keep">8–9%</span> of the words went to the wrong person, against 6% for <span translate="no">ElevenLabs</span>’ own labels.'
+body = 'How often a word goes to the wrong speaker is in the <a href="#benchmarks">benchmarks</a>.'
 docs = "How the speaker labels work"
 caption = "The app’s Speakers panel, with each voice’s share of the talking."
 panel_alt = "The app’s Speakers panel for the made-up sprint planning: {{shares}} of the talking, each name with a Merge into button"
@@ -104,7 +81,7 @@ shot_alt = "Compare transcripts in the app: Omar’s line as Cohere and whisper-
 
 [facts]
 h2 = "Runs on an ordinary laptop"
-lede = 'No graphics card is needed: on the project’s test laptop, <span translate="no">Cohere Transcribe Arabic</span> writes up an hour of audio in about 20&nbsp;minutes.'
+lede = 'No graphics card is needed. How long an hour of meetings takes on an ordinary laptop is in the <a href="#benchmarks">benchmarks</a>.'
 gpu = "Graphics card"
 gpu_value = "Optional, it speeds things up"
 languages = "Languages"
@@ -124,6 +101,49 @@ licence_value = "AGPL-3.0, free and open source"
 # the spec sheet's two groups
 computer = "On your computer"
 recordings = "With your recordings"
+
+# The benchmarks, a grid of figure cards build.py draws from the numbers of the docs' charts (docs/charts.py reads
+# results/summary.json, results/*-diarization.json and docs/charts-data.json), each rounded as the docs round it, so no
+# number is typed here. A card's title is beside its figure, and the line under the title names the model the figure
+# is of ({{model}}) and, for the speaker labels on the public sets, the test set ({{set}}), its last words kept together
+# (&nbsp;) so it never ends on one word alone; the note under each chart
+# says which way is better, and *_table is the caption of the chart's table for screen readers. The private meetings
+# are only ever "a private set of recorded meetings", with aggregate numbers.
+[benchmarks]
+h2 = "Benchmarks"
+lede = 'Measured on public test sets and on a private set of recorded meetings, on a laptop with an Intel Core <span class="keep">i5-1245U</span> and no NVIDIA graphics card.'
+draft = "Real meetings are harder than any test set, so treat a local transcript as a draft: for minutes people will rely on, a hosted service is still more accurate."
+wer = "Word error rate"
+wer_line = "{{model}} on&nbsp;Perle"
+wer_table = "Word error rate on Perle, lower is better"
+english = "English terms kept in English"
+english_line = "{{model}} on&nbsp;Perle"
+english_table = "English terms kept in Latin script on Perle, higher is better"
+nemotron = "Speech given to the wrong speaker"
+nemotron_line = "{{model}} on&nbsp;{{set}}"
+nemotron_table = "Speech given to the wrong speaker on ArzEn and AMI, with the number of people estimated, lower is better"
+meetings = "Words that differ from ElevenLabs"
+meetings_line = "{{model}} on the recorded&nbsp;meetings"
+meetings_table = "Words that differ from ElevenLabs’ transcript on the recorded meetings, lower is closer"
+speed = "For an hour of meetings"
+speed_line = "{{model}}, speaker labels&nbsp;included"
+speed_table = "Minutes for an hour of the recorded meetings on the test laptop, speaker labels included, lower is faster"
+speakers = "Words given to the wrong speaker"
+speakers_line = "{{model}} on meetings of two or three&nbsp;people"
+speakers_table = "Words given to the wrong speaker on the recorded meetings of two or three people, lower is better"
+lower = "Lower is better"
+higher = "Higher is better"
+closer = "Lower is closer"
+faster = "Lower is faster"
+tried = "Also tried"
+tried_row = "{{model}}, also tried"
+hint = "{{model}} with an Egyptian style hint"
+elevenlabs = '<span translate="no">ElevenLabs</span>’ own labels'
+minute = "min"
+model = "Model"
+test_set = "Test set"
+sets = 'Test sets: <a href="{{perle}}">Perle</a>, {{clips}} clips of Egyptian Arabic–English talk, MIT licence; <a href="{{arzen}}">ArzEn</a>, interviews in Egyptian Arabic and English, <span class="keep">CC BY-SA 4.0</span>; <a href="{{ami}}">AMI</a>, meetings in English, <span class="keep">CC BY 4.0</span>; and a private set of recorded meetings.'
+more = 'Every number, the method and the test sets are in the repository: <a href="{{results}}">the results</a>, <a href="{{speakers}}">the speaker labels</a> and <a href="{{tables}}">the tables</a>.'
 
 # The public numbers, a grid of charts build.py draws: GitHub's from the stats branch, and the newest month of the
 # anonymous counts' totals from docs/usage.json. {{day}}, {{month}}, {{release}}, {{platform}} and the links are

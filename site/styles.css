@@ -112,7 +112,6 @@
   --fs-small: 14px;
   --lh-display: 1.1; --lh-title: 1.2; --lh-lede: 1.5; --lh-body: 1.6; --lh-small: 1.45;
   --track-display: -0.02em; --track-title: -0.01em;
-  --fs-table: var(--fs-body);  /* the measured numbers' cells */
   --fs-line: 18px;             /* the hero's transcript, the same on both pages */
   --fs-register: 24px;
   --fs-code: 14px;
@@ -162,7 +161,6 @@ html:lang(ar) {
   --fs-small: 16px;
   --lh-display: 1.3; --lh-title: 1.3; --lh-lede: 1.7; --lh-body: 1.8; --lh-small: 1.7;
   --track-display: 0; --track-title: 0;
-  --fs-table: var(--fs-small);  /* the table's Latin model names fit their column at Arabic's smaller step */
   --fs-tick: 14px;
   --measure: 30em;
 }
@@ -474,57 +472,6 @@ mark {
   text-decoration: underline wavy var(--wrong) 1.5px; text-underline-offset: 0.36em;
 }
 
-/* the measured numbers: one line of column names over their direction, tabular figures, the default marked, and a
-   thin bar beside the English kept, which is the claim, growing from the column's start */
-.results { width: 100%; border-collapse: collapse; font-size: var(--fs-table); font-variant-numeric: tabular-nums; }
-.results caption { caption-side: bottom; text-align: start; }
-.results th, .results td {
-  padding: 12px 0; padding-inline-start: 16px; border-bottom: 1px solid var(--line);
-  font-weight: 400; text-align: start; vertical-align: baseline;
-}
-.results th:first-child { padding-inline-start: 0; }
-.results thead th {
-  padding-top: 0; border-bottom-color: var(--line-strong); vertical-align: bottom;
-  font-size: var(--fs-small); font-weight: 600; white-space: nowrap;
-}
-.results .hint { display: block; color: var(--muted); font-weight: 400; white-space: normal; }
-.results abbr { text-decoration: none; }
-.results .num { text-align: end; }
-.results .kept, .results td.time { text-align: start; white-space: nowrap; }
-.results .fig { font-family: var(--mono); font-size: var(--fs-small); }
-.results .model { font-weight: 500; }
-.results .note { display: block; color: var(--muted); font-size: var(--fs-small); }
-.pill {
-  /* inline, not a block of its own, so the no-break space before it keeps it with the model's last word */
-  display: inline; margin-inline-start: 2px; padding: 1px 8px; border-radius: 999px;
-  box-shadow: inset 0 0 0 1px var(--line-strong); color: var(--muted);
-  font-size: var(--fs-small); font-weight: 500; line-height: 1.5; white-space: nowrap;
-}
-.bar {
-  position: relative; display: inline-block; width: 64px; height: 6px; margin-inline-end: 8px;
-  border-radius: 999px; background: var(--line); vertical-align: middle;
-}
-.bar::before {
-  content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: calc(var(--v) * 1%);
-  border-start-start-radius: 999px; border-end-start-radius: 999px; border-start-end-radius: 4px; border-end-end-radius: 4px;
-  background: var(--mark);
-}
-.results .label { display: none; }
-/* in Arabic every column reads from its start, the right; the figures, all of a width, line up on their points */
-html:lang(ar) .results .num { text-align: start; }
-@media (max-width: 699px) {
-  /* one block per model; the roles in the markup keep it a table for screen readers, and the caption stays under */
-  .results { display: flex; flex-direction: column; }
-  .results tbody, .results tr, .results th, .results td { display: block; }
-  .results caption { display: block; order: 2; margin-top: 16px; }
-  .results thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .results tr { padding: 16px 0 12px; border-bottom: 1px solid var(--line); }
-  .results th[scope="row"] { padding: 0 0 8px; border: 0; }
-  .results td { display: flex; align-items: center; gap: 12px; padding: 4px 0; border: 0; }
-  .results .label { display: inline; flex: 1; color: var(--muted); }
-  .results .num, html:lang(ar) .results .num { text-align: start; }
-}
-
 /* the pictures of the app, at their own size, which is the app's: taken at two or three times it, and never drawn
    smaller, so no line of the app is shown smaller than the app draws it. The desktop form is up to 656 px wide and
    the phone form, below 750 px, up to 280, which a 320 px phone holds. The width and height in the markup (the phone
@@ -554,14 +501,15 @@ html:lang(ar) .results .num { text-align: start; }
   .spec { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 32px; }
   .spec-foot { grid-column: 1 / -1; }
 }
-/* ---------- the numbers: a grid of cards, each a figure build.py draws, the claim over it and its sources under it.
-   One column on a phone and a tablet; from 1000 px three to a row, the anonymous counts' month across a row of its
-   own. ---------- */
-.numbers .bento, .numbers-source { grid-column: 1 / -1; }
+/* ---------- the benchmarks and the numbers: a grid of cards, each a figure build.py draws, the claim over it and its
+   sources under it. One column on a phone and a tablet; from 1000 px three to a row, the anonymous counts' month
+   across a row of its own. ---------- */
+.numbers .bento, .benchmarks .bento, .numbers-source, .sources { grid-column: 1 / -1; }
 .bento { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
-.numbers-source { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.numbers-source, .sources { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.sources { max-width: 60em; }
 @media (min-width: 1000px) {
-  .numbers .sec-grid { row-gap: 32px; }
+  .numbers .sec-grid, .benchmarks .sec-grid { row-gap: 32px; }
   .bento { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
   .bento .span-2 { grid-column: span 2; }
   .bento .span-3 { grid-column: 1 / -1; }
@@ -634,6 +582,36 @@ html[dir="rtl"] .tip { translate: 50% -8px; }
 .rank-rest .rank-bar::before { background: var(--series-rest); }
 .rank-value { font-weight: 500; font-variant-numeric: tabular-nums; }
 .rank-name { overflow-wrap: anywhere; }
+
+/* bars to compare (the benchmarks): one grid for the whole chart, so every bar starts on the same zero line; each bar's
+   name, its bar and its value at the end, Sedjem's own in the brand's teal and the others in grey; a heading over a
+   group; and which way is better under them. A share of the words or the minutes for an hour has a track for the
+   whole. A benchmark's figure stands over its words in a narrow card and beside them from 320 px, so every card of a
+   row is laid out alike. */
+.benchmarks .card { container-type: inline-size; }
+.benchmarks .kpi { flex-direction: column; align-items: flex-start; gap: 8px; }
+@container (min-width: 320px) {
+  .benchmarks .kpi { flex-direction: row; align-items: center; gap: 16px; }
+}
+.kpi-unit { font-size: var(--fs-lede); font-weight: 500; letter-spacing: 0; }
+.bars { display: grid; gap: 12px; margin-top: auto; padding-top: 20px; }
+.bar-list {
+  display: grid; grid-template-columns: max-content minmax(0, 1fr) max-content; align-items: center; gap: 8px 12px;
+  margin: 0; padding: 0; list-style: none; font-size: var(--fs-small); line-height: var(--lh-small);
+}
+.bar-list li { display: contents; }
+.bar-list .bar-head { display: block; grid-column: 1 / -1; margin-top: 8px; color: var(--muted); }
+.bar-list .bar-head:first-child { margin-top: 0; }
+.bar-track { position: relative; height: 8px; border-start-end-radius: 4px; border-end-end-radius: 4px; }
+.bars-whole .bar-track { background: var(--line); }
+.bar-fill {
+  position: absolute; inset-block: 0; inset-inline-start: 0; width: calc(var(--v) * 1%); min-width: 2px;
+  border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--series-1);
+}
+.bar-other .bar-fill { background: var(--series-rest); }
+.bar-value { font-weight: 500; font-variant-numeric: tabular-nums; text-align: end; white-space: nowrap; }
+.bar-lead .bar-value { font-weight: 600; }
+.bar-note { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
 
 /* one whole in parts: a thin bar of blocks 2 px apart, and a legend of each part's name and share */
 .parts { display: grid; gap: 12px; margin-top: auto; padding-top: 20px; }
@@ -713,7 +691,7 @@ html[dir="rtl"] .tip { translate: 50% -8px; }
 /* ---------- forced colours: borders the theme drew with shadows ---------- */
 @media (forced-colors: active) {
   .frame, .btn, .srt, .code-box, .menu-panel, .spec, .card { border: 1px solid CanvasText; }
-  .bar::before, .rank-bar::before, .part { background: CanvasText; }
+  .rank-bar::before, .part, .bar-fill { background: CanvasText; }
   .chart .line { stroke: CanvasText; }
   .chart .dot { fill: CanvasText; }
   .chart .mark { stroke: CanvasText; }

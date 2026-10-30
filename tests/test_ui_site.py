@@ -650,6 +650,65 @@ class SiteInBrowserTest(unittest.TestCase):
                                     self.assertEqual(len(rows), 6)
                             self.assertEqual(page.errors, [])
 
+    def test_the_benchmarks_fit_and_their_bars_start_at_zero(self):
+        """The benchmarks from 320 to 1440 px on both pages, light and dark: nothing reaches past its card or the column
+        and the page doesn't scroll sideways; from 1000 px three cards to a row, all of a width, and below one under the
+        other. In every chart the bars start on one zero line, on the start side (the right on the Arabic page), each
+        as long as its number over the chart's whole, Sedjem's in the brand's teal and the others in grey; and a card's
+        figure stands beside its words where the card has room and over them where it hasn't, alike in a row."""
+        boxes = """() => { const sec = document.querySelector('section[aria-labelledby="benchmarks"]');
+            const column = sec.querySelector('.wrap').getBoundingClientRect(), rtl = getComputedStyle(sec).direction === 'rtl';
+            const out = [], cards = [];
+            sec.querySelectorAll('.card').forEach(card => {
+              const c = card.getBoundingClientRect();
+              if (c.left < column.left - 0.5 || c.right > column.right + 0.5) out.push('card ' + card.id);
+              card.querySelectorAll('*').forEach(e => {
+                if (!e.getClientRects().length || e.closest('.sr-only')) return;
+                const b = e.getBoundingClientRect();
+                if (b.left < c.left - 0.5 || b.right > c.right + 0.5) out.push(card.id + ' ' + e.tagName + ' ' + e.textContent.trim().slice(0, 30));
+              });
+              const bars = Array.from(card.querySelectorAll('.bar-list li:not(.bar-head)')).map(li => {
+                const fill = li.querySelector('.bar-fill'), track = li.querySelector('.bar-track').getBoundingClientRect();
+                const f = fill.getBoundingClientRect();
+                return {start: rtl ? f.right : f.left, trackStart: rtl ? track.right : track.left, width: f.width,
+                        whole: track.width, v: parseFloat(fill.style.getPropertyValue('--v')), ours: li.classList.contains('bar-sedjem'),
+                        colour: getComputedStyle(fill).backgroundColor};
+              });
+              const figure = card.querySelector('.kpi-figure').getBoundingClientRect(), words = card.querySelector('.kpi-text').getBoundingClientRect();
+              const beside = rtl ? words.right <= figure.left : words.left >= figure.right;
+              cards.push({id: card.id, top: Math.round(c.top), width: Math.round(c.width), bars, beside, over: words.top >= figure.bottom,
+                          room: card.clientWidth - parseFloat(getComputedStyle(card).paddingLeft) - parseFloat(getComputedStyle(card).paddingRight)});
+            });
+            return {out, cards}; }"""
+        teal, grey = "rgb(20, 163, 161)", {"light": "rgb(138, 149, 163)", "dark": "rgb(111, 122, 136)"}
+        for path in PAGES:
+            for width in (320, 390, 768, 1024, 1280, 1440):
+                for system in ("light", "dark") if width in (390, 1440) else ("light",):
+                    with self.subTest(path, width=width, system=system):
+                        page = self.open(path, width, system=system)
+                        page.locator('section[aria-labelledby="benchmarks"]').scroll_into_view_if_needed()
+                        page.evaluate("document.fonts.ready.then(() => true)")
+                        found = page.evaluate(boxes)
+                        self.assertEqual(found["out"], [])
+                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        rows = {}
+                        for card in found["cards"]:
+                            rows.setdefault(card["top"], []).append(card)
+                        self.assertEqual([len(row) for row in rows.values()], [3, 3] if width >= 1000 else [1] * 6)
+                        self.assertEqual(len({card["width"] for card in found["cards"]}), 1)
+                        for card in found["cards"]:
+                            bars = card["bars"]
+                            self.assertLess(max(b["start"] for b in bars) - min(b["start"] for b in bars), 0.5, card["id"])
+                            for b in bars:
+                                self.assertAlmostEqual(b["start"], b["trackStart"], delta=0.5)
+                                self.assertAlmostEqual(b["width"], max(2, b["whole"] * b["v"] / 100), delta=1, msg=card["id"])
+                                self.assertEqual(b["colour"], teal if b["ours"] else grey[system])
+                            self.assertEqual((card["beside"], card["over"]), (True, False) if card["room"] >= 320 else (False, True),
+                                             card["id"])
+                        for row in rows.values():
+                            self.assertEqual(len({card["beside"] for card in row}), 1)
+                        self.assertEqual(page.errors, [])
+
     def test_a_chart_tells_its_points_on_hover_and_from_the_keyboard(self):
         """With scripts, a pointer over a small line shows the nearest day's value and date, the same as its table's
         row, with a hairline at the day; on the Arabic page, where time runs from the right, the nearest day is the one

@@ -45,33 +45,10 @@ models = "زي ما بعض الموديلات بتكتبه"
 sedjem = "زي ما Sedjem بيكتبه"
 caption = "نفس الجملة، مكتوبة بالطريقتين."  # trimmed
 
-[measured]
-h2 = "متجرّب على مجموعة اختبار مفتوحة"  # new
-lede = 'على 40 مقطع مفتوح بالعربي المصري والإنجليزي، فيه موديلات ماحافظتش غير على <span class="keep">8–25%</span> من المصطلحات الإنجليزي بحروفها اللاتيني. الموديلات اللي Sedjem بيشغّلها حافظت على&nbsp;<span class="keep">77–90%</span>.'  # trimmed
-body = "الاجتماعات الحقيقية أصعب من أي مجموعة اختبار، فاعتبر النص اللي بيطلع على جهازك مسوّدة. ولو هيتعمل منه محضر الناس هتعتمد عليه، الخدمات اللي بتشتغل أونلاين لسه أدق."
-method = "طريقة القياس وكل الأرقام"
-caption = "اتقاس على Perle، مجموعة مفتوحة فيها 40 مقطع بالعربي المصري والإنجليزي، على لابتوب الاختبار بتاع المشروع: Intel Core i5-1245U من غير كارت شاشة NVIDIA."
-model = "الموديل"
-wer = "نسبة الخطأ"  # new
-wer_alt = "نسبة الأخطاء في الكلمات"
-kept = "فضل إنجليزي"  # new
-hour = "ساعة صوت بتاخد"  # new
-lower = "الأقل&nbsp;أحسن"  # new
-higher = "الأعلى&nbsp;أحسن"  # new
-laptop = "على لابتوب&nbsp;الاختبار"  # new
-default = "الافتراضي"
-cohere = "Cohere Transcribe Arabic"
-medium = '<bdi dir="ltr"><span translate="no">whisper-medium</span> <span translate="no">code-switching</span></bdi>'  # new: one left-to-right run, so the name keeps its order
-large = "Whisper large-v3"
-large_note = "مع تلميح للهجة المصرية"
-cohere_hour = "حوالي 20&nbsp;دقيقة"
-medium_hour = "30–45&nbsp;دقيقة"
-large_hour = "حوالي ساعتين"
-
 [voices]
 h2 = "كل صوت بياخد اسمه"
 lede = "موديل بصمة الصوت بيفرّق بين المتكلمين ويحط على كلام كل واحد اسمه، وانت بتسمّي كل واحد مرة واحدة."  # trimmed
-body = 'في اختبارات المشروع على اجتماعات فيها اتنين أو تلاتة، <span class="keep">8–9%</span> من الكلمات راحت للشخص الغلط، مقابل 6% في تقسيم ElevenLabs نفسه.'
+body = 'وكام مرة كلمة بتروح للمتكلم الغلط، تلاقيه في <a href="#benchmarks">نتايج الاختبارات</a>.'  # new
 docs = "ازاي البرنامج بيعرف المتكلمين"  # new
 caption = "قسم المتكلمين في البرنامج، وواجهته بالإنجليزي، ونصيب كل صوت من الكلام."  # new
 panel_alt = "قسم المتكلمين في البرنامج لاجتماع الـ sprint planning المتألّف: {{shares}} من الكلام، وجنب كل اسم زرار Merge into"  # new
@@ -106,7 +83,7 @@ shot_alt = "مقارنة نصين في البرنامج: سطر عمر زي ما
 
 [facts]
 h2 = "بيشتغل على لابتوب عادي"  # new
-lede = "مش محتاج كارت شاشة: على لابتوب الاختبار بتاع المشروع، Cohere Transcribe Arabic بيكتب ساعة صوت في حوالي 20&nbsp;دقيقة."  # new
+lede = 'مش محتاج كارت شاشة. وساعة الاجتماعات بتاخد قد إيه على لابتوب عادي، تلاقيه في <a href="#benchmarks">نتايج الاختبارات</a>.'  # new
 gpu = "كارت الشاشة"  # new
 gpu_value = "مش شرط، ولو موجود بيسرّع"  # new
 languages = "اللغات"  # new
@@ -126,6 +103,43 @@ licence_value = "AGPL-3.0، مجاني ومفتوح المصدر"  # trimmed
 # the spec sheet's two groups
 computer = "على جهازك"  # new
 recordings = "مع تسجيلاتك"  # new
+
+# The benchmarks, as en.toml explains: every number is filled in by build.py from the docs' data
+[benchmarks]
+h2 = "نتايج الاختبارات"  # new
+lede = "اتقاس على مجموعات اختبار مفتوحة وعلى مجموعة خاصة من اجتماعات متسجّلة، على لابتوب فيه Intel Core i5-1245U ومن غير كارت شاشة NVIDIA."  # new
+draft = "الاجتماعات الحقيقية أصعب من أي مجموعة اختبار، فاعتبر النص اللي بيطلع على جهازك مسوّدة: ولو هيتعمل منه محضر الناس هتعتمد عليه، الخدمات اللي بتشتغل أونلاين لسه أدق."
+wer = "نسبة الخطأ في الكلمات"  # new
+wer_line = "{{model}} على&nbsp;Perle"  # new
+wer_table = "نسبة الخطأ في الكلمات على Perle، الأقل أحسن"  # new
+english = "مصطلحات إنجليزي فضلت إنجليزي"  # new
+english_line = "{{model}} على&nbsp;Perle"  # new
+english_table = "المصطلحات الإنجليزي اللي فضلت بحروفها اللاتيني على Perle، الأعلى أحسن"  # new
+nemotron = "كلام راح للمتكلم الغلط"  # new
+nemotron_line = "{{model}} على&nbsp;{{set}}"  # new
+nemotron_table = "الكلام اللي راح للمتكلم الغلط على ArzEn وAMI، وكل موديل بيقدّر عدد الناس بنفسه، الأقل أحسن"  # new
+meetings = "كلمات مختلفة عن ElevenLabs"  # new
+meetings_line = "{{model}} على الاجتماعات&nbsp;المتسجّلة"  # new
+meetings_table = "الكلمات اللي مختلفة عن نص ElevenLabs على الاجتماعات المتسجّلة، الأقل أقرب"  # new
+speed = "لساعة اجتماعات"  # new
+speed_line = "{{model}}، ومعاها أسامي&nbsp;المتكلمين"  # new
+speed_table = "الدقايق اللي بتاخدها ساعة من الاجتماعات المتسجّلة على لابتوب الاختبار، ومعاها أسامي المتكلمين، الأقل أسرع"  # new
+speakers = "كلمات راحت للمتكلم الغلط"  # new
+speakers_line = "{{model}} في اجتماعات فيها اتنين أو&nbsp;تلاتة"  # new
+speakers_table = "الكلمات اللي راحت للمتكلم الغلط في الاجتماعات المتسجّلة اللي فيها اتنين أو تلاتة، الأقل أحسن"  # new
+lower = "الأقل أحسن"  # new
+higher = "الأعلى أحسن"  # new
+closer = "الأقل أقرب"  # new
+faster = "الأقل أسرع"  # new
+tried = "اتجرّبوا كمان"  # new
+tried_row = "{{model}}، اتجرّب كمان"  # new
+hint = "{{model}} مع تلميح للهجة المصرية"
+elevenlabs = "تقسيم ElevenLabs نفسه"  # new
+minute = "دقيقة"  # new
+model = "الموديل"
+test_set = "مجموعة الاختبار"  # new
+sets = 'مجموعات الاختبار: <a href="{{perle}}">Perle</a>، فيها {{clips}} مقطع بالعربي المصري والإنجليزي، برخصة MIT؛ و<a href="{{arzen}}">ArzEn</a>، مقابلات بالعربي المصري والإنجليزي، برخصة CC BY-SA 4.0؛ و<a href="{{ami}}">AMI</a>، اجتماعات بالإنجليزي، برخصة CC BY 4.0؛ ومجموعة خاصة من اجتماعات متسجّلة.'  # new
+more = 'كل رقم، وطريقة القياس، ومجموعات الاختبار موجودين في الريبو على GitHub: <a href="{{results}}">النتايج</a>، و<a href="{{speakers}}">تقسيم المتكلمين</a>، و<a href="{{tables}}">الجداول</a>.'  # new
 
 # The public numbers, as en.toml explains; the numbers in Western digits, as everywhere on the page
 [numbers]

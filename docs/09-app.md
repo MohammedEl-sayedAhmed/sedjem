@@ -781,9 +781,9 @@ Every change needs the header `X-Sedjem: 1`.
 
 ## Limits
 
-- Local transcription runs on the CPU. An hour of audio takes roughly 20 minutes with Cohere and
-  30–45 minutes with whisper-medium in performance mode, and several times longer in power-saver
-  mode.
+- Local transcription runs on the CPU. On the test meetings, with speaker labels, an hour of audio
+  took about 16 minutes with Cohere and 32 with whisper-medium in performance mode (9–19 and 18–47
+  from one meeting to another), and several times longer in power-saver mode.
 - Speaker labels on a meeting of two or three people put about 8–9% of words on the wrong person
   ([speaker labels](04-speaker-labels.md)). Use rename and merge to fix what matters.
 - The transcripts are drafts. On the test meetings, the local models differ from ElevenLabs on
