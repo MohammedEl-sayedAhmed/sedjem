@@ -23,8 +23,8 @@ status: executed
 
 | Option | Pros | Cons |
 |--------|------|------|
-| Keep the pip cache in the Desktop build | Faster builds | A cache written by an earlier run can reach a release; the alert stays open |
-| No pip cache in the Desktop build, and the test jobs keep theirs | Nothing from an earlier run reaches a release; the alert is resolved; the test runs stay quick | Every desktop build downloads its packages |
+| Keep the pip cache in the Desktop build | Faster builds | A cache written by an earlier run can reach a release |
+| No pip cache in the Desktop build, and the test jobs keep theirs | Nothing from an earlier run reaches a release; the test runs stay quick | Every desktop build downloads its packages |
 
 ## Decision
 
@@ -35,6 +35,9 @@ carry an earlier run's packages into a release. The test jobs publish nothing, s
 
 - Each desktop build installs from freshly downloaded packages.
 - Desktop builds don't get faster from the cache that issue #14 asked for.
+- CodeQL still flags the steps that run the checked-out commit, as main's Desktop build already did before CodeQL
+  ran here. The commit is one a maintainer started by hand or a main commit passed by the Release or Nightly
+  workflow, so these were judged false positives, to be dismissed with that reason rather than changed in code.
 - `tests/test_pipeline.py` checks that no step of the Desktop build restores a cache.
 
 ## Artifacts

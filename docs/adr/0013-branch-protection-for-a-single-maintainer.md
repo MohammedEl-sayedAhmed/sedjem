@@ -25,9 +25,9 @@ As the repository's settings on GitHub show on 30 October 2026, main is protecte
 - no review is required;
 - administrators aren't bound, so the maintainer can still push to main directly.
 
-[PR #34](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/34), not merged yet, adds the quick `checks` job to the
-required checks (when it fails, the jobs that need it are skipped, and GitHub counts a skipped check as passed) and
-writes down the rule in `docs/14-pipeline.md`: larger changes, and every change an agent makes, go through a pull
+[PR #34](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/34), not merged yet, adds a quick `checks` job that the
+test jobs wait for. It should join the required checks in the settings: when it fails, the jobs that need it are
+skipped, and GitHub counts a skipped required check as passed. The pull request also writes down the rule in `docs/14-pipeline.md`: larger changes, and every change an agent makes, go through a pull
 request, and the maintainer may push small fixes straight to main.
 
 ## Consequences
