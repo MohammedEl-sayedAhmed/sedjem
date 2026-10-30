@@ -1565,10 +1565,15 @@ class Docs(unittest.TestCase):
         self.assertIn("[Usage counts](13-usage-counts.md)", (ROOT / "docs" / "README.md").read_text(encoding="utf-8"))
 
     def test_the_release(self):
+        """The notes of the version in app/__init__.py name its installer and say that the release before it can
+        update itself; the installer has the same version."""
         from app import __version__
-        notes = (ROOT / ".github" / "release-notes" / f"v{__version__}.md").read_text(encoding="utf-8")
+        folder = ROOT / ".github" / "release-notes"
+        number = lambda version: tuple(int(n) for n in version.split("."))  # noqa: E731
+        previous = max((number(p.stem[1:]) for p in folder.glob("v*.md")), key=lambda v: (v < number(__version__), v))
+        notes = (folder / f"v{__version__}.md").read_text(encoding="utf-8")
         self.assertIn(f"Sedjem-{__version__}-setup.exe", notes)
-        self.assertIn("0.3.0 can update itself: *Settings → Updates*", notes)
+        self.assertIn(f"{'.'.join(map(str, previous))} can update itself: *Settings → Updates*", notes)
         self.assertIn(f'#define AppVersion "{__version__}"', (ROOT / "desktop" / "installer.iss").read_text(encoding="utf-8"))
 
 
