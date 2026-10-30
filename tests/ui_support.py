@@ -69,7 +69,7 @@ def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, video=
     folder = Path(home) / "app_data" / "jobs" / jid
     folder.mkdir(parents=True)
     t = np.arange(int(seconds * 16000)) / 16000
-    freq = 180 + zlib.crc32(jid.encode()) % 200
+    freq = 180 + zlib.crc32(jid.encode()) % 2_000_000 / 10_000  # 200 tones were few: two ids shared one now and then
     sf.write(folder / "audio.flac", (0.05 * np.sin(2 * np.pi * freq * t)).astype(np.float32), 16000)
     if video:
         make_clip(folder / "video.mp4", *video, seconds=seconds)

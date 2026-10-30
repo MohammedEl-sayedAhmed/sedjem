@@ -75,8 +75,10 @@ class Downloads:
         return {item_id: self.status(item_id) for item_id in self.cfg.download_items()}
 
     def part_size(self, f):
-        part = self.part_path(f)
-        return part.stat().st_size if part.exists() else 0
+        try:
+            return self.part_path(f).stat().st_size
+        except FileNotFoundError:  # not started, or put in place since it was looked for
+            return 0
 
     def part_path(self, f):
         p = self.cfg.path(f["path"])
