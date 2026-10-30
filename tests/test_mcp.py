@@ -883,7 +883,7 @@ class MainAndBranches(Case):
         self.assertIn(f"  - main text · Cohere Transcribe Arabic · id {self.main} · latest version 0 · made from Cohere "
                       "Transcribe Arabic, version 2", retro)
         self.assertNotIn("the main transcript", retro)
-        self.assertIn(f"one of 3 transcripts of this recording; none is chosen as the main one",
+        self.assertIn("one of 3 transcripts of this recording; none is chosen as the main one",
                       self.text("get_transcript", id=RETRO_A))
 
     def test_search_looks_in_main_transcripts_only_unless_include_branches(self):
@@ -918,7 +918,7 @@ class MainAndBranches(Case):
                          "version 2 is the latest")
         main = self.text("get_transcript", id=self.main)
         self.assertIn("Version 0 of 1 (the latest) · the main transcript of this recording (main text)", main)
-        self.assertIn(f"Version 0 of 1 (the latest) · branch whisper-medium code-switching · the main transcript is main text",
+        self.assertIn("Version 0 of 1 (the latest) · branch whisper-medium code-switching · the main transcript is main text",
                       self.text("get_transcript", id=RETRO_B))
         self.assertIn("Version 0 of 1 (the latest)", self.text("get_transcript", id=MEETING), "one transcript: its version")
         self.assertIn("has no version 5: its versions are 0-2, and 2 is the latest", self.problem("get_transcript", id=RETRO_A, version=5))

@@ -51,6 +51,7 @@ for cfg in "$@"; do
     *) echo "unknown model '$model' (whisper, large-v3, cohere, audar, qwen3asr, r2t2)" >&2; exit 1 ;;
   esac
   # $engine is split into words on purpose.
+  # shellcheck disable=SC2086
   if [ -n "${PROMPT:-}" ]; then
     $PY -u bench/run_bench.py "${SET:-perle}" "$audio" $engine --language "$lang" --mode "${MODE:-pipeline}" --prompt "$PROMPT"
   else
