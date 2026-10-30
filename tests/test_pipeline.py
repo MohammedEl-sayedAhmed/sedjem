@@ -354,6 +354,12 @@ class Security(unittest.TestCase):
             self.assertTrue(update["groups"])
         self.assertEqual(pip["versioning-strategy"], "increase-if-necessary")
         self.assertEqual(pip["groups"]["python"]["update-types"], ["minor", "patch"])
+        # the engines first, so they never ride along with the routine updates, and every kind of their release
+        self.assertEqual(list(pip["groups"]), ["engines", "python"])
+        self.assertNotIn("update-types", pip["groups"]["engines"])
+        engines = set(pip["groups"]["engines"]["patterns"])
+        for name in ("faster-whisper", "av", "sherpa-onnx", "transcribe-cpp"):
+            self.assertIn(name, engines)
         self.assertEqual(actions["groups"]["github-actions"]["patterns"], ["*"], "CodeQL's init and analyze together")
         # the PyAV ceiling in requirements.txt is kept
         self.assertIn("av>=11,<19", (ROOT / "requirements.txt").read_text(encoding="utf-8"))

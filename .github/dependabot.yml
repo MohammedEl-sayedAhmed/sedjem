@@ -15,9 +15,13 @@ updates:
     # it. Every exact pin (==) still gets a pull request for each release. The default would raise the lower end
     # of a range with each release, and so the oldest version the requirements allow.
     versioning-strategy: increase-if-necessary
-    # the minor and patch releases in one pull request; a new major version comes alone, so that a break is
-    # easy to tell apart
+    # The speech engines and the audio they read come in a pull request of their own, any kind of release, since the
+    # tests use stand-ins for the models: it is merged after a run on real recordings (bench/, docs/14-pipeline.md).
+    # The other minor and patch releases come in one pull request; a new major version of those comes alone, so that
+    # a break is easy to tell apart. A package goes to the first group it matches.
     groups:
+      engines:
+        patterns: ["faster-whisper", "ctranslate2", "av", "sherpa-onnx", "transcribe-cpp", "soundfile", "onnxruntime*"]
       python:
         patterns: ["*"]
         update-types: [minor, patch]
