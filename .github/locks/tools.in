@@ -1,0 +1,5 @@
+# The pipeline's own tools, locked with their hashes into tools.txt by .github/scripts/locks.py (docs/14-pipeline.md).
+# Outside Dependabot's view: a new version is set here by hand, and the locks are made again.
+ruff  # the Python linter of the quick checks, at the version requirements-dev.txt pins
+uv==0.13.0  # makes the locks (.github/scripts/locks.py); the Tests workflow sets Sedjem up with it as the docs say
+pip-audit==2.10.1  # the known vulnerabilities of the locked packages (the Security workflow)

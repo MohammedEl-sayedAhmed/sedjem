@@ -1,7 +1,9 @@
 # Dependabot's weekly pull requests for the pip requirements and the workflows' actions (docs/14-pipeline.md). Each
 # is checked like any other pull request: the Tests workflow is the gate, and the Desktop build runs too, since
 # they change the requirement files or the workflows. Their titles start with an area, as the commit titles do, so
-# the release notes put them under tests, docs and the pipeline.
+# the release notes put them under tests, docs and the pipeline. Dependabot doesn't make the locks the workflows
+# install from (.github/locks/): on its pull request for the pip requirements, run python .github/scripts/locks.py
+# and push the locks, or the quick checks fail.
 version: 2
 updates:
   - package-ecosystem: pip
