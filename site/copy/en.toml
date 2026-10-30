@@ -114,7 +114,7 @@ opens_value = "Audio and video files, YouTube links and&nbsp;playlists"
 exports = "Exports"
 exports_value = "Plain text, SRT, WebVTT, Markdown and JSON"
 download = "Download"
-download_value = "About 80&nbsp;MB, then a model of 778&nbsp;MB or 1.6&nbsp;GB"
+download_value = "About 90&nbsp;MB, then a model of 778&nbsp;MB or 1.6&nbsp;GB"
 platforms = "Platforms"
 platforms_value = "Windows&nbsp;10 and&nbsp;11, Linux on&nbsp;x64"
 assistants = "Assistants"
@@ -125,49 +125,109 @@ licence_value = "AGPL-3.0, free and open source"
 computer = "On your computer"
 recordings = "With your recordings"
 
-# The public numbers, which build.py sets on a sheet like the facts': GitHub's from the stats branch, and the newest
-# month of the anonymous counts' totals from docs/usage.json. {{day}}, {{month}}, {{release}} and the links are
-# filled in by build.py, and the numbers are its own.
+# The public numbers, a grid of charts build.py draws: GitHub's from the stats branch, and the newest month of the
+# anonymous counts' totals from docs/usage.json. {{day}}, {{month}}, {{release}}, {{platform}} and the links are
+# filled in by build.py, and the numbers are its own. A card's title is over its number, and its label under it.
 [numbers]
-h2 = "Counted in the open"
+h2 = '<span translate="no">Sedjem</span> in numbers'
 lede = "Downloads, stars and page views from GitHub, and the totals of the anonymous counts that the app and this website send."
 months = "January February March April May June July August September October November December"
-github = "On GitHub, as of {{day}}"
+day = "Day"
+downloads_title = "Downloads"
 downloads = "Downloads, all releases"
-latest = "Downloads of {{release}}, the latest release"
-stars = "Stars"
-views = "Repository page views, 30 days to {{day}}"
-views_between = "Repository page views, {{first}} to {{last}}"
+releases_title = "Downloads by release"
+release = "Release"
+previews = "Previews"
+platforms_title = "Windows and Linux"
+platform_share = "of downloads are for {{platform}}"
+platform = "System"
+share = "Share"
+windows = "Windows"
+linux = "Linux"
+other = "Other"
+views_title = "Repository page views"
+stars_title = "Stars"
+stars = "Stars on GitHub"
 app = "In the app, {{month}}"
-installs = 'Installs that ran <span translate="no">Sedjem</span>'
-countries = "Countries"
-transcriptions = "Transcriptions"
-hours = "Hours of audio"
-model = "Most used model"
+installs = 'installs ran <span translate="no">Sedjem</span>'
+countries = "countries"
+transcriptions = "transcriptions"
+hours = "hours of audio"
+model = "Most used model:"
 model_cohere = '<span translate="no">Cohere Transcribe Arabic</span>'
 model_whisper_medium = '<span translate="no">whisper-medium</span> <span translate="no">code-switching</span>'
 model_whisper_large = '<span translate="no">Whisper large-v3</span>'
-model_other_local = "Another model on the computer"
-model_hosted = "Hosted services"
-website = "On this website, {{month}}"
-page_views = "Page views"
-clicks = "Download clicks"
+model_other_local = "another model on the computer"
+model_hosted = "hosted services"
+top = "Where it ran"
+country = "Country"
+other_countries = "Other countries"
+website = "On this website"
+page_views = "page views"
+clicks = "download clicks"
 counts = "The anonymous counts"
 not_yet = "The app and this website count anonymously, and their first monthly totals, for November 2026, come out in early December."
-caption_github = 'GitHub’s numbers are read every day (<a href="{{charts}}">the charts</a>).'
+caption_github = 'GitHub’s numbers are as of {{day}} and read every day (<a href="{{charts}}">the charts</a>).'
 caption_counts = 'The anonymous counts are totalled once a month (<a href="{{method}}">the method</a>).'
+
+# The countries the counts' card may name, by their codes; one not here shows its code
+week_more = "+{{n}} in the last 7 days"
+week_none = "none in the last 7 days"
+release_out = "{{release}} out"
+older = "Older releases"
+latest_title = "Downloads of {{release}}"
+latest_out = "the latest release, out on {{day}}"
+latest_only = "the latest release"
+platform_rest = "{{platform}}: {{share}}%"
+views_30 = "Repository page views, last 30 days"
+views_since = "Repository page views since {{first}}"
+views_average = "about {{n}} a day"
+more_since = "+{{n}} since {{day}}"
+since_day = "since {{day}}"
+
+[countries]
+EG = "Egypt"
+SA = "Saudi Arabia"
+AE = "Emirates"
+KW = "Kuwait"
+QA = "Qatar"
+BH = "Bahrain"
+OM = "Oman"
+JO = "Jordan"
+LB = "Lebanon"
+PS = "Palestine"
+IQ = "Iraq"
+SY = "Syria"
+YE = "Yemen"
+LY = "Libya"
+TN = "Tunisia"
+DZ = "Algeria"
+MA = "Morocco"
+SD = "Sudan"
+US = "United States"
+GB = "United Kingdom"
+DE = "Germany"
+FR = "France"
+NL = "Netherlands"
+CA = "Canada"
+TR = "Türkiye"
+IN = "India"
+PK = "Pakistan"
 
 [get]
 h2 = 'Get <span translate="no">Sedjem</span>'
 fine = 'Free and open source under the <span class="keep">AGPL-3.0</span>. Version&nbsp;{{version}}.'
 windows = "Windows"
-windows_text = "Windows&nbsp;10 and&nbsp;11. The installer is about 80&nbsp;MB and installs for your user, without admin rights. It isn’t signed yet, so Windows SmartScreen warns about an unknown publisher: choose More info, then Run anyway."
+windows_text = "Windows&nbsp;10 and&nbsp;11. The installer is about 90&nbsp;MB and installs for your user, without admin rights. It isn’t signed yet, so Windows SmartScreen warns about an unknown publisher: choose More info, then Run anyway."
 linux = "Linux"
 linux_text = 'Linux on x64. Unpack the archive and run <span translate="no" dir="ltr">Sedjem/Sedjem</span>.'
 source = "From source"
 source_text = "With Python 3.12, Git and uv:"
 code_alt = "The commands that run Sedjem from its source"
 source_link = "Windows and other setups"
+# under each download, when build.py has the latest release's details: the file, and its SHA256
+file = "File"
+sha256 = "SHA256"
 start = "First start"
 start_text = 'In Settings → Models, download <span translate="no">whisper-medium</span> (778&nbsp;MB) or <span translate="no">Cohere Transcribe Arabic</span> (1.6&nbsp;GB). The speaker model, <span translate="no">TitaNet-small</span> (40&nbsp;MB), comes with the first one. A graphics card is optional.'
 

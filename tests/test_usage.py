@@ -1485,7 +1485,8 @@ class Totals(unittest.TestCase):
         totals.write(root, totals.totals(rows, "2026-10", "2026-12-03"))
         totals.write(root, t, site)
         self.assertEqual(build.monthly(root / "docs" / "usage.json"),
-                         {"app": {"month": "2026-11", "installs": 11, "countries": 4, "transcriptions": 17, "hours": 7.8,
+                         {"app": {"month": "2026-11", "installs": 11, "countries": 4,
+                                  "top": [("EG", 4), ("SA", 3), ("other", 4)], "transcriptions": 17, "hours": 7.8,
                                   "model": "cohere"},
                           "website": {"page_views": 16, "countries": 3, "clicks": 5}})
         self.assertEqual(build.ENGINES, totals.ENGINES)

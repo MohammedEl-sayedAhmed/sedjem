@@ -1,13 +1,21 @@
 # The website on GitHub Pages, https://mohammedel-sayedahmed.github.io/sedjem/: site/build.py builds it from site/
 # with the made-up meeting, its captures of the app, the logo and the fonts from the rest of the repository, the site's
 # tests check the result, and it is published. Runs for a push to main that changes anything the build reads, after
-# each successful run of the Repository stats workflow (stats.yml), so that the page's numbers are the day's, and by
-# hand (Actions → Pages → Run workflow, or `gh workflow run pages.yml`). Pages must be turned on in the repository's
-# settings with GitHub Actions as its source. To build and look at it locally, see site/build.py's docstring.
+# each successful run of the Repository stats workflow (stats.yml), so that the page's numbers are the day's, after
+# a release, so that its files are the downloads as soon as they exist, and by hand (Actions → Pages → Run workflow,
+# or `gh workflow run pages.yml`). Pages must be turned on in the repository's settings with GitHub Actions as its
+# source. To build and look at it locally, see site/build.py's docstring.
+#
+# A release reaches the site two ways. The Desktop build workflow publishes one for a pushed tag with the workflow's
+# own token, which never starts another workflow, so its run's success starts this one. A release published by a
+# person starts this one too (release: published), but the github-pages environment deploys from main only, and
+# such a run is on the release's tag, so it only asks for a run on main.
 #
 # The page's numbers come from the stats branch, whose files are downloaded through the API: never a checkout or a
-# fetch of that branch, which GitHub would count as a clone. A file that can't be downloaded or read leaves its
-# numbers out of the page, with a warning, and never stops the publication.
+# fetch of that branch, which GitHub would count as a clone. The latest release's details come from the API too;
+# GitHub gives each file's SHA256, so its SHA256SUMS.txt is downloaded only for a release without them, as every
+# download would add to its count. A file that can't be downloaded or read leaves its part of the page as it is
+# without it, with a warning, and never stops the publication.
 name: Pages
 
 on:
@@ -26,9 +34,10 @@ on:
       - "tests/site_support.py"
       - ".github/workflows/pages.yml"
   workflow_run:
-    workflows: ["Repository stats"]
+    workflows: ["Repository stats", "Desktop build"]
     types: [completed]
-    branches: [main]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -42,9 +51,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  on-main:
+    # a release published by a person: ask for a build on main, the one branch that may deploy (pre-releases leave
+    # the downloads as they are)
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start the Pages workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
+
   build:
-    # after the stats workflow, only when it succeeded
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    # a push, a run by hand, or after another workflow that succeeded: the stats on main, or the Desktop build of a
+    # pushed tag, a release
+    if: >-
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.event == 'push'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -67,8 +94,28 @@ jobs:
             fi
           done
 
+      - name: Download the latest release's details (through the API)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          folder="$RUNNER_TEMP/release"
+          mkdir -p "$folder"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$folder/release.json"; then
+            if ! jq -e '[.assets[] | select(.name != "SHA256SUMS.txt") | .digest] | all' "$folder/release.json" > /dev/null; then
+              id=$(jq -r '.assets[] | select(.name == "SHA256SUMS.txt") | .id' "$folder/release.json")
+              if [ -z "$id" ] || ! gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$id" \
+                  > "$folder/SHA256SUMS.txt"; then
+                rm -f "$folder/SHA256SUMS.txt"
+                echo "::warning::The release has no SHA256 for its files; the downloads show none."
+              fi
+            fi
+          else
+            rm -f "$folder/release.json"
+            echo "::warning::The latest release could not be read; the downloads link its page, without sizes or SHA256."
+          fi
+
       - name: Build
-        run: python site/build.py _site --stats "$RUNNER_TEMP/stats"
+        run: python site/build.py _site --stats "$RUNNER_TEMP/stats" --release "$RUNNER_TEMP/release"
 
       - name: Check (offline, standard library only)
         run: python -m unittest tests.test_site -v
