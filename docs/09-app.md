@@ -206,17 +206,17 @@ never changes. Each saved change after that is a new version (1, 2, and so on), 
 `v3` next to the title) lists them, newest first, with the time, the kind of change, your message if
 you gave one, and an automatic summary such as "3 lines changed, Speaker 1 renamed to Mona".
 
-- **Edit mode.** Everything done between *Edit* and *Done editing* (the text of lines, a line's
+- Edit mode: everything done between *Edit* and *Done editing* (the text of lines, a line's
   speaker, names, merges, the title) becomes one version. Before it is saved, *Review your changes*
   shows it the way `git diff` does: each changed line as it was in red and as it is now in green,
   the changed words marked, with one unchanged line around each change. The message is optional,
   and Enter saves.
-- **Quick changes.** Outside edit mode, renaming a speaker, merging two and changing the title are
+- Quick changes: outside edit mode, renaming a speaker, merging two and changing the title are
   saved at once with an automatic summary. Quick changes made within two minutes of each other,
   none with a message, are kept as one version.
-- **View** shows a version and what changed from the version before it, or from any other version.
-  **Restore** makes an older version the newest one again, and the versions in between stay.
-  **Export** and **Copy text** there give that version; the rest of the app uses the newest one. A
+- *View* shows a version and what changed from the version before it, or from any other version.
+  *Restore* makes an older version the newest one again, and the versions in between stay.
+  *Export* and *Copy text* there give that version; the rest of the app uses the newest one. A
   message can be added to any version, or changed, later.
 
 A transcription made before the history existed gets one the first time it is opened. Version 0 is
@@ -436,7 +436,7 @@ form also has a region field. The region is saved with the key in `secrets.json`
 `AZURE_SPEECH_REGION` overrides it, and `region` in the config is the default (`westeurope`). None
 of the four has been measured on Egyptian speech by the project.
 
-- **Gemini** ([keys](https://aistudio.google.com/apikey)) uses `gemini-3.5-transcribe` through the
+- Gemini ([keys](https://aistudio.google.com/apikey)) uses `gemini-3.5-transcribe` through the
   Interactions API, with `store: false` so Google doesn't keep the request. The app asks for verbatim
   text with word times and speaker labels when they are on (up to 8; three or more is experimental).
   For Arabic + English it sends no `language_codes`, so the model detects the language, which its
@@ -451,7 +451,7 @@ of the four has been measured on Egyptian speech by the project.
   tier costs nothing, but Google uses what you send to improve its products and human reviewers may
   read it, except for users in the EEA, Switzerland and the UK. With billing on it isn't used, and the
   price is about $0.30 an hour ($2 per million audio tokens in, $12 per million text tokens out).
-- **Deepgram** ([keys](https://console.deepgram.com/)) gets the audio as the body of one request to
+- Deepgram ([keys](https://console.deepgram.com/)) gets the audio as the body of one request to
   `/v1/listen` with `model=nova-3`, `language=ar-EG`, `smart_format`, `utterances`, `diarize_model=latest`
   for speaker labels (`diarize=true` is deprecated), your terms as `keyterm` (up to 100) and
   `mip_opt_out=true`, which keeps the audio out of Deepgram's model training. Nova-3 has 17 Arabic
@@ -460,7 +460,7 @@ of the four has been measured on Egyptian speech by the project.
   dropped. It can't detect Arabic, so auto-detect also sends `ar-EG`. There is $200 of free credit,
   then $0.0043 a minute ($0.26 an hour) with speaker labels included, and $0.0013 a minute more with
   key terms. Deepgram stores no transcripts.
-- **AssemblyAI** ([dashboard](https://www.assemblyai.com/dashboard/home)) gets the audio through
+- AssemblyAI ([dashboard](https://www.assemblyai.com/dashboard/home)) gets the audio through
   `/v2/upload`, then a transcript request with Universal-3.5 Pro (Universal-2 as the fallback),
   language detection expecting `ar` and `en` (how Universal-3.5 Pro follows switches between
   languages), `speaker_labels`, `speakers_expected` when you give the number (it is taken as exact)
@@ -471,7 +471,7 @@ of the four has been measured on Egyptian speech by the project.
   with key terms. AssemblyAI may train on the audio; free accounts can't opt out, paid ones can under
   *Data controls*. Its data page says audio sent to the EU endpoint
   (`base_url = "https://api.eu.assemblyai.com"`) isn't used for training.
-- **Azure AI Speech** ([portal](https://portal.azure.com/), *Keys and Endpoint* of the Speech resource)
+- Azure AI Speech ([portal](https://portal.azure.com/), *Keys and Endpoint* of the Speech resource)
   uses fast transcription: one multipart request to
   `https://<region>.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15`
   with the key in `Ocp-Apim-Subscription-Key`, the audio, and a definition with `locales: ["ar-EG"]`,
@@ -581,7 +581,7 @@ times in all; a used-up quota fails at once. Cancel works during an upload and b
 ElevenLabs and Speechmatics, none of the three leaves a stored job or transcript that the app could
 delete afterwards.
 
-- **OpenAI** uses `gpt-transcribe` ($0.27/h), which takes `languages[]` (the app sends `ar` and
+- OpenAI uses `gpt-transcribe` ($0.27/h), which takes `languages[]` (the app sends `ar` and
   `en`) and your terms as `keywords[]`. It returns text without times, as do `gpt-4o-transcribe`
   ($0.36/h) and `gpt-4o-mini-transcribe` ($0.18/h), which get the terms as `prompt`; so these are sent
   one stretch of 10 to 25 s at a time (`piece_s`), and each stretch becomes a line. That is 150 to
@@ -598,7 +598,7 @@ delete afterwards.
   computer instead.
   There is no free tier. OpenAI doesn't train on API data, and for transcriptions it keeps no
   abuse-monitoring logs and no application state.
-- **Groq** runs `whisper-large-v3` ($0.111/h; `whisper-large-v3-turbo` costs $0.04/h but is weaker
+- Groq runs `whisper-large-v3` ($0.111/h; `whisper-large-v3-turbo` costs $0.04/h but is weaker
   on Arabic) with `response_format = verbose_json`, segment timestamps and `language`. The `prompt` is
   the Egyptian style hint that took local large-v3 from 47% to 34% WER on ArzEn, followed by your
   terms, cut to about 200 characters because Whisper prompts are limited to 224 tokens; with the
@@ -608,7 +608,7 @@ delete afterwards.
   plan), so parts stay under 24 MB. Groq has no speaker labels; they come from the speaker model on this
   computer. It keeps no request data by default, but may log requests for up to 30 days to look into
   errors or abuse.
-- **Mistral** runs `voxtral-mini-2602` (Voxtral Mini Transcribe 2, $0.18/h) with
+- Mistral runs `voxtral-mini-2602` (Voxtral Mini Transcribe 2, $0.18/h) with
   `timestamp_granularities = segment`, `diarize` when labels are on, and up to 100 terms as
   `context_bias`. Its docs say timestamps can't be combined with `language`, so the language is always
   detected, and that context bias is tuned for English. Phrases are sent with underscores for
@@ -617,15 +617,15 @@ delete afterwards.
   parts are kept to 58 minutes; each part has its own speaker numbers. Mistral may use API data to
   improve its models unless *Anonymous improvement data* is switched off (*Admin*, then *Privacy*).
 
-**Speaker labels on this computer.** For a model without speaker labels (Groq, or OpenAI with
-`diarize_model = ""`), when labels are on and a speaker model is downloaded, the app runs the voice
+Speaker labels for a model without them (Groq, or OpenAI with `diarize_model = ""`) are made on this
+computer: when labels are on and a speaker model is downloaded, the app runs the voice
 step of the local models before uploading, with the speaker model in use ([speaker
 models](#speaker-models)). It runs in the model process (`app/worker.py --speaker-timeline`, which
 prints the timeline as JSON), and each line gets the speaker of most windows within it, so a line
 that spans a change of speaker goes to whoever talks most in it. Run once with TitaNet-small on six
 public Perle clips joined together, the step took 1.3 s and gave each clip its own speaker.
 
-**Checked on 25 September 2026** in the official docs:
+Checked on 25 September 2026 in the official docs:
 [OpenAI's speech-to-text guide](https://developers.openai.com/api/docs/guides/speech-to-text), the
 model pages for
 [gpt-transcribe](https://developers.openai.com/api/docs/models/gpt-transcribe),
@@ -654,7 +654,7 @@ example requests and replies), [overview](https://docs.mistral.ai/studio/audio/s
 [free mode](https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key)
 and [training opt-out](https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training).
 
-**Not verified:** how long a request the 4o models take (only the 2,000 output tokens are
+Not verified: how long a request the 4o models take (only the 2,000 output tokens are
 documented; users report about 1,400 to 1,500 s), how many tokens a minute of audio counts for
 against the per-minute limit, whether the 2,000 tokens apply per chunk or per request with
 `chunking_strategy = auto`, whether the diarize model takes WebM clips as known
