@@ -2,7 +2,8 @@
 
 Safety: it listens on 127.0.0.1, answers only requests addressed to that host (no DNS rebinding),
 and every request that changes something must carry the X-Sedjem header, which other websites
-open in the same browser cannot send (no cross-site requests).
+open in the same browser cannot send (no cross-site requests). Running jobs for other computers
+(app/remote.py) has a server of its own, on another port, off unless it is switched on.
 """
 import json
 import os
@@ -20,12 +21,12 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, engines, hub, report, updates, usage, video, youtube
+from . import assistants, compare, courses, engines, hub, remote, report, updates, usage, video, youtube
 from . import transcript as T
 from . import history
 from .config import FALLBACK_SPEAKER_MODEL, FROZEN, power_profile, set_power_profile
 from .downloads import Downloads
-from .jobs import ACTIVE, Runner, Store, probe_seconds
+from .jobs import ACTIVE, Joined, Runner, Store, probe_seconds
 
 STATIC = Path(__file__).resolve().parent / "static"
 ID = r"(\d{8}-\d{6}-[0-9a-f]{4})"
@@ -50,7 +51,10 @@ class App:
         self.store = Store(cfg.storage)
         # the anonymous usage counts (app/usage.py); like updates, they send only once an entry point starts them
         self.usage = usage.Usage(cfg, version=lambda: self.updates.running()["version"], facts=self.usage_facts)
-        self.runner = Runner(self.store, cfg, gpus=self.gpu_names, ended=self.usage.job_ended)
+        self.served = Store(cfg.storage / "remote")  # jobs run here for other computers, apart from the library
+        self.remote = remote.Remote(self)  # both sides of running jobs on another computer (app/remote.py)
+        self.runner = Runner(Joined(self.store, self.served), cfg, gpus=self.gpu_names, ended=self.usage.job_ended)
+        self.runner.remote = self.remote
         self.runner.recover()
         self.downloads = Downloads(cfg, done=self.usage.downloaded)
         self.server = None
@@ -211,6 +215,7 @@ class App:
             "storage": {"dir": str(self.cfg.storage), "free_gb": round(shutil.disk_usage(self.cfg.storage).free / 1e9, 1),
                         "used_mb": round(self.used_bytes() / 1e6), "jobs": len(jobs)},
             "active": sum(1 for j in jobs if j["status"] in ACTIVE),
+            "remote": self.remote.summary(),  # the paired computers jobs can be sent to (app/remote.py)
         }
 
     def assistants_view(self):
@@ -235,7 +240,8 @@ def summary(job):
     group say it of the group's one main transcript, app/compare.py); branch: {name, from: {id, version}} for a
     branch, else None."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
-            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course", "branch")
+            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course", "branch",
+            "remote")
     return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True}
 
 
@@ -483,19 +489,49 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, f"confirm that the recording may be uploaded to {model['service']}")
         return model
 
+    def remote_choice(self, p, default=None):
+        """For a job on a paired computer (run_on, app/remote.py): (the computer, the model as that computer listed it,
+        the job's fields that say so). The recording goes there only with consent, the form's tick, which is asked the
+        first time for each computer. A computer that doesn't answer now still gets the job: it runs here instead when
+        it starts, if it can."""
+        rem = self.app.remote
+        cid = str(p.get("run_on") or "")
+        try:
+            computer = rem.computer(cid)
+        except remote.RemoteError:
+            raise ApiError(400, "that computer isn't paired with this one")
+        model_id = str(p.get("model") or default or "")
+        if not remote.MODEL_ID.fullmatch(model_id):
+            raise ApiError(400, "unknown model")
+        if rem.listed_model(cid, model_id) is None:
+            rem.ask(cid)  # its models as they are now
+        model = rem.listed_model(cid, model_id)
+        if model is None and rem.listed.get(cid) is not None:
+            raise ApiError(400, f"that model isn't installed on {computer['name']}")
+        if not computer.get("consented") and str(p.get("confirm_send")).lower() not in ("1", "true"):
+            raise ApiError(400, f"confirm that the recording may be sent to {computer['name']} on your network")
+        here = self.app.cfg.models.get(model_id) or {}
+        model = model or {"id": model_id, "title": here.get("title") or model_id, "prompt": here.get("prompt")}
+        return computer, model, {"remote": {"id": computer["id"], "name": computer["name"]}, "kind": "remote",
+                                 "model_title": model["title"]}
+
     def create_job(self, params):
         cfg, runner = self.app.cfg, self.app.runner
         ctype = self.headers.get("Content-Type", "")
         is_json = ctype.startswith("application/json")
         p = self.body_json() if is_json else params
-        model = self.ready_model(p)
+        computer, extra = None, {}
+        if p.get("run_on"):  # on a paired computer
+            computer, model, extra = self.remote_choice(p)
+        else:
+            model = self.ready_model(p)
         options = parse_options(p, cfg, model)
         if is_json:  # a file already on this computer: read it in place, no copy
             source = Path(str(p.get("path") or "")).expanduser()
             if not source.is_file():
                 raise ApiError(400, f"file not found: {source}")
             job = runner.new_job(title=p.get("title") or source.stem, source_name=source.name,
-                                 model_id=model["id"], options=options, source_path=str(source.resolve()))
+                                 model_id=model["id"], options=options, source_path=str(source.resolve()), **extra)
         else:
             name = Path(p.get("name") or "recording").name
             ext = Path(name).suffix if AUDIO_EXT.match(Path(name).suffix or "") else ".bin"
@@ -508,7 +544,7 @@ class Handler(BaseHTTPRequestHandler):
             if shutil.disk_usage(cfg.storage).free < n * 1.2 + 1e9:
                 raise ApiError(507, "not enough free disk space for this file")
             job = runner.new_job(title=p.get("title") or Path(name).stem, source_name=name,
-                                 model_id=model["id"], options=options)
+                                 model_id=model["id"], options=options, **extra)
             dest = self.app.store.dir(job["id"]) / f"source{ext.lower()}"
             try:
                 with open(dest, "wb") as f:
@@ -523,6 +559,8 @@ class Handler(BaseHTTPRequestHandler):
             except BaseException:
                 self.app.store.delete(job["id"])
                 raise
+        if computer and not computer.get("consented"):  # the tick was given: not asked again for this computer
+            self.app.remote.consent(computer["id"])
         runner.submit(job["id"])
         self.json(summary(self.app.store.get(job["id"])), 201)
 
@@ -698,6 +736,13 @@ class Handler(BaseHTTPRequestHandler):
             if job.get("source_url") and job["status"] not in ACTIVE:  # a YouTube download that failed: again
                 return self.retry_download(job, p)
             raise ApiError(409, "this transcription has no prepared audio yet")
+        if p.get("run_on"):  # again on a paired computer
+            computer, model, extra = self.remote_choice(p, job["model"])
+            options = parse_options({**(job.get("options") or {}), **p}, self.app.cfg, model)
+            new = self.app.runner.rerun(jid, model["id"], options, **extra)
+            if not computer.get("consented"):
+                self.app.remote.consent(computer["id"])
+            return self.json(summary(new), 201)
         model = self.ready_model(p, job["model"])
         options = parse_options({**(job.get("options") or {}), **p}, self.app.cfg, model)
         self.json(summary(self.app.runner.rerun(jid, model["id"], options)), 201)
@@ -954,6 +999,8 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as e:
                 raise ApiError(400, str(e))
         self.app.usage.settings_changed(before, self.app.cfg.settings())  # turned off: what was kept goes at once
+        if "remote_serve" in values:  # Run jobs for other computers: listen, or stop
+            self.app.remote.apply()
         self.json(self.app.status())
 
     # Assistants over MCP (app/assistants.py; app/mcp.py is the server they start): Settings → Assistants. The
@@ -981,6 +1028,56 @@ class Handler(BaseHTTPRequestHandler):
         except OSError as e:
             raise ApiError(500, f"could not clear the list: {e}")
         self.json(self.app.assistants_view())
+
+    # Other computers (app/remote.py): Settings, Other computers. The serving side's switch is saved with the other
+    # settings (POST /api/settings with remote_serve).
+    def remote_info(self, _params):
+        self.json(self.app.remote.view())
+
+    def remote_code(self, _params):
+        """A new one-time pairing code, shown on this computer to be typed on the other. Answers like GET /api/remote."""
+        try:
+            self.app.remote.open_code()
+        except remote.Denied as e:
+            raise ApiError(e.status, str(e))
+        self.json(self.app.remote.view())
+
+    def remote_close_code(self, _params):
+        self.app.remote.close_code()
+        self.json(self.app.remote.view())
+
+    def remote_revoke(self, _params, cid):
+        """A computer no longer allowed to send jobs here (its token stops working at once)."""
+        try:
+            self.app.remote.revoke(cid)
+        except remote.Denied as e:
+            raise ApiError(e.status, str(e))
+        self.json(self.app.remote.view())
+
+    def remote_pair(self, _params):
+        """{address, code}: pair with the computer at address, which shows the code. Answers like GET /api/remote."""
+        p = self.body_json()
+        try:
+            self.app.remote.pair(p.get("address"), p.get("code"))
+        except remote.Unreachable as e:
+            raise ApiError(502, f"Couldn't reach {p.get('address')}: {e}. Check that Sedjem runs there with Run jobs for "
+                                f"other computers turned on, and that both computers are on the same network")
+        except remote.RemoteError as e:
+            raise ApiError(400, str(e))
+        self.json(self.app.remote.view())
+
+    def remote_forget(self, _params, cid):
+        """Unpair from a computer this one sends jobs to. Answers like GET /api/remote."""
+        try:
+            self.app.remote.forget(cid)
+        except remote.RemoteError as e:
+            raise ApiError(404, str(e))
+        self.json(self.app.remote.view())
+
+    def remote_ask(self, _params, cid):
+        """What a paired computer says now: {"online": true, "name", "models" (its installed local models), "speakers",
+        "machine", "busy"}, or {"online": false, "error"}."""
+        self.json(self.app.remote.ask(cid))
 
     def open_folder(self, _params):
         """Show the data folder in the file manager, or with {"job": id} the courses folder a YouTube job's
@@ -1174,6 +1271,13 @@ ROUTES = [
     ("GET", r"/api/assistants", Handler.assistants_info),
     ("POST", r"/api/assistants/hide", Handler.hide_from_assistants),
     ("POST", r"/api/assistants/log/clear", Handler.clear_assistants_log),
+    ("GET", r"/api/remote", Handler.remote_info),
+    ("POST", r"/api/remote/code", Handler.remote_code),
+    ("DELETE", r"/api/remote/code", Handler.remote_close_code),
+    ("DELETE", r"/api/remote/clients/([0-9a-f]{12})", Handler.remote_revoke),
+    ("POST", r"/api/remote/pair", Handler.remote_pair),
+    ("GET", r"/api/remote/computers/([0-9a-f]{12})", Handler.remote_ask),
+    ("DELETE", r"/api/remote/computers/([0-9a-f]{12})", Handler.remote_forget),
     ("POST", r"/api/open-folder", Handler.open_folder),
     ("POST", r"/api/probe", Handler.probe),
     ("POST", r"/api/downloads/([\w-]+)", Handler.download),

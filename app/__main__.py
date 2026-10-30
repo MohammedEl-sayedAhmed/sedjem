@@ -52,6 +52,7 @@ def main():
         sys.exit(f"port {port} is in use by another program; start with --port N")
     app.updates.start()  # checks for updates in the background, if the user agreed to it
     app.usage.start()  # sends the anonymous usage counts, while they are allowed (app/usage.py)
+    app.remote.start()  # runs jobs for other computers, if that is switched on (app/remote.py)
     print(f"Sedjem is running at {url}  (data: {cfg.storage}; stop with Ctrl+C)", flush=True)
     if cfg.server.get("open_browser", True) and not args.no_browser and not restarted:
         threading.Timer(0.6, webbrowser.open, [url]).start()
@@ -61,6 +62,7 @@ def main():
         pass
     finally:
         app.runner.shutdown()
+        app.remote.stop()
         server.server_close()
 
 

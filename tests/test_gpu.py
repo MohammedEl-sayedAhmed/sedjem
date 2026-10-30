@@ -385,7 +385,8 @@ class SettingsTests(unittest.TestCase):
                                                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
                                                "mcp_write": False,  # assistants only read until the user says
                                                "update_check": None, "update_channel": "stable", "update_skip": None,
-                                               "usage_counts": None})
+                                               "usage_counts": None,
+                                               "remote_serve": False})  # no port open for other computers until asked
 
     def test_saved_settings_win_and_survive_a_restart(self):
         self.cfg.save_settings(device="cpu", threads=2, performance_while_running=True)
@@ -394,7 +395,7 @@ class SettingsTests(unittest.TestCase):
                                             "speaker_model": "titanet-small",
                                             "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [], "mcp_write": False,
                                             "update_check": None, "update_channel": "stable", "update_skip": None,
-                                            "usage_counts": None})
+                                            "usage_counts": None, "remote_serve": False})
 
     def test_bad_values_are_refused(self):
         for bad in ({"device": "tpu"}, {"threads": 0}, {"threads": 10_000}, {"threads": True},

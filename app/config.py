@@ -131,7 +131,8 @@ class Config:
                 "update_check": None, "update_channel": "stable", "update_skip": None,
                 # anonymous usage counts (app/usage.py): on by default, but None (nothing counted or sent) until the
                 # first-start dialog has said so
-                "usage_counts": None}
+                "usage_counts": None,
+                "remote_serve": False}  # Run jobs for other computers (app/remote.py): off until the user turns it on
 
     def saved_settings(self):
         return _read_json(self.settings_path)
@@ -161,6 +162,8 @@ class Config:
                 if check_hidden(value):
                     continue
             if key in ("update_check", "usage_counts") and (value is None or isinstance(value, bool)):
+                continue
+            if key == "remote_serve" and isinstance(value, bool):
                 continue
             if key == "update_channel" and value in ("stable", "latest"):
                 continue

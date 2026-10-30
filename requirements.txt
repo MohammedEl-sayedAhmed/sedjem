@@ -7,5 +7,6 @@ soundfile==0.14.0
 numpy==2.5.3
 threadpoolctl==3.7.0  # caps NumPy's BLAS threads for Nemotron-3-Diarization (nemotron.py)
 requests==2.34.2
+cryptography==50.0.2  # the certificate for running jobs for other computers (app/remote.py)
 yt-dlp==2026.8.19  # YouTube links (app/youtube.py)
 yt-dlp-ejs==0.8.0  # its scripts for YouTube's JavaScript challenge, run in Deno or Node.js

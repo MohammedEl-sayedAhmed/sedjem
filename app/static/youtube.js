@@ -22,10 +22,10 @@ const ytLang = (code) => YT_LANG[String(code || "").split("-")[0].toLowerCase()]
 // videos to transcribe; captions: use the captions people made, where a video has them.
 const YT = { url: "", checked: "", busy: false, adding: false, found: null, error: "", picked: new Set(), captions: true };
 
-// The icon for how a transcript was made: on this computer, by a hosted service, or from YouTube's captions.
-const kindIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : ICON.laptop);
+// The icon for how a transcript was made: on this computer, on a paired one, by a hosted service, or from YouTube's captions.
+const kindIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.kind === "remote" ? ICON.network : ICON.laptop);
 // The small icon in the list: none for a local recording, as before.
-const listIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.youtube_id ? YT_ICON.video : "");
+const listIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.kind === "remote" ? ICON.network : j.youtube_id ? YT_ICON.video : "");
 
 // ---------------------------------------------------------------------------------------------
 // The new transcription page

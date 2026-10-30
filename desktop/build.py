@@ -133,6 +133,7 @@ def main():
         "--hidden-import", "nemotron", "--hidden-import", "threadpoolctl",
         "--hidden-import", "app.worker", "--hidden-import", "app.desktop", "--hidden-import", "app.selftest",
         "--hidden-import", "app.mcp",  # Sedjem --mcp, the assistants' server
+        "--hidden-import", "cryptography.x509",  # the serving side's certificate (app/remote.py), made on first use
         # packages with native libraries or data files loaded at run time
         "--collect-all", "faster_whisper", "--collect-all", "ctranslate2", "--collect-all", "sherpa_onnx",
         "--collect-all", "transcribe_cpp", "--collect-all", "transcribe_cpp_native", "--collect-all", "av",
