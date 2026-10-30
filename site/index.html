@@ -84,10 +84,12 @@
       <div class="hero-text">
         <h1 id="hero-title">{{hero.h1}}</h1>
         <p class="lead">{{hero.lead}}</p>
-        <!-- the button is for the reader's own system once site.js has looked; Windows' without it. data-download and
-             data-place say what a download link is for the counts; the hero's platform is the label on show -->
+        <!-- the button is for the reader's own system once site.js has looked, its label and its file (data-href-linux);
+             Windows' without it. Each download link is the latest release's file, or the release's page when build.py
+             has no details of it. data-download and data-place say what a download link is for the counts; the hero's
+             platform is the label on show -->
         <p class="actions">
-          <a class="btn btn-primary btn-large" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest" data-download data-place="hero"><span data-os="windows">{{hero.windows}}</span><span data-os="linux" hidden>{{hero.linux}}</span></a>
+          <a class="btn btn-primary btn-large" href="{{href_windows}}" data-href-linux="{{href_linux}}" data-download data-place="hero"><span data-os="windows">{{hero.windows}}</span><span data-os="linux" hidden>{{hero.linux}}</span></a>
           <a class="others" href="#download"><span data-os="windows">{{hero.others_windows}}</span><span data-os="linux" hidden>{{hero.others_linux}}</span></a>
         </p>
       </div>
@@ -285,6 +287,10 @@
     </div>
   </section>
 
+  <!-- the project's public numbers, made by build.py from the stats branch's files and docs/usage.json, and left out
+       when there are none to show -->
+{{numbers}}
+
   <section class="sec get" id="download" aria-labelledby="get">
     <div class="wrap sec-grid">
       <div class="claim">
@@ -293,12 +299,14 @@
         <div class="way">
           <h3>{{get.windows}}</h3>
           <p>{{get.windows_text}}</p>
-          <a class="btn btn-primary" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest" data-download="windows" data-place="get">{{hero.windows}}</a>
+          <a class="btn btn-primary" href="{{href_windows}}" data-download="windows" data-place="get">{{hero.windows}}</a>
+          {{file_windows}}
         </div>
         <div class="way">
           <h3>{{get.linux}}</h3>
           <p>{{get.linux_text}}</p>
-          <a class="btn" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest" data-download="linux" data-place="get">{{hero.linux}}</a>
+          <a class="btn" href="{{href_linux}}" data-download="linux" data-place="get">{{hero.linux}}</a>
+          {{file_linux}}
         </div>
       </div>
       <div class="proof">

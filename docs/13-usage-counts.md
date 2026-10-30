@@ -193,13 +193,21 @@ files (a late event is in the newer one), and `tools/usage_totals.py` turns them
 It adds them to `docs/usage.json`, and writes the newest month into the README and every month into the table
 below.
 
+The website counts its own page views and download clicks, in an Aptabase app of its own ([privacy](privacy.md#the-website)).
+The same monthly step takes that app's export too (`--website`) and adds the website's totals to `docs/usage.json`
+under `website`: the page views, the visitors (each of Aptabase's daily hashes once a day, added up), the countries,
+the pages by language, the phones, tablets and desktops, the sites that linked to it (`none` for no link) and the
+download clicks by platform. The website shows the newest month of both, beside GitHub's downloads, stars and page
+views, in its section of numbers; before the first month, it says when the first totals come.
+
 Only totals are published. A country is listed only when at least three installs were active there that month, and
 so is a region, a system, a version of a system or of Sedjem, and a locale; the others are added up as `other`, so
-that no one install can be picked out. Since anyone can send events with the app key, which is public, a weekly
-summary with numbers Sedjem never sends is left out, and a value Sedjem never sends counts as `unknown` (as does a
-value missing from an event of an older version). The exports themselves, which have every event with its daily
-user hash and session number, are deleted afterwards and never go into the repository. The script's own
-description has the steps.
+that no one install can be picked out. On the website's side a country or a linking site is listed only when at
+least three visitors came from it that month, and at most ten sites are. Since anyone can send events with the app
+key, which is public, a weekly summary with numbers Sedjem never sends is left out, and a value Sedjem never sends
+counts as `unknown` (as does a value missing from an event of an older version); a website event that its pages
+never send is left out. The exports themselves, which have every event with its daily user hash and session number,
+are deleted afterwards and never go into the repository. The script's own description has the steps.
 
 <!-- usage-totals:start -->
 No totals yet: the counts start with Sedjem 0.3.0, and the first month's totals will be here once that month has
@@ -215,8 +223,9 @@ been exported.
 | `app/config.toml`, `[usage]` | the app key (`app_key`), and `host` for a self-hosted Aptabase |
 | `settings.json` in the data folder | `usage_counts`: unset until the first-start dialog has said that the counts are on, then `true` or `false` |
 | `usage.json` in the data folder | the day and month counted, how far the assistants' log was counted, the counts of weeks not sent yet, and the events waiting |
-| `tools/usage_totals.py` | the public totals, from Aptabase's monthly exports |
-| `docs/usage.json` | the public totals, month by month |
+| `tools/usage_totals.py` | the public totals, from Aptabase's monthly exports of the app's and the website's events |
+| `docs/usage.json` | the public totals, month by month, the app's and the website's |
+| `site/build.py` | the website's section of numbers, which shows the newest month |
 | `tests/test_usage.py`, `tests/test_ui_usage.py` | the tests: the events and their fields, each counting point, each period once, the switch and the variables, the sending against a stand-in for Aptabase, the totals, and the switch and the notice in the browser |
 
 Scripts can read the switch in `GET /api/status`, whose `usage` field says whether this copy can send counts

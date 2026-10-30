@@ -10,8 +10,9 @@ branches, restores, combines, YouTube courses, downloads and Update now. Nothing
 first-start dialog, with the switch off, without a key, with DO_NOT_TRACK or SEDJEM_NO_USAGE, or while the tests run.
 The sender is tried against a stand-in for Aptabase on 127.0.0.1: accepted, a key Aptabase doesn't take, 400, 408,
 429, 5xx, a timeout, no connection, a redirect, events that waited for days, batches of 25, at most 100 waiting.
-The totals and KPIs are made from made-up exports, with the three-install threshold. The docs must list exactly what
-is sent, and the totals script must know the same lists as the app.
+The totals and KPIs are made from made-up exports, with the three-install threshold, and so are the website's, with
+the three-visitor threshold for countries and sites; the website reads back what the script writes. The docs must list
+exactly what is sent, and the totals script must know the same lists as the app and the website.
 
 Nothing here reaches Aptabase: while unittest is loaded app/usage.py counts and sends nothing, and post() refuses
 any address but 127.0.0.1. The tests that try the sending replace test_run() and point the key at the stand-in.
@@ -1173,6 +1174,34 @@ def export(rows, header=HEADER, quotes=False):
     return out.getvalue()
 
 
+def website():
+    """An export of the Sedjem website app with November 2026's page views, 16 of them by 8 visitors (a visitor is a
+    day's hash): Egypt 6 by 4 (E1 on two days), Saudi Arabia 4 by 2, Germany 5 by 1 and one with no country; linked
+    from linkedin.com by 3 visitors, github.com by 2 and an intranet by 1. Five download clicks, and five events the
+    pages never send; and a page view in October and one in December."""
+    def visit(user, day, page, device, referrer, country, times=1):
+        return [{**row("page_view", country, "", "", f"2026-11-{day} 10:00:00", {"page": page, "device": device, "theme":
+                                                                                 "system", "referrer": referrer},
+                       os_name="Android", os_version="", version="0.3.1"), "user_id": user}] * times
+    def click(platform, place="get", page="en"):
+        return {**row("download", "EG", "", "", "2026-11-05 10:01:00", {"platform": platform, "place": place, "page": page}),
+                "user_id": "E1"}
+    rows = (visit("E1", "05", "en", "phone", "none", "EG", 2) + visit("E1", "05", "ar", "phone", "linkedin.com", "EG")
+            + visit("E2", "05", "ar", "desktop", "linkedin.com", "EG") + visit("E1", "06", "en", "desktop", "linkedin.com", "EG")
+            + visit("E3", "07", "404", "tablet", "none", "EG") + visit("S1", "08", "en", "desktop", "github.com", "SA", 2)
+            + visit("S2", "08", "ar", "phone", "github.com", "SA", 2) + visit("D1", "09", "en", "desktop", "none", "DE", 5)
+            + visit("X1", "10", "en", "phone", "intranet.example.corp", ""))
+    rows += [click("windows", "hero"), click("windows"), click("windows", page="ar"), click("linux"), click("source")]
+    good = visit("E9", "11", "en", "phone", "none", "EG")[0]
+    rows += [{**good, "string_props": json.dumps(props)} for props in (
+        {"page": "fr", "device": "phone", "theme": "system", "referrer": "none"},
+        {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "title": "Board meeting"},
+        {"page": "en", "device": "phone", "theme": "system", "referrer": "Bad Host!"})]
+    rows += [click("mac"), {**good, "event_name": "active_month"}]
+    rows += [{**good, "timestamp": "2026-10-31 23:00:00"}, {**good, "timestamp": "2026-12-01 08:00:00"}]
+    return rows
+
+
 def november():
     """Two exports: November's, and December's so far. November 2026 has 11 active installs: Egypt 4 (Cairo 3, Giza
     1, on Linux), Saudi Arabia 3, the Emirates 2 (one sent late, in December's export), the US 1 (a preview), and
@@ -1342,8 +1371,8 @@ class Totals(unittest.TestCase):
                          ["2026-11", "2026-12", "2026-10"])
         with mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit) as e:
             totals.main([str(p) for p in self.exports()] + ["--exported", "2027-03-01", "--root", str(self.tmp)])
-        self.assertIn("the exports have nothing for 2027-02 (they have 2026-10, 2026-11, 2026-12); choose the month "
-                      "with --month", str(e.exception.code))
+        self.assertIn("the app's exports have nothing for 2027-02 (they have 2026-10, 2026-11, 2026-12); choose the "
+                      "month with --month", str(e.exception.code))
 
     def test_writing_the_totals(self):
         root = self.tmp / "repo"
@@ -1388,6 +1417,86 @@ class Totals(unittest.TestCase):
             text = (ROOT / page).read_text(encoding="utf-8")
             self.assertEqual((text.count(totals.START), text.count(totals.END)), (1, 1), page)
             self.assertLess(text.index(totals.START), text.index(totals.END))
+
+    def test_the_websites_totals(self):
+        site = totals.website_totals(totals.read(self.write(export(website()), "website.csv")), "2026-11", "2026-12-03")
+        self.assertEqual((site["month"], site["exported"], site["page_views"], site["visitors"]), ("2026-11", "2026-12-03", 16, 8))
+        self.assertEqual(site["countries"], {"count": 3, "page_views": {"EG": 6, "other": 10}},
+                         "Saudi Arabia (4 views by 2 visitors), Germany (5 by 1) and no country are folded")
+        self.assertEqual(site["pages"], {"en": 11, "ar": 4, "404": 1})
+        self.assertEqual(site["devices"], {"phone": 6, "tablet": 1, "desktop": 9})
+        self.assertEqual(site["referrers"], {"none": 8, "sites": {"linkedin.com": 3, "other": 5}},
+                         "github.com (4 views by 2 visitors) and the intranet (1) are folded")
+        self.assertEqual(site["downloads"], {"clicks": 5, "platforms": {"windows": 3, "linux": 1, "source": 1}})
+        self.assertEqual(site["skipped"], 5)
+        published = json.dumps(site)
+        for private in ("E1", "S1", "D1", "intranet.example.corp", "github.com", '"SA"', '"DE"', "9F86D081884C7D65"):
+            self.assertNotIn(private, published)
+        # at most ten sites by name, each with three visitors or more; the rest are "other"
+        rows = [{"visitor": (f"2026-11-0{i % 3 + 1}", f"u{site_}"), "site": f"site{site_:02}.example"}
+                for site_ in range(12) for i in range(3 + site_)]
+        folded = totals.fold_visitors(rows, lambda r: r["site"], most=totals.SITES)
+        self.assertEqual(list(folded), [f"site{n:02}.example" for n in range(11, 1, -1)] + ["other"])
+        self.assertEqual(folded["other"], 3 + 4)
+        # without a user column, every page view counts as a visitor of its own
+        rows = totals.read(self.write(export(website(), header=[h for h in HEADER if h != "user_id"]), "plain.csv"))
+        self.assertEqual(totals.website_totals(rows, "2026-11", "x")["visitors"], 16)
+
+    def test_writing_the_websites_totals(self):
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
+        with mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
+        self.assertIn("The website in November 2026: 16 page views by 8 visitors, 3 countries, 5 download clicks; 5 "
+                      "events left out", out.getvalue())
+        data = json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))
+        self.assertEqual((list(data["months"]), list(data["website"])), (["2026-11"], ["2026-11"]))
+        readme = (root / "README.md").read_text(encoding="utf-8")
+        # the website alone, for another month: the app's months and the README stay as they were
+        with mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main(["--website", site, "--month", "2026-10", "--exported", "2026-12-03", "--root", str(root)])
+        self.assertNotIn("README.md", out.getvalue())
+        data = json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))
+        self.assertEqual((list(data["months"]), list(data["website"])), (["2026-11"], ["2026-10", "2026-11"]))
+        self.assertEqual(data["website"]["2026-10"]["page_views"], 1)
+        self.assertEqual((root / "README.md").read_text(encoding="utf-8"), readme)
+        for args, words in (([], "give the app's exports, the website's (--website), or both"),
+                            (["--website", site, "--month", "2026-09"], "the website's exports have nothing for 2026-09")):
+            with self.subTest(words), mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit) as e:
+                totals.main([*args, "--root", str(root)])
+            self.assertIn(words, str(e.exception.code))
+
+    def test_the_website_reads_what_the_script_writes(self):
+        """The page's section of numbers (site/build.py monthly) reads back the newest month docs/usage.json has, with
+        the website's totals for the same month."""
+        spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        rows = totals.read(self.exports())
+        t = totals.totals(rows, "2026-11", "2026-12-03")
+        site = totals.website_totals(totals.read(self.write(export(website()), "website.csv")), "2026-11", "2026-12-03")
+        totals.write(root, totals.totals(rows, "2026-10", "2026-12-03"))
+        totals.write(root, t, site)
+        self.assertEqual(build.monthly(root / "docs" / "usage.json"),
+                         {"app": {"month": "2026-11", "installs": 11, "countries": 4,
+                                  "top": [("EG", 4), ("SA", 3), ("other", 4)], "transcriptions": 17, "hours": 7.8,
+                                  "model": "cohere"},
+                          "website": {"page_views": 16, "countries": 3, "clicks": 5}})
+        self.assertEqual(build.ENGINES, totals.ENGINES)
+
+    def test_the_script_knows_what_the_website_sends(self):
+        js = (ROOT / "site" / "counts.js").read_text(encoding="utf-8")
+        events = json.loads(re.search(r"var EVENTS = (\{.*?\});", js, re.S).group(1))
+        self.assertEqual({name: {k: tuple(v) if v else None for k, v in props.items()} for name, props in events.items()},
+                         totals.WEBSITE)
+        self.assertEqual(re.search(r"var HOST = /\^(.*?)\$/;", js).group(1), totals.HOST.pattern)
 
     def test_the_script_knows_what_the_app_sends(self):
         self.assertEqual(totals.SUMMARY, usage.SUMMARY)

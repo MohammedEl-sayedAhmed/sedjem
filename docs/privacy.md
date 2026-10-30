@@ -112,6 +112,9 @@ Nothing is counted when the browser has Do Not Track or Global Privacy Control t
 requests to Aptabase. A copy of the pages anywhere but the published address, a local preview or a page opened from
 the disk sends nothing either.
 
+Their totals are published once a month, as the app's are ([usage counts](13-usage-counts.md#public-totals)): a
+country or a site that linked to the website is named only when at least three visitors came from it that month.
+
 ## Assistants
 
 An assistant connected over MCP, such as Claude Desktop, Cursor or VS Code, reads the transcripts that
