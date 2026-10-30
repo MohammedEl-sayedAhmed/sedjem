@@ -2,7 +2,10 @@
 Nothing is read from or written to your own data: the server runs on a temporary folder.
 Run from the repository root with the project's Python (it needs the app's packages and Playwright with Chrome):
     python -P docs/images/make/screenshots.py [shot names...]
-The shots are saved at twice the size in docs/images/make/out/; shrink.py turns them into the files in docs/images/."""
+The shots are saved at twice the size in docs/images/make/out/; shrink.py turns them into the files in docs/images/.
+The shot named "site" is the website's: one region of the app per claim, light and dark, from a desktop window at
+twice the size and a phone's at three times, saved in out/site/ (python docs/images/make/shrink.py site then makes
+the lossless files in site/captures/)."""
 import json
 import os
 import shutil
@@ -37,6 +40,9 @@ import content  # noqa: E402
 
 HOME = TMP / "home"
 (HOME / "app_data").mkdir(parents=True)
+# The first-start questions are answered: no update checks, and no usage counts from a throwaway copy
+(HOME / "app_data" / "settings.json").write_text(json.dumps({"update_check": False}), encoding="utf-8")
+os.environ["SEDJEM_NO_USAGE"] = "1"
 OUT.mkdir(parents=True, exist_ok=True)
 
 MACHINE = {"manufacturer": "Dell Inc.", "model": "XPS 15 9530", "os": "Ubuntu 24.04.3 LTS (Linux 6.14.0)",
@@ -105,7 +111,7 @@ for m in cfg0.models.values():
             p.parent.mkdir(parents=True, exist_ok=True)
             with open(p, "wb") as fh:
                 fh.truncate(f["size"])
-for f in cfg0.local.get("voiceprint_files", []):
+for f in (f for m in cfg0.local.get("speaker_models", []) if m["id"] == "titanet-small" for f in m.get("files", [])):
     p = HOME / f["path"]
     p.parent.mkdir(parents=True, exist_ok=True)
     with open(p, "wb") as fh:
@@ -157,10 +163,13 @@ def want(name):
 
 errors = []
 with sync_playwright() as pw:
-    browser = pw.chromium.launch(channel="chrome")
+    try:
+        browser = pw.chromium.launch(channel="chrome")
+    except Exception:  # no Chrome installed: Playwright's own Chromium
+        browser = pw.chromium.launch()
 
-    def new_page(dark=False, height=900):
-        ctx = browser.new_context(viewport={"width": 1440, "height": height}, device_scale_factor=2,
+    def new_page(dark=False, height=900, width=1440, scale=2):
+        ctx = browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=scale,
                                   color_scheme="dark" if dark else "light")
         ctx.add_init_script(f"try {{ localStorage.setItem('sedjem-theme', '{'dark' if dark else 'light'}') }} catch (e) {{}}")
         page = ctx.new_page()
@@ -300,6 +309,102 @@ with sync_playwright() as pw:
         page.wait_for_timeout(1200)
         shoot(page, "live-progress")
         page.context.close()
+    if want("site"):
+        # The website's captures: each the region of the app that proves one claim, at the app's own size, which is
+        # the size the page shows it at and never smaller. So each is cut from a window narrow enough for the region
+        # to fit: no wider than WIDE css px from a desktop's window, at twice the pixels, to sit whole in the page's
+        # evidence column, and no wider than NARROW from a phone's, at three times, to sit whole on a 320 px phone.
+        # Saved as they are, in PNG, in out/site/; shrink.py site makes the lossless files in site/captures/.
+        SITE = OUT / "site"
+        SITE.mkdir(parents=True, exist_ok=True)
+        WIDE, NARROW = 656, 280
+        BOX = """([sels, pad]) => { let l = 1e9, t = 1e9, r = -1e9, b = -1e9;
+          for (const s of sels) { const e = document.querySelector(s); if (!e) throw new Error('no ' + s);
+            const x = e.getBoundingClientRect(); l = Math.min(l, x.left); t = Math.min(t, x.top); r = Math.max(r, x.right); b = Math.max(b, x.bottom); }
+          return {x: Math.max(0, l - pad), y: Math.max(0, t - pad), width: r - l + 2 * pad, height: b - t + 2 * pad}; }"""
+
+        def save(page, name, box, wide):
+            limit = WIDE if wide else NARROW
+            if box["width"] > limit:
+                raise SystemExit(f"site {name}: {box['width']:.0f} px wide, more than {limit}")
+            page.evaluate(HIDE_PATHS)
+            page.evaluate("() => document.querySelectorAll('.toast').forEach(t => t.remove())")
+            page.wait_for_timeout(300)
+            page.screenshot(path=str(SITE / f"{name}.png"), clip=box)
+            print("site", name, round(box["width"]), "x", round(box["height"]))
+
+        def cut(page, name, sels, wide, pad=8, show=None):
+            page.evaluate("(s) => document.querySelector(s).scrollIntoView({block: 'center'})", show or sels[0])
+            page.wait_for_timeout(300)
+            save(page, name, page.evaluate(BOX, [sels, pad]), wide)
+
+        def speakers(page, name, wide):
+            transcript(page)
+            if wide:  # the lines and the Speakers panel beside them, from the panel's top to its foot
+                box = page.evaluate("""() => { const t = document.querySelector('.tools').getBoundingClientRect(),
+                    p = document.querySelector('.side-col .panel').getBoundingClientRect();
+                  return {x: t.left - 8, y: p.top - 8, width: p.right - t.left + 16, height: p.height + 16}; }""")
+                save(page, name, box, wide)
+            else:  # inside the panel's own edge, so the page's frame is the picture's one border
+                cut(page, name, [".side-col .panel"], wide, pad=-4)
+
+        def reading(page, name, wide):
+            transcript(page)
+            page.evaluate("() => document.querySelector('#transcript .line[data-i=\"1\"]').classList.add('current')")
+            # the search and three lines, the second being heard; on a phone the three lines
+            cut(page, name, ([".tools"] if wide else []) + [f"#transcript .line[data-i='{i}']" for i in range(3)], wide,
+                pad=8 if wide else 6, show=".tools" if wide else "#transcript .line[data-i='1']")
+
+        def review(page, name, wide):
+            transcript(page)
+            page.click("#editBtn")
+            page.wait_for_timeout(300)
+            page.locator("#transcript .line[data-i='12'] .text").click()
+            page.keyboard.press("ControlOrMeta+A")
+            page.keyboard.type("أنا شايف إنه eight story points، فيه API جديدة كمان")
+            page.locator("#transcript .line[data-i='3'] .text").click()
+            page.wait_for_timeout(300)
+            page.click("#editBtn")
+            page.wait_for_selector("#review[open] .diff")
+            page.wait_for_timeout(400)
+            cut(page, name, ["#review .diff"], wide, pad=-1)
+
+        def comparing(page, name, wide):
+            go(page, f"#/compare/{A},{B}")
+            page.wait_for_selector("#cmpGrid .cmp-row")
+            page.check("#cmpOnlyDiff")
+            page.wait_for_timeout(300)
+            page.click("#cmpGrid [data-keep='12:1']")
+            page.evaluate("() => { document.querySelector('[data-keep=\"12:1\"]').closest('.cmp-row').id = 'shotRow'; }")
+            cut(page, name, ["#shotRow"], wide, pad=0)
+
+        def local(page, name, wide):
+            # Settings, Models: the models on the computer with their sizes and states, and on a desktop the speaker
+            # model in use under them, as the app shows them
+            go(page, "#/new")
+            page.click("#settingsBtn")
+            page.wait_for_selector("#settings[open] .set-panel")
+            page.click("#settings [data-set-tab='models']")
+            page.wait_for_selector("#settings .spk-chosen")
+            page.wait_for_timeout(500)
+            if wide:  # down to the end of the speaker model's row
+                box = page.evaluate(BOX, [["#settings .set-panel h3", "#settings .set-items", "#settings .spk-chosen"], 12])
+                box["height"] = page.evaluate("() => document.querySelector('#settings .spk-chosen').getBoundingClientRect().bottom") + 1 - box["y"]
+                save(page, name, box, wide)
+            else:  # the first three models
+                cut(page, name, ["#settings .set-panel h3", "#settings .set-items .set-item:nth-child(3)"], wide, pad=4)
+
+        # (name, how, desktop window width, phone window width): each window is as narrow as the app allows for
+        # the region to fit, so the region keeps the app's own size
+        for shot, take, width, phone in (("speakers", speakers, 1000, 312), ("reading", reading, 1270, 312),
+                                         ("review", review, 734, 358), ("compare", comparing, 690, 312),
+                                         ("local", local, 940, 340)):
+            for dark in (False, True):
+                for wide in (True, False):
+                    page = new_page(dark=dark, height=1000 if shot == "local" else 900, width=width if wide else phone,
+                                    scale=2 if wide else 3)
+                    take(page, f"{shot}-{'wide' if wide else 'narrow'}-{'dark' if dark else 'light'}", wide)
+                    page.context.close()
     browser.close()
 
 print("errors:", errors)

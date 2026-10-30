@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Page not found: Sedjem</title>
+  <meta name="robots" content="noindex">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1216" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="{{base}}icon.svg" type="image/svg+xml">
+  <!-- GitHub Pages serves this page for a missing address at any depth, so it carries its own styles and the logo
+       tile, and only its fonts and tab icon come from the site's path; where they can't be found it still reads the
+       same. One page in both languages: English from the left edge, Arabic from the right. It has no theme button,
+       but takes the theme picked on the other pages (site.js keeps it under the same key). -->
+  <script>
+    try { var theme = localStorage.getItem("sedjem-site-theme"); if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-theme", theme); } catch (e) {}
+  </script>
+  <style>
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("{{base}}fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("{{base}}fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
+    @font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; font-display: swap; src: url("{{base}}fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
+    @font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; font-display: swap; src: url("{{base}}fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2") format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
+    :root { color-scheme: light dark; --bg: #f4f5f7; --text: #18202b; --muted: #5f6b7a; --accent: #0e7c7b; --accent-strong: #0a6362; }
+    @media (prefers-color-scheme: dark) {
+      :root:not([data-theme="light"]) { color-scheme: dark; --bg: #0f1216; --text: #e6eaf0; --muted: #9aa5b3; --accent: #2bb3b0; --accent-strong: #3cc9c6; }
+    }
+    :root[data-theme="dark"] { color-scheme: dark; --bg: #0f1216; --text: #e6eaf0; --muted: #9aa5b3; --accent: #2bb3b0; --accent-strong: #3cc9c6; }
+    :root[data-theme="light"] { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 400 16px/1.6 "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif; }
+    main { width: min(100% - 32px, 1200px); margin: 0 auto; padding: 64px 0 128px; }
+    .mark { display: block; width: 48px; height: 48px; margin: 0 0 48px; }
+    .both { display: grid; grid-template-columns: minmax(0, 1fr); gap: 48px 24px; }
+    h1, h2 { margin: 0; font-weight: 600; text-wrap: balance; }
+    h1 { font-size: 40px; line-height: 1.15; letter-spacing: -0.015em; }
+    h2 { font-size: 44px; line-height: 1.3; }
+    p { max-width: 36em; margin: 16px 0 0; text-wrap: pretty; }
+    [lang="ar"] { font-family: "IBM Plex Sans Arabic", "IBM Plex Sans", "Segoe UI", "Noto Sans Arabic", system-ui, sans-serif; font-size: 19px; line-height: 1.8; }
+    a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 0.22em; }
+    a:hover { color: var(--accent-strong); text-decoration-thickness: 2px; }
+    a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+    @media (min-width: 900px) {
+      main { width: min(100% - 96px, 1200px); padding-top: 96px; }
+      .both { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: baseline; }
+    }
+  </style>
+</head>
+<body>
+<main>
+  {{icon}}
+  <div class="both">
+    <div>
+      <h1>This page isn’t here.</h1>
+      <p>The address may be old or mistyped. <a href="{{base}}">Sedjem’s home page</a> has the downloads and the links to the documentation.</p>
+    </div>
+    <div lang="ar" dir="rtl">
+      <h2>الصفحة دي مش موجودة.</h2>
+      <p>ممكن العنوان يكون قديم أو فيه غلطة. <a href="{{base}}ar/">الصفحة الرئيسية</a> فيها التحميل ولينكات التوثيق.</p>
+    </div>
+  </div>
+</main>
+</body>
+</html>

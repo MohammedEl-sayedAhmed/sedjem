@@ -1,0 +1,336 @@
+<!doctype html>
+<!-- The one template of both pages: build.py fills it in from copy/en.toml for / and copy/ar.toml for /ar/. -->
+<html lang="{{page.lang}}" dir="{{page.dir}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{page.title}}</title>
+  <meta name="description" content="{{page.description}}">
+  <link rel="canonical" href="{{url}}">
+  <link rel="alternate" hreflang="en" href="{{url_en}}">
+  <link rel="alternate" hreflang="ar" href="{{url_ar}}">
+  <link rel="alternate" hreflang="x-default" href="{{url_en}}">
+  <meta name="color-scheme" content="light dark">
+  <meta name="theme-color" content="#f4f5f7" media="(prefers-color-scheme: light)" data-scheme="light">
+  <meta name="theme-color" content="#0f1216" media="(prefers-color-scheme: dark)" data-scheme="dark">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Sedjem">
+  <meta property="og:url" content="{{url}}">
+  <meta property="og:locale" content="{{page.locale}}">
+  <meta property="og:locale:alternate" content="{{other_locale}}">
+  <meta property="og:title" content="{{page.title}}">
+  <meta property="og:description" content="{{page.description}}">
+  <meta property="og:image" content="{{url_en}}images/social-preview.png">
+  <meta property="og:image:width" content="1280">
+  <meta property="og:image:height" content="640">
+  <meta property="og:image:alt" content="{{page.social_alt}}">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{page.title}}">
+  <meta name="twitter:description" content="{{page.description}}">
+  <meta name="twitter:image" content="{{url_en}}images/social-preview.png">
+  <meta name="twitter:image:alt" content="{{page.social_alt}}">
+  <link rel="icon" href="{{root}}icon.svg" type="image/svg+xml">
+  <link rel="icon" href="{{root}}icon-192.png" type="image/png" sizes="192x192">
+  <link rel="apple-touch-icon" href="{{root}}icon-192.png">
+{{preloads}}
+  <link rel="stylesheet" href="{{root}}styles.css">
+  <!-- Not deferred on purpose: before the page is first drawn it puts on the theme the reader picked, so the other
+       one never shows first, and marks the page for the transcript's arrival, so no line is shown and then hidden.
+       Without it the page follows the system's theme, every line is simply there, and the download is Windows'. -->
+  <script src="{{root}}site.js"></script>
+</head>
+<body id="top">
+<a class="skip" href="#main">{{page.skip}}</a>
+
+<header class="site-header wrap">
+  <a class="brand" href="#top">
+    <img class="view-light" src="{{root}}brand/sedjem-logo-colour.svg" alt="Sedjem" width="121" height="28">
+    <img class="view-dark" src="{{root}}brand/sedjem-logo-colour-dark.svg" alt="Sedjem" width="121" height="28">
+  </a>
+  <nav class="nav-wide">
+    <ul class="nav">
+      <li><a href="#download">{{nav.download}}</a></li>
+      <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/main/docs#readme">{{nav.docs}}</a></li>
+      <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem">{{nav.github}}</a></li>
+      <li><a class="other-lang" href="{{other_href}}" lang="{{other_lang}}" hreflang="{{other_lang}}"><span dir="{{other_dir}}">{{page.other}}</span></a></li>
+    </ul>
+  </nav>
+{{theme_wide}}
+  <!-- on a phone: the download, and the rest behind a disclosure that opens without JavaScript -->
+  <a class="btn btn-primary get-short" href="#download">{{nav.download}}</a>
+  <details class="menu">
+    <summary><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg><span class="sr-only">{{nav.menu}}</span></summary>
+    <div class="menu-panel">
+      <nav>
+        <ul>
+          <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/main/docs#readme">{{nav.docs}}</a></li>
+          <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem">{{nav.github}}</a></li>
+          <li><a class="other-lang" href="{{other_href}}" lang="{{other_lang}}" hreflang="{{other_lang}}"><span dir="{{other_dir}}">{{page.other}}</span></a></li>
+        </ul>
+      </nav>
+{{theme_menu}}
+    </div>
+  </details>
+</header>
+
+<main id="main">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-text">
+        <h1 id="hero-title">{{hero.h1}}</h1>
+        <p class="lead">{{hero.lead}}</p>
+        <!-- the button is for the reader's own system once site.js has looked; Windows' without it -->
+        <p class="actions">
+          <a class="btn btn-primary btn-large" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest"><span data-os="windows">{{hero.windows}}</span><span data-os="linux" hidden>{{hero.linux}}</span></a>
+          <a class="others" href="#download"><span data-os="windows">{{hero.others_windows}}</span><span data-os="linux" hidden>{{hero.others_linux}}</span></a>
+        </p>
+      </div>
+{{ear}}
+      <figure class="hero-figure">
+        <div class="frame">
+          <ol class="log" data-reveal translate="no" dir="rtl">
+{{transcript}}
+          </ol>
+          <pre class="srt" dir="ltr" translate="no"><span class="srt-name" lang="en">sprint-planning.srt</span>
+{{srt}}</pre>
+        </div>
+        <figcaption>{{hero.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="english">
+    <div class="wrap sec-grid">
+      <div class="claim">
+        <h2 id="english">{{english.h2}}</h2>
+        <p class="lede">{{english.lede}}</p>
+      </div>
+      <figure class="proof registers">
+        <dl>
+          <div class="register register-off">
+            <dt>{{english.models}}</dt>
+            <dd lang="ar" dir="rtl" translate="no"><span>صباح الخير يا جماعة، خلونا نبدأ <mark>السبرينت بلانينج</mark></span> <span>بسرعة عشان عندنا <mark>ديمو</mark> الساعة اتنين</span></dd>
+          </div>
+          <div class="register">
+            <dt>{{english.sedjem}}</dt>
+            <dd lang="ar" dir="rtl" translate="no"><span>صباح الخير يا جماعة، خلونا نبدأ ال <mark lang="en">sprint planning</mark></span> <span>بسرعة عشان عندنا <mark lang="en">demo</mark> الساعة اتنين</span></dd>
+          </div>
+        </dl>
+        <figcaption>{{english.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="measured">
+    <div class="wrap sec-grid">
+      <div class="claim">
+        <h2 id="measured">{{measured.h2}}</h2>
+        <p class="lede">{{measured.lede}}</p>
+        <p>{{measured.body}}</p>
+        <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/03-results.md">{{measured.method}}</a></p>
+      </div>
+      <div class="proof">
+        <table class="results">
+          <caption>{{measured.caption}}</caption>
+          <thead>
+            <tr>
+              <th scope="col">{{measured.model}}</th>
+              <th scope="col" class="num"><abbr title="{{measured.wer_alt}}">{{measured.wer}}</abbr><span class="hint">{{measured.lower}}</span></th>
+              <th scope="col" class="num kept">{{measured.kept}}<span class="hint">{{measured.higher}}</span></th>
+              <th scope="col" class="time">{{measured.hour}}<span class="hint">{{measured.laptop}}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <th scope="row"><span class="model">{{measured.cohere}}</span></th>
+              <td class="num"><span class="label" aria-hidden="true">{{measured.wer}}</span><span class="fig" dir="ltr">13.4%</span></td>
+              <td class="num kept"><span class="label" aria-hidden="true">{{measured.kept}}</span><span class="bar" style="--v: 77" aria-hidden="true"></span><span class="fig" dir="ltr">77%</span></td>
+              <td class="time"><span class="label" aria-hidden="true">{{measured.hour}}</span><span>{{measured.cohere_hour}}</span></td>
+            </tr>
+            <tr>
+              <th scope="row"><span class="model">{{measured.medium}}</span>&nbsp;<span class="pill">{{measured.default}}</span></th>
+              <td class="num"><span class="label" aria-hidden="true">{{measured.wer}}</span><span class="fig" dir="ltr">18.5%</span></td>
+              <td class="num kept"><span class="label" aria-hidden="true">{{measured.kept}}</span><span class="bar" style="--v: 90" aria-hidden="true"></span><span class="fig" dir="ltr">90%</span></td>
+              <td class="time"><span class="label" aria-hidden="true">{{measured.hour}}</span><span>{{measured.medium_hour}}</span></td>
+            </tr>
+            <tr>
+              <th scope="row"><span class="model">{{measured.large}}</span> <span class="note">{{measured.large_note}}</span></th>
+              <td class="num"><span class="label" aria-hidden="true">{{measured.wer}}</span><span class="fig" dir="ltr">20.8%</span></td>
+              <td class="num kept"><span class="label" aria-hidden="true">{{measured.kept}}</span><span class="bar" style="--v: 88" aria-hidden="true"></span><span class="fig" dir="ltr">88%</span></td>
+              <td class="time"><span class="label" aria-hidden="true">{{measured.hour}}</span><span>{{measured.large_hour}}</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="voices">
+    <div class="wrap sec-grid sec-shot">
+      <div class="claim">
+        <h2 id="voices">{{voices.h2}}</h2>
+        <p class="lede">{{voices.lede}}</p>
+        <p>{{voices.body}}</p>
+        <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/04-speaker-labels.md">{{voices.docs}}</a></p>
+      </div>
+      <figure class="proof shot">
+        <div class="frame">
+{{shot_speakers}}
+        </div>
+        <figcaption>{{voices.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="local">
+    <div class="wrap sec-grid sec-shot">
+      <div class="claim">
+        <h2 id="local">{{local.h2}}</h2>
+        <p class="lede">{{local.lede}}</p>
+        <p>{{local.counts}}</p>
+        <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md">{{local.docs}}</a></p>
+      </div>
+      <figure class="proof shot">
+        <div class="frame">
+{{shot_local}}
+        </div>
+        <figcaption>{{local.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="reading">
+    <div class="wrap sec-grid sec-shot">
+      <div class="claim">
+        <h2 id="reading">{{reading.h2}}</h2>
+        <p class="lede">{{reading.lede}}</p>
+      </div>
+      <figure class="proof shot">
+        <div class="frame">
+{{shot_reading}}
+        </div>
+        <figcaption>{{reading.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="fixing">
+    <div class="wrap sec-grid sec-shot">
+      <div class="claim">
+        <h2 id="fixing">{{fixing.h2}}</h2>
+        <p class="lede">{{fixing.lede}}</p>
+      </div>
+      <figure class="proof shot">
+        <div class="frame">
+{{shot_review}}
+        </div>
+        <figcaption>{{fixing.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="comparing">
+    <div class="wrap sec-grid sec-shot">
+      <div class="claim">
+        <h2 id="comparing">{{comparing.h2}}</h2>
+        <p class="lede">{{comparing.lede}}</p>
+        <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/09-app.md">{{comparing.docs}}</a></p>
+      </div>
+      <figure class="proof shot">
+        <div class="frame">
+{{shot_compare}}
+        </div>
+        <figcaption>{{comparing.caption}}</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="sec" aria-labelledby="facts">
+    <div class="wrap sec-grid">
+      <div class="claim">
+        <h2 id="facts">{{facts.h2}}</h2>
+        <p class="lede">{{facts.lede}}</p>
+      </div>
+      <!-- a short spec sheet: what Sedjem needs on your computer beside what it does with your recordings -->
+      <div class="proof">
+        <div class="spec">
+          <div>
+            <h3>{{facts.computer}}</h3>
+            <dl>
+              <div><dt>{{facts.platforms}}</dt><dd>{{facts.platforms_value}}</dd></div>
+              <div><dt>{{facts.gpu}}</dt><dd>{{facts.gpu_value}}</dd></div>
+              <div><dt>{{facts.download}}</dt><dd>{{facts.download_value}}</dd></div>
+            </dl>
+          </div>
+          <div>
+            <h3>{{facts.recordings}}</h3>
+            <dl>
+              <div><dt>{{facts.languages}}</dt><dd>{{facts.languages_value}}</dd></div>
+              <div><dt>{{facts.opens}}</dt><dd>{{facts.opens_value}}</dd></div>
+              <div><dt>{{facts.exports}}</dt><dd>{{facts.exports_value}}</dd></div>
+              <div><dt>{{facts.assistants}}</dt><dd>{{facts.assistants_value}}</dd></div>
+            </dl>
+          </div>
+          <dl class="spec-foot">
+            <div><dt>{{facts.licence}}</dt><dd>{{facts.licence_value}}</dd></div>
+          </dl>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="sec get" id="download" aria-labelledby="get">
+    <div class="wrap sec-grid">
+      <div class="claim">
+        <h2 id="get">{{get.h2}}</h2>
+        <p class="fine">{{get.fine}}</p>
+        <div class="way">
+          <h3>{{get.windows}}</h3>
+          <p>{{get.windows_text}}</p>
+          <a class="btn btn-primary" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest">{{hero.windows}}</a>
+        </div>
+        <div class="way">
+          <h3>{{get.linux}}</h3>
+          <p>{{get.linux_text}}</p>
+          <a class="btn" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest">{{hero.linux}}</a>
+        </div>
+      </div>
+      <div class="proof">
+        <div class="way">
+          <h3>{{get.source}}</h3>
+          <p>{{get.source_text}}</p>
+          <div class="code-box"><pre class="code" dir="ltr" lang="en" translate="no" tabindex="0" aria-label="{{get.code_alt}}"><code>git clone https://github.com/MohammedEl-sayedAhmed/sedjem.git
+cd sedjem
+uv venv .venv --python 3.12
+uv pip install --python .venv -r requirements.txt
+./app.sh</code></pre></div>
+          <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem#readme">{{get.source_link}}</a></p>
+        </div>
+        <div class="way">
+          <h3>{{get.start}}</h3>
+          <p>{{get.start_text}}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="wrap sec-grid foot">
+    <p class="claim name-note">{{footer.ear}}</p>
+    <div class="proof foot-meta">
+      <ul class="foot-links">
+        <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/tree/main/docs#readme">{{footer.docs}}</a></li>
+        <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases">{{footer.releases}}</a></li>
+        <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/brand/README.md">{{footer.brand}}</a></li>
+        <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/LICENSE">{{footer.licence}}</a></li>
+        <li><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md">{{footer.privacy}}</a></li>
+      </ul>
+      <!-- the attribution the licence's NOTICE requires, with its link, in Latin on both pages -->
+      <p><a href="https://github.com/MohammedEl-sayedAhmed/sedjem"><span lang="en" dir="ltr" translate="no">Sedjem by Mohammed El-sayed Ahmed</span></a>. {{footer.free}} <a class="keep" href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/LICENSE"><span lang="en" dir="ltr" translate="no">GNU AGPL-3.0</span></a>.</p>
+      <p>{{footer.made_up}}</p>
+    </div>
+  </div>
+</footer>
+</body>
+</html>

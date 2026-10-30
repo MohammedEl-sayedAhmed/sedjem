@@ -1,0 +1,64 @@
+# The website on GitHub Pages, https://mohammedel-sayedahmed.github.io/sedjem/: site/build.py builds it from site/
+# with the made-up meeting, its captures of the app, the logo and the fonts from the rest of the repository, the site's
+# tests check the result, and it is published. Runs for a push to main that changes anything the build reads, and by
+# hand (Actions → Pages → Run workflow, or `gh workflow run pages.yml`). Pages must be turned on in the repository's
+# settings with GitHub Actions as its source. To build and look at it locally, see site/build.py's docstring.
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "docs/images/make/content.py"
+      - "docs/images/social-preview.png"
+      - "docs/brand/sedjem-*.svg"
+      - "docs/video/fonts/*"
+      - "app/__init__.py"
+      - "app/static/icon*"
+      - "tests/test_site.py"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# one publication at a time, and one that has started is allowed to finish
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build
+        run: python site/build.py _site
+
+      - name: Check (offline, standard library only)
+        run: python -m unittest tests.test_site -v
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v5

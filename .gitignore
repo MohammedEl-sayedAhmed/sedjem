@@ -53,6 +53,8 @@ docs/video/renders/
 docs/video/.hyperframes/
 # the README screenshots at twice the size, before docs/images/make/shrink.py
 docs/images/make/out/
+# the website, as site/build.py writes it (GitHub Pages builds its own copy)
+_site/
 
 # Large or machine-specific (see docs/08-disk-and-cleanup.md to recreate)
 models/

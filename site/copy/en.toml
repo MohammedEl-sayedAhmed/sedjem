@@ -1,0 +1,150 @@
+# The words of the English page, https://mohammedel-sayedahmed.github.io/sedjem/. ar.toml has the same keys for
+# the Arabic page, which tests/test_site.py checks; build.py puts both into index.html.
+#
+# Values are HTML: product names sit in <span translate="no">, a <span class="keep"> never breaks across lines, and
+# &nbsp; keeps a number with its unit. The [page] table and the keys ending in _alt are plain text for attributes.
+# {{version}} is filled in from app/__init__.py. Each section is a claim, a lede of a sentence or two, at most a
+# short paragraph more, and a link to the docs for the rest.
+
+[page]
+lang = "en"
+dir = "ltr"
+locale = "en_US"
+title = "Sedjem: Egyptian Arabic–English meetings, transcribed on your own computer"
+description = "Sedjem turns Egyptian Arabic–English meetings and calls into transcripts on your own computer. The English words stay in English, and each speaker is told apart by voice."
+social_alt = "The Sedjem logo, the line “Transcripts of Egyptian Arabic–English meetings, made on your own computer” and a sprint planning transcript in the app"
+skip = "Skip to the content"
+other = "العربية"  # the link to the other page, in its own language
+
+[nav]
+download = "Download"
+docs = "Docs"
+github = "GitHub"
+menu = "Menu"
+
+# the theme button's name, for the theme in force
+[theme]
+system = "Theme: follows the system"
+light = "Theme: light"
+dark = "Theme: dark"
+
+[hero]
+h1 = "Meetings don’t speak one language."
+lead = '<span translate="no">Sedjem</span> turns Egyptian Arabic–English meetings and calls into transcripts on your own computer. The English words stay in English, and each speaker is told apart by voice.'
+windows = "Download for Windows"
+linux = "Download for Linux"
+others_windows = "Linux, and the source"  # beside the Windows button
+others_linux = "Windows, and the source"  # beside the Linux button
+caption = 'A made-up sprint planning as <span translate="no">Sedjem</span> writes it<span class="with-srt">, and its first lines exported as subtitles</span>.'
+
+[english]
+h2 = "English words stay English"
+lede = 'Egyptian teams talk in Arabic sentences full of English words. Many speech models write those words in Arabic letters; the ones <span translate="no">Sedjem</span> runs keep them in Latin script.'
+models = "As some models write it"
+sedjem = 'As <span translate="no">Sedjem</span> writes it'
+caption = "One line, written both ways."
+
+[measured]
+h2 = "Checked on a public test set"
+lede = 'On 40 public Egyptian Arabic–English clips, several models kept only <span class="keep">8–25%</span> of the English terms in Latin script. The ones <span translate="no">Sedjem</span> runs kept&nbsp;<span class="keep">77–90%</span>.'
+body = "Real meetings are harder than any test set, so treat a local transcript as a draft. For minutes that people will rely on, a hosted service is still more accurate."
+method = "The method and every number"
+caption = 'Measured on Perle, a public set of 40 Egyptian Arabic–English clips, on the project’s test laptop: an Intel Core <span class="keep">i5-1245U</span> with no NVIDIA graphics card.'
+model = "Model"
+wer = "WER"
+wer_alt = "word error rate"
+kept = "English kept"
+hour = "1&nbsp;h takes"
+lower = "lower is&nbsp;better"
+higher = "higher is&nbsp;better"
+laptop = "on the test&nbsp;laptop"
+default = "default"
+cohere = '<span translate="no">Cohere Transcribe Arabic</span>'
+medium = '<span translate="no">whisper-medium</span> <span translate="no">code-switching</span>'
+large = '<span translate="no">Whisper large-v3</span>'
+large_note = "with an Egyptian style hint"
+cohere_hour = "about 20&nbsp;min"
+medium_hour = "30–45&nbsp;min"
+large_hour = "about 2&nbsp;h"
+
+[voices]
+h2 = "Every voice gets its own name"
+lede = "A voiceprint model tells the speakers apart and labels their lines; you name each one once."
+body = 'In the project’s tests on meetings of two or three people, <span class="keep">8–9%</span> of the words went to the wrong person, against 6% for <span translate="no">ElevenLabs</span>’ own labels.'
+docs = "How the speaker labels work"
+caption = "The app’s Speakers panel, with each voice’s share of the talking."
+panel_alt = "The app’s Speakers panel for the made-up sprint planning: {{shares}} of the talking, each name with a Merge into button"
+
+[local]
+h2 = "Your recording stays on your computer"
+lede = "The models run on your own processor or graphics card. There is no account, and a recording is uploaded only if you choose a hosted service and allow it, each time."
+counts = '<span translate="no">Sedjem</span> also sends a few anonymous usage counts, such as its version, your country and how many transcriptions it made, so the project knows where it’s used. Never your recordings, transcripts or file names. You can switch them off in Settings.'
+docs = "Privacy, in full"
+caption = "The models on this computer, as the app’s Settings show them."
+row_alt = "The app’s Settings, Models on this computer: whisper-medium code-switching, taking 778 MB, and Cohere Transcribe Arabic, taking 1.6 GB, both downloaded, and Whisper large-v3 still to download"
+
+[reading]
+h2 = "Click a line to hear it"
+lede = "The transcript follows the recording as it plays. Search it, rename the speakers and correct the text while you listen."
+caption = "The transcript, with the line being heard marked."
+shot_alt = "The transcript in the app: lines of Arabic with English terms, each with its time and speaker, and the line being heard marked"
+
+[fixing]
+h2 = "Every fix is a new version"
+lede = "Edits are shown as a diff before they’re saved, and the model’s own output stays as version&nbsp;0."
+caption = "One edited line, reviewed before it is saved."
+shot_alt = "Review your changes in the app: Omar’s line as it was, in red, and as it is now, in green, with eight story points marked"
+
+[comparing]
+h2 = "Two models, the better line from each"
+lede = 'Run a second model on the same recording. <span translate="no">Sedjem</span> lines the transcripts up, marks the words that differ, and keeps the line you choose.'
+docs = "The app, step by step"
+caption = "One line from two models, with the word that differs marked."
+shot_alt = "Compare transcripts in the app: Omar’s line as Cohere and whisper-medium wrote it, the differing word marked, and whisper-medium’s line kept"
+
+[facts]
+h2 = "Runs on an ordinary laptop"
+lede = 'No graphics card is needed: on the project’s test laptop, <span translate="no">Cohere Transcribe Arabic</span> writes up an hour of audio in about 20&nbsp;minutes.'
+gpu = "Graphics card"
+gpu_value = "Optional, it speeds things up"
+languages = "Languages"
+languages_value = "Egyptian Arabic and English, mixed"
+opens = "Opens"
+opens_value = "Audio and video files, YouTube links and&nbsp;playlists"
+exports = "Exports"
+exports_value = "Plain text, SRT, WebVTT, Markdown and JSON"
+download = "Download"
+download_value = "About 80&nbsp;MB, then a model of 778&nbsp;MB or 1.6&nbsp;GB"
+platforms = "Platforms"
+platforms_value = "Windows&nbsp;10 and&nbsp;11, Linux on&nbsp;x64"
+assistants = "Assistants"
+assistants_value = '<span translate="no">Claude</span>, <span translate="no">Cursor</span> and <span translate="no">VS Code</span>, over&nbsp;MCP'
+licence = "Licence"
+licence_value = "AGPL-3.0, free and open source"
+# the spec sheet's two groups
+computer = "On your computer"
+recordings = "With your recordings"
+
+[get]
+h2 = 'Get <span translate="no">Sedjem</span>'
+fine = 'Free and open source under the <span class="keep">AGPL-3.0</span>. Version&nbsp;{{version}}.'
+windows = "Windows"
+windows_text = "Windows&nbsp;10 and&nbsp;11. The installer is about 80&nbsp;MB and installs for your user, without admin rights. It isn’t signed yet, so Windows SmartScreen warns about an unknown publisher: choose More info, then Run anyway."
+linux = "Linux"
+linux_text = 'Linux on x64. Unpack the archive and run <span translate="no" dir="ltr">Sedjem/Sedjem</span>.'
+source = "From source"
+source_text = "With Python 3.12, Git and uv:"
+code_alt = "The commands that run Sedjem from its source"
+source_link = "Windows and other setups"
+start = "First start"
+start_text = 'In Settings → Models, download <span translate="no">whisper-medium</span> (778&nbsp;MB) or <span translate="no">Cohere Transcribe Arabic</span> (1.6&nbsp;GB). The speaker model, <span translate="no">TitaNet-small</span> (40&nbsp;MB), comes with the first one. A graphics card is optional.'
+
+[footer]
+ear = '<span translate="no">Sedjem</span> is the ancient Egyptian word for “to&nbsp;hear”, written with the sign of an ear.'
+free = "Free software under the"
+docs = "Documentation"
+releases = "Releases"
+brand = "Name and logo"
+licence = "Licence"
+privacy = "Privacy"
+made_up = "The transcripts in the screenshots are made up, and so are the names."
