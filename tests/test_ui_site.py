@@ -7,7 +7,11 @@ app follow the pick and only the ones on show are fetched, and without scripts t
 phone's menu still opens and the download is Windows'. The pictures of the app are never drawn smaller than their
 own size, from a 320 px phone to a desktop; the speakers' names are in their colours, which read on the card in both
 themes; the commands fade at the edge where more of them is to the side, and the subtitles are left out on a phone.
-These were checks by hand; tests/test_site.py has the ones that need no browser.
+The grid of numbers, built from tests/site_support.py's made-up stats and totals and again without any, fits every
+width from a phone's to a desktop's on both pages, its dates never touching and never smaller, and is whole without
+scripts; with them, a chart tells its points on hover and from the keyboard. The downloads are the made-up latest
+release's files, Linux's on a Linux computer. These were checks by hand; tests/test_site.py has the ones that need
+no browser.
 
 The anonymous counts are checked on a second build that counts on 127.0.0.1, with a stand-in key: one page_view for
 each page opened, with the right values, as the one request off this computer; a download for each download link;
@@ -33,6 +37,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import site_support as fixture
 from ui_support import REQUIRED, launch, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -77,14 +82,18 @@ class SiteInBrowserTest(unittest.TestCase):
                 raise RuntimeError("Playwright is not installed: pip install -r requirements-dev.txt")
             raise unittest.SkipTest("Playwright is not installed (pip install -r requirements-dev.txt)")
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.out = build.build(Path(cls.tmp.name) / "site")
+        tmp = Path(cls.tmp.name)  # with every number in the section of numbers
+        cls.out = build.build(tmp / "site", stats=fixture.write_stats(tmp / "stats"), usage=fixture.write_usage(tmp / "usage.json"),
+                              latest=fixture.write_release(tmp / "release"))
         # the same site counting on this computer's address, with a stand-in key
-        cls.counting = build.build(Path(cls.tmp.name) / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
+        cls.counting = build.build(tmp / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
+        # and without numbers: no stats, and no totals yet
+        cls.plain = build.build(tmp / "plain", usage=tmp / "no-usage.json")
         cls.servers = [ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
-                       for out in (cls.out, cls.counting)]
+                       for out in (cls.out, cls.counting, cls.plain)]
         for server in cls.servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
-        cls.base, cls.counting_base = (f"http://127.0.0.1:{server.server_address[1]}" for server in cls.servers)
+        cls.base, cls.counting_base, cls.plain_base = (f"http://127.0.0.1:{server.server_address[1]}" for server in cls.servers)
         cls.playwright = sync_playwright().start()
         try:
             cls.browser = launch(cls.playwright, args=[NO_APTABASE])
@@ -583,6 +592,118 @@ class SiteInBrowserTest(unittest.TestCase):
                 self.counts(page, 0)
                 self.assertEqual(page.outside, [])
                 self.assertEqual(page.errors, [])
+
+    def test_the_grid_fits_from_a_phone_to_a_desktop(self):
+        """The grid of numbers from 320 to 1440 px on both pages, with every number and without any, with and without
+        scripts: nothing in it reaches past its card or the column, nothing overflows its own box, and the page doesn't
+        scroll sideways, and every number is there without scripts. From 1000 px the figure cards stand three to a row,
+        all of a width, and the counts' month across a row of its own; below, one under the other."""
+        boxes = """() => { const sec = document.querySelector('section[aria-labelledby="numbers"]');
+            const column = sec.querySelector('.wrap').getBoundingClientRect();
+            const out = [];
+            sec.querySelectorAll('.card').forEach(card => {
+              const c = card.getBoundingClientRect();
+              if (c.left < column.left - 0.5 || c.right > column.right + 0.5) out.push('card ' + card.id);
+              card.querySelectorAll('h3, h4, p, span, li, data, svg, .split, .rank, .ticks').forEach(e => {
+                if (!e.getClientRects().length || e.closest('.sr-only')) return;
+                const b = e.getBoundingClientRect();
+                if (b.left < c.left - 0.5 || b.right > c.right + 0.5) out.push(card.id + ' ' + e.tagName + ' ' + e.textContent.trim().slice(0, 30));
+                if (e.scrollWidth > e.clientWidth + 1 && getComputedStyle(e).overflow !== 'visible') out.push('overflows ' + e.textContent.trim().slice(0, 30));
+              });
+              // the dates along a chart: none on another, and none smaller than the tick size
+              card.querySelectorAll('.ticks').forEach(ticks => {
+                const labels = Array.from(ticks.querySelectorAll('.tick')).filter(t => t.getClientRects().length && getComputedStyle(t).display !== 'none')
+                  .map(t => t.firstElementChild.getBoundingClientRect()).sort((a, b) => a.left - b.left);
+                labels.forEach((b, i) => { if (i && b.left < labels[i - 1].right + 4) out.push(card.id + ' dates touch'); });
+                ticks.querySelectorAll('.tick').forEach(t => { if (parseFloat(getComputedStyle(t).fontSize) < 12) out.push('small date'); });
+              });
+            });
+            const tops = Array.from(sec.querySelectorAll('.card')).map(c => [c.id, Math.round(c.getBoundingClientRect().top), Math.round(c.getBoundingClientRect().width)]);
+            return {out, figures: sec.querySelectorAll('.card data').length, soon: sec.querySelectorAll('.soon').length, tops}; }"""
+        for base, figures, soon in ((self.base, 12, 0), (self.plain_base, 0, 1)):
+            for path in PAGES:
+                for width in (320, 390, 768, 1024, 1280, 1440):
+                    for scripts in (True, False) if width in (390, 1440) else (True,):
+                        with self.subTest(path, width=width, numbers=bool(figures), scripts=scripts):
+                            page = self.open(path, width, base=base, scripts=scripts)
+                            page.locator('section[aria-labelledby="numbers"]').scroll_into_view_if_needed()
+                            page.evaluate("document.fonts.ready.then(() => true)")
+                            found = page.evaluate(boxes)
+                            self.assertEqual(found["out"], [])
+                            self.assertEqual((found["figures"], found["soon"]), (figures, soon))
+                            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                            if figures:
+                                rows = {}
+                                for key, top, card_width in found["tops"]:
+                                    rows.setdefault(top, []).append((key, card_width))
+                                if width >= 1000:
+                                    self.assertEqual([[k for k, _ in row] for row in rows.values()],
+                                                     [["numbers-downloads", "numbers-releases", "numbers-platforms"],
+                                                      ["numbers-views", "numbers-stars"], ["numbers-counts"]])
+                                    widths = {k: w for row in rows.values() for k, w in row}
+                                    whole = widths.pop("numbers-counts")
+                                    wide = widths.pop("numbers-stars")  # it fills the row before the counts
+                                    self.assertEqual(len(set(widths.values())), 1, widths)
+                                    self.assertAlmostEqual(wide, 2 * widths["numbers-views"] + 24, delta=2)
+                                    self.assertAlmostEqual(whole, 3 * widths["numbers-views"] + 2 * 24, delta=2)
+                                else:
+                                    self.assertEqual(len(rows), 6)
+                            self.assertEqual(page.errors, [])
+
+    def test_a_chart_tells_its_points_on_hover_and_from_the_keyboard(self):
+        """With scripts, a pointer over a small line shows the nearest day's value and date, the same as its table's
+        row, with a hairline at the day; on the Arabic page, where time runs from the right, the nearest day is the one
+        under the pointer. Once the line has the focus, the arrow keys move along it the way time runs. Without scripts
+        there is nothing to show and nothing takes the focus."""
+        tip = """() => { const t = document.querySelector('#numbers-views .tip');
+            return t && !t.hidden ? [t.querySelector('strong').textContent, t.querySelector('span').textContent] : null; }"""
+        row = "i => Array.from(document.querySelectorAll('#numbers-views tbody tr')[i].cells).map(c => c.textContent).reverse()"
+        for path in PAGES:
+            with self.subTest(path):
+                page = self.open(path, 1440)
+                chart = page.locator("#numbers-views .chart")
+                chart.scroll_into_view_if_needed()
+                box = chart.bounding_box()
+                # the tenth day of thirty, the first at one end and the last at the other: from the left, or from the
+                # right on the Arabic page
+                across = (9 / 29) if path == "/" else 1 - (9 / 29)
+                page.mouse.move(box["x"] + box["width"] * across, box["y"] + box["height"] / 2)
+                self.assertEqual(page.evaluate(tip), page.evaluate(row, 9))
+                cross = page.locator("#numbers-views .cross").bounding_box()
+                self.assertAlmostEqual(cross["x"], box["x"] + box["width"] * across, delta=box["width"] / 58 + 1)
+                page.mouse.move(0, 0)
+                self.assertIsNone(page.evaluate(tip))
+                page.locator("#numbers-views .plot").focus()
+                self.assertEqual(page.evaluate(tip), page.evaluate(row, 29), "the focus starts at the newest day")
+                page.keyboard.press("ArrowLeft" if path == "/" else "ArrowRight")
+                self.assertEqual(page.evaluate(tip), page.evaluate(row, 28))
+                page.keyboard.press("Home")
+                self.assertEqual(page.evaluate(tip), page.evaluate(row, 0))
+                self.assertEqual(page.locator("#numbers-views .plot").get_attribute("aria-label"),
+                                 page.locator("#numbers-views h3").text_content())
+                self.assertEqual(page.errors, [])
+            with self.subTest(path, scripts=False):
+                page = self.open(path, 1440, scripts=False)
+                self.assertEqual(page.locator("section[aria-labelledby='numbers'] [tabindex]").count(), 0)
+                self.assertEqual(page.locator("section[aria-labelledby='numbers'] .tip").count(), 0)
+
+    def test_the_downloads_are_the_releases_files(self):
+        """The hero's download is the latest release's Windows installer, and on a Linux computer its Linux archive
+        with the label to match; each SHA256 is selected whole by one click."""
+        for path in PAGES:
+            for platform, scripts, system in ((None, False, "windows"), ("Linux x86_64", True, "linux"), ("Windows", True, "windows")):
+                with self.subTest(path, platform=platform):
+                    page = self.open(path, 1440, scripts=scripts, platform=platform)
+                    name = fixture.FILES[system][0]
+                    self.assertEqual(page.locator(".actions [data-download]").get_attribute("href"),
+                                     f"https://github.com/MohammedEl-sayedAhmed/sedjem/releases/download/{fixture.TAG}/{name}")
+            page = self.open(path, 1440)
+            code = page.locator("#download .sum").first
+            code.scroll_into_view_if_needed()
+            code.click()
+            self.assertEqual(page.evaluate("getSelection().toString()"), fixture.FILES["windows"][2])
+            self.assertEqual(page.evaluate("getComputedStyle(document.querySelector('#download .sum')).fontFamily").split(",")[0].strip('"'),
+                             "IBM Plex Mono")
 
     def test_the_counts_keep_nothing_in_the_browser(self):
         """After a page view and a download: no cookie, nothing in local or session storage, IndexedDB or the cache."""

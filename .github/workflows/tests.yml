@@ -1,6 +1,8 @@
-# The test suite on Linux and Windows, for every push to main and every pull request. The Desktop build
-# workflow runs the same tests before building, but only by hand or for a version tag; this catches
-# problems when they are made, not on release day.
+# The checks of every change, for every push to main and every pull request (docs/14-pipeline.md). The quick
+# checks run first and the slower jobs only after they pass: the test suite on Linux and Windows, with a summary
+# on the run's page (and the coverage on Linux), and the steps of the README for running from source on Windows.
+# The Desktop build workflow runs the same tests before building; this catches problems when they are made, not on
+# release day. main requires the jobs checks, test (ubuntu-24.04), test (windows-latest) and windows-source.
 name: Tests
 
 on:
@@ -8,28 +10,80 @@ on:
     branches: [main]
   pull_request:
 
-permissions:
-  contents: read
+permissions: {}
 
+# A new push to a pull request cancels the run it replaces. Every commit on main keeps its own run, since the
+# nightly preview and the Release workflow look for a passed run of the commit itself.
 concurrency:
-  group: tests-${{ github.ref }}
-  cancel-in-progress: true
+  group: tests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
+  # The quick checks, a minute or two: the linters, the links in the docs and the repository's rules for public
+  # text (tests/test_public_text.py), which need nothing installed but ruff.
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Python (ruff, as pinned in requirements-dev.txt; ruff.toml)
+        run: |
+          python -m pip install "$(grep -E '^ruff==' requirements-dev.txt)"
+          ruff check --output-format=github .
+
+      - name: JavaScript (node --check)
+        run: git ls-files -z '*.js' | xargs -0 -n 1 node --check
+
+      - name: Shell scripts (shellcheck)
+        run: |
+          shellcheck --version
+          git ls-files -z '*.sh' | xargs -0 shellcheck
+
+      # Ubuntu doesn't package actionlint: the release binary, checked against its SHA-256 from the release's
+      # checksums file. It also runs shellcheck on the workflows' bash steps.
+      - name: Workflows (actionlint)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+      - name: Docs links and public text (standard library only)
+        run: python -m unittest tests.test_docs_links tests.test_public_text -v
+
   test:
+    needs: checks
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-24.04, windows-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
+    permissions:
+      contents: read
     defaults:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
           cache: pip
@@ -43,26 +97,44 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -r requirements-desktop.txt -r requirements-dev.txt
 
+      # The browser tests use the runner's Chrome, so there is no Playwright browser to download or cache. No test
+      # is retried: one that fails and then passes goes into an issue as a flaky test (docs/14-pipeline.md).
       - name: Tests (the hosted services are local stand-ins; no models needed)
-        run: python -m unittest discover -s tests -v
+        run: python .github/scripts/run_tests.py ${{ runner.os == 'Linux' && '--coverage' || '' }}
         env:
           # the browser tests (tests/test_ui*.py) run in the runner's Chrome; fail rather than skip without it
           SEDJEM_UI_REQUIRED: "1"
+          # a failed browser test leaves its Playwright trace and a screenshot here (tests/ui_support.py)
+          SEDJEM_UI_TRACES: ui-failures
+
+      - name: Upload the failed browser tests' traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-failures-${{ matrix.os }}
+          path: ui-failures
+          retention-days: 14
+          if-no-files-found: ignore
 
   # Windows from source, as README.md and docs/10-desktop.md say, in PowerShell (the terminal of VS Code and
   # Windows Terminal): a .venv made with `py -3.12` and the two requirement files, then .\app.cmd, which must
   # start Sedjem (here its server only, as there is no desktop); and the same with uv, whose self-test must pass.
   windows-source:
+    needs: checks
     runs-on: windows-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
     # Sedjem itself runs here, outside the test runner, so it is told not to send anonymous usage counts
     # (app/usage.py). The test job above runs without this, as on a developer's computer: the tests never send.
     env:
       SEDJEM_NO_USAGE: "1"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 

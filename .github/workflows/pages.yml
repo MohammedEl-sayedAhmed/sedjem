@@ -1,8 +1,21 @@
 # The website on GitHub Pages, https://mohammedel-sayedahmed.github.io/sedjem/: site/build.py builds it from site/
 # with the made-up meeting, its captures of the app, the logo and the fonts from the rest of the repository, the site's
-# tests check the result, and it is published. Runs for a push to main that changes anything the build reads, and by
-# hand (Actions → Pages → Run workflow, or `gh workflow run pages.yml`). Pages must be turned on in the repository's
-# settings with GitHub Actions as its source. To build and look at it locally, see site/build.py's docstring.
+# tests check the result, and it is published. Runs for a push to main that changes anything the build reads, after
+# each successful run of the Repository stats workflow (stats.yml), so that the page's numbers are the day's, after
+# a release, so that its files are the downloads as soon as they exist, and by hand (Actions → Pages → Run workflow,
+# or `gh workflow run pages.yml`). Pages must be turned on in the repository's settings with GitHub Actions as its
+# source. To build and look at it locally, see site/build.py's docstring.
+#
+# A release reaches the site two ways. The Desktop build workflow publishes one for a pushed tag with the workflow's
+# own token, which never starts another workflow, so its run's success starts this one. A release published by a
+# person starts this one too (release: published), but the github-pages environment deploys from main only, and
+# such a run is on the release's tag, so it only asks for a run on main.
+#
+# The page's numbers come from the stats branch, whose files are downloaded through the API: never a checkout or a
+# fetch of that branch, which GitHub would count as a clone. The latest release's details come from the API too;
+# GitHub gives each file's SHA256, so its SHA256SUMS.txt is downloaded only for a release without them, as every
+# download would add to its count. A file that can't be downloaded or read leaves its part of the page as it is
+# without it, with a warning, and never stops the publication.
 name: Pages
 
 on:
@@ -11,13 +24,19 @@ on:
     paths:
       - "site/**"
       - "docs/images/make/content.py"
-      - "docs/images/social-preview.png"
       - "docs/brand/sedjem-*.svg"
       - "docs/video/fonts/*"
       - "app/__init__.py"
       - "app/static/icon*"
+      - "docs/usage.json"
       - "tests/test_site.py"
+      - "tests/site_support.py"
       - ".github/workflows/pages.yml"
+  workflow_run:
+    workflows: ["Repository stats", "Desktop build"]
+    types: [completed]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -31,23 +50,80 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  on-main:
+    # a release published by a person: ask for a build on main, the one branch that may deploy (pre-releases leave
+    # the downloads as they are)
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Start the Pages workflow on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
+
   build:
+    # a push, a run by hand, or after another workflow that succeeded: the stats on main, or the Desktop build of a
+    # pushed tag, a release. Never after a run for a fork's pull request, whose branch may also be called main; the
+    # build checks out main either way, never the run's code
+    if: >-
+      github.event_name == 'push' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository &&
+       (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.event == 'push'))
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
 
+      - name: Download the stats branch's numbers (through the API, not a checkout)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/stats"
+          for file in downloads.csv repo.csv views.csv; do
+            if ! gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/$file?ref=stats" \
+                > "$RUNNER_TEMP/stats/$file"; then
+              rm -f "$RUNNER_TEMP/stats/$file"
+              echo "::warning::$file could not be downloaded from the stats branch; its numbers are left out of the page."
+            fi
+          done
+
+      - name: Download the latest release's details (through the API)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          folder="$RUNNER_TEMP/release"
+          mkdir -p "$folder"
+          if gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$folder/release.json"; then
+            if ! jq -e '[.assets[] | select(.name != "SHA256SUMS.txt") | .digest] | all' "$folder/release.json" > /dev/null; then
+              id=$(jq -r '.assets[] | select(.name == "SHA256SUMS.txt") | .id' "$folder/release.json")
+              if [ -z "$id" ] || ! gh api -H "Accept: application/octet-stream" "repos/$GITHUB_REPOSITORY/releases/assets/$id" \
+                  > "$folder/SHA256SUMS.txt"; then
+                rm -f "$folder/SHA256SUMS.txt"
+                echo "::warning::The release has no SHA256 for its files; the downloads show none."
+              fi
+            fi
+          else
+            rm -f "$folder/release.json"
+            echo "::warning::The latest release could not be read; the downloads link its page, without sizes or SHA256."
+          fi
+
       - name: Build
-        run: python site/build.py _site
+        run: python site/build.py _site --stats "$RUNNER_TEMP/stats" --release "$RUNNER_TEMP/release"
 
       - name: Check (offline, standard library only)
         run: python -m unittest tests.test_site -v
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: _site
 
@@ -61,4 +137,4 @@ jobs:
     steps:
       - name: Publish
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

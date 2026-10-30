@@ -1,0 +1,44 @@
+# Dependabot's weekly pull requests for the pip requirements and the workflows' actions (docs/14-pipeline.md). Each
+# is checked like any other pull request: the Tests workflow is the gate, and the Desktop build runs too, since
+# they change the requirement files or the workflows. Their titles start with an area, as the commit titles do, so
+# the release notes put them under tests, docs and the pipeline.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"  # requirements.txt, requirements-desktop.txt and requirements-dev.txt
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    # Leave a range alone while the new release already fits it, and change it only when a release falls outside
+    # it. Every exact pin (==) still gets a pull request for each release. The default would raise the lower end
+    # of a range with each release, and so the oldest version the requirements allow.
+    versioning-strategy: increase-if-necessary
+    # the minor and patch releases in one pull request; a new major version comes alone, so that a break is
+    # easy to tell apart
+    groups:
+      python:
+        patterns: ["*"]
+        update-types: [minor, patch]
+    ignore:
+      # faster-whisper 1.2.1 opens audio with metadata_errors=, which PyAV 19 removed (requirements.txt)
+      - dependency-name: av
+        versions: [">=19"]
+    commit-message:
+      prefix: "Dependencies"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    # All in one pull request, so that the actions that work together move together: CodeQL's init and analyze
+    # fail when they run at different versions. Each stays pinned to a commit, with its version in a comment.
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: "Workflows"

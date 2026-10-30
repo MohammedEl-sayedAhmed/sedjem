@@ -45,6 +45,8 @@ colors:
   brand-teal-deep: "#0b5f5e"
   brand-teal-on-dark: "#2dd4bf"
   wordmark: "#111111"
+  numbers-teal-light: "#6dbeba"
+  numbers-teal-dark: "#2f7f7c"
 typography:
   display:
     fontFamily: "IBM Plex Sans, Plex Sans Fallback, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif"
@@ -178,6 +180,26 @@ typography:
     fontSize: "44px"
     fontWeight: 600
     lineHeight: 1.3
+  figure:  # a figure card's number; the counts' numbers from 700 px
+    fontFamily: "IBM Plex Sans, Plex Sans Fallback, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif"
+    fontSize: "40px"
+    fontWeight: 600
+    lineHeight: 1
+  figure-phone:
+    fontFamily: "IBM Plex Sans, Plex Sans Fallback, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif"
+    fontSize: "32px"
+    fontWeight: 600
+    lineHeight: 1.1
+  tick:  # the tooltip's day
+    fontFamily: "IBM Plex Sans, Plex Sans Fallback, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif"
+    fontSize: "12px"
+    fontWeight: 400
+    lineHeight: 1.5
+  tick-ar:
+    fontFamily: "IBM Plex Sans Arabic, IBM Plex Sans, Segoe UI, Noto Sans Arabic, system-ui, sans-serif"
+    fontSize: "14px"
+    fontWeight: 400
+    lineHeight: 1.5
 rounded:
   tag: "2px"
   panel: "4px"
@@ -323,6 +345,7 @@ everything is one column, the claim first, then the proof, then its caption.
             ... Every fix is a new version [the diff before saving]
             ... Two models, the better line from each [one line, two models, Kept]
             ... Runs on an ordinary laptop [the facts: a spec sheet on a tonal plate]
+            ... Sedjem in numbers [the claim over a grid of figure cards, three to a row, the sources under it]
             Get Sedjem                   From source
             Free and open source ...     [ git clone ... ]   (scrolls sideways if it must)
             Windows ... (Download)       First start
@@ -397,6 +420,61 @@ with dotted leaders were both turned down: one tonal plate (the tray) with two g
 computer" (platforms, graphics card, download) and "With your recordings" (languages, what it opens and exports,
 the assistants), each term small and muted over its value, and the licence across the foot. One column on a phone.
 
+## The numbers
+
+"Sedjem in numbers" (Sedjem بالأرقام) shows the project's public numbers as a grid of figure cards, the way a
+dashboard shows a figure. The owner turned down two earlier forms: the facts' spec sheet again, as plain, and then
+a grid of bklit.com's chart cards with axes and dates, as cramped. The claim stands over the grid and a line under it
+says where the numbers come from, GitHub's as of their day, with links to the stats branch's charts and to how the
+totals are made.
+
+A figure card is its number, large (40 px, semibold, tabular figures), beside its title and one line about it, then
+a small picture across the card under them, kept to the card's foot. The card is the card surface with a hairline
+edge and, in the dark theme, the lit top edge. Five cards hold GitHub's numbers:
+
+- the downloads in all, with how many came in the last seven days (or since the first day, while the history is
+  shorter than a week), over a small line of the running total;
+- the latest release's downloads, with the day it came out, over a thin bar of it, the older releases and the
+  previews, with a legend of names and shares;
+- the larger system's share, with the other's, over a thin bar of the two and its legend;
+- the repository's page views of the last 30 days recorded, with their daily average, over a small line of each day;
+- the stars, with how many came since the first day recorded, over a small line of them.
+
+The small line has no axes and no dates: a smooth curve (a monotone cubic, which never overshoots a value, so a
+running total never seems to dip) over a wash of the same teal that fades downwards, its last stretch dashed, as that
+day is still being counted, to a dot, and a ring on a day a release came out. A running total fills the picture from
+its lowest value to its highest; the page views start from nothing. The bar of parts is 8 px, its parts 2 px apart.
+
+The sixth card is the anonymous counts' newest month, across a row of its own, so the card before it, the stars,
+fills the second row two columns wide: the installs and their countries
+large, the transcriptions and hours smaller, the most used model, the five countries with the most installs as ranked
+bars and the rest as other, and the website's page views, countries and download clicks. Before the first month is
+exported it is one more card in the row, calm and hatched, with one line saying when the first totals come; no number
+stands in for one. The grid has three columns from 1000 px, one below; a card whose file can't be read is left out
+and the rest keep their order.
+
+The colours are the brand's teal, #14a3a1 (the ear's), for a series and for the part a card is about; a lighter teal,
+#6dbeba, for a whole's second part (Linux, the older releases) on the light card, and a darker one, #2f7f7c, on the
+dark card; and a grey of the palette for the part that adds up the rest (previews, other countries). The dataviz
+validator, validate_palette.js, was run on them against the card in both themes. The teal alone passes every check.
+As two categories the pair fails in both themes: the second teal is too close to the first in chroma and, for full
+colour vision, in hue. Read as two steps of one hue, which is how the cards use them, both pairs pass every check of
+an ordinal ramp; the first light teal tried, #8fd3cf, failed its contrast on white (1.7:1 against a floor of 2:1). So the parts never rely on colour alone: the legend names each with its share, and each card's
+table gives every number. Text never wears these colours.
+
+The pictures are SVG drawn by build.py, placed across in per cent and down in pixels, so the words around them stay
+at the page's own sizes at any width; the line and its wash stretch across in a nested SVG with strokes that keep
+their width, and each wash has a gradient of its own. The Arabic page mirrors the line, so time runs from the right
+as its words do. Every number is in the HTML at build time, with thousands separators and in Western digits on both
+pages, as the Arabic copy writes every number, each in a data element, each date in a time element, and each picture
+has a table of its numbers for screen readers; the downloads' table marks the day each release came out. site.js
+adds a tooltip: a pointer or a tap over a line shows the nearest day's value and date, read from that table, with a
+hairline at the day, and the arrow keys move it once the line has the focus.
+
+build.py reads the numbers from files (the stats branch's, which pages.yml downloads through the API, and
+docs/usage.json) and fetches nothing; Pages rebuilds after each day's stats. A file it can't read leaves its cards
+out, and the section is left out when it has nothing to show.
+
 ## The table
 
 It is the page's centre of credibility, so it is set rather than left as a default: one line of column names, each
@@ -463,6 +541,11 @@ The hero has one download, for the reader's own system: site.js shows Linux's on
 anywhere else, which is also what the page shows without JavaScript. The link beside it names the other system and
 the source, and goes to the downloads section, where both are, with the licence and version line.
 
+Each download is the latest release's file itself, which pages.yml reads through the API when it builds, and the
+version line is that release's. Under each button go the file's name and size, as GitHub's release page gives it,
+and its SHA256 in mono, which one click selects whole. Without the release's details the links go to the release's
+page, with the same words and no file, size or sum.
+
 ## The counts
 
 The pages load nothing from other sites, but they count their visits anonymously (docs/privacy.md, "The website").
@@ -473,6 +556,19 @@ Track or Global Privacy Control, and sends only from the published host, which b
 element with the key, the address and the version, so a local preview sends nothing. The download links say what
 they are in data-download and data-place; the hero's is the label on show. Without a key in build.py the script is
 left out.
+
+## The share pictures
+
+A link to either page shows its own picture in LinkedIn, WhatsApp, X, Slack and the like: images/og-en.png for the
+English page and images/og-ar.png for the Arabic one, 1200 by 630 pixels, the size those apps ask for. Each is the
+hero on the light page in a smaller frame: the logo, the headline in two lines, the line of the page's title under it,
+the ear beside them as a thicker line, and three lines of the made-up transcript in the same tray and card, right to
+left, with the speakers' names in their colours and the English words in English. The Arabic one is laid out right
+to left, with the Arabic names. The type is a step up from the page's (64 px headline, 27 px lines, 22 px names) so
+that it reads on a thumbnail about 500 px wide, and nothing that matters leaves the middle 1100 by 560, as some apps
+crop the edges. docs/images/make/og.py draws both from the copy, content.py, the logo and the fonts, checks that
+middle and that no line runs past its end, and saves each as a full colour PNG, packed tighter but losslessly.
+og:image:alt and twitter:image:alt describe it in the page's language.
 
 ## Accessibility
 
@@ -540,8 +636,8 @@ After the site went live, the user asked for two more:
   icon is now the theme on show, a sun or a moon, and each press switches to the other theme, as above.
 - The ear was missing on phones. Below 1000 px it is back, smaller, over the headline on the end side.
 
-Checked against the tells: no gradient but the logo tile's own and the commands' edge fade, no glow, glass, blur,
-grain or orb; no cards in
-cards, bento, icon tiles or coloured side strips; no eyebrow labels, uppercase or monospace labels, or numbering; no
-big-number stats; no coloured or italic word in a heading; no device frame or tilt; one motion; no arrows on links;
-and no claim or number that isn't in the docs.
+Checked against the tells: no gradient but the logo tile's own, the commands' edge fade and the empty counts card's
+hatch, no glow, glass, blur, grain or orb; no cards in cards, icon tiles or coloured side strips, and a bento grid only
+for the numbers, where each card is a chart; no eyebrow labels, uppercase or monospace labels, or numbering; large
+numbers only as a chart card's figure, over its chart; no coloured or italic word in a heading; no device frame or
+tilt; one motion; no arrows on links; and no claim or number that isn't in the docs or the data.

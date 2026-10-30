@@ -46,7 +46,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
       New transcription
     </a>
-    <input class="search" type="search" id="jobSearch" placeholder="Search transcriptions" aria-label="Search transcriptions">
+    <div class="side-tools">
+      <input class="search" type="search" id="jobSearch" placeholder="Search" aria-label="Search transcriptions">
+      <select id="jobSort" aria-label="Sort transcriptions" title="Sort transcriptions"></select>
+    </div>
     <nav class="job-list" id="jobList" aria-label="Transcriptions"></nav>
     <div class="sidebar-foot" id="storageInfo"></div>
   </aside>

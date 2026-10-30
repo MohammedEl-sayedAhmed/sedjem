@@ -14,7 +14,7 @@ dir = "rtl"
 locale = "ar_EG"
 title = "Sedjem: نصوص اجتماعاتك بالعربي المصري والإنجليزي، على جهازك انت"
 description = "Sedjem بيحوّل اجتماعاتك ومكالماتك اللي بالمصري والإنجليزي لنص مكتوب على جهازك انت، والكلمات الإنجليزي بتفضل بالإنجليزي، وكل متكلم بيتعرف من صوته."
-social_alt = "لوجو Sedjem، وجملة بالإنجليزي معناها نصوص اجتماعات بالعربي المصري والإنجليزي معمولة على جهازك انت، ونص اجتماع sprint planning في البرنامج"  # new
+social_alt = "لوجو Sedjem، وجملة «الاجتماعات مش بتتكلم لغة واحدة.» فوق تلات سطور من اجتماع sprint planning متألّف بالعربي المصري والإنجليزي، واسم كل متكلم بلونه"  # new
 skip = "روح للمحتوى"  # new
 other = "English"
 
@@ -116,7 +116,7 @@ opens_value = "ملفات صوت وفيديو، ولينكات YouTube والـ&
 exports = "بيصدّر"  # new
 exports_value = "نص عادي، SRT، WebVTT، Markdown وJSON"  # trimmed
 download = "التحميل"
-download_value = "حوالي 80&nbsp;MB، وبعدين موديل 778&nbsp;MB أو 1.6&nbsp;GB"  # new
+download_value = "حوالي 90&nbsp;MB، وبعدين موديل 778&nbsp;MB أو 1.6&nbsp;GB"  # new
 platforms = "الأنظمة"  # new
 platforms_value = "Windows 10 و11، وLinux على&nbsp;x64"  # trimmed
 assistants = "المساعدين"  # new
@@ -127,17 +127,106 @@ licence_value = "AGPL-3.0، مجاني ومفتوح المصدر"  # trimmed
 computer = "على جهازك"  # new
 recordings = "مع تسجيلاتك"  # new
 
+# The public numbers, as en.toml explains; the numbers in Western digits, as everywhere on the page
+[numbers]
+h2 = "Sedjem بالأرقام"  # new
+lede = "التحميلات والنجوم ومشاهدات الصفحات من GitHub، ومجموع الأرقام المجهولة اللي البرنامج والموقع ده بيبعتوها."  # new
+months = "يناير فبراير مارس أبريل مايو يونيو يوليو أغسطس سبتمبر أكتوبر نوفمبر ديسمبر"  # new
+day = "اليوم"  # new
+downloads_title = "التحميلات"  # new
+downloads = "التحميلات، كل الإصدارات"  # new
+releases_title = "التحميلات حسب الإصدار"  # new
+release = "الإصدار"  # new
+previews = "الإصدارات التجريبية"  # new
+platforms_title = "Windows وLinux"  # new
+platform_share = "من التحميلات لـ {{platform}}"  # new
+platform = "النظام"  # new
+share = "النسبة"  # new
+windows = "Windows"  # new
+linux = "Linux"  # new
+other = "غيرهم"  # new
+views_title = "مشاهدات صفحات المشروع"  # new
+stars_title = "النجوم"  # new
+stars = "النجوم على GitHub"  # new
+app = "في البرنامج، شهر {{month}}"  # new
+installs = "نسخ Sedjem اللي اشتغلت"  # new
+countries = "الدول"  # new
+transcriptions = "النصوص اللي اتعملت"  # new
+hours = "ساعات الصوت"  # new
+model = "أكتر موديل اتستخدم:"  # new
+model_cohere = "Cohere Transcribe Arabic"  # new
+model_whisper_medium = '<bdi dir="ltr"><span translate="no">whisper-medium</span> <span translate="no">code-switching</span></bdi>'  # new: one left-to-right run, as in the table
+model_whisper_large = "Whisper large-v3"  # new
+model_other_local = "موديل تاني على الجهاز"  # new
+model_hosted = "خدمات أونلاين"  # new
+top = "اشتغل فين"  # new
+country = "الدولة"  # new
+other_countries = "دول تانية"  # new
+website = "على الموقع ده"  # new
+page_views = "مشاهدات الصفحات"  # new
+clicks = "ضغطات على التحميل"  # new
+counts = "الأرقام المجهولة"  # new
+not_yet = "البرنامج والموقع ده بيعدّوا بأرقام مجهولة، وأول مجموع شهري ليهم، بتاع نوفمبر 2026، هيطلع في أوائل ديسمبر."  # new
+caption_github = 'أرقام GitHub لحد {{day}}، وبتتقري كل يوم (<a href="{{charts}}">الرسوم البيانية</a>).'  # new
+caption_counts = 'الأرقام المجهولة بتتجمع مرة كل شهر (<a href="{{method}}">طريقة الحساب</a>).'  # new
+
+# The countries the counts' card may name, as en.toml explains
+week_more = "+{{n}} في آخر 7 أيام"  # new
+week_none = "مفيش تحميلات في آخر 7 أيام"  # new
+release_out = "نزل {{release}}"  # new
+older = "إصدارات أقدم"  # new
+latest_title = "تحميلات {{release}}"  # new
+latest_out = "آخر إصدار، نزل {{day}}"  # new
+latest_only = "آخر إصدار"  # new
+platform_rest = "{{platform}}: {{share}}%"  # new
+views_30 = "مشاهدات صفحة المشروع، آخر 30 يوم"  # new
+views_since = "مشاهدات صفحة المشروع من {{first}}"  # new
+views_average = "حوالي {{n}} في اليوم"  # new
+more_since = "+{{n}} من {{day}}"  # new
+since_day = "من {{day}}"  # new
+
+[countries]
+EG = "مصر"  # new
+SA = "السعودية"  # new
+AE = "الإمارات"  # new
+KW = "الكويت"  # new
+QA = "قطر"  # new
+BH = "البحرين"  # new
+OM = "عُمان"  # new
+JO = "الأردن"  # new
+LB = "لبنان"  # new
+PS = "فلسطين"  # new
+IQ = "العراق"  # new
+SY = "سوريا"  # new
+YE = "اليمن"  # new
+LY = "ليبيا"  # new
+TN = "تونس"  # new
+DZ = "الجزائر"  # new
+MA = "المغرب"  # new
+SD = "السودان"  # new
+US = "أمريكا"  # new
+GB = "بريطانيا"  # new
+DE = "ألمانيا"  # new
+FR = "فرنسا"  # new
+NL = "هولندا"  # new
+CA = "كندا"  # new
+TR = "تركيا"  # new
+IN = "الهند"  # new
+PK = "باكستان"  # new
+
 [get]
 h2 = "نزّل Sedjem"
 fine = "مجاني ومفتوح المصدر برخصة AGPL-3.0. الإصدار&nbsp;{{version}}."  # trimmed
 windows = "Windows"
-windows_text = "Windows 10 و11. الـ installer حوالي 80&nbsp;MB وبيتسطّب لحسابك انت، من غير صلاحيات admin. لسه مش موقّع، فـ Windows SmartScreen هيحذرك من ناشر مش معروف: اختار More info وبعدين Run anyway."
+windows_text = "Windows 10 و11. الـ installer حوالي 90&nbsp;MB وبيتسطّب لحسابك انت، من غير صلاحيات admin. لسه مش موقّع، فـ Windows SmartScreen هيحذرك من ناشر مش معروف: اختار More info وبعدين Run anyway."
 linux = "Linux"
 linux_text = "Linux على x64. فك الملف المضغوط وشغّل Sedjem/Sedjem."
 source = "من الكود"  # new
 source_text = "بـ Python 3.12 وGit وuv:"
 code_alt = "الأوامر اللي بتشغّل Sedjem من الكود"  # new
 source_link = "Windows وطرق تسطيب تانية"
+file = "الملف"  # new
+sha256 = "SHA256"  # new
 start = "أول تشغيل"  # new
 start_text = "أول ما تفتحه، نزّل موديل من Settings → Models: يا إما whisper-medium (778&nbsp;MB)، يا إما Cohere Transcribe Arabic (1.6&nbsp;GB). موديل المتكلمين TitaNet-small (40&nbsp;MB) بينزل مع أول واحد. كارت الشاشة مش شرط."
 

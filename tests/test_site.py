@@ -4,17 +4,25 @@ every file they link or load is in the build and nothing is loaded from another 
 stylesheet is one of the palette's, images have alt text and their real proportions, Arabic is marked as Arabic and
 the Arabic page reads right to left, the copy keeps the repository's style, the transcript and the speakers' shares
 come from docs/images/make/content.py and the version from app/__init__.py, the measured numbers are the docs',
-the two pages carry the same sections, numbers and images and point to each other, the theme button is named in each
+the two pages carry the same sections, numbers and images and point to each other, each page shares its own picture
+of 1200 x 630 described in its language, the theme button is named in each
 language and the dark theme is one set of tokens, the transcript, the download and the menu are whole without
 JavaScript, the speakers' names are in colours that read on the card, the pictures of the app keep every pixel and
 are set at their own size, and the first view stays small. The anonymous counts go only to Aptabase, only from the
 published site, never with Do Not Track or Global Privacy Control, and hold only the values the privacy policy lists.
-Offline, standard library only.
+The section of numbers, built from made-up stats files and totals (tests/site_support.py), is a grid of charts whose
+every number is its source's, each with a table of the same numbers; it is dated right, the same on both pages, says
+when the first totals come before there are any, leaves out what a missing or broken file would have given, and is
+all in the HTML: the build reads files and fetches nothing. The downloads are the latest release's files, with their
+names, sizes and SHA256 as the release gives them, or the release's page and the general wording without its
+details. Offline, standard library only.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
+import contextlib
 import fnmatch
 import importlib.util
+import io
 import json
 import math
 import posixpath
@@ -25,11 +33,15 @@ import tempfile
 import tomllib
 import unittest
 from collections import Counter
+from datetime import date, timedelta
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import site_support as fixture  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
 build = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(build)
@@ -53,6 +65,8 @@ PALETTE = {
     "#3fcfbf": "app.css dark --s4",
     "#14a3a1": "docs/brand: the ear and cursor on light", "#0b5f5e": "docs/brand: the icon gradient's dark end",
     "#2dd4bf": "docs/brand: the ear and cursor on dark", "#111111": "docs/brand: the wordmark's letters on light",
+    "#6dbeba": "site: the numbers' light teal, a whole's second part on the light card",
+    "#2f7f7c": "site: the numbers' darker teal, a whole's second part on the dark card",
 }
 NAMED_COLOURS = re.compile(
     r"\b(?:white|black|red|green|blue|gr[ae]y|silver|orange|yellow|purple|pink|teal|navy|maroon|olive|lime|aqua|"
@@ -61,7 +75,10 @@ VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "met
 ARABIC = re.compile("[" + chr(0x600) + "-" + chr(0x6FF) + "]")
 LATIN_WORD = re.compile(r"[A-Za-z]{2,}")
 NBSP = chr(0xA0)
-FIRST_VIEW_BUDGET = 360_000  # bytes: a page, its stylesheet and script, every font file and the header's two logos
+# bytes: a page, its stylesheet and script, every font file and the header's two logos. The section of numbers adds
+# about 18 kB to a page, its charts and the tables that say their numbers, and up to 10 kB more as the running totals
+# grow by a point a week (DAILY)
+FIRST_VIEW_BUDGET = 385_000
 # The two lines of the registers, and the words marked in each
 REGISTERS = [
     ("صباح الخير يا جماعة، خلونا نبدأ السبرينت بلانينج بسرعة عشان عندنا ديمو الساعة اتنين",
@@ -213,7 +230,9 @@ class SiteTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.out = build.build(Path(cls.tmp.name) / "site")
+        tmp = Path(cls.tmp.name)  # with every number, so each check covers the section of numbers too
+        cls.out = build.build(tmp / "site", stats=fixture.write_stats(tmp / "stats"),
+                              usage=fixture.write_usage(tmp / "usage.json"), latest=fixture.write_release(tmp / "release"))
         cls.meeting = build.meeting()
         cls.pages = {page: parse((cls.out / page).read_text(encoding="utf-8")) for page in build.PAGES}
         cls.homes = {lang: cls.pages[page][0] for lang, page in HOMES.items()}
@@ -345,7 +364,7 @@ class SiteTest(unittest.TestCase):
                 self.assertIn("defer", counter.attrs)
                 self.assertEqual({k: v for k, v in counter.attrs.items() if k.startswith("data-")},
                                  {"data-page": PAGE_OF[page], "data-key": build.COUNTS_KEY, "data-endpoint": ENDPOINT,
-                                  "data-host": build.COUNTS_HOST, "data-version": build.version()})
+                                  "data-host": build.COUNTS_HOST, "data-version": fixture.RELEASE})
 
     def test_the_counts_check_before_they_send_and_hold_only_the_listed_values(self):
         """counts.js stops before anything is sent when Do Not Track or Global Privacy Control is on or the page isn't
@@ -608,10 +627,18 @@ class SiteTest(unittest.TestCase):
             with open(ROOT / "site" / "copy" / f"{lang}.toml", "rb") as f:
                 tables[lang] = {f"{t}.{k}" for t, values in tomllib.load(f).items() for k in values}
         self.assertEqual(tables["en"], tables["ar"])
-        # and every one of them is used: by the template, or by build.py for the theme buttons and the pictures
+        # and every one of them is used: by the template, or by build.py for the theme buttons, the pictures and the
+        # numbers (a model's name by the name docs/usage.json gives it)
         template = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
         used = set(re.findall(r"\{\{(\w+\.\w+)\}\}", template)) | {"theme.to_dark", "theme.to_light"}
-        self.assertEqual(used | set(build.SHOTS.values()), tables["en"])
+        source = (ROOT / "site" / "build.py").read_text(encoding="utf-8")
+        numbers = {f"numbers.{key}" for key in re.findall(r'say\(["\'](\w+)["\'][,)]', source)}
+        numbers |= {"numbers.months"} | {f"numbers.model_{engine}" for engine in build.ENGINES}
+        numbers |= {f"numbers.{system}" for system in ("windows", "linux", "other")}
+        numbers |= set(re.findall(r'words\["(get\.\w+)"\]', source))
+        numbers |= {key for key in tables["en"] if key.startswith("countries.")}
+        self.assertEqual(used | set(build.SHOTS.values()) | numbers, tables["en"])
+        self.assertTrue(all(re.fullmatch(r"countries\.[A-Z]{2}", key) for key in tables["en"] if key.startswith("countries.")))
 
     def test_copy_follows_the_house_style(self):
         for name in ("index.html", "ar/index.html", "404.html", "styles.css", "site.js", build.COUNTER):
@@ -655,6 +682,50 @@ class SiteTest(unittest.TestCase):
                                           and n.attrs.get("type") == "image/svg+xml"))
                 if lang == "ar":
                     self.assertTrue(ARABIC.search(title.text()) and ARABIC.search(meta["description"]))
+
+    def test_each_page_shares_its_own_picture(self):
+        """A link to a page shows that page's own picture: og: and twitter: tags with the same absolute https
+        address, a PNG in the build of exactly the size they give, 1200 x 630, and its description in the page's
+        language."""
+        shared = set()
+        for lang, root in self.homes.items():
+            with self.subTest(lang):
+                meta = {n.attrs.get("name") or n.attrs.get("property"): n.attrs.get("content")
+                        for n in root.find(lambda n: n.tag == "meta")}
+                url = f"{build.URL}images/og-{lang}.png"
+                self.assertTrue(url.startswith("https://"))
+                self.assertEqual((meta["og:image"], meta["twitter:image"]), (url, url))
+                self.assertEqual(image_size(self.out / url[len(build.URL):]), (1200, 630))
+                self.assertEqual((meta["og:image:width"], meta["og:image:height"], meta["og:image:type"]),
+                                 ("1200", "630", "image/png"))
+                self.assertEqual(meta["twitter:card"], "summary_large_image")
+                self.assertEqual((meta["twitter:title"], meta["twitter:description"]), (meta["og:title"], meta["og:description"]))
+                alt = meta["og:image:alt"]
+                self.assertEqual(meta["twitter:image:alt"], alt)
+                self.assertGreaterEqual(len(alt.split()), 10)
+                arabic, latin = len(ARABIC.findall(alt)), len(re.findall("[A-Za-z]", alt))
+                if lang == "ar":
+                    self.assertGreater(arabic, 2 * latin, alt)
+                else:
+                    self.assertEqual(arabic, 0, alt)
+                shared.add(url)
+        self.assertEqual(len(shared), len(HOMES))
+
+    def test_the_share_pictures_come_from_their_generator(self):
+        """The share pictures are made by docs/images/make/og.py at 1200 x 630, kept inside the middle 1100 x 560
+        that some apps crop to, and saved in full colour, losslessly packed, small enough for the apps that fetch
+        them."""
+        generator = (ROOT / "docs" / "images" / "make" / "og.py").read_text(encoding="utf-8")
+        for line in ("W, H = 1200, 630", "SAFE = (50, 35, 1150, 595)", 'OUT / f"og-{lang}.png"', "optimize=True"):
+            self.assertIn(line, generator)
+        self.assertNotIn("quantize", generator)
+        self.assertEqual(sorted(p.name for p in (ROOT / "site" / "images").iterdir()), ["og-ar.png", "og-en.png"])
+        for lang in HOMES:
+            with self.subTest(lang):
+                self.assertEqual(build.FILES[f"images/og-{lang}.png"], f"site/images/og-{lang}.png")
+                data = (ROOT / "site" / "images" / f"og-{lang}.png").read_bytes()
+                self.assertEqual((data[24], data[25]), (8, 2))  # 8 bits, RGB: every colour, not a palette
+                self.assertLess(len(data), 300_000)
 
     def test_the_transcript_comes_from_content_py(self):
         m = self.meeting
@@ -700,7 +771,7 @@ class SiteTest(unittest.TestCase):
         for name in ("--motion", "--motion-start", "--motion-step", "--motion-row"):
             self.assertIn(f'token("{name}")', script)
         css = re.sub(r"/\*.*?\*/", "", self.css, flags=re.S)
-        hiding = [rule for rule in re.findall(r"([^{}]+)\{([^}]*)\}", css) if re.search(r"opacity:\s*0\b|visibility:\s*hidden", rule[1])]
+        hiding = [rule for rule in re.findall(r"([^{}]+)\{([^}]*)\}", css) if re.search(r"(?<![-\w])opacity:\s*0(?![.\d%])|visibility:\s*hidden", rule[1])]
         self.assertEqual([selector.strip() for selector, _ in hiding], [".will-reveal .log .row"])
         self.assertIn('root.classList.add("will-reveal")', script)
 
@@ -906,12 +977,16 @@ class SiteTest(unittest.TestCase):
                 self.assertEqual([a.attrs["href"] for a in last.find(lambda n: n.tag == "a")], [privacy])
             self.assertNotRegex((self.out / HOMES[lang]).read_text(encoding="utf-8").lower(), r"code.?signing")
 
-    def test_the_version_is_the_apps(self):
+    def test_the_version_is_the_latest_releases_or_the_apps(self):
+        """The downloads' small print names the latest release's version, or the app's without the release's details."""
         source = (ROOT / "app" / "__init__.py").read_text(encoding="utf-8")
-        version = re.search(r'__version__ = "([^"]+)"', source).group(1)
-        for lang, home in self.homes.items():
-            (fine,) = home.find(lambda n: "fine" in n.classes())
-            self.assertTrue(squash(fine.text()).endswith(VERSION_IN[lang].format(version)), fine.text())
+        self.assertEqual(build.version(), re.search(r'__version__ = "([^"]+)"', source).group(1))
+        with tempfile.TemporaryDirectory() as tmp:
+            plain = build.build(Path(tmp) / "site")
+            for version, out in ((fixture.RELEASE, self.out), (build.version(), plain)):
+                for lang, page in HOMES.items():
+                    (fine,) = parse((out / page).read_text(encoding="utf-8"))[0].find(lambda n: "fine" in n.classes())
+                    self.assertTrue(squash(fine.text()).endswith(VERSION_IN[lang].format(version)), fine.text())
 
     def test_the_first_view_stays_small(self):
         fonts = sorted(set(re.findall(r'url\("(fonts/[^"]+\.woff2)"\)', self.css)))
@@ -956,6 +1031,57 @@ class SiteTest(unittest.TestCase):
                 self.assertTrue(any(fnmatch.fnmatch(source, p) for p in patterns))
         for line in ("pages: write", "id-token: write", "group: pages", "workflow_dispatch:"):
             self.assertIn(line, workflow)
+        # and the totals of the counts, which the section of numbers reads
+        self.assertTrue(any(fnmatch.fnmatch("docs/usage.json", p) for p in patterns))
+        self.assertEqual(build.USAGE, ROOT / "docs" / "usage.json")
+
+    def test_the_numbers_refresh_after_the_stats_without_a_checkout_of_them(self):
+        """Pages rebuilds after each successful run of the Repository stats workflow on main, as well as on a push and
+        by hand, so the numbers are the day's. It downloads the stats files through the API into a folder and builds
+        from it; it never checks out or fetches the stats branch, which GitHub would count as a clone, and a file it
+        can't download is left out with a warning rather than stopping the publication."""
+        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+        names = json.loads("[" + re.search(r'\n  workflow_run:\n    workflows: \[(.+)\]\n    types: \[completed\]\n', workflow).group(1) + "]")
+        self.assertEqual(names, ["Repository stats", "Desktop build"])
+        for name, path in zip(names, ("stats.yml", "desktop.yml")):
+            self.assertIn(f"\nname: {name}\n", (ROOT / ".github" / "workflows" / path).read_text(encoding="utf-8"))
+        self.assertIn("\n  push:\n", workflow)
+        self.assertIn("github.event.workflow_run.conclusion == 'success' &&\n"
+                      "       github.event.workflow_run.head_repository.full_name == github.repository &&\n"
+                      "       (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.event == 'push'))", workflow)
+        (download,) = re.findall(r"\n      - name: Download the stats.*?\n(?=\n      - )", workflow, re.S)
+        for name in build.STATS:
+            self.assertIn(name, download.split("for file in ")[1].split(";")[0])
+        self.assertIn('gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/$file?ref=stats"', download)
+        self.assertIn("::warning::", download)
+        self.assertIn('python site/build.py _site --stats "$RUNNER_TEMP/stats" --release "$RUNNER_TEMP/release"', workflow)
+        self.assertNotRegex(workflow, r"ref:\s*stats|git (?:fetch|clone|checkout|pull)|fetch-depth: 0")
+        self.assertEqual(workflow.count("actions/checkout@"), 1)  # main's, which the build reads
+
+    def test_a_release_reaches_the_site(self):
+        """A release is on the site as soon as its files exist: the Desktop build's success after a pushed tag starts
+        a build (that workflow publishes with its own token, which starts no workflow), and a release published by a
+        person starts a run that asks for one on main, the one branch the github-pages environment deploys from;
+        pre-releases leave the downloads alone. The build reads the latest release through the API, and its
+        SHA256SUMS.txt only when GitHub has no digest of a file, as each download adds to its count; a release that
+        can't be read leaves a warning and the general wording."""
+        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+        desktop = (ROOT / ".github" / "workflows" / "desktop.yml").read_text(encoding="utf-8")
+        self.assertIn("\n  release:\n    types: [published]\n", workflow)
+        self.assertIn('tags: ["v*"]', desktop)
+        self.assertIn('gh release create "$tag"', desktop)
+        (job,) = re.findall(r"\n  on-main:\n.*?(?=\n\n  \w)", workflow, re.S)
+        self.assertIn("if: github.event_name == 'release' && !github.event.release.prerelease", job)
+        self.assertIn("actions: write", job)
+        self.assertIn('gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"', job)
+        self.assertNotIn("actions: write", workflow.replace(job, ""))
+        self.assertNotIn("github.event_name == 'release'", workflow.split("\n  build:\n")[1].split("\n    steps:")[0])
+        (step,) = re.findall(r"\n      - name: Download the latest release.*?\n(?=\n      - )", workflow, re.S)
+        self.assertIn('gh api "repos/$GITHUB_REPOSITORY/releases/latest" > "$folder/release.json"', step)
+        self.assertIn("""jq -e '[.assets[] | select(.name != "SHA256SUMS.txt") | .digest] | all'""", step)
+        self.assertIn('"repos/$GITHUB_REPOSITORY/releases/assets/$id"', step)
+        self.assertEqual(step.count("::warning::"), 2)
+        self.assertNotRegex(step, r"gh release download|curl|wget")
 
     def test_readme_links_the_site_near_the_top(self):
         top = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()[:25]
@@ -966,6 +1092,535 @@ class SiteTest(unittest.TestCase):
         modules = {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
         modules |= {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual({m.split(".")[0] for m in modules}, set(sys.stdlib_module_names))
+        # and never fetches: the numbers come from files
+        self.assertFalse({m for m in modules if m.split(".")[0] in ("http", "socket", "ssl", "subprocess", "ftplib")
+                          or m in ("urllib", "urllib.request")}, modules)
+
+
+MONTHS = "January February March April May June July August September October November December".split()
+
+
+def long_day(d):
+    return f"{d.day} {MONTHS[d.month - 1]} {d.year}"
+
+
+class NumbersTest(unittest.TestCase):
+    """The section of numbers, built from the made-up stats files and totals of tests/site_support.py: a grid of figure
+    cards, each its number beside its title and one line, over a small picture drawn at build time."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.dir = Path(cls.tmp.name)
+        cls.stats = fixture.write_stats(cls.dir / "stats")
+        cls.usage = fixture.write_usage(cls.dir / "usage.json")
+        cls.full = cls.sections(build.build(cls.dir / "full", stats=cls.stats, usage=cls.usage))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    @staticmethod
+    def sections(out):
+        """Each page's section of numbers, or None when it has none."""
+        found = {}
+        for lang, page in HOMES.items():
+            root, errors = parse((out / page).read_text(encoding="utf-8"))
+            assert not errors, errors
+            sections = root.find(lambda n: n.tag == "section" and n.attrs.get("aria-labelledby") == "numbers")
+            found[lang] = sections[0] if sections else None
+        return found
+
+    def build(self, name, **kwargs):
+        """A build with other numbers, and what it said in the log."""
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
+            out = build.build(self.dir / name, **kwargs)
+        return self.sections(out), log.getvalue()
+
+    @staticmethod
+    def cards(section):
+        """Each card by its key: its width in the grid, its title, its figure (value, as shown) and its line, the points
+        of its line ((across, down) as drawn), its bar of parts ((part, value)) and legend ((name, share)), its table's
+        rows, the counts' numbers ((value, label)) and its line saying when the first totals come."""
+        out = {}
+        for card in section.find(lambda n: "card" in n.classes()):
+            first = lambda node, test: (node.find(test) or [None])[0]  # noqa: E731
+            figure = first(card, lambda n: "kpi-figure" in n.classes())
+            text = first(card, lambda n: "kpi-text" in n.classes())
+            plot = first(card, lambda n: "plot" in n.classes())
+            data = figure and first(figure, lambda n: n.tag == "data")
+            out[card.attrs["id"].removeprefix("numbers-")] = {
+                "span": next(c for c in card.classes() if c.startswith("span-")),
+                "title": squash(first(card, lambda n: n.tag == "h3").text()),
+                "figure": (data.attrs["value"], squash(data.text())) if data else None,
+                "line": squash(first(text, lambda n: n.tag == "p").text()) if text else None,
+                "points": [tuple(float(v) for v in p.split(",")) for p in plot.attrs["data-points"].split()] if plot else [],
+                "parts": [(p.classes()[1], int(p.attrs["style"].removeprefix("--v: "))) for p in card.find(
+                    lambda n: "part" in n.classes() and n.parent.attrs.get("class") == "split")],
+                "legend": [(squash("".join(c if isinstance(c, str) else "" if "share" in c.classes() else c.text() for c in li.children)),
+                            squash(first(li, lambda n: "share" in n.classes()).text()))
+                           for li in card.find(lambda n: n.tag == "li" and "legend" in n.parent.classes())],
+                "rank": [(squash(first(li, lambda n: "rank-name" in n.classes()).text()),
+                          squash(first(li, lambda n: "rank-value" in n.classes()).text()))
+                         for li in card.find(lambda n: n.tag == "li" and n.parent.tag == "ol")],
+                "table": [[squash(c.text()) for c in tr.children if not isinstance(c, str)]
+                          for tr in card.find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")],
+                "stats": [(first(p, lambda n: n.tag == "data").attrs["value"], squash(first(p, lambda n: n.tag == "span").text()))
+                          for p in card.find(lambda n: "stat" in n.classes())],
+                "soon": [squash(p.text()) for p in card.find(lambda n: "soon" in n.classes())],
+            }
+        return out
+
+    @staticmethod
+    def expected():
+        """The numbers each card must show, worked out here again from tests/site_support.py's files."""
+        days = sorted({date.fromisoformat(d) for d, *_ in fixture.DOWNLOADS})
+        app = [(date.fromisoformat(d), r, a, n) for d, r, a, n in fixture.DOWNLOADS if not a.endswith(".txt")]
+        per_day = [(d, sum(n for dd, _, _, n in app if dd == d)) for d in days]
+        first_seen = {}
+        for d, r, _, _ in sorted(app):
+            first_seen.setdefault(r, d)
+        newest = [(r, a, n) for d, r, a, n in app if d == days[-1]]
+        releases = {}
+        for r, _, n in newest:
+            releases[r] = releases.get(r, 0) + n
+        week_ago = [n for d, n in per_day if d <= days[-1] - timedelta(7)]
+        return {"per_day": per_day, "first_seen": first_seen, "releases": releases,
+                "week": per_day[-1][1] - (week_ago[-1] if week_ago else per_day[0][1]),
+                "windows": sum(n for _, a, n in newest if a.endswith(".exe")),
+                "linux": sum(n for _, a, n in newest if "linux" in a), "views": sorted(fixture.VIEWS)[-30:],
+                "stars": [(fixture.DAY - timedelta(1), fixture.STARS - 4), (fixture.DAY, fixture.STARS)],
+                "app": fixture.USAGE["months"]["2026-11"], "website": fixture.USAGE["website"]["2026-11"]}
+
+    def test_every_number_on_every_card_is_its_sources(self):
+        """Each card's figure, its line, its bar of parts, its legend and its table are the files' numbers, worked out
+        again here: the downloads in all each day (the app's files of every release, previews included, not the
+        checksums) and those of the last seven days, the newest release that isn't a preview against the older ones
+        and the previews, Windows' and Linux's shares, the page views of the last 30 days recorded and their daily
+        average, the stars and how many came since the first day, and the newest month of the counts with its
+        countries, the five with the most installs by name and the rest as other."""
+        e = self.expected()
+        fmt = lambda n: f"{n:,}"  # noqa: E731
+        share = lambda n, whole: f"{round(n / whole * 100)}%"  # noqa: E731
+        self.assertEqual(e["per_day"][-1][1], fixture.TOTAL)
+        self.assertEqual(e["releases"], {"v0.10.0": fixture.LATEST, "v0.9.2": 463, "v0.10.1-preview.20261201": 7})
+        self.assertEqual(sum(n for _, n, _ in e["views"]), fixture.VIEWS_30)
+        cards = self.cards(self.full["en"])
+        self.assertEqual(list(cards), ["downloads", "releases", "platforms", "views", "stars", "counts"])
+        c = cards["downloads"]
+        self.assertEqual((c["figure"], c["title"], c["line"]),
+                         ((str(fixture.TOTAL), fmt(fixture.TOTAL)), "Downloads, all releases", f"+{fmt(e['week'])} since {e['per_day'][0][0].day} {e['per_day'][0][0]:%B}"))
+        self.assertEqual(e["week"], fixture.TOTAL - 380, "the history is shorter than a week, so it counts from its first day")
+        out = {d: r.removeprefix("v") for r, d in e["first_seen"].items() if d > e["per_day"][0][0] and not "-" in r}
+        self.assertEqual(out, {fixture.DAY: "0.10.0"})
+        self.assertEqual(c["table"], [[long_day(d) + (f" ({out[d]} out)" if d in out else ""), fmt(n)] for d, n in e["per_day"]])
+        c = cards["releases"]
+        older = sum(n for r, n in e["releases"].items() if r != "v0.10.0" and "-" not in r)
+        whole = fixture.LATEST + older + 7
+        self.assertEqual((c["figure"], c["title"], c["line"]),
+                         ((str(fixture.LATEST), fmt(fixture.LATEST)), "Downloads of 0.10.0", "the latest release, out on 2 December"))
+        self.assertEqual(c["parts"], [("part-latest", fixture.LATEST), ("part-older", older), ("part-previews", 7)])
+        self.assertEqual(c["legend"], [("0.10.0", share(fixture.LATEST, whole)), ("Older releases", share(older, whole)),
+                                       ("Previews", share(7, whole))])
+        self.assertEqual(c["table"], [["0.10.0", fmt(fixture.LATEST)], ["0.9.2", "463"], ["Previews", "7"]])
+        c = cards["platforms"]
+        whole = e["windows"] + e["linux"]
+        self.assertEqual((e["windows"], e["linux"], whole), (1589, 157, fixture.TOTAL))
+        self.assertEqual((c["figure"], c["title"], c["line"]),
+                         ((share(e["windows"], whole)[:-1], share(e["windows"], whole)), "of downloads are for Windows",
+                          f"Linux: {share(e['linux'], whole)}"))
+        self.assertEqual(c["parts"], [("part-windows", e["windows"]), ("part-linux", e["linux"])])
+        self.assertEqual(c["legend"], [("Windows", share(e["windows"], whole)), ("Linux", share(e["linux"], whole))])
+        self.assertEqual(c["table"], [["Windows", fmt(e["windows"]), share(e["windows"], whole)],
+                                      ["Linux", fmt(e["linux"]), share(e["linux"], whole)]])
+        c = cards["views"]
+        self.assertEqual((c["figure"], c["title"], c["line"]),
+                         ((str(fixture.VIEWS_30), fmt(fixture.VIEWS_30)), "Repository page views, last 30 days",
+                          f"about {round(fixture.VIEWS_30 / 30, 1)} a day"))
+        self.assertEqual(c["table"], [[long_day(d), fmt(n)] for d, n, _ in e["views"]])
+        c = cards["stars"]
+        self.assertEqual((c["figure"], c["title"], c["line"]),
+                         ((str(fixture.STARS), fmt(fixture.STARS)), "Stars on GitHub", "+4 since 1 December"))
+        self.assertEqual(c["table"], [[long_day(d), fmt(n)] for d, n in e["stars"]])
+        c, u, w = cards["counts"], e["app"], e["website"]
+        self.assertEqual((c["title"], c["span"]), ("In the app, November 2026", "span-3"))
+        self.assertEqual(c["stats"], [(str(u["installs"]["active"]), "installs ran Sedjem"),
+                                      (str(u["installs"]["countries"]["count"]), "countries"),
+                                      (str(u["runs"]["transcriptions"]), "transcriptions"), (str(u["runs"]["hours"]), "hours of audio"),
+                                      (str(w["page_views"]), "page views"), (str(w["countries"]["count"]), "countries"),
+                                      (str(w["downloads"]["clicks"]), "download clicks")])
+        where = fixture.WHERE
+        top = sorted((k for k in where if k != "other"), key=lambda k: -where[k])[:5]
+        names = {"EG": "Egypt", "SA": "Saudi Arabia", "AE": "Emirates", "US": "United States", "DE": "Germany"}
+        rows = [(names[k], fmt(where[k])) for k in top] + [("Other countries", fmt(sum(where.values()) - sum(where[k] for k in top)))]
+        self.assertEqual((c["rank"], [tuple(r) for r in c["table"]]), (rows, rows))
+        self.assertEqual(rows[-1], ("Other countries", "133"), "Jordan (30) is added to the other countries")
+        (model,) = self.full["en"].find(lambda n: "model" in n.classes())
+        self.assertEqual(squash(model.text()), "Most used model: whisper-medium code-switching")
+
+    def test_the_lines_are_drawn_to_the_numbers(self):
+        """Each small line is its numbers: a point a row of the table, at its day across the card and at its value down
+        a 56 px picture, from the lowest value (or 0 for the page views) at the bottom to the highest at the top; a
+        smooth curve through every point that never overshoots one; the last stretch dashed to the dot on the last
+        day; and a ring on each release day before it."""
+        e = self.expected()
+        section = self.full["en"]
+        down = lambda v, lo, hi: round(6 + (1 - (v - lo) / ((hi - lo) or 1)) * 46, 1)  # noqa: E731
+        span = lambda series: (series[-1][0] - series[0][0]).days  # noqa: E731
+        cards = self.cards(section)
+        for key, series, floor in (("downloads", e["per_day"], None), ("views", [(d, n) for d, n, _ in e["views"]], 0),
+                                   ("stars", e["stars"], None)):
+            with self.subTest(key):
+                lo = min(n for _, n in series) if floor is None else floor
+                hi = max(n for _, n in series)
+                self.assertEqual(cards[key]["points"], [(round((d - series[0][0]).days / span(series) * 100, 2), down(n, lo, hi))
+                                                        for d, n in series])
+                self.assertEqual(len(cards[key]["points"]), len(cards[key]["table"]))
+                (card,) = section.find(lambda n: n.attrs.get("id") == f"numbers-{key}")
+                paths = card.find(lambda n: n.tag == "path" and "line" in n.classes())
+                want = [(round(x * 10, 1), y) for x, y in cards[key]["points"]]
+                pieces = list(self.pieces(paths))
+                self.assertEqual(sorted({p[3] for p in pieces} | {p[2] for p in pieces}), sorted(set(want)),
+                                 "the curve passes through every point")
+                for c1, c2, end, start in pieces:
+                    low, high = sorted((start[1], end[1]))
+                    self.assertTrue(low - 0.05 <= c1[1] <= high + 0.05 and low - 0.05 <= c2[1] <= high + 0.05,
+                                    "a piece's handles stay between its ends, so the curve never overshoots")
+                tails = [p for p in paths if "line-tail" in p.classes()]
+                if len(want) > 2:  # the last stretch, dashed: the day still being counted
+                    self.assertEqual([t.attrs["d"].split(" C")[0] for t in tails], [f"M{want[-2][0]:.1f},{want[-2][1]:.1f}"])
+                else:
+                    self.assertEqual(tails, [])
+                (dot,) = card.find(lambda n: n.tag == "circle" and "dot" in n.classes())
+                self.assertEqual((dot.attrs["cx"], float(dot.attrs["cy"])), ("100%", want[-1][1]))
+                (stop,) = card.find(lambda n: n.tag == "linearGradient".lower() or n.tag == "lineargradient")
+                self.assertEqual(stop.attrs["id"], f"wash-{key}")
+        # a release first counted before the last day is a ring on the line; on the last day, the dot stands for it
+        downloads = list(fixture.DOWNLOADS) + [(d, "v0.9.5", "Sedjem-0.9.5-setup.exe", n) for d, n in
+                                               (("2026-11-30", 3), ("2026-12-01", 4), ("2026-12-02", 5))]
+        sections, _ = self.build("ring", stats=fixture.write_stats(self.dir / "ring-stats", downloads=downloads), usage=self.usage)
+        (card,) = sections["en"].find(lambda n: n.attrs.get("id") == "numbers-downloads")
+        rings = [r.attrs["cx"] for r in card.find(lambda n: n.tag == "circle" and "mark" in n.classes())]
+        self.assertEqual(rings, ["50%"], "0.9.5, first counted on the third of five days")
+        self.assertIn("30 November 2026 (0.9.5 out)", str(self.cards(sections["en"])["downloads"]["table"]))
+        self.assertFalse(self.full["en"].find(lambda n: n.tag == "circle" and "mark" in n.classes()))
+
+    def test_a_long_history_is_drawn_by_the_week(self):
+        """A running total of up to DAILY days has a point a day; a longer one a point a week, the first day, the last
+        and every seventh back from it, so a picture and its table grow by a row a week."""
+        start = date(2026, 1, 1)
+        self.assertEqual(build.weekly([(start + timedelta(i), i) for i in range(build.DAILY)]),
+                         [(start + timedelta(i), i) for i in range(build.DAILY)])
+        thinned = build.weekly([(start + timedelta(i), i) for i in range(50)])
+        self.assertEqual([n for _, n in thinned], [0, 7, 14, 21, 28, 35, 42, 49])
+        thinned = build.weekly([(start + timedelta(i), i) for i in range(52)])
+        self.assertEqual([n for _, n in thinned], [0, 2, 9, 16, 23, 30, 37, 44, 51])
+        self.assertEqual(build.DAILY, 35)
+
+    @staticmethod
+    def pieces(paths):
+        """Each cubic piece of the paths: its two handles, its end and its start."""
+        for p in paths:
+            d = p.attrs["d"]
+            start = tuple(float(v) for v in re.match(r"M([\d.]+),([\d.]+)", d).groups())
+            for c in re.findall(r"C([\d.]+,[\d.]+) ([\d.]+,[\d.]+) ([\d.]+,[\d.]+)", d):
+                c1, c2, end = (tuple(float(v) for v in xy.split(",")) for xy in c)
+                yield c1, c2, end, start
+                start = end
+
+    def test_each_picture_has_its_text_alternative(self):
+        """Every picture is hidden from screen readers and none can take the focus without site.js; each card with a
+        picture has one table of the same numbers, captioned, with a row for each point of its line; the figure, its
+        title and its line are text."""
+        for lang, section in self.full.items():
+            for card in section.find(lambda n: "card" in n.classes()):
+                pictures = card.find(lambda n: n.tag == "svg" and "chart" in n.classes()) + card.find(
+                    lambda n: n.tag == "ol" or "split" in n.classes() or "legend" in n.classes())
+                tables = card.find(lambda n: n.tag == "table")
+                with self.subTest(lang, card=card.attrs["id"]):
+                    if not pictures:
+                        continue
+                    self.assertEqual(len(tables), 1)
+                    self.assertIn("sr-only", tables[0].classes())
+                    self.assertTrue(squash(tables[0].find(lambda n: n.tag == "caption")[0].text()))
+                    for picture in pictures:
+                        self.assertEqual(picture.nearest("aria-hidden"), "true", picture.tag)
+                    self.assertFalse(card.find(lambda n: "tabindex" in n.attrs))
+                    rows = tables[0].find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")
+                    for plot in card.find(lambda n: "plot" in n.classes()):  # site.js shows a point from its row
+                        self.assertEqual(len(plot.attrs["data-points"].split()), len(rows))
+                    for svg in card.find(lambda n: n.tag == "svg" and "chart" in n.classes()):
+                        self.assertEqual((svg.attrs.get("aria-hidden"), svg.attrs.get("focusable")), ("true", "false"))
+
+    def test_the_cards_take_their_places_in_the_grid(self):
+        """Five figure cards of GitHub's numbers, one column each of the three, then the counts: one card more before
+        the first month, so two full rows, and with a month a row of its own, the stars filling the row before it. A card whose file can't be read is left
+        out and the others keep their order."""
+        self.assertEqual({k: c["span"] for k, c in self.cards(self.full["en"]).items()},
+                         {"downloads": "span-1", "releases": "span-1", "platforms": "span-1", "views": "span-1",
+                          "stars": "span-2", "counts": "span-3"})
+        sections, _ = self.build("grid-not-yet", stats=self.stats, usage=self.dir / "nowhere.json")
+        self.assertEqual([c["span"] for c in self.cards(sections["en"]).values()], ["span-1"] * 6)
+        broken = fixture.write_stats(self.dir / "no-views")
+        (broken / "views.csv").unlink()
+        sections, log = self.build("no-views-site", stats=broken, usage=self.usage)
+        self.assertEqual(list(self.cards(sections["en"])), ["downloads", "releases", "platforms", "stars", "counts"])
+        self.assertIn("views.csv can't be read", log)
+
+    def test_the_dates_are_the_numbers_own(self):
+        """GitHub's numbers are as of the newest day in its daily snapshots, said under the grid; the latest release is
+        out on the day it was first counted, the stars count from their first day, the page views run to the last day
+        recorded, and the counts are of the newest month, each named in the page's language and in a time element."""
+        for lang, section in self.full.items():
+            (source,) = section.find(lambda n: "numbers-source" in n.classes())
+            self.assertEqual([(t.attrs["datetime"], squash(t.text())) for t in source.find(lambda n: n.tag == "time")],
+                             [("2026-12-02", {"en": "2 December 2026", "ar": "2 ديسمبر 2026"}[lang])])
+            times = lambda key: [(t.attrs["datetime"], squash(t.text())) for t in section.find(  # noqa: E731
+                lambda n: n.attrs.get("id") == f"numbers-{key}")[0].find(lambda n: n.tag == "time" and not n.inside(lambda m: m.tag == "table"))]
+            self.assertEqual(times("counts"), [("2026-11", {"en": "November 2026", "ar": "نوفمبر 2026"}[lang])])
+            self.assertEqual(times("releases"), [("2026-12-02", {"en": "2 December", "ar": "2 ديسمبر"}[lang])])
+            self.assertEqual(times("stars"), [("2026-12-01", {"en": "1 December", "ar": "1 ديسمبر"}[lang])])
+            self.assertEqual(times("views"), [])
+        # with a shorter history the page views say from when, and the average is over the days recorded
+        short = fixture.VIEWS[-10:]
+        sections, _ = self.build("short", stats=fixture.write_stats(self.dir / "short-stats", views=short), usage=self.usage)
+        views = self.cards(sections["en"])["views"]
+        self.assertEqual((views["title"], views["line"]),
+                         ("Repository page views since 22 November", f"about {round(sum(n for _, n, _ in short) / 10, 1)} a day"))
+
+    def test_before_the_first_month_the_page_says_when_it_comes(self):
+        """Without docs/usage.json the counts' card is a calm hatched one with a line saying the first totals,
+        November's, come out in early December, and no number standing in for them; without a stats folder GitHub's
+        cards are left out."""
+        sections, log = self.build("not-yet", usage=self.dir / "nowhere.json")
+        self.assertEqual(log, "")
+        for lang, words in (("en", "their first monthly totals, for November 2026, come out in early December"),
+                            ("ar", "وأول مجموع شهري ليهم، بتاع نوفمبر 2026، هيطلع في أوائل ديسمبر")):
+            with self.subTest(lang):
+                cards = self.cards(sections[lang])
+                self.assertEqual(list(cards), ["counts"])
+                self.assertIn(words, cards["counts"]["soon"][0])
+                self.assertEqual((cards["counts"]["stats"], cards["counts"]["span"]), ([], "span-1"))
+                self.assertFalse(sections[lang].find(lambda n: n.tag in ("data", "svg", "ol", "table")))
+                self.assertNotIn(build.CHARTS, str([a.attrs["href"] for a in sections[lang].find(lambda n: n.tag == "a")]))
+        css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
+        self.assertRegex(css, r"#numbers-counts:has\(\.soon\) \{[^}]*repeating-linear-gradient\(135deg, var\(--line\)")
+        sections, _ = self.build("not-yet-github", stats=self.stats, usage=self.dir / "nowhere.json")
+        self.assertEqual(list(self.cards(sections["en"])), ["downloads", "releases", "platforms", "views", "stars", "counts"])
+
+    def test_a_missing_or_broken_file_leaves_its_card_out(self):
+        """A stats file that is missing, empty or not what repo_stats.py writes leaves its cards out, with a line in the
+        log, and the build goes on; unreadable totals leave the counts' card out, with no promise of totals either.
+        The website's totals missing for the newest month leave only them out, and nothing at all, no section."""
+        broken = fixture.write_stats(self.dir / "broken")
+        (broken / "repo.csv").unlink()
+        (broken / "views.csv").write_text("date,views,unique\n2026-12-01,many,2\n", encoding="utf-8")
+        sections, log = self.build("broken-site", stats=broken, usage=self.usage)
+        self.assertEqual(list(self.cards(sections["en"])), ["downloads", "releases", "platforms", "counts"])
+        self.assertIn("repo.csv can't be read", log)
+        self.assertIn("views.csv can't be read", log)
+        for name, text in (("empty", ""), ("header", "date,release,asset,downloads\n"), ("wrong", "a,b\n1,2\n"),
+                           ("negative", "date,release,asset,downloads\n2026-12-02,v1.0.0,x.exe,-4\n")):
+            with self.subTest(name):
+                folder = fixture.write_stats(self.dir / f"stats-{name}")
+                (folder / "downloads.csv").write_text(text, encoding="utf-8")
+                sections, log = self.build(f"site-{name}", stats=folder, usage=self.usage)
+                self.assertEqual(list(self.cards(sections["en"])), ["views", "stars", "counts"])
+                self.assertIn("downloads.csv can't be read", log)
+        empty = self.dir / "empty-stats"
+        empty.mkdir()
+        sections, log = self.build("no-stats", stats=empty, usage=self.usage)
+        self.assertEqual(list(self.cards(sections["en"])), ["counts"])
+        self.assertIn("GitHub's numbers are left out", log)
+        for name, text in (("json", "{not json"), ("shape", '{"months": {"2026-11": {"installs": 3}}}'),
+                           ("negative", json.dumps({"months": {"2026-11": {**fixture.USAGE["months"]["2026-11"],
+                                                                           "installs": {"active": -1, "countries": {"count": 1, "installs": {}}}}}}))):
+            with self.subTest(name):
+                path = self.dir / f"usage-{name}.json"
+                path.write_text(text, encoding="utf-8")
+                sections, log = self.build(f"usage-site-{name}", stats=self.stats, usage=path)
+                self.assertNotIn("counts", self.cards(sections["en"]))
+                self.assertIn("the counts are left out", log)
+                self.assertNotIn("first monthly totals", squash(visible_text(sections["en"])))
+        sections, _ = self.build("both-gone", stats=empty, usage=self.dir / "usage-json.json")
+        self.assertEqual(sections, {"en": None, "ar": None}, "nothing to show, so no section")
+        data = json.loads(json.dumps(fixture.USAGE))
+        del data["website"]["2026-11"]
+        sections, log = self.build("no-website", stats=self.stats, usage=fixture.write_usage(self.dir / "no-website.json", data))
+        self.assertFalse(sections["en"].find(lambda n: "website" in n.classes()))
+        self.assertIn("installs ran Sedjem", str(self.cards(sections["en"])["counts"]["stats"]))
+        self.assertEqual(log, "")
+
+    def test_the_arabic_page_has_the_same_numbers(self):
+        """The same numbers in the same order on both pages, in the figures, the pictures, the legends and the tables,
+        written alike: Western digits and the same separators, as the Arabic copy writes every number."""
+        values = {lang: [(d.attrs["value"], d.text()) for d in section.find(lambda n: n.tag == "data")]
+                  for lang, section in self.full.items()}
+        self.assertEqual(len(values["en"]), 5 + 7)  # the figure of each of GitHub's cards, and seven of the counts'
+        self.assertEqual(values["en"], values["ar"])
+        points = {lang: [plot.attrs["data-points"] for plot in section.find(lambda n: "plot" in n.classes())]
+                  for lang, section in self.full.items()}
+        self.assertEqual(points["en"], points["ar"])
+        digits = {lang: re.findall(r"\d+(?:[,.]\d+)*", squash(visible_text(section))) for lang, section in self.full.items()}
+        self.assertEqual(Counter(digits["en"]), Counter(digits["ar"]))
+        self.assertFalse(re.search("[٠-٩۰-۹]", visible_text(self.full["ar"])), "Arabic-Indic digits")
+        self.assertEqual(build.NUMERALS, {"en": (",", "."), "ar": (",", ".")})
+        ar = self.cards(self.full["ar"])
+        self.assertEqual(ar["counts"]["rank"][0], ("مصر", "640"))
+        self.assertEqual(ar["platforms"]["table"][0][0], "Windows")
+
+    def test_the_numbers_are_in_the_page_and_nothing_is_fetched(self):
+        """Every number is in the HTML, so the section needs no script: it has none, loads nothing, its pictures link
+        nothing outside the page (their washes use gradients of their own, by id), the points site.js may show are
+        plain numbers, and its links are the stats branch's charts and the method. The build reads the files it is
+        given and nothing else. The section sits after the facts and before the downloads, under its own title."""
+        for lang, section in self.full.items():
+            self.assertFalse(section.find(lambda n: n.tag in ("script", "img", "iframe", "object", "noscript", "image", "use", "foreignobject")))
+            self.assertFalse([n for n in section.iter() if any(k.startswith("on") or k in ("src", "href", "xlink:href") for k in n.attrs) and n.tag != "a"])
+            self.assertEqual([a.attrs["href"] for a in section.find(lambda n: n.tag == "a")], [build.CHARTS, build.METHOD])
+            for node in section.find(lambda n: "url(" in n.attrs.get("style", "")):
+                self.assertRegex(node.attrs["style"], r"^fill: url\(#wash-\w+\)$")
+            for plot in section.find(lambda n: "plot" in n.classes()):
+                self.assertRegex(plot.attrs["data-points"], r"^[\d.]+,[\d.]+(?: [\d.]+,[\d.]+)*$")
+            (h2,) = section.find(lambda n: n.tag == "h2")
+            self.assertEqual((h2.attrs["id"], squash(h2.text())), ("numbers", {"en": "Sedjem in numbers", "ar": "Sedjem بالأرقام"}[lang]))
+            self.assertEqual(h2.find(lambda n: n.attrs.get("translate") == "no")[0].text(), "Sedjem")
+        self.assertEqual(build.CHARTS, "https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme")
+        self.assertTrue(build.METHOD.endswith("/blob/main/docs/13-usage-counts.md#public-totals"))
+        self.assertIn("## Public totals", (ROOT / "docs" / "13-usage-counts.md").read_text(encoding="utf-8"))
+        self.assertIsNone(build.github(None))
+        page = (self.dir / "full" / "index.html").read_text(encoding="utf-8")
+        self.assertLess(page.index('aria-labelledby="facts"'), page.index('aria-labelledby="numbers"'))
+        self.assertLess(page.index('aria-labelledby="numbers"'), page.index('aria-labelledby="get"'))
+        self.assertNotIn("Counted in the open", page + (ROOT / "site" / "DESIGN.md").read_text(encoding="utf-8"))
+
+    def test_the_palette_is_the_one_design_md_records(self):
+        """The pictures' colours are the brand's teal for a series, a light teal for a whole's second part (a darker
+        one on the dark card) and a grey for the rest, as DESIGN.md records them with what the dataviz validator said
+        of them; the marks take them from the stylesheet, never from the page, and text never wears them."""
+        css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
+        root = re.search(r":root\s*\{([^}]*)\}", css).group(1)
+        self.assertEqual(re.findall(r"--series-(\w+): (#[0-9a-f]{6});", root), [("1", "#14a3a1"), ("2", "#6dbeba"), ("rest", "#8a95a3")])
+        for block in (r':root:not\(\[data-theme="light"\]\)\s*\{([^}]*)\}', r':root\[data-theme="dark"\]\s*\{([^}]*)\}'):
+            self.assertEqual(sorted(re.findall(r"--series-(\w+): (#[0-9a-f]{6});", re.search(block, css).group(1))),
+                             [("2", "#2f7f7c"), ("rest", "#6f7a88")])
+        for rule in re.findall(r"([^{}]+)\{([^}]*var\(--series-[^}]*)\}", css):
+            self.assertNotRegex(rule[1], r"(?<![-\w])color:\s*var\(--series", rule[0])
+        design = (ROOT / "site" / "DESIGN.md").read_text(encoding="utf-8").split("## The numbers")[1].split("\n## ")[0]
+        for words in ("#14a3a1", "#6dbeba", "#2f7f7c", "validate_palette.js"):
+            self.assertIn(words, design)
+
+
+class ReleaseTest(unittest.TestCase):
+    """The downloads: the latest release's files, from tests/site_support.py's made-up release."""
+
+    def build(self, release=None, sums=None):
+        """Each page's tree, built with release.json (and SHA256SUMS.txt) or none, and what the build said in the log."""
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        folder = fixture.write_release(Path(tmp.name) / "release", release, sums) if release is not False else None
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
+            out = build.build(Path(tmp.name) / "site", latest=folder)
+        return {lang: parse((out / page).read_text(encoding="utf-8"))[0] for lang, page in HOMES.items()}, log.getvalue()
+
+    @staticmethod
+    def downloads(root):
+        """The download links' addresses: the hero's (with its Linux one) and the downloads section's, and each way's
+        file as (name, size in bytes, size shown, SHA256), or None."""
+        (hero,) = root.find(lambda n: n.attrs.get("data-place") == "hero")
+        out = {"hero": (hero.attrs["href"], hero.attrs["data-href-linux"])}
+        for way in root.find(lambda n: "way" in n.classes() and n.find(lambda c: c.attrs.get("data-place") == "get" and c.tag == "a" and c.attrs.get("data-download") in ("windows", "linux"))):
+            (link,) = way.find(lambda n: n.tag == "a" and n.attrs.get("data-download") in ("windows", "linux"))
+            files = way.find(lambda n: "file" in n.classes())
+            file = None
+            if files:
+                (name,) = files[0].find(lambda n: "file-name" in n.classes())
+                (size,) = files[0].find(lambda n: n.tag == "data")
+                sums = files[0].find(lambda n: n.tag == "code")
+                file = (name.text(), int(size.attrs["value"]), squash(size.text()), sums[0].text() if sums else None)
+            out[link.attrs["data-download"]] = (link.attrs["href"], file)
+        return out
+
+    def test_the_downloads_are_the_latest_releases_files(self):
+        """Each download links the latest release's file for its system, the hero's Windows' with Linux's for site.js;
+        under each, the file's name, its size as GitHub's release page gives it (MB of 1,048,576 bytes) with the bytes
+        in its data element, and its SHA256 in mono, the same on both pages; the version is the release's."""
+        pages, log = self.build()
+        self.assertEqual(log, "")
+        url = lambda name: f"https://github.com/MohammedEl-sayedAhmed/sedjem/releases/download/{fixture.TAG}/{name}"  # noqa: E731
+        (win, win_size, win_sha), (lin, lin_size, lin_sha) = fixture.FILES["windows"], fixture.FILES["linux"]
+        expected = {"hero": (url(win), url(lin)),
+                    "windows": (url(win), (win, win_size, "87.7 MB", win_sha)),
+                    "linux": (url(lin), (lin, lin_size, "190.2 MB", lin_sha))}
+        for lang, root in pages.items():
+            with self.subTest(lang):
+                self.assertEqual(self.downloads(root), expected)
+                for code in root.find(lambda n: n.tag == "code" and "sum" in n.classes()):
+                    self.assertEqual((code.attrs.get("lang"), code.attrs.get("dir"), code.attrs.get("translate")), ("en", "ltr", "no"))
+        self.assertEqual((f"{win_size / 2 ** 20:.1f}", f"{lin_size / 2 ** 20:.1f}"), ("87.7", "190.2"))
+        css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
+        (rule,) = re.findall(r"\n\.sum \{([^}]*)\}", css)
+        self.assertIn("var(--mono)", rule)
+        self.assertIn("user-select: all", rule)
+        script = (ROOT / "site" / "site.js").read_text(encoding="utf-8")
+        self.assertIn('link.setAttribute("href", link.getAttribute("data-href-linux"))', script)
+
+    def test_the_sums_come_from_the_release(self):
+        """SHA256SUMS.txt gives each file's SHA256 when the folder has it, and GitHub's digest otherwise; a file whose
+        two differ shows neither, with a line in the log, and one without either shows its name and size alone."""
+        (win, _, win_sha), (lin, _, lin_sha) = fixture.FILES["windows"], fixture.FILES["linux"]
+        sums = lambda pages: {k: v[1][3] for k, v in self.downloads(pages["en"]).items() if k != "hero"}  # noqa: E731
+        pages, log = self.build(fixture.release_json(digests=False), fixture.SUMS)
+        self.assertEqual((sums(pages), log), ({"windows": win_sha, "linux": lin_sha}, ""))
+        pages, log = self.build(fixture.release_json(), fixture.SUMS)
+        self.assertEqual((sums(pages), log), ({"windows": win_sha, "linux": lin_sha}, ""))
+        pages, log = self.build(fixture.release_json(), fixture.SUMS.replace(win_sha, "0" * 64))
+        self.assertEqual(sums(pages), {"windows": None, "linux": lin_sha})
+        self.assertIn(f"{win}: SHA256SUMS.txt and GitHub's digest differ", log)
+        pages, _ = self.build(fixture.release_json(digests=False))
+        self.assertEqual(sums(pages), {"windows": None, "linux": None})
+        self.assertEqual(self.downloads(pages["en"])["linux"][1][:3], (lin, fixture.FILES["linux"][1], "190.2 MB"))
+
+    def test_without_the_release_the_general_wording(self):
+        """Without the release's details (no folder, no release.json, a release.json that isn't a release's, a
+        pre-release, or a file served from elsewhere) every download links the release's page, with the general
+        wording, no file and no SHA256, and the version is the app's; the build says why in its log and goes on."""
+        latest = "https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest"
+        general = {"hero": (latest, latest), "windows": (latest, None), "linux": (latest, None)}
+        foreign = fixture.release_json()
+        foreign["assets"][0]["browser_download_url"] = "https://example.com/Sedjem-0.10.0-setup.exe"
+        for name, release, words in (("no folder", False, ""), ("not json", "{oops", "release.json can't be read"),
+                                     ("a pre-release", fixture.release_json(prerelease=True), "isn't a release"),
+                                     ("a preview's tag", fixture.release_json(tag="v0.10.1-preview.20261201"), "isn't a release"),
+                                     ("elsewhere", foreign, "is served from")):
+            with self.subTest(name):
+                if release == "{oops":
+                    tmp = tempfile.TemporaryDirectory()
+                    self.addCleanup(tmp.cleanup)
+                    (Path(tmp.name) / "release.json").write_text(release, encoding="utf-8")
+                    log = io.StringIO()
+                    with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
+                        out = build.build(Path(tmp.name) / "site", latest=Path(tmp.name))
+                    pages, log = {lang: parse((out / page).read_text(encoding="utf-8"))[0] for lang, page in HOMES.items()}, log.getvalue()
+                else:
+                    pages, log = self.build(release)
+                for lang, root in pages.items():
+                    self.assertEqual(self.downloads(root), general)
+                    (fine,) = root.find(lambda n: "fine" in n.classes())
+                    self.assertTrue(squash(fine.text()).endswith(VERSION_IN[lang].format(build.version())))
+                    self.assertFalse(root.find(lambda n: n.tag == "code" and "sum" in n.classes()))
+                self.assertIn(words, log)
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
+            build.build(Path(tmp.name) / "site", latest=Path(tmp.name))
+        self.assertIn("no release.json", log.getvalue())
+        # the general wording is today's: the installer's size and SmartScreen
+        with open(ROOT / "site" / "copy" / "en.toml", "rb") as f:
+            self.assertIn("The installer is about 90&nbsp;MB", tomllib.load(f)["get"]["windows_text"])
 
 
 if __name__ == "__main__":

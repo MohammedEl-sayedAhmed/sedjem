@@ -44,7 +44,6 @@ def t_axis(n):
 
 def adsr(n, a=0.01, d=0.1, s=0.7, r=0.2, hold=None):
     """An envelope of n samples: attack, decay to sustain, release over the last r seconds."""
-    t = t_axis(n)
     env = np.ones(n) * s
     a_n, d_n, r_n = int(a * SR), int(d * SR), int(r * SR)
     if a_n:

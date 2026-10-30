@@ -290,6 +290,7 @@ def groups(d):
           ("Bit rate", _num(rec.get("bit_rate")) and f"{round(rec['bit_rate'] / 1000)} kb/s", True),
           ("Size", size(rec.get("size")), True),
           ("Length", clock(rec.get("duration")), True),
+          ("Recorded", when(rec.get("recorded")), True),
           ("Video", video and video_text(rec), True))
     group("Model",
           ("Name", model_name(model), False),

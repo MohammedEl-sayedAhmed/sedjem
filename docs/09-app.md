@@ -60,6 +60,17 @@ merge two speakers that the model split, edit the text, change a line's speaker,
 audio again with another model to compare (the runs share one audio file, so this takes no extra
 space).
 
+*Run again with* lists the models that are ready, and the ones that have not run on the recording
+yet come first. A model that already made a transcript of it, or is making one, is listed below
+them as already run, and choosing it opens that transcript instead of starting another run. When
+the model made more than one, it opens the recording's main transcript if that is one of them, else
+the newest. A run that failed or was cancelled does not count, and neither does a branch, since no
+model made its text. Which transcripts belong to the same recording is decided as described in
+[comparing and combining transcripts](#comparing-and-combining-transcripts). *Again with other
+options*, at the end of the menu, runs this transcript's model on the recording once more, with the
+speakers, language and vocabulary starting as this transcript's and open to change. It makes a new
+transcript and leaves this one as it is.
+
 A recording with a picture also gets a video on its page, at the top of the side column (above the
 transcript, and kept in view, in a narrow window). The bar at the bottom then plays the video instead
 of the audio, so the transcript follows it the same way: the line being played is highlighted,
@@ -87,9 +98,9 @@ light and dark themes, the layout works in a narrow window, and the page loads n
 [privacy](#privacy) says).
 
 Each transcription keeps a record of how it was made: the recording (name, format, codec, sample
-rate, channels, bit rate, size, length), the model (its engine and file, or the service and API
-model), the run (processor or graphics card, power mode, threads, times, speed, peak memory, speaker
-model, app version) and the computer (maker and model, operating system, processor, memory, graphics
+rate, channels, bit rate, size, length, and when it was made), the model (its engine and file, or
+the service and API model), the run (processor or graphics card, power mode, threads, times, speed,
+peak memory, speaker model, app version) and the computer (maker and model, operating system, processor, memory, graphics
 cards). The *Details* panel shows the main lines, with the makers' logos next to the hardware and the
 system, *More details* the rest, and *Copy details* copies all of it. The exports carry it too:
 plain text starts with a short header, WebVTT with a `NOTE`, Markdown ends with a Details section
@@ -97,6 +108,28 @@ and JSON has a `details` object. SRT has no place for comments and stays as it w
 made before this was added show fewer details. In the text, subtitle and Markdown exports, a line
 that is mostly Arabic starts with a right-to-left mark, so players and editors show it right to
 left even when it begins with an English word.
+
+The sidebar lists the transcriptions, newest first, under Today and a heading for each month (with
+the year for another year). The search box above it filters them by title, model, course or branch
+name, and the menu beside the search changes the order: newest or oldest first by the date they were
+added, title A to Z or Z to A, longest or shortest first, last changed (the newest saved version
+first), or the recording's own date. The date orders keep the headings for today and the months; the
+title and length orders have none. A recording with several transcripts stays one item, ordered by
+its main transcript when it has one, else by its newest transcript (for last changed, the one changed
+last). A course stays one item too, ordered by its newest lecture, by its own title, or by the length
+of its lectures together, and its lectures stay in lecture order. A recording whose length isn't known
+yet comes last in both length orders. The search works on top of the order, and the order is
+remembered in the browser, like the theme; an order it doesn't know goes back to newest first. The
+menu is a labelled list that works with the keyboard and screen readers, and it stays beside the
+search in a narrow window.
+
+The recording's own date comes from the file's tags when they have one: the creation time that
+phones, recorders and cameras write into MP4, M4A, MOV and Matroska files, or the date of a WAV or MP3
+file. A bare year, a clock that was never set (before 1990) or a time still to come doesn't count, and
+the file's modified time is used instead. An upload keeps the modified time the browser gives for the
+file, as a copy would, and a file read in place has its own. The date is kept with the transcription
+when the recording is prepared, re-runs and branches keep it, and it shows as Recorded under *More
+details*. Transcriptions made before this was added sort by the date they were added.
 
 ## YouTube videos and courses
 
@@ -175,17 +208,17 @@ never changes. Each saved change after that is a new version (1, 2, and so on), 
 `v3` next to the title) lists them, newest first, with the time, the kind of change, your message if
 you gave one, and an automatic summary such as "3 lines changed, Speaker 1 renamed to Mona".
 
-- **Edit mode.** Everything done between *Edit* and *Done editing* (the text of lines, a line's
+- Edit mode: everything done between *Edit* and *Done editing* (the text of lines, a line's
   speaker, names, merges, the title) becomes one version. Before it is saved, *Review your changes*
   shows it the way `git diff` does: each changed line as it was in red and as it is now in green,
   the changed words marked, with one unchanged line around each change. The message is optional,
   and Enter saves.
-- **Quick changes.** Outside edit mode, renaming a speaker, merging two and changing the title are
+- Quick changes: outside edit mode, renaming a speaker, merging two and changing the title are
   saved at once with an automatic summary. Quick changes made within two minutes of each other,
   none with a message, are kept as one version.
-- **View** shows a version and what changed from the version before it, or from any other version.
-  **Restore** makes an older version the newest one again, and the versions in between stay.
-  **Export** and **Copy text** there give that version; the rest of the app uses the newest one. A
+- *View* shows a version and what changed from the version before it, or from any other version.
+  *Restore* makes an older version the newest one again, and the versions in between stay.
+  *Export* and *Copy text* there give that version; the rest of the app uses the newest one. A
   message can be added to any version, or changed, later.
 
 A transcription made before the history existed gets one the first time it is opened. Version 0 is
@@ -405,7 +438,7 @@ form also has a region field. The region is saved with the key in `secrets.json`
 `AZURE_SPEECH_REGION` overrides it, and `region` in the config is the default (`westeurope`). None
 of the four has been measured on Egyptian speech by the project.
 
-- **Gemini** ([keys](https://aistudio.google.com/apikey)) uses `gemini-3.5-transcribe` through the
+- Gemini ([keys](https://aistudio.google.com/apikey)) uses `gemini-3.5-transcribe` through the
   Interactions API, with `store: false` so Google doesn't keep the request. The app asks for verbatim
   text with word times and speaker labels when they are on (up to 8; three or more is experimental).
   For Arabic + English it sends no `language_codes`, so the model detects the language, which its
@@ -420,7 +453,7 @@ of the four has been measured on Egyptian speech by the project.
   tier costs nothing, but Google uses what you send to improve its products and human reviewers may
   read it, except for users in the EEA, Switzerland and the UK. With billing on it isn't used, and the
   price is about $0.30 an hour ($2 per million audio tokens in, $12 per million text tokens out).
-- **Deepgram** ([keys](https://console.deepgram.com/)) gets the audio as the body of one request to
+- Deepgram ([keys](https://console.deepgram.com/)) gets the audio as the body of one request to
   `/v1/listen` with `model=nova-3`, `language=ar-EG`, `smart_format`, `utterances`, `diarize_model=latest`
   for speaker labels (`diarize=true` is deprecated), your terms as `keyterm` (up to 100) and
   `mip_opt_out=true`, which keeps the audio out of Deepgram's model training. Nova-3 has 17 Arabic
@@ -429,7 +462,7 @@ of the four has been measured on Egyptian speech by the project.
   dropped. It can't detect Arabic, so auto-detect also sends `ar-EG`. There is $200 of free credit,
   then $0.0043 a minute ($0.26 an hour) with speaker labels included, and $0.0013 a minute more with
   key terms. Deepgram stores no transcripts.
-- **AssemblyAI** ([dashboard](https://www.assemblyai.com/dashboard/home)) gets the audio through
+- AssemblyAI ([dashboard](https://www.assemblyai.com/dashboard/home)) gets the audio through
   `/v2/upload`, then a transcript request with Universal-3.5 Pro (Universal-2 as the fallback),
   language detection expecting `ar` and `en` (how Universal-3.5 Pro follows switches between
   languages), `speaker_labels`, `speakers_expected` when you give the number (it is taken as exact)
@@ -440,7 +473,7 @@ of the four has been measured on Egyptian speech by the project.
   with key terms. AssemblyAI may train on the audio; free accounts can't opt out, paid ones can under
   *Data controls*. Its data page says audio sent to the EU endpoint
   (`base_url = "https://api.eu.assemblyai.com"`) isn't used for training.
-- **Azure AI Speech** ([portal](https://portal.azure.com/), *Keys and Endpoint* of the Speech resource)
+- Azure AI Speech ([portal](https://portal.azure.com/), *Keys and Endpoint* of the Speech resource)
   uses fast transcription: one multipart request to
   `https://<region>.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15`
   with the key in `Ocp-Apim-Subscription-Key`, the audio, and a definition with `locales: ["ar-EG"]`,
@@ -550,7 +583,7 @@ times in all; a used-up quota fails at once. Cancel works during an upload and b
 ElevenLabs and Speechmatics, none of the three leaves a stored job or transcript that the app could
 delete afterwards.
 
-- **OpenAI** uses `gpt-transcribe` ($0.27/h), which takes `languages[]` (the app sends `ar` and
+- OpenAI uses `gpt-transcribe` ($0.27/h), which takes `languages[]` (the app sends `ar` and
   `en`) and your terms as `keywords[]`. It returns text without times, as do `gpt-4o-transcribe`
   ($0.36/h) and `gpt-4o-mini-transcribe` ($0.18/h), which get the terms as `prompt`; so these are sent
   one stretch of 10 to 25 s at a time (`piece_s`), and each stretch becomes a line. That is 150 to
@@ -567,7 +600,7 @@ delete afterwards.
   computer instead.
   There is no free tier. OpenAI doesn't train on API data, and for transcriptions it keeps no
   abuse-monitoring logs and no application state.
-- **Groq** runs `whisper-large-v3` ($0.111/h; `whisper-large-v3-turbo` costs $0.04/h but is weaker
+- Groq runs `whisper-large-v3` ($0.111/h; `whisper-large-v3-turbo` costs $0.04/h but is weaker
   on Arabic) with `response_format = verbose_json`, segment timestamps and `language`. The `prompt` is
   the Egyptian style hint that took local large-v3 from 47% to 34% WER on ArzEn, followed by your
   terms, cut to about 200 characters because Whisper prompts are limited to 224 tokens; with the
@@ -577,7 +610,7 @@ delete afterwards.
   plan), so parts stay under 24 MB. Groq has no speaker labels; they come from the speaker model on this
   computer. It keeps no request data by default, but may log requests for up to 30 days to look into
   errors or abuse.
-- **Mistral** runs `voxtral-mini-2602` (Voxtral Mini Transcribe 2, $0.18/h) with
+- Mistral runs `voxtral-mini-2602` (Voxtral Mini Transcribe 2, $0.18/h) with
   `timestamp_granularities = segment`, `diarize` when labels are on, and up to 100 terms as
   `context_bias`. Its docs say timestamps can't be combined with `language`, so the language is always
   detected, and that context bias is tuned for English. Phrases are sent with underscores for
@@ -586,15 +619,15 @@ delete afterwards.
   parts are kept to 58 minutes; each part has its own speaker numbers. Mistral may use API data to
   improve its models unless *Anonymous improvement data* is switched off (*Admin*, then *Privacy*).
 
-**Speaker labels on this computer.** For a model without speaker labels (Groq, or OpenAI with
-`diarize_model = ""`), when labels are on and a speaker model is downloaded, the app runs the voice
+Speaker labels for a model without them (Groq, or OpenAI with `diarize_model = ""`) are made on this
+computer: when labels are on and a speaker model is downloaded, the app runs the voice
 step of the local models before uploading, with the speaker model in use ([speaker
 models](#speaker-models)). It runs in the model process (`app/worker.py --speaker-timeline`, which
 prints the timeline as JSON), and each line gets the speaker of most windows within it, so a line
 that spans a change of speaker goes to whoever talks most in it. Run once with TitaNet-small on six
 public Perle clips joined together, the step took 1.3 s and gave each clip its own speaker.
 
-**Checked on 25 September 2026** in the official docs:
+Checked on 25 September 2026 in the official docs:
 [OpenAI's speech-to-text guide](https://developers.openai.com/api/docs/guides/speech-to-text), the
 model pages for
 [gpt-transcribe](https://developers.openai.com/api/docs/models/gpt-transcribe),
@@ -623,7 +656,7 @@ example requests and replies), [overview](https://docs.mistral.ai/studio/audio/s
 [free mode](https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key)
 and [training opt-out](https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training).
 
-**Not verified:** how long a request the 4o models take (only the 2,000 output tokens are
+Not verified: how long a request the 4o models take (only the 2,000 output tokens are
 documented; users report about 1,400 to 1,500 s), how many tokens a minute of audio counts for
 against the per-minute limit, whether the 2,000 tokens apply per chunk or per request with
 `chunking_strategy = auto`, whether the diarize model takes WebM clips as known
@@ -731,9 +764,9 @@ Every change needs the header `X-Sedjem: 1`.
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
 | `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
-| `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&confirm_upload=` | the body is the file |
+| `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&modified=&confirm_upload=` | the body is the file; `modified` is the file's modified time in milliseconds, kept as the recording's date when its tags have none |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
-| `GET /api/jobs`, `GET /api/jobs/<id>` | the list; one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |
+| `GET /api/jobs`, `GET /api/jobs/<id>` | the list, newest first, each with `changed` (when its latest version was saved, else when it finished or was added) and `recorded` (when the recording was made, else when it was added); one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |
 | `PATCH /api/jobs/<id>` | `title`, `speaker_names`, `lines`, or `merge: {from, into}`; with `base_version`, 409 and no change when that isn't the latest version |
 | `POST /api/jobs/<id>/cancel`, `POST /api/jobs/<id>/rerun`, `DELETE /api/jobs/<id>` | |
 | `POST /api/jobs/<id>/branch` with `{"version": …, "name": …}` | a branch: a new transcript of the recording that starts as that version |

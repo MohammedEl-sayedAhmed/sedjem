@@ -1,12 +1,14 @@
-"""Public totals of Sedjem's anonymous usage counts (app/usage.py, docs/13-usage-counts.md), from Aptabase's
-monthly exports.
+"""Public totals of Sedjem's anonymous usage counts (app/usage.py, docs/13-usage-counts.md) and of its website's
+(site/counts.js, docs/privacy.md), from Aptabase's monthly exports.
 
 Once a month, a few days into it:
   1. In Aptabase (eu.aptabase.com), open Sedjem's Export page and download the Release events of last month, and of
      this month so far, as CSV. An event is stamped when it is sent, so one sent late (after a few days offline)
-     is in this month's export although it counts for last month.
-  2. python tools/usage_totals.py path/to/last-month.csv path/to/this-month.csv
-  3. Read the changes to docs/usage.json, README.md and docs/13-usage-counts.md, and commit them.
+     is in this month's export although it counts for last month. Download last month's events of the "Sedjem
+     website" app too.
+  2. python tools/usage_totals.py path/to/last-month.csv path/to/this-month.csv --website path/to/website.csv
+  3. Read the changes to docs/usage.json, README.md and docs/13-usage-counts.md, and commit them. The website shows
+     the newest month once the change is on main.
   4. Delete the exports. They have every event with its daily user hash and session id, so they never go into the
      repository.
 
@@ -21,6 +23,13 @@ Only totals are written: counts, sums, shares and averages. A country is listed 
 active there that month, and so is a region, a system, a version of a system or of Sedjem, and a locale; the rest
 are added up as "other", so that no one install can be picked out.
 
+The website's totals go into docs/usage.json under "website", by month: the page views, and the visitors (one a
+day for each of Aptabase's daily hashes, added up), the countries, the pages by language, the phones, tablets and
+desktops, the sites that linked to it, and the download clicks by platform. A country or a site is listed only when
+at least 3 visitors came from it that month, and at most 10 sites are, so that no one visit can be picked out. An
+event the pages never send (another event, a prop too many or too few, a value not on counts.js's lists) is left
+out.
+
 The exports' columns are found by their names, in any order and letter case: timestamp, event_name, os_name,
 os_version, app_version, country_code, and string_props with numeric_props (or one props column); region_name and
 locale are read when they are there. The props may be JSON with single quotes in place of double ones. A missing
@@ -28,10 +37,11 @@ column stops the script with its name. Anyone can post events with the app key, 
 never sends is left out: a week_summary whose numbers aren't whole numbers up to what a week can hold is skipped,
 and a value Sedjem never sends (or a name that isn't plain text) counts as "unknown" or "other".
 
-Options: --month 2026-11 (the month to total; default the month before --exported), --exported 2026-12-03 (the
-day of the exports; default today), --root (the repository to write into; default this one).
-Standard library only; the lists of what Sedjem sends are copies of app/usage.py's, which tests/test_usage.py
-compares.
+Options: --website (the website's exports; either set alone totals only its part), --month 2026-11 (the month to
+total; default the month before --exported), --exported 2026-12-03 (the day of the exports; default today), --root
+(the repository to write into; default this one).
+Standard library only; the lists of what Sedjem sends are copies of app/usage.py's, and those of what the website
+sends are site/counts.js's, which tests/test_usage.py compares.
 """
 import argparse
 import csv
@@ -47,13 +57,14 @@ OUT = Path("docs/usage.json")
 PAGES = {"readme": Path("README.md"), "docs": Path("docs/13-usage-counts.md")}
 START, END = "<!-- usage-totals:start -->", "<!-- usage-totals:end -->"
 LEAST = 3  # installs a country (or a region, a version, a locale) needs that month to be listed by name
+SITES = 10  # the most sites that linked to the website listed by name
 
 # The columns, by the names an export may give them (compared in lower case, with - and spaces as _)
 COLUMNS = {"timestamp": ("timestamp",), "event": ("event_name", "eventname"), "os": ("os_name", "osname"),
            "os_version": ("os_version", "osversion"), "app_version": ("app_version", "appversion"),
            "country": ("country_code", "countrycode"), "region": ("region_name", "regionname"), "locale": ("locale",),
            "string_props": ("string_props", "stringprops"), "numeric_props": ("numeric_props", "numericprops"),
-           "props": ("props", "properties")}
+           "props": ("props", "properties"), "user": ("user_id", "userid")}
 REQUIRED = ("timestamp", "event", "os", "os_version", "app_version", "country")
 
 # What Sedjem sends (copies of app/usage.py's lists)
@@ -97,6 +108,13 @@ FEATURES = {"youtube": ("youtube",), "editing": EDITS, "compare": ("compares",),
 PLAIN = re.compile(r"[A-Za-z0-9][A-Za-z0-9 .()_/+-]{0,59}")  # a system's or Sedjem's version as it may be published
 PLACE = re.compile(r"[^\W\d_][\w .,'()/-]{0,59}")  # a region's name, in any alphabet
 MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
+
+# What the website sends (a copy of site/counts.js's EVENTS): each event with its props and their values, None for
+# the referrer, a host name as HOST allows it
+WEBSITE = {"page_view": {"page": ("en", "ar", "404"), "device": ("phone", "tablet", "desktop"),
+                         "theme": ("light", "dark", "system"), "referrer": None},
+           "download": {"platform": ("windows", "linux", "source"), "place": ("hero", "get"), "page": ("en", "ar", "404")}}
+HOST = re.compile(r"[a-z0-9._:\[\]-]{1,60}")
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
           "November", "December")
 
@@ -160,7 +178,8 @@ def week_month(week):
 
 def read(paths):
     """The exports' rows: {"month" (the month it counts for), "event", "os", "os_version", "app_version", "country",
-    "region", "locale", "props"}."""
+    "region", "locale", "props", "visitor"}. The visitor is the day and Aptabase's daily hash, to count visitors
+    by, or the row's own number when the export has no user column."""
     out = []
     for path in [paths] if isinstance(paths, (str, Path)) else paths:
         try:
@@ -184,7 +203,8 @@ def read(paths):
                 month = week_month(merged.get("week")) or sent
             out.append({"month": month, "event": event, "os": cell("os"), "os_version": cell("os_version"),
                         "app_version": cell("app_version"), "country": cell("country").upper(),
-                        "region": cell("region"), "locale": cell("locale").lower(), "props": merged})
+                        "region": cell("region"), "locale": cell("locale").lower(), "props": merged,
+                        "visitor": (cell("timestamp")[:10], cell("user")) if cell("user") else len(out)})
     return out
 
 
@@ -192,6 +212,19 @@ def fold(counts, least=LEAST):
     """The values with at least `least` installs, most first, and the rest added up as "other"."""
     shown = {k: n for k, n in sorted(counts.items(), key=lambda kv: (-kv[1], kv[0])) if n >= least and k != "other"}
     rest = sum(counts.values()) - sum(shown.values())
+    return {**shown, **({"other": rest} if rest else {})}
+
+
+def fold_visitors(rows, key, least=LEAST, most=None):
+    """Page views by the value key(row) gives, listed by name, most first, only for a value at least `least` visitors
+    came with (and at most `most` of them); the rest are added up as "other"."""
+    views, visitors = Counter(), {}
+    for r in rows:
+        views[key(r)] += 1
+        visitors.setdefault(key(r), set()).add(r["visitor"])
+    shown = [k for k in sorted(views, key=lambda k: (-views[k], k)) if len(visitors[k]) >= least and k != "other"]
+    shown = {k: views[k] for k in shown[:most]}
+    rest = sum(views.values()) - sum(shown.values())
     return {**shown, **({"other": rest} if rest else {})}
 
 
@@ -288,6 +321,43 @@ def totals(rows, month, exported):
     }
 
 
+def website_events(rows):
+    """The website's events that hold exactly what its pages send, and how many others were left out."""
+    good, skipped = [], 0
+    for r in rows:
+        allowed = WEBSITE.get(r["event"])
+        props = r["props"]
+        if allowed and set(props) == set(allowed) and all(
+                isinstance(props[k], str) and (props[k] in values if values else HOST.fullmatch(props[k]))
+                for k, values in allowed.items()):
+            good.append(r)
+        else:
+            skipped += 1
+    return good, skipped
+
+
+def website_totals(rows, month, exported):
+    """That month's totals of the website's counts: page views and visitors, where they came from and what they
+    opened, and the download clicks."""
+    events, skipped = website_events([r for r in rows if r["month"] == month])
+    views = [r for r in events if r["event"] == "page_view"]
+    clicks = [r for r in events if r["event"] == "download"]
+    country = lambda r: r["country"] if re.fullmatch(r"[A-Z]{2}", r["country"]) else "other"  # noqa: E731
+    by = lambda rows_, prop, values: {v: sum(1 for r in rows_ if r["props"][prop] == v) for v in values}  # noqa: E731
+    linked = [r for r in views if r["props"]["referrer"] != "none"]
+    return {
+        "month": month, "exported": exported,
+        "page_views": len(views), "visitors": len({r["visitor"] for r in views}),
+        "countries": {"count": len({country(r) for r in views} - {"other"}), "page_views": fold_visitors(views, country)},
+        "pages": by(views, "page", WEBSITE["page_view"]["page"]),
+        "devices": by(views, "device", WEBSITE["page_view"]["device"]),
+        "referrers": {"none": len(views) - len(linked),
+                      "sites": fold_visitors(linked, lambda r: r["props"]["referrer"], most=SITES)},
+        "downloads": {"clicks": len(clicks), "platforms": by(clicks, "platform", WEBSITE["download"]["platform"])},
+        "skipped": skipped,
+    }
+
+
 # ---------------------------------------------------------------------------------------------
 # Writing
 # ---------------------------------------------------------------------------------------------
@@ -341,20 +411,23 @@ def put_block(text, block, name):
     return f"{text[:start + len(START)]}\n{block}\n{text[end:]}"
 
 
-def write(root, t):
-    """Add the month to docs/usage.json and write the totals into README.md and docs/13-usage-counts.md."""
+def write(root, t=None, site=None):
+    """Add the app's month (t) and the website's (site) to docs/usage.json, keeping the other months, and write the
+    app's totals into README.md and docs/13-usage-counts.md."""
     root = Path(root)
     path = root / OUT
     try:
         old = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         old = {}
-    months = old.get("months") if isinstance(old.get("months"), dict) else {}
-    months = dict(sorted({**months, t["month"]: t}.items()))
-    data = {"about": "Monthly totals of Sedjem's anonymous usage counts, made by tools/usage_totals.py from "
-                     "Aptabase's exports; see docs/13-usage-counts.md", "months": months}
+    kept = lambda key: old.get(key) if isinstance(old.get(key), dict) else {}  # noqa: E731
+    months = dict(sorted({**kept("months"), **({t["month"]: t} if t else {})}.items()))
+    website = dict(sorted({**kept("website"), **({site["month"]: site} if site else {})}.items()))
+    data = {"about": "Monthly totals of Sedjem's anonymous usage counts (months) and of its website's (website), made "
+                     "by tools/usage_totals.py from Aptabase's exports; see docs/13-usage-counts.md", "months": months,
+            **({"website": website} if website else {})}
     pages = {}
-    for key, page in PAGES.items():
+    for key, page in PAGES.items() if months else ():
         text = (root / page).read_text(encoding="utf-8")
         block = readme_block(months[max(months)]) if key == "readme" else docs_block(months)  # the newest month
         pages[page] = put_block(text, block, page.as_posix())
@@ -364,9 +437,18 @@ def write(root, t):
         (root / page).write_text(text, encoding="utf-8")
 
 
+def exported_month(rows, month, whose):
+    """ExportError when the exports hold nothing for the month, naming the months they do hold."""
+    if not any(r["month"] == month for r in rows):
+        found = sorted({r["month"] for r in rows if MONTH.fullmatch(r["month"])})
+        raise ExportError(f"{whose} exports have nothing for {month} (they have {', '.join(found) or 'no month'}); "
+                          "choose the month with --month")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("exports", type=Path, nargs="+", help="Aptabase's exports of Release events, as CSV")
+    ap.add_argument("exports", type=Path, nargs="*", help="Aptabase's exports of Release events, as CSV")
+    ap.add_argument("--website", type=Path, nargs="+", default=[], help="the Sedjem website app's exports, as CSV")
     ap.add_argument("--month", help="the month to total, as 2026-11 (default: the month before --exported)")
     ap.add_argument("--exported", default=date.today().isoformat(), help="the day of the exports (default today)")
     ap.add_argument("--root", type=Path, default=ROOT, help="the repository to write into (default this one)")
@@ -376,20 +458,30 @@ def main(argv=None):
             raise ExportError(f"--month {args.month} isn't a month like 2026-11")
         if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])-\d\d", args.exported):
             raise ExportError(f"--exported {args.exported} isn't a day like 2026-12-03")
+        if not args.exports and not args.website:
+            raise ExportError("give the app's exports, the website's (--website), or both")
         month = args.month or last_month(args.exported)
-        rows = read(args.exports)
-        if not any(r["month"] == month for r in rows):
-            found = sorted({r["month"] for r in rows if MONTH.fullmatch(r["month"])})
-            raise ExportError(f"the exports have nothing for {month} (they have {', '.join(found) or 'no month'}); "
-                              "choose the month with --month")
-        t = totals(rows, month, args.exported)
-        write(args.root, t)
+        t = site = None
+        if args.exports:
+            rows = read(args.exports)
+            exported_month(rows, month, "the app's")
+            t = totals(rows, month, args.exported)
+        if args.website:
+            rows = read(args.website)
+            exported_month(rows, month, "the website's")
+            site = website_totals(rows, month, args.exported)
+        write(args.root, t, site)
     except ExportError as e:
         sys.exit(f"usage_totals: {e}")
-    print(f"{month_name(t['month'])}: {t['installs']['active']} active installs, {t['installs']['new']} new, "
-          f"{t['installs']['countries']['count']} countries, {t['runs']['transcriptions']} transcriptions, "
-          f"{t['runs']['hours']} hours" + (f"; {t['skipped']} week summaries left out" if t["skipped"] else ""))
-    print(f"Wrote {OUT.as_posix()}, README.md and docs/13-usage-counts.md. Delete the exports now.")
+    if t:
+        print(f"{month_name(t['month'])}: {t['installs']['active']} active installs, {t['installs']['new']} new, "
+              f"{t['installs']['countries']['count']} countries, {t['runs']['transcriptions']} transcriptions, "
+              f"{t['runs']['hours']} hours" + (f"; {t['skipped']} week summaries left out" if t["skipped"] else ""))
+    if site:
+        print(f"The website in {month_name(site['month'])}: {site['page_views']} page views by {site['visitors']} "
+              f"visitors, {site['countries']['count']} countries, {site['downloads']['clicks']} download clicks"
+              + (f"; {site['skipped']} events left out" if site["skipped"] else ""))
+    print(f"Wrote {OUT.as_posix()}" + (", README.md and docs/13-usage-counts.md" if t else "") + ". Delete the exports now.")
 
 
 if __name__ == "__main__":

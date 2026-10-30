@@ -259,26 +259,70 @@ function jobPercent(j) {
   return 0;
 }
 
+// The orders of the list, chosen next to its search: {value: [label, what an item is ordered by, direction]}. The
+// date orders have a heading for today and one for each month; the others have none.
+const SORTS = {
+  newest: ["Newest first", "added", -1],
+  oldest: ["Oldest first", "added", 1],
+  title: ["Title A to Z", "title", 1],
+  "title-desc": ["Title Z to A", "title", -1],
+  longest: ["Longest first", "length", -1],
+  shortest: ["Shortest first", "length", 1],
+  changed: ["Last changed", "changed", -1],
+  recorded: ["Recording date", "recorded", -1],
+};
+const DATED = new Set(["added", "changed", "recorded"]);
+const SORT_KEY = "sedjem-sort";  // localStorage: the order chosen, newest first when what is kept is unknown
+const sortKept = () => { try { const v = localStorage.getItem(SORT_KEY); return Object.hasOwn(SORTS, v) ? v : "newest"; } catch { return "newest"; } };
+const stamp = (iso) => Date.parse(iso) || 0;
+const byTitle = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+// What an item is ordered by. A recording: its main transcript, else its newest one (for last changed, the one
+// changed last). A course: its newest lecture by that date, its title, and its lectures' length together. The
+// API gives each job when it was last changed and when its recording was made (else when it was added).
+function sortKeys(r) {
+  const latest = (k) => Math.max(...r.jobs.map((j) => stamp(j[k])));
+  if (r.course) {
+    return { title: r.course.title || "Course", added: latest("created"), changed: latest("changed"), recorded: latest("recorded"),
+      length: r.lectures.reduce((t, j) => t + (j.audio_s || 0), 0) || null, id: r.jobs[0].id };
+  }
+  const j = r.main || r.newest;
+  return { title: j.title || "Untitled", added: stamp(j.created), changed: r.main ? stamp(j.changed) : latest("changed"),
+    recorded: stamp(j.recorded), length: j.audio_s || null, id: j.id };
+}
+
+// The heading over an item in a date order: Today, else its month ("October", "March 2025" in another year)
+function dateHeading(t) {
+  const d = new Date(t), now = new Date();
+  if (d.toDateString() === now.toDateString()) return "Today";
+  return d.toLocaleDateString([], { month: "long", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+}
+
 function renderSidebar() {
   const q = $("#jobSearch").value.trim().toLowerCase();
   const hit = (j) => !q || (j.title || "").toLowerCase().includes(q) || (j.model_title || "").toLowerCase().includes(q)
     || (j.course?.title || "").toLowerCase().includes(q) || (j.branch?.name || "").toLowerCase().includes(q);
   // a recording once, with its transcripts (compare.js); a course once, with its lectures (youtube.js)
   const recordings = jobGroups(S.jobs.filter((j) => !j.course)).filter((r) => r.jobs.some(hit));
-  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit)).map((c) => ({ ...c, newest: c.jobs[0] }))]
-    .sort((a, b) => b.newest.created.localeCompare(a.newest.created) || b.newest.id.localeCompare(a.newest.id));
+  const [, by, dir] = SORTS[$("#jobSort").value] || SORTS.newest;
+  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit))].map((r) => ({ ...r, keys: sortKeys(r) }));
+  items.sort((a, b) => {
+    const x = a.keys[by], y = b.keys[by];
+    if ((x == null) !== (y == null)) return x == null ? 1 : -1;  // a length not known yet (or never read) goes last
+    return dir * (by === "title" ? byTitle.compare(x, y) : x - y)
+      || b.keys.added - a.keys.added || b.keys.id.localeCompare(a.keys.id);  // then newest first
+  });
   if (!items.length) {
     $("#jobList").innerHTML = `<div class="empty-list">${S.jobs.length ? "No matches" : "Your transcriptions will appear here."}</div>`;
     return;
   }
-  const today = new Date().toDateString();
   let group = null;
   $("#jobList").innerHTML = items.map((r) => {
-    const j = r.newest;
-    const g = new Date(j.created).toDateString() === today ? "Today" : "Earlier";
-    const head = g !== group ? `<div class="job-group">${(group = g)}</div>` : "";
+    const g = DATED.has(by) ? dateHeading(r.keys[by]) : null;
+    const head = g && g !== group ? `<div class="job-group">${esc((group = g))}</div>` : "";
     if (r.course) return head + courseItem(r);
     if (r.jobs.length > 1) return head + groupItem(r);
+    const j = r.newest;
     const activeCls = S.route.name === "job" && S.route.id === j.id ? " active" : "";
     const bar = ACTIVE.has(j.status) ? `<div class="bar"><i style="width:${jobPercent(j).toFixed(1)}%"></i></div>` : "";
     return `${head}<a class="job-item${activeCls}" href="#/job/${j.id}">
@@ -288,6 +332,7 @@ function renderSidebar() {
   }).join("");
   bindCourses();
   refreshGroupBar();
+  refreshRerunMenu();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -318,6 +363,14 @@ function estimateText(m, seconds, short = false) {
   if (short) return `About <b>${human(t)}</b> on this computer${slow ? " (power-saver)" : ""}`;
   return `About <b>${human(t)}</b>${where}${sp.measured ? " (measured on earlier runs)" : ""}${slow ? " in power-saver mode. Performance mode (Settings) is about 3–5× faster" : ""}`;
 }
+
+// The options of a transcription, on the new transcription page and in Again with other options
+const SPEAKER_CHOICES = [["none", "No labels"], ["auto", "Auto-detect"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
+const LANGUAGES = [["ar", "Arabic + English"], ["en", "English"], ["auto", "Auto-detect"]];
+const languageHint = (m, language) => (m?.id === "cohere" && language === "auto"
+  ? "Cohere can't detect the language, so it will use Arabic." : "Arabic + English is right for code-switched meetings.");
+const promptHint = (m) => esc(m.prompt_hint) || { elevenlabs: "Sent as key terms (up to 5 words each). ElevenLabs charges about 20% more for requests with key terms.",
+  speechmatics: "Sent as custom vocabulary (up to 6 words per term)." }[m.id] || "Given to Whisper as a hint. Plausible but untested; leave empty if unsure.";
 
 function speakerHint(m, speakers) {
   if (speakers === "none") return "One block of text with timestamps, no names.";
@@ -367,8 +420,7 @@ function renderNew() {
   formDefaults();
   const f = S.form, m = formModel(), st = S.status;
   const src = f.file ? { name: f.file.name, size: f.file.size } : f.path;
-  const speakerOpts = [["none", "No labels"], ["auto", "Auto-detect"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]];
-  const custom = !speakerOpts.some(([v]) => v === f.speakers);
+  const custom = !SPEAKER_CHOICES.some(([v]) => v === f.speakers);
   const hosted = m && m.kind === "hosted";
   const yt = f.source === "youtube", picked = yt ? ytPicked().length : 0;
   const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); YouTube links run here
@@ -417,14 +469,14 @@ function renderNew() {
     <div class="step-head"><span class="step-num">3</span> Options</div>
     <div class="field">
       <span class="field-label">Speakers</span>
-      <div class="segmented" id="spk">${speakerOpts.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.speakers === v}">${t}</button>`).join("")}<input type="number" id="spkN" min="1" max="20" placeholder="7+" value="${custom ? esc(f.speakers) : ""}" aria-label="Number of speakers"></div>
+      <div class="segmented" id="spk">${SPEAKER_CHOICES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.speakers === v}">${t}</button>`).join("")}<input type="number" id="spkN" min="1" max="20" placeholder="7+" value="${custom ? esc(f.speakers) : ""}" aria-label="Number of speakers"></div>
       <p class="hint" id="spkHint">${speakerHint(m, f.speakers)}${speakerLimits(m, f.speakers)}</p>
     </div>
     <div class="grid2">
       <div class="field">
         <span class="field-label">Language</span>
-        <div class="segmented" id="lang">${[["ar", "Arabic + English"], ["en", "English"], ["auto", "Auto-detect"]].map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
-        <p class="hint">${m?.id === "cohere" && f.language === "auto" ? "Cohere can't detect the language, so it will use Arabic." : "Arabic + English is right for code-switched meetings."}</p>
+        <div class="segmented" id="lang">${LANGUAGES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
+        <p class="hint">${languageHint(m, f.language)}</p>
       </div>
       ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">Each transcription is named after its video; you can rename it later.</p></div>` : `<div class="field">
         <label for="titleInput">Title</label>
@@ -434,8 +486,7 @@ function renderNew() {
     ${m?.prompt ? `<div class="field">
       <label for="promptInput">Vocabulary <span class="opt">optional</span></label>
       <textarea id="promptInput" dir="auto" rows="2" placeholder="Names and terms, comma-separated: Jira, GitHub, backend, deployment">${esc(f.prompt)}</textarea>
-      <p class="hint">${esc(m.prompt_hint) || { elevenlabs: "Sent as key terms (up to 5 words each). ElevenLabs charges about 20% more for requests with key terms.",
-        speechmatics: "Sent as custom vocabulary (up to 6 words per term)." }[m.id] || "Given to Whisper as a hint. Plausible but untested; leave empty if unsure."}</p>
+      <p class="hint">${promptHint(m)}</p>
     </div>` : ""}
   </div>
 
@@ -568,7 +619,8 @@ async function start() {
     } else {
       S.uploading = { loaded: 0, total: f.file.size };
       renderNew();
-      job = await api.upload(f.file, { ...params, name: f.file.name }, (loaded, total) => {
+      // its modified time is the recording's date when the file's tags have none (sysinfo.recording)
+      job = await api.upload(f.file, { ...params, name: f.file.name, modified: f.file.lastModified }, (loaded, total) => {
         S.uploading = { loaded, total };
         const bar = $(".progress i"), text = $("#uploadText");
         if (bar) bar.style.width = `${(loaded / total * 100).toFixed(1)}%`;
@@ -667,9 +719,8 @@ function renderJob() {
     j.seconds ? `<span>${ICON.cpu} took ${human(j.seconds)}${j.rtf ? ` (${Number(j.rtf).toFixed(2)}× real time)` : ""}</span>` : "",
     `<span>${esc(when(j.created))}</span>`,
   ].filter(Boolean).join("");
-  const otherModels = (S.status?.models || []).filter((x) => x.ready);
   const exportMenu = ["txt", "srt", "vtt", "md", "json"].map((fmt) => `<a href="/api/jobs/${j.id}/export/${fmt}" data-fmt="${fmt}" download>${ICON.download} ${{ txt: "Text (.txt)", srt: "Subtitles (.srt)", vtt: "Web subtitles (.vtt)", md: "Markdown (.md)", json: "JSON (.json)" }[fmt]}</a>`).join("");
-  const rerunMenu = otherModels.map((x) => `<button data-rerun="${esc(x.id)}">${x.kind === "hosted" ? ICON.cloud : ICON.laptop} ${esc(x.title)}<span class="sub">${x.id === j.model ? "same" : x.kind === "hosted" ? "uploads" : "local"}</span></button>`).join("");
+  rerunShown = rerunMenu(j);
   const hasLines = S.lines.length > 0;
   const slot = videoSlot();  // the video, or its progress while it is being made
 
@@ -708,7 +759,7 @@ function renderJob() {
     <div class="actions">
       <div class="menu-wrap"><button class="btn" data-menu="exportMenu" ${hasLines ? "" : "disabled"}>${ICON.download} Export ${ICON.chevron}</button><div class="menu" id="exportMenu">${exportMenu}</div></div>
       <button class="btn" id="copyBtn" ${hasLines ? "" : "disabled"}>${ICON.copy} Copy text</button>
-      <div class="menu-wrap"><button class="btn" data-menu="rerunMenu" ${S.hasAudio ? "" : "disabled"}>${ICON.redo} Run again with ${ICON.chevron}</button><div class="menu" id="rerunMenu">${rerunMenu || '<button disabled>No other model is ready</button>'}</div></div>
+      <div class="menu-wrap"><button class="btn" data-menu="rerunMenu" ${S.hasAudio ? "" : "disabled"}>${ICON.redo} Run again with ${ICON.chevron}</button><div class="menu" id="rerunMenu">${rerunShown}</div></div>
       <div class="menu-wrap"><button class="btn" data-menu="branchMenu" ${j.status === "done" && S.version != null ? "" : "disabled"}>${BRANCH_ICON} Branches ${ICON.chevron}</button><div class="menu" id="branchMenu">
         <button type="button" id="mainBtn">${mainItem(j)}</button>
         <button type="button" id="branchHere">${BRANCH_ICON} New branch from this version…</button></div></div>
@@ -919,6 +970,7 @@ function bindJob() {
   };
   $$("[data-menu]").forEach((b) => (b.onclick = (e) => { e.stopPropagation(); toggleMenu(b.dataset.menu); }));
   $$("[data-rerun]").forEach((b) => (b.onclick = () => rerun(b.dataset.rerun)));
+  bindRerunMenu();
   $$("#exportMenu a").forEach((a) => (a.onclick = (e) => saveExport(e, a)));
   const copy = $("#copyBtn");
   if (copy) copy.onclick = () => copyText();  // the text only; Copy details has the rest
@@ -1006,20 +1058,136 @@ function markDirty() {
   bindEditbar();
 }
 
-async function rerun(modelId) {
+// ---- Run again with --------------------------------------------------------------------------------
+// The models that made a transcript of a job's recording, {model id: the transcript to open}: one that finished or
+// is running, not a branch (a branch's text was copied, not made by a model). The transcript to open is the
+// recording's main one when it is of that model, else the newest the model made. The recording's transcripts are
+// its group in the list (compare.js groupOf, app/compare.py).
+function modelsRun(j) {
+  const list = groupOf(j.id), out = new Map();
+  for (const x of list.length ? list : [j]) {  // oldest first, so the newest stays
+    if (!x.branch && (x.status === "done" || ACTIVE.has(x.status))) out.set(x.model, x);
+  }
+  const main = list.find((x) => x.main && x.status === "done");
+  if (main && out.has(main.model)) out.set(main.model, main);
+  return out;
+}
+
+// The menu: the ready models still to try on this recording, then the ones that already ran on it, each a link to
+// its transcript, and this transcript's model again with other options.
+let rerunShown = "";
+function rerunMenu(j) {
+  const ready = (S.status?.models || []).filter((x) => x.ready), ran = modelsRun(j), own = model(j.model);
+  const icon = (x) => (x.kind === "hosted" ? ICON.cloud : ICON.laptop);
+  const left = ready.filter((x) => !ran.has(x.id)).map((x) => `<button type="button" data-rerun="${esc(x.id)}">${icon(x)} ${esc(x.title)}<span class="sub">${x.kind === "hosted" ? "uploads" : "local"}</span></button>`);
+  const done = ready.filter((x) => ran.has(x.id)).map((x) => {
+    const t = ran.get(x.id), here = t.id === j.id, running = ACTIVE.has(t.status);
+    const tip = here ? "The transcript on this page" : running ? "Open the transcript it is making"
+      : t.main ? "Open the recording's main transcript, made with it" : "Open the transcript it made";
+    return `<a class="ran" href="#/job/${esc(t.id)}" data-ran="${esc(x.id)}" title="${tip}">${icon(x)} ${esc(x.title)}<span class="sub">${running ? "" : ICON.check} ${here ? "this transcript" : running ? "running" : "already run"}</span></a>`;
+  });
+  const again = own ? `<button type="button" id="againBtn" ${own.ready ? "" : "disabled"} title="${esc(own.title)} on this recording again, with other speakers, language or vocabulary">${ICON.redo} Again with other options…</button>` : "";
+  return [left.join("") || `<button type="button" disabled>${ready.length ? "No model left to try" : "No model is ready"}</button>`,
+    done.join(""), again].filter(Boolean).join("<hr>");
+}
+
+function bindRerunMenu() {
+  $$("#rerunMenu [data-rerun]").forEach((b) => (b.onclick = () => rerun(b.dataset.rerun)));
+  $$("#rerunMenu a.ran").forEach((a) => (a.onclick = () => closeMenus()));
+  const again = $("#againBtn");
+  if (again) again.onclick = () => openAgain();
+}
+
+// After the list of transcriptions was fetched again: a run that finished or started meanwhile shows in the menu
+function refreshRerunMenu() {
+  const menu = $("#rerunMenu");
+  if (!menu || S.route.name !== "job" || !S.job) return;
+  const html = rerunMenu(S.job);
+  if (html === rerunShown) return;
+  menu.innerHTML = rerunShown = html;
+  bindRerunMenu();
+}
+
+// options: the speakers, language and vocabulary to use instead of this transcript's (Again with other options).
+// Whether the new transcription was started.
+async function rerun(modelId, options = {}) {
   const m = model(modelId);
-  if (!m) return;
+  if (!m) return false;
   closeMenus();
   let confirmUpload = false;
   if (m.kind === "hosted") {
-    if (!confirm(`Upload this recording to ${m.service} to transcribe it? It leaves this computer.`)) return;
+    if (!confirm(`Upload this recording to ${m.service} to transcribe it? It leaves this computer.`)) return false;
     confirmUpload = true;
   }
   try {
-    const r = await api.post(`/api/jobs/${S.job.id}/rerun`, { model: modelId, confirm_upload: confirmUpload });
+    const r = await api.post(`/api/jobs/${S.job.id}/rerun`, { ...options, model: modelId, confirm_upload: confirmUpload });
     await refreshJobs();
-    location.hash = `#/job/${r.id}`;
-  } catch (e) { toast(e.message, "error"); }
+    location.hash = `#/job/${r.id}`;  // (which closes the dialog)
+    return true;
+  } catch (e) { toast(e.message, "error"); return false; }
+}
+
+// Again with other options: this transcript's model on the recording again, with the speakers, language and
+// vocabulary starting as this transcript's. Like Run again with, it makes a new transcript of the recording.
+const AGAIN = { speakers: "auto", language: "ar", prompt: "" };
+
+function openAgain() {
+  const j = S.job, m = model(j?.model);
+  closeMenus();
+  if (!m?.ready) return;
+  const o = j.options || {};
+  Object.assign(AGAIN, { speakers: String(o.speakers ?? "auto"), language: o.language || "ar", prompt: o.prompt || "" });
+  const dlg = diffDialog("again", "Run again with other options");
+  if (!$("#againForm")) {
+    dlg.insertAdjacentHTML("beforeend", `<form class="dlg-foot" id="againForm">
+      <button type="button" class="btn" id="againCancel">Cancel</button>
+      <button type="submit" class="btn btn-primary" id="againGo">${ICON.redo} Run again</button></form>`);
+    $("#againCancel").onclick = () => dlg.close();
+    $("#againForm").onsubmit = (e) => { e.preventDefault(); runAgain(); };
+  }
+  drawAgain();
+  dlg.showModal();
+}
+
+function drawAgain() {
+  const m = model(S.job.model), a = AGAIN;
+  const custom = !SPEAKER_CHOICES.some(([v]) => v === a.speakers);
+  $("#againBody").innerHTML = `<p class="hint again-lead">With ${esc(m.title)}, on the same recording. It makes a new transcript; this one stays as it is.</p>
+    <div class="field">
+      <span class="field-label">Speakers</span>
+      <div class="segmented" id="againSpk">${SPEAKER_CHOICES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${a.speakers === v}">${t}</button>`).join("")}<input type="number" id="againSpkN" min="1" max="20" placeholder="7+" value="${custom ? esc(a.speakers) : ""}" aria-label="Number of speakers"></div>
+      <p class="hint" id="againSpkHint">${speakerHint(m, a.speakers)}${speakerLimits(m, a.speakers)}</p>
+    </div>
+    <div class="field">
+      <span class="field-label">Language</span>
+      <div class="segmented" id="againLang">${LANGUAGES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${a.language === v}">${t}</button>`).join("")}</div>
+      <p class="hint">${languageHint(m, a.language)}</p>
+    </div>
+    ${m.prompt ? `<div class="field">
+      <label for="againPrompt">Vocabulary <span class="opt">optional</span></label>
+      <textarea id="againPrompt" dir="auto" rows="2" placeholder="Names and terms, comma-separated: Jira, GitHub, backend, deployment">${esc(a.prompt)}</textarea>
+      <p class="hint">${promptHint(m)}</p>
+    </div>` : ""}`;
+  $$("#againSpk button").forEach((b) => (b.onclick = () => { a.speakers = b.dataset.v; drawAgain(); }));
+  $("#againSpkN").oninput = (e) => {
+    const n = parseInt(e.target.value, 10);
+    if (!(n >= 1 && n <= 20)) return;
+    a.speakers = String(n);
+    $$("#againSpk button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    $("#againSpkHint").innerHTML = speakerHint(m, a.speakers) + speakerLimits(m, a.speakers);  // without redrawing the field
+  };
+  $$("#againLang button").forEach((b) => (b.onclick = () => { a.language = b.dataset.v; drawAgain(); }));
+  const pr = $("#againPrompt");
+  if (pr) pr.oninput = (e) => (a.prompt = e.target.value);
+}
+
+async function runAgain() {
+  const m = model(S.job.model), go = $("#againGo");
+  if (!m || go.disabled) return;
+  go.disabled = true;
+  try {
+    await rerun(m.id, { speakers: AGAIN.speakers, language: AGAIN.language, prompt: m.prompt ? AGAIN.prompt : "" });
+  } finally { go.disabled = false; }
 }
 
 function renderTranscriptOnly() {
@@ -1222,7 +1390,7 @@ function collectDraft() {
   return { lines, speaker_names: S.draft.names, title: S.draft.title };
 }
 
-function diffDialog(id, title) {  // the History and review dialogs, made on first use
+function diffDialog(id, title) {  // the History, review and Again with other options dialogs, made on first use
   let dlg = document.getElementById(id);
   if (dlg) return dlg;
   document.body.insertAdjacentHTML("beforeend", `<dialog id="${id}" class="diff-dlg" aria-labelledby="${id}Title">
@@ -2324,6 +2492,12 @@ $("#themeBtn").onclick = () => {
 };
 $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
 $("#jobSearch").oninput = renderSidebar;
+$("#jobSort").innerHTML = Object.entries(SORTS).map(([v, [label]]) => `<option value="${v}">${label}</option>`).join("");
+$("#jobSort").value = sortKept();
+$("#jobSort").onchange = (e) => {
+  try { localStorage.setItem(SORT_KEY, e.target.value); } catch { /* private mode */ }
+  renderSidebar();
+};
 
 // keep the direction right while a line, title or name is being typed
 document.addEventListener("input", (e) => {

@@ -120,17 +120,18 @@ runs the model worker (`Sedjem --transcribe …`), so each transcription still g
 and the assistants' MCP server (`Sedjem --mcp`).
 
 The Tests workflow ([`.github/workflows/tests.yml`](../.github/workflows/tests.yml)) runs the tests on
-Windows and Linux for every push and pull request, and on Windows also sets Sedjem up from source
+Windows and Linux for every push to main and pull request, and on Windows also sets Sedjem up from source
 exactly as above, in PowerShell: with pip, checking that `.\app.cmd` starts it, and with uv, checking
-that its self-test passes.
+that its self-test passes. [The pipeline](14-pipeline.md) describes all the workflows.
 
 The GitHub Actions workflow [`.github/workflows/desktop.yml`](../.github/workflows/desktop.yml)
 builds and checks the app on Windows and Linux. It runs the unit tests, a self-test from source, the
 build, and a self-test of the build; on Windows also the real-model test, a native-window test and
 the installer, which it uploads and keeps for 7 days. It runs when started by hand
-(*Actions → Desktop build → Run workflow*, or `gh workflow run desktop.yml`), for a version tag
-(`git tag v0.3.0 && git push origin v0.3.0`; the version must match `app/__init__.py`) and for the
-nightly previews below, so it doesn't use Actions minutes on every push. A tag or a preview also
+(*Actions → Desktop build → Run workflow*, or `gh workflow run desktop.yml`), for a pull request that
+changes how the app is built or started, for a release from the Release workflow
+([cutting a release](14-pipeline.md#cutting-a-release)) or a version tag pushed by hand, and for the
+nightly previews below, so it doesn't use Actions minutes on every push. A release or a preview also
 publishes the Windows installer, the Linux archive and `SHA256SUMS.txt` on GitHub, as a release or a
 pre-release.
 
@@ -157,7 +158,9 @@ one, and it never touches the data folder. A silent installation without `/UPDAT
 nothing. The Desktop build workflow tries this on Windows: it installs the new installer into a
 temporary folder, installs it again over itself in update mode, and checks that the old files are
 gone, the data folder is kept, Sedjem started from the installed folder and answers, and the
-uninstaller still removes the program.
+uninstaller still removes the program. It then installs the newest release, starts it, and runs the new
+installer over it the way *Update now* does (setup starts in its update mode and Sedjem quits), and checks
+that the new version starts from the installed folder with the data kept.
 
 The Nightly preview workflow ([`.github/workflows/preview.yml`](../.github/workflows/preview.yml))
 runs once a day. It takes the newest commit on main whose Tests workflow passed on Windows and Linux,

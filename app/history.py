@@ -505,6 +505,12 @@ def latest_version(store, jid):
     return versions[-1]["n"] if versions else 0
 
 
+def latest_time(store, jid):
+    """When the latest version was saved, read without writing: None when there is no history yet."""
+    versions = read_versions(store, jid)
+    return versions[-1].get("time") if versions else None
+
+
 def at(store, jid, n, cfg=None):
     """(job, lines, edited) as they were at version n, for the exports, edited saying whether its lines
     differ from the model's; None if there is no version n."""
