@@ -96,6 +96,10 @@ installed. Then Sedjem:
    and reloads once the new one answers. If the new process stops right away (the updated code can't
    start), the old one keeps running and *Settings* says so.
 
+If the checkout was moved on by hand after the check, with `git pull` while Sedjem was running, so that it
+already has the offered commit, it isn't moved again. Sedjem installs the requirement files that changed since
+the commit it runs, and starts again on the checkout's code.
+
 When Sedjem was started from a terminal, the new process runs in the background after the restart and
 writes what it prints to `sedjem.log` in the data folder. *Quit Sedjem* in *Settings* stops it.
 

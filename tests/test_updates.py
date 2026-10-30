@@ -853,6 +853,53 @@ class SourceTests(UpdatesCase):
         self.assertEqual(self.head(), mine)
         self.spawn.assert_not_called()
 
+    def test_a_checkout_pulled_past_the_offer_starts_again_on_its_code(self):
+        # Seen on 2026-10-30: Sedjem offered a release, the checkout was then pulled by hand past it, and Update now
+        # said the checkout had diverged. It already has the offered commit, so Sedjem starts again on its code.
+        b = self.repos.commit({"app.txt": "two\n"}, "Second")
+        self.gh.run(b)
+        up = self.up()
+        self.assertEqual(self.checked(up)["available"]["commit"], b)  # offered before the pull
+        c = self.repos.commit({"app.txt": "three\n"}, "Third")
+        git(self.checkout, "pull", "-q", "--ff-only", "origin", "main")
+        with mock.patch.object(sys, "orig_argv", ["python3", "-m", "app", "--no-browser"]):
+            up.start_install()
+            install = self.wait_install(up)
+            end = time.time() + 10
+            while not self.quits and time.time() < end:
+                time.sleep(0.05)
+        self.assertEqual(install["state"], "restarting", install)
+        self.assertEqual(self.head(), c, "the checkout stays where it was pulled to")
+        self.installer.assert_not_called()  # no requirement file changed
+        self.spawn.assert_called_once()
+        self.assertEqual(self.quits, [True])
+
+    def test_a_checkout_pulled_past_the_offer_gets_the_requirements_since_the_running_code(self):
+        b = self.repos.commit({"app.txt": "two\n"}, "Second")
+        self.gh.run(b)
+        up = self.up()
+        self.checked(up)
+        c = self.changed_requirements()  # after the offered commit: only the running code is older than it
+        git(self.checkout, "pull", "-q", "--ff-only", "origin", "main")
+        with self.which("/opt/uv/bin/uv"):
+            up.start_install()
+            install = self.wait_install(up)
+        self.assertEqual(install["state"], "restarting", install)
+        self.assertEqual(self.head(), c)
+        self.assertEqual(self.installed_files(), [("requirements-dev.txt", "numpy\nmcp\n"),
+                                                  ("requirements.txt", "requests==2.35.0\n")])
+
+    def test_an_offer_older_than_the_running_code_restarts_nothing(self):
+        b = self.repos.commit({"app.txt": "two\n"}, "Second")
+        self.gh.run(b)
+        up = self.up()
+        self.checked(up)
+        git(self.checkout, "pull", "-q", "--ff-only", "origin", "main")
+        up._running = {**up.running(), "commit": self.head()}  # as if this process had started on the pulled code
+        with self.assertRaises(updates.Refused):  # the offer is gone: nothing to install, nothing to restart
+            up.start_install()
+        self.spawn.assert_not_called()
+
     def test_a_commit_that_isnt_on_main_at_origin_is_refused(self):
         git(self.repos.work, "switch", "-q", "-c", "other")
         x = self.repos.commit({"app.txt": "elsewhere\n"}, "Elsewhere", push=False)

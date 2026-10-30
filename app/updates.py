@@ -988,35 +988,52 @@ class Updates:
         return p.returncode == 0
 
     def update_source(self, available, target):
-        """git fetch, check, requirements, git merge --ff-only, restart."""
+        """git fetch, check, requirements, git merge --ff-only, restart. A checkout moved on by hand since the check
+        (git pull), so that it already has the offered commit and maybe newer ones, isn't moved: the requirements
+        changed since the commit this process runs are installed, and Sedjem starts again on the checkout's code."""
         sha = target["commit"]
         self.git("fetch", "origin", "main", timeout=600)
         p = run_git(self.root, "cat-file", "-e", f"{sha}^{{commit}}")
         if p is None or p.returncode != 0 or not self.is_ancestor(sha, "FETCH_HEAD"):
             raise InstallError("The offered commit isn't on main at origin, so Sedjem won't move this checkout to it.")
+        if self.is_ancestor(sha, "HEAD"):
+            runs = self.running()["commit"]
+            head = self.git("rev-parse", "HEAD").strip()
+            if runs == head:
+                raise InstallError("Sedjem already runs this version or a newer one. Check for updates again.")
+            self.progress(state="installing")
+            self.install_requirements(runs or sha, head)
+            self.progress(state="restarting")
+            self.restart()
+            return
         if not self.is_ancestor("HEAD", sha):
             raise InstallError("This checkout has commits that the offered one doesn't have, so it can't be updated "
                                "by fast-forwarding. Update it by hand.")
         self.progress(state="installing")
-        changed = [f.strip() for f in self.git("diff", "--name-only", "HEAD", sha).splitlines()]
-        files = [f for f in changed if REQUIREMENTS.fullmatch(f) and self.applies(f)]
-        if files:  # installed before the merge: if this fails, the checkout stays as it was
-            tool = self.installer()
-            if tool is None:
-                raise InstallError("The new version needs other packages, and neither uv nor pip is here to install "
-                                   "them. Install uv or pip, then update by hand.")
-            folder = self.folder / "requirements"
-            folder.mkdir(parents=True, exist_ok=True)
-            for f in files:
-                path = folder / f
-                path.write_text(self.git("show", f"{sha}:{f}"), encoding="utf-8")
-                p = run_installer([*tool[1], str(path)], cwd=str(self.root))
-                if p.returncode != 0:
-                    said = (p.stderr or p.stdout or "").strip().splitlines()
-                    raise InstallError(f"Installing the packages in {f} failed: {said[-1] if said else p.returncode}")
+        self.install_requirements("HEAD", sha)  # before the merge: if this fails, the checkout stays as it was
         self.git("merge", "--ff-only", sha)
         self.progress(state="restarting")
         self.restart()
+
+    def install_requirements(self, old, new):
+        """Install the requirement files that changed between two commits, as the new one has them."""
+        changed = [f.strip() for f in self.git("diff", "--name-only", old, new).splitlines()]
+        files = [f for f in changed if REQUIREMENTS.fullmatch(f) and self.applies(f)]
+        if not files:
+            return
+        tool = self.installer()
+        if tool is None:
+            raise InstallError("The new version needs other packages, and neither uv nor pip is here to install "
+                               "them. Install uv or pip, then update by hand.")
+        folder = self.folder / "requirements"
+        folder.mkdir(parents=True, exist_ok=True)
+        for f in files:
+            path = folder / f
+            path.write_text(self.git("show", f"{new}:{f}"), encoding="utf-8")
+            p = run_installer([*tool[1], str(path)], cwd=str(self.root))
+            if p.returncode != 0:
+                said = (p.stderr or p.stdout or "").strip().splitlines()
+                raise InstallError(f"Installing the packages in {f} failed: {said[-1] if said else p.returncode}")
 
     def restart(self):
         """Start this program again with the same command line and port, then quit this one. The new process waits
