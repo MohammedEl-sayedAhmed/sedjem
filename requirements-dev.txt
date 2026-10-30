@@ -1,6 +1,6 @@
 # For the tests only (not needed to run Sedjem): the browser tests in tests/test_ui*.py drive Chromium
 # with Playwright. They use the installed Chrome or Edge, or run `playwright install chromium` first.
-playwright==1.63.0
+playwright==1.64.1
 # The MCP server (app/mcp.py) is tested with the official MCP SDK as its client; the app itself does not use it.
 mcp==2.3.0
 # The workflow tests (tests/test_pipeline.py and others) read .github/workflows/*.yml
@@ -8,4 +8,4 @@ pyyaml==6.0.3
 # The coverage of the tests, measured by .github/scripts/run_tests.py --coverage and shown in the Tests workflow
 coverage==7.17.0
 # The Python linter of the quick checks (ruff.toml); the Tests workflow installs this version
-ruff==0.17.0
+ruff==0.17.3
