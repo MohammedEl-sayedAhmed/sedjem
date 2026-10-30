@@ -9,12 +9,17 @@ language and the dark theme is one set of tokens, the transcript, the download a
 JavaScript, the speakers' names are in colours that read on the card, the pictures of the app keep every pixel and
 are set at their own size, and the first view stays small. The anonymous counts go only to Aptabase, only from the
 published site, never with Do Not Track or Global Privacy Control, and hold only the values the privacy policy lists.
-Offline, standard library only.
+The section of numbers, built from made-up stats files and totals (tests/site_support.py), shows each number as its
+source has it, as of the right day and month, the same on both pages, says when the first totals come before there
+are any, leaves out what a missing or broken file would have given, and is all in the HTML: the build reads files
+and fetches nothing. Offline, standard library only.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
+import contextlib
 import fnmatch
 import importlib.util
+import io
 import json
 import math
 import posixpath
@@ -30,6 +35,9 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import site_support as fixture  # noqa: E402
+
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
 build = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(build)
@@ -213,7 +221,9 @@ class SiteTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.out = build.build(Path(cls.tmp.name) / "site")
+        tmp = Path(cls.tmp.name)  # with every number, so each check covers the section of numbers too
+        cls.out = build.build(tmp / "site", stats=fixture.write_stats(tmp / "stats"),
+                              usage=fixture.write_usage(tmp / "usage.json"))
         cls.meeting = build.meeting()
         cls.pages = {page: parse((cls.out / page).read_text(encoding="utf-8")) for page in build.PAGES}
         cls.homes = {lang: cls.pages[page][0] for lang, page in HOMES.items()}
@@ -608,10 +618,14 @@ class SiteTest(unittest.TestCase):
             with open(ROOT / "site" / "copy" / f"{lang}.toml", "rb") as f:
                 tables[lang] = {f"{t}.{k}" for t, values in tomllib.load(f).items() for k in values}
         self.assertEqual(tables["en"], tables["ar"])
-        # and every one of them is used: by the template, or by build.py for the theme buttons and the pictures
+        # and every one of them is used: by the template, or by build.py for the theme buttons, the pictures and the
+        # numbers (a model's name by the name docs/usage.json gives it)
         template = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
         used = set(re.findall(r"\{\{(\w+\.\w+)\}\}", template)) | {"theme.to_dark", "theme.to_light"}
-        self.assertEqual(used | set(build.SHOTS.values()), tables["en"])
+        source = (ROOT / "site" / "build.py").read_text(encoding="utf-8")
+        numbers = {f"numbers.{key}" for key in re.findall(r'(?:say|item)\("(\w+)"', source)}
+        numbers |= {"numbers.months"} | {f"numbers.model_{engine}" for engine in build.ENGINES}
+        self.assertEqual(used | set(build.SHOTS.values()) | numbers, tables["en"])
 
     def test_copy_follows_the_house_style(self):
         for name in ("index.html", "ar/index.html", "404.html", "styles.css", "site.js", build.COUNTER):
@@ -956,6 +970,29 @@ class SiteTest(unittest.TestCase):
                 self.assertTrue(any(fnmatch.fnmatch(source, p) for p in patterns))
         for line in ("pages: write", "id-token: write", "group: pages", "workflow_dispatch:"):
             self.assertIn(line, workflow)
+        # and the totals of the counts, which the section of numbers reads
+        self.assertTrue(any(fnmatch.fnmatch("docs/usage.json", p) for p in patterns))
+        self.assertEqual(build.USAGE, ROOT / "docs" / "usage.json")
+
+    def test_the_numbers_refresh_after_the_stats_without_a_checkout_of_them(self):
+        """Pages rebuilds after each successful run of the Repository stats workflow on main, as well as on a push and
+        by hand, so the numbers are the day's. It downloads the stats files through the API into a folder and builds
+        from it; it never checks out or fetches the stats branch, which GitHub would count as a clone, and a file it
+        can't download is left out with a warning rather than stopping the publication."""
+        workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
+        stats = (ROOT / ".github" / "workflows" / "stats.yml").read_text(encoding="utf-8")
+        self.assertRegex(workflow, r'\n  workflow_run:\n    workflows: \["(.+)"\]\n    types: \[completed\]\n    branches: \[main\]\n')
+        self.assertIn(f'\nname: {re.search(r"workflows: \[\"(.+)\"\]", workflow).group(1)}\n', stats)
+        self.assertIn("\n  push:\n", workflow)
+        self.assertIn("if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'", workflow)
+        (download,) = re.findall(r"\n      - name: Download the stats.*?\n(?=\n      - )", workflow, re.S)
+        for name in build.STATS:
+            self.assertIn(name, download.split("for file in ")[1].split(";")[0])
+        self.assertIn('gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/$file?ref=stats"', download)
+        self.assertIn("::warning::", download)
+        self.assertIn('python site/build.py _site --stats "$RUNNER_TEMP/stats"', workflow)
+        self.assertNotRegex(workflow, r"ref:\s*stats|git (?:fetch|clone|checkout|pull)|fetch-depth: 0")
+        self.assertEqual(workflow.count("actions/checkout@"), 1)  # main's, which the build reads
 
     def test_readme_links_the_site_near_the_top(self):
         top = (ROOT / "README.md").read_text(encoding="utf-8").splitlines()[:25]
@@ -966,6 +1003,206 @@ class SiteTest(unittest.TestCase):
         modules = {alias.name for node in ast.walk(tree) if isinstance(node, ast.Import) for alias in node.names}
         modules |= {node.module for node in ast.walk(tree) if isinstance(node, ast.ImportFrom)}
         self.assertLessEqual({m.split(".")[0] for m in modules}, set(sys.stdlib_module_names))
+        # and never fetches: the numbers come from files
+        self.assertFalse({m for m in modules if m.split(".")[0] in ("http", "socket", "ssl", "subprocess", "ftplib")
+                          or m in ("urllib", "urllib.request")}, modules)
+
+
+class NumbersTest(unittest.TestCase):
+    """The section of numbers, built from the made-up stats files and totals of tests/site_support.py."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.dir = Path(cls.tmp.name)
+        cls.stats = fixture.write_stats(cls.dir / "stats")
+        cls.usage = fixture.write_usage(cls.dir / "usage.json")
+        cls.full = cls.sections(build.build(cls.dir / "full", stats=cls.stats, usage=cls.usage))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    @staticmethod
+    def sections(out):
+        """Each page's section of numbers, or None when it has none."""
+        found = {}
+        for lang, page in HOMES.items():
+            root, errors = parse((out / page).read_text(encoding="utf-8"))
+            assert not errors, errors
+            sections = root.find(lambda n: n.tag == "section" and n.attrs.get("aria-labelledby") == "numbers")
+            found[lang] = sections[0] if sections else None
+        return found
+
+    def build(self, name, **kwargs):
+        """A build with other numbers, and what it said in the log."""
+        log = io.StringIO()
+        with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
+            out = build.build(self.dir / name, **kwargs)
+        return self.sections(out), log.getvalue()
+
+    @staticmethod
+    def groups(section):
+        """The sheet's groups: (heading, [(term, value as shown, its data value or None)], text) in order."""
+        out = []
+        (sheet,) = section.find(lambda n: "spec" in n.classes())
+        for group in [c for c in sheet.children if not isinstance(c, str)]:
+            (h3,) = group.find(lambda n: n.tag == "h3")
+            items = [(squash(dt.text()), squash(dd.text()), dd.find(lambda n: n.tag == "data")[0].attrs["value"]
+                      if dd.find(lambda n: n.tag == "data") else None)
+                     for dt, dd in ((d.find(lambda n: n.tag == "dt")[0], d.find(lambda n: n.tag == "dd")[0])
+                                    for d in group.find(lambda n: n.tag == "div" and n.parent.tag == "dl"))]
+            paragraphs = [squash(p.text()) for p in group.find(lambda n: n.tag == "p")]
+            out.append((squash(h3.text()), items, paragraphs))
+        return out
+
+    def test_every_number_is_its_sources(self):
+        """GitHub's downloads (the app's files, every release, and the newest release that isn't a preview), stars and
+        page views of the last 30 days recorded, each worked out here again from the files; the newest month's
+        installs, countries, transcriptions, hours and most used model, and the website's page views, countries and
+        download clicks for that month, from the totals. Each number is written with thousands separators."""
+        newest = max(d for d, *_ in fixture.DOWNLOADS)
+        app = [(r, n) for d, r, a, n in fixture.DOWNLOADS if d == newest and not a.endswith(".txt")]
+        self.assertEqual(sum(n for _, n in app), fixture.TOTAL)
+        self.assertEqual(sum(n for r, n in app if r == "v" + fixture.RELEASE), fixture.LATEST)
+        views = sorted(fixture.VIEWS)
+        last = views[-1][0]
+        self.assertEqual(sum(n for d, n, _ in views if (last - d).days < 30), fixture.VIEWS_30)
+        u = fixture.USAGE["months"]["2026-11"]
+        site = fixture.USAGE["website"]["2026-11"]
+        expected = {
+            "en": [("On GitHub, as of 2 December 2026",
+                    [("Downloads, all releases", "1,746", str(fixture.TOTAL)),
+                     ("Downloads of 0.10.0, the latest release", "1,276", str(fixture.LATEST)),
+                     ("Stars", "1,021", str(fixture.STARS)),
+                     ("Repository page views, 30 days to 1 December", f"{fixture.VIEWS_30:,}", str(fixture.VIEWS_30))], []),
+                   ("In the app, November 2026",
+                    [("Installs that ran Sedjem", "1,204", str(u["installs"]["active"])),
+                     ("Countries", "23", str(u["installs"]["countries"]["count"])),
+                     ("Transcriptions", "5,310", str(u["runs"]["transcriptions"])),
+                     ("Hours of audio", "2,750.5", str(u["runs"]["hours"])),
+                     ("Most used model", "whisper-medium code-switching", None)], []),
+                   ("On this website, November 2026",
+                    [("Page views", "12,345", str(site["page_views"])), ("Countries", "31", str(site["countries"]["count"])),
+                     ("Download clicks", "678", str(site["downloads"]["clicks"]))], [])],
+        }
+        self.assertEqual(self.groups(self.full["en"]), expected["en"])
+        self.assertEqual(max(u["runs"]["models"], key=u["runs"]["models"].get), "whisper_medium")
+        # the numbers on show are their values written out, and the newer month wins over the older
+        for lang, section in self.full.items():
+            for data in section.find(lambda n: n.tag == "data"):
+                value = data.attrs["value"]
+                self.assertEqual(data.text(), f"{float(value):,.1f}" if "." in value else f"{int(value):,}", lang)
+            self.assertNotIn("99", [d.attrs["value"] for d in section.find(lambda n: n.tag == "data")])
+
+    def test_the_dates_are_the_numbers_own(self):
+        """GitHub's are as of the newest day in its daily snapshots, the page views up to the last day recorded, and the
+        counts are of the newest month, each named in the page's language and in a time element."""
+        for lang, section in self.full.items():
+            times = [(n.attrs["datetime"], squash(n.text())) for n in section.find(lambda n: n.tag == "time")]
+            self.assertEqual(times, {"en": [("2026-12-02", "2 December 2026"), ("2026-12-01", "1 December"),
+                                            ("2026-11", "November 2026"), ("2026-11", "November 2026")],
+                                     "ar": [("2026-12-02", "2 ديسمبر 2026"), ("2026-12-01", "1 ديسمبر"),
+                                            ("2026-11", "نوفمبر 2026"), ("2026-11", "نوفمبر 2026")]}[lang])
+        self.assertEqual(fixture.DAY.isoformat(), "2026-12-02")
+        # with a shorter history the page views name their first and last days
+        short = fixture.VIEWS[-10:]
+        sections, _ = self.build("short", stats=fixture.write_stats(self.dir / "short-stats", views=short), usage=self.usage)
+        (h3, items, _), *_ = self.groups(sections["en"])
+        self.assertEqual(items[3], ("Repository page views, 22 November to 1 December", f"{sum(n for _, n, _ in short):,}",
+                                    str(sum(n for _, n, _ in short))))
+
+    def test_before_the_first_month_the_page_says_when_it_comes(self):
+        """Without docs/usage.json the counts' part is one line saying the first totals, November's, come out in early
+        December, with no number standing in for them; and without a stats folder GitHub's part is left out."""
+        sections, log = self.build("not-yet", usage=self.dir / "nowhere.json")
+        self.assertEqual(log, "")
+        for lang, words in (("en", "their first monthly totals, for November 2026, come out in early December"),
+                            ("ar", "وأول مجموع شهري ليهم، بتاع نوفمبر 2026، هيطلع في أوائل ديسمبر")):
+            with self.subTest(lang):
+                (group,) = self.groups(sections[lang])
+                self.assertEqual(group[1], [])
+                self.assertIn(words, group[2][0])
+                self.assertFalse(sections[lang].find(lambda n: n.tag in ("data", "dl")))
+                self.assertNotIn("github.com/MohammedEl-sayedAhmed/sedjem/tree/stats",
+                                 str([a.attrs["href"] for a in sections[lang].find(lambda n: n.tag == "a")]))
+        # and with GitHub's numbers the line stands beside them
+        sections, _ = self.build("not-yet-github", stats=self.stats, usage=self.dir / "nowhere.json")
+        self.assertEqual([g[0] for g in self.groups(sections["en"])], ["On GitHub, as of 2 December 2026", "The anonymous counts"])
+
+    def test_a_missing_or_broken_file_leaves_its_numbers_out(self):
+        """A stats file that is missing, empty or not what repo_stats.py writes leaves its numbers out, with a line in
+        the log, and the build goes on; unreadable totals leave the counts' part out, with no promise of totals either.
+        The website's totals missing for the newest month leave only them out."""
+        broken = fixture.write_stats(self.dir / "broken")
+        (broken / "repo.csv").unlink()
+        (broken / "views.csv").write_text("date,views,unique\n2026-12-01,many,2\n", encoding="utf-8")
+        sections, log = self.build("broken-site", stats=broken, usage=self.usage)
+        (github, items, _), *_ = self.groups(sections["en"])
+        self.assertEqual([term for term, *_ in items], ["Downloads, all releases", "Downloads of 0.10.0, the latest release"])
+        self.assertEqual(github, "On GitHub, as of 2 December 2026")
+        self.assertIn("repo.csv can't be read", log)
+        self.assertIn("views.csv can't be read", log)
+        for name, text in (("empty", ""), ("header", "date,release,asset,downloads\n"), ("wrong", "a,b\n1,2\n"),
+                           ("negative", "date,release,asset,downloads\n2026-12-02,v1.0.0,x.exe,-4\n")):
+            with self.subTest(name):
+                folder = fixture.write_stats(self.dir / f"stats-{name}")
+                (folder / "downloads.csv").write_text(text, encoding="utf-8")
+                sections, log = self.build(f"site-{name}", stats=folder, usage=self.usage)
+                self.assertNotIn("Downloads", str(self.groups(sections["en"])[0]))
+                self.assertIn("downloads.csv can't be read", log)
+        empty = self.dir / "empty-stats"
+        empty.mkdir()
+        sections, log = self.build("no-stats", stats=empty, usage=self.usage)
+        self.assertEqual([g[0] for g in self.groups(sections["en"])], ["In the app, November 2026", "On this website, November 2026"])
+        self.assertIn("GitHub's numbers are left out", log)
+        # totals that can't be read
+        for name, text in (("json", "{not json"), ("shape", '{"months": {"2026-11": {"installs": 3}}}'),
+                           ("negative", json.dumps({"months": {"2026-11": {**fixture.USAGE["months"]["2026-11"],
+                                                                           "installs": {"active": -1, "countries": {"count": 1}}}}}))):
+            with self.subTest(name):
+                path = self.dir / f"usage-{name}.json"
+                path.write_text(text, encoding="utf-8")
+                sections, log = self.build(f"usage-site-{name}", stats=self.stats, usage=path)
+                self.assertEqual([g[0] for g in self.groups(sections["en"])], ["On GitHub, as of 2 December 2026"])
+                self.assertIn("the counts are left out", log)
+                self.assertNotIn("monthly", squash(visible_text(sections["en"])))
+        sections, _ = self.build("both-gone", stats=empty, usage=self.dir / "usage-json.json")
+        self.assertEqual(sections, {"en": None, "ar": None}, "nothing to show, so no section")
+        data = json.loads(json.dumps(fixture.USAGE))
+        del data["website"]["2026-11"]
+        sections, log = self.build("no-website", stats=self.stats, usage=fixture.write_usage(self.dir / "no-website.json", data))
+        self.assertEqual([g[0] for g in self.groups(sections["en"])], ["On GitHub, as of 2 December 2026", "In the app, November 2026"])
+        self.assertEqual(log, "")
+
+    def test_the_arabic_page_has_the_same_numbers(self):
+        """The same numbers in the same order, written alike: Western digits and the same separators, as the Arabic
+        copy writes every number; and the same release and days."""
+        values = {lang: [(d.attrs["value"], d.text()) for d in section.find(lambda n: n.tag == "data")]
+                  for lang, section in self.full.items()}
+        self.assertEqual(len(values["en"]), 11)
+        self.assertEqual(values["en"], values["ar"])
+        digits = {lang: re.findall(r"\d+(?:[,.]\d+)*", squash(visible_text(section))) for lang, section in self.full.items()}
+        self.assertEqual(Counter(digits["en"]), Counter(digits["ar"]))
+        self.assertFalse(re.search("[\u0660-\u0669\u06f0-\u06f9]", visible_text(self.full["ar"])), "Arabic-Indic digits")
+        self.assertEqual(build.NUMERALS, {"en": (",", "."), "ar": (",", ".")})
+
+    def test_the_numbers_are_in_the_page_and_nothing_is_fetched(self):
+        """Every number is in the HTML, so the section needs no script: it has none, loads nothing, and its links are
+        the stats branch's charts and the method. The build reads the files it is given and nothing else."""
+        for lang, section in self.full.items():
+            self.assertFalse(section.find(lambda n: n.tag in ("script", "img", "iframe", "object", "noscript")))
+            self.assertFalse([n for n in section.iter() if any(k.startswith("on") or k == "src" for k in n.attrs)])
+            self.assertEqual([a.attrs["href"] for a in section.find(lambda n: n.tag == "a")], [build.CHARTS, build.METHOD])
+            self.assertTrue(section.find(lambda n: n.tag == "figcaption"))
+        self.assertEqual(build.CHARTS, "https://github.com/MohammedEl-sayedAhmed/sedjem/tree/stats#readme")
+        self.assertTrue(build.METHOD.endswith("/blob/main/docs/13-usage-counts.md#public-totals"))
+        self.assertIn("## Public totals", (ROOT / "docs" / "13-usage-counts.md").read_text(encoding="utf-8"))
+        self.assertIsNone(build.github(None))
+        # the section sits after the facts and before the downloads
+        page = (self.dir / "full" / "index.html").read_text(encoding="utf-8")
+        self.assertLess(page.index('aria-labelledby="facts"'), page.index('aria-labelledby="numbers"'))
+        self.assertLess(page.index('aria-labelledby="numbers"'), page.index('aria-labelledby="get"'))
 
 
 if __name__ == "__main__":

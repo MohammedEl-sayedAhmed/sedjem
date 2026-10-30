@@ -127,6 +127,36 @@ licence_value = "AGPL-3.0، مجاني ومفتوح المصدر"  # trimmed
 computer = "على جهازك"  # new
 recordings = "مع تسجيلاتك"  # new
 
+# The public numbers, as en.toml explains; the numbers in Western digits, as everywhere on the page
+[numbers]
+h2 = "الأرقام على المكشوف"  # new
+lede = "التحميلات والنجوم ومشاهدات الصفحات من GitHub، ومجموع الأرقام المجهولة اللي البرنامج والموقع ده بيبعتوها."  # new
+months = "يناير فبراير مارس أبريل مايو يونيو يوليو أغسطس سبتمبر أكتوبر نوفمبر ديسمبر"  # new
+github = "على GitHub، لحد {{day}}"  # new
+downloads = "التحميلات، من كل الإصدارات"  # new
+latest = "تحميلات {{release}}، آخر إصدار"  # new
+stars = "النجوم"  # new
+views = "مشاهدات صفحات المشروع، آخر 30 يوم لحد {{day}}"  # new
+views_between = "مشاهدات صفحات المشروع، من {{first}} لحد {{last}}"  # new
+app = "في البرنامج، شهر {{month}}"  # new
+installs = "نسخ Sedjem اللي اشتغلت"  # new
+countries = "الدول"  # new
+transcriptions = "النصوص اللي اتعملت"  # new
+hours = "ساعات الصوت"  # new
+model = "أكتر موديل اتستخدم"  # new
+model_cohere = "Cohere Transcribe Arabic"  # new
+model_whisper_medium = '<bdi dir="ltr"><span translate="no">whisper-medium</span> <span translate="no">code-switching</span></bdi>'  # new: one left-to-right run, as in the table
+model_whisper_large = "Whisper large-v3"  # new
+model_other_local = "موديل تاني على الجهاز"  # new
+model_hosted = "خدمات أونلاين"  # new
+website = "على الموقع ده، شهر {{month}}"  # new
+page_views = "مشاهدات الصفحات"  # new
+clicks = "الضغط على التحميل"  # new
+counts = "الأرقام المجهولة"  # new
+not_yet = "البرنامج والموقع ده بيعدّوا بأرقام مجهولة، وأول مجموع شهري ليهم، بتاع نوفمبر 2026، هيطلع في أوائل ديسمبر."  # new
+caption_github = 'أرقام GitHub بتتقري كل يوم (<a href="{{charts}}">الرسوم البيانية</a>).'  # new
+caption_counts = 'الأرقام المجهولة بتتجمع مرة كل شهر (<a href="{{method}}">طريقة الحساب</a>).'  # new
+
 [get]
 h2 = "نزّل Sedjem"
 fine = "مجاني ومفتوح المصدر برخصة AGPL-3.0. الإصدار&nbsp;{{version}}."  # trimmed

@@ -323,6 +323,7 @@ everything is one column, the claim first, then the proof, then its caption.
             ... Every fix is a new version [the diff before saving]
             ... Two models, the better line from each [one line, two models, Kept]
             ... Runs on an ordinary laptop [the facts: a spec sheet on a tonal plate]
+            ... Counted in the open [the numbers: the same sheet, GitHub's beside the app's month, the website's below]
             Get Sedjem                   From source
             Free and open source ...     [ git clone ... ]   (scrolls sideways if it must)
             Windows ... (Download)       First start
@@ -396,6 +397,23 @@ The facts under "Runs on an ordinary laptop" are a short spec sheet, after a row
 with dotted leaders were both turned down: one tonal plate (the tray) with two groups side by side, "On your
 computer" (platforms, graphics card, download) and "With your recordings" (languages, what it opens and exports,
 the assistants), each term small and muted over its value, and the licence across the foot. One column on a phone.
+
+## The numbers
+
+"Counted in the open" shows the project's public numbers on the facts' sheet again, a term small and muted over its
+value, rather than as big figures with small labels: on the plate, GitHub's group ("On GitHub, as of" the day) with
+the downloads of every release and of the newest one that isn't a preview, the stars and the repository's page views
+of the last 30 days recorded; beside it the app's newest month (the installs that ran it, their countries, the
+transcriptions, the hours of audio and the most used model); and across the foot the website's same month (page
+views, countries and download clicks), three in a row from 700 px. One column on a phone. A caption under the plate
+says where they come from, with links to the stats branch's charts and to how the totals are made. Before the first
+month is exported the app's group is one line saying when the first totals come, and nothing stands in for a number.
+
+The numbers are written into the HTML at build time, with thousands separators and in Western digits on both pages,
+as the Arabic copy writes every number, each in a data element with its plain value and each date in a time element.
+build.py reads them from files (the stats branch's, which pages.yml downloads through the API, and docs/usage.json)
+and fetches nothing; Pages rebuilds after each day's stats. A file it can't read leaves its numbers out, and the
+section is left out when it has nothing to show.
 
 ## The table
 

@@ -7,7 +7,9 @@ app follow the pick and only the ones on show are fetched, and without scripts t
 phone's menu still opens and the download is Windows'. The pictures of the app are never drawn smaller than their
 own size, from a 320 px phone to a desktop; the speakers' names are in their colours, which read on the card in both
 themes; the commands fade at the edge where more of them is to the side, and the subtitles are left out on a phone.
-These were checks by hand; tests/test_site.py has the ones that need no browser.
+The section of numbers, built from tests/site_support.py's made-up stats and totals and again without any, fits a
+phone's width and a desktop's on both pages, and is whole without scripts. These were checks by hand;
+tests/test_site.py has the ones that need no browser.
 
 The anonymous counts are checked on a second build that counts on 127.0.0.1, with a stand-in key: one page_view for
 each page opened, with the right values, as the one request off this computer; a download for each download link;
@@ -33,6 +35,7 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
+import site_support as fixture
 from ui_support import REQUIRED, launch, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -77,14 +80,17 @@ class SiteInBrowserTest(unittest.TestCase):
                 raise RuntimeError("Playwright is not installed: pip install -r requirements-dev.txt")
             raise unittest.SkipTest("Playwright is not installed (pip install -r requirements-dev.txt)")
         cls.tmp = tempfile.TemporaryDirectory()
-        cls.out = build.build(Path(cls.tmp.name) / "site")
+        tmp = Path(cls.tmp.name)  # with every number in the section of numbers
+        cls.out = build.build(tmp / "site", stats=fixture.write_stats(tmp / "stats"), usage=fixture.write_usage(tmp / "usage.json"))
         # the same site counting on this computer's address, with a stand-in key
-        cls.counting = build.build(Path(cls.tmp.name) / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
+        cls.counting = build.build(tmp / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
+        # and without numbers: no stats, and no totals yet
+        cls.plain = build.build(tmp / "plain", usage=tmp / "no-usage.json")
         cls.servers = [ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
-                       for out in (cls.out, cls.counting)]
+                       for out in (cls.out, cls.counting, cls.plain)]
         for server in cls.servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
-        cls.base, cls.counting_base = (f"http://127.0.0.1:{server.server_address[1]}" for server in cls.servers)
+        cls.base, cls.counting_base, cls.plain_base = (f"http://127.0.0.1:{server.server_address[1]}" for server in cls.servers)
         cls.playwright = sync_playwright().start()
         try:
             cls.browser = launch(cls.playwright, args=[NO_APTABASE])
@@ -583,6 +589,40 @@ class SiteInBrowserTest(unittest.TestCase):
                 self.counts(page, 0)
                 self.assertEqual(page.outside, [])
                 self.assertEqual(page.errors, [])
+
+    def test_the_numbers_fit_a_phone_and_a_desktop(self):
+        """The section of numbers at 390 and 1440 px on both pages, with every number and without any: nothing in it
+        reaches past the column or out of its own box, the page doesn't scroll sideways, and without scripts every
+        number is there. From 700 px the sheet has GitHub's numbers beside the app's and the website's three in a row
+        across the foot; on a phone it is one column."""
+        boxes = """() => { const sec = document.querySelector('section[aria-labelledby="numbers"]');
+            const column = sec.querySelector('.wrap').getBoundingClientRect(), sheet = sec.querySelector('.spec').getBoundingClientRect();
+            const out = Array.from(sec.querySelectorAll('h2, p, h3, dt, dd, figcaption')).filter(e => {
+              const b = e.getBoundingClientRect();
+              return b.left < column.left - 0.5 || b.right > column.right + 0.5 || e.scrollWidth > e.clientWidth + 1
+                || (e.closest('.spec') && (b.left < sheet.left - 0.5 || b.right > sheet.right + 0.5)); })
+              .map(e => e.tagName + ' ' + e.textContent.trim().slice(0, 40));
+            const tops = sel => Array.from(sec.querySelectorAll(sel)).map(e => Math.round(e.getBoundingClientRect().top));
+            return {out, figures: sec.querySelectorAll('data').length, groups: tops('.spec > div > h3'),
+                    wide: tops('.spec-wide dd'), lines: sec.querySelectorAll('.spec p').length}; }"""
+        for base, figures, lines in ((self.base, 11, 0), (self.plain_base, 0, 1)):
+            for path in PAGES:
+                for width in (390, 1440):
+                    for scripts in (True, False):
+                        with self.subTest(path, width=width, numbers=bool(figures), scripts=scripts):
+                            page = self.open(path, width, base=base, scripts=scripts)
+                            page.locator('section[aria-labelledby="numbers"]').scroll_into_view_if_needed()
+                            page.evaluate("document.fonts.ready.then(() => true)")
+                            found = page.evaluate(boxes)
+                            self.assertEqual(found["out"], [])
+                            self.assertEqual((found["figures"], found["lines"]), (figures, lines))
+                            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                            if figures:
+                                github, app, website = found["groups"]
+                                self.assertEqual(github == app, width == 1440, found)  # side by side, or one under the other
+                                self.assertLess(app, website)
+                                self.assertEqual(len(set(found["wide"])) == 1, width == 1440, found)
+                            self.assertEqual(page.errors, [])
 
     def test_the_counts_keep_nothing_in_the_browser(self):
         """After a page view and a download: no cookie, nothing in local or session storage, IndexedDB or the cache."""

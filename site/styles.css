@@ -540,6 +540,13 @@ html:lang(ar) .results .num { text-align: start; }
   .spec { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 32px; }
   .spec-foot { grid-column: 1 / -1; }
 }
+/* the numbers: the same sheet, GitHub's beside the app's newest month and the website's across the foot, its three side
+   by side from 700 px; before the first month's totals, a line says when they come */
+.spec .spec-wide { grid-column: 1 / -1; }
+.spec p { max-width: var(--measure); margin-top: 16px; }
+@media (min-width: 700px) {
+  .spec-wide dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 24px; }
+}
 
 /* ---------- the downloads ---------- */
 .get { scroll-margin-top: 24px; }

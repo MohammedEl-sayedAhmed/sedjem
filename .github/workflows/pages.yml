@@ -1,8 +1,13 @@
 # The website on GitHub Pages, https://mohammedel-sayedahmed.github.io/sedjem/: site/build.py builds it from site/
 # with the made-up meeting, its captures of the app, the logo and the fonts from the rest of the repository, the site's
-# tests check the result, and it is published. Runs for a push to main that changes anything the build reads, and by
+# tests check the result, and it is published. Runs for a push to main that changes anything the build reads, after
+# each successful run of the Repository stats workflow (stats.yml), so that the page's numbers are the day's, and by
 # hand (Actions → Pages → Run workflow, or `gh workflow run pages.yml`). Pages must be turned on in the repository's
 # settings with GitHub Actions as its source. To build and look at it locally, see site/build.py's docstring.
+#
+# The page's numbers come from the stats branch, whose files are downloaded through the API: never a checkout or a
+# fetch of that branch, which GitHub would count as a clone. A file that can't be downloaded or read leaves its
+# numbers out of the page, with a warning, and never stops the publication.
 name: Pages
 
 on:
@@ -16,8 +21,14 @@ on:
       - "docs/video/fonts/*"
       - "app/__init__.py"
       - "app/static/icon*"
+      - "docs/usage.json"
       - "tests/test_site.py"
+      - "tests/site_support.py"
       - ".github/workflows/pages.yml"
+  workflow_run:
+    workflows: ["Repository stats"]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
@@ -32,6 +43,8 @@ concurrency:
 
 jobs:
   build:
+    # after the stats workflow, only when it succeeded
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
@@ -41,8 +54,21 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Download the stats branch's numbers (through the API, not a checkout)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/stats"
+          for file in downloads.csv repo.csv views.csv; do
+            if ! gh api -H "Accept: application/vnd.github.raw" "repos/$GITHUB_REPOSITORY/contents/$file?ref=stats" \
+                > "$RUNNER_TEMP/stats/$file"; then
+              rm -f "$RUNNER_TEMP/stats/$file"
+              echo "::warning::$file could not be downloaded from the stats branch; its numbers are left out of the page."
+            fi
+          done
+
       - name: Build
-        run: python site/build.py _site
+        run: python site/build.py _site --stats "$RUNNER_TEMP/stats"
 
       - name: Check (offline, standard library only)
         run: python -m unittest tests.test_site -v
