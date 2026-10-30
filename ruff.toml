@@ -1,0 +1,7 @@
+# ruff, the Python linter of the quick checks (.github/workflows/tests.yml, docs/14-pipeline.md), pinned in
+# requirements-dev.txt. For now it looks for errors only: syntax errors (E9) and the pyflakes rules (F), such as
+# undefined names, unused imports and variables, and f-strings without placeholders. Run: ruff check .
+target-version = "py312"
+
+[lint]
+select = ["E9", "F"]
