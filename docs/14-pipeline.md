@@ -135,7 +135,11 @@ pull request to microsoft/winget-pkgs if it is still open; once it is merged, th
 ## Security
 
 - Dependabot opens a pull request a week for the actions and one for the minor and patch releases of the Python
-  packages; a new major version comes alone. Each goes through the Tests workflow like any other change. It
+  packages; a new major version comes alone. Each goes through the Tests workflow like any other change. The speech
+  engines and the audio libraries they read with (faster-whisper, CTranslate2, PyAV, sherpa-onnx, transcribe-cpp,
+  soundfile, ONNX Runtime) come in a pull request of their own, any kind of release: the tests use stand-ins for the
+  models, so a passing run says nothing about the transcripts, and that pull request is merged only after the
+  models have run on real recordings with the new versions. It
   leaves a range such as `av>=11,<19` alone while new releases fit it, and never proposes PyAV 19, which
   faster-whisper 1.2.1 can't use.
 - pip-audit looks up every package the requirement files resolve to in the Python Packaging Advisory Database and
