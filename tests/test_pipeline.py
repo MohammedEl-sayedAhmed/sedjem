@@ -467,7 +467,8 @@ class RunTests(unittest.TestCase):
             text = summary.read_text(encoding="utf-8")
             self.assertIn("### Example: passed", text)
             self.assertRegex(text, r"Coverage: \d+% of the statements ran")
-            self.assertIn("app/__init__.py", text.replace("\\_", "_").replace("\\", "/"))
+            # the report is Markdown, which escapes "_" and, on Windows, the backslash in a path too
+            self.assertIn("app/__init__.py", re.sub(r"\\(.)", r"\1", text).replace("\\", "/"))
             (tests / "test_example.py").write_text("import unittest\nclass E(unittest.TestCase):\n"
                                                     "    def test_x(self):\n        self.fail('no')\n", encoding="utf-8")
             done = subprocess.run([*command[:6], "--title", "Again"], cwd=ROOT, capture_output=True, text=True,
