@@ -71,6 +71,7 @@ const ICON = {
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
   key: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>',
   assistant: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.5 12a8.5 8.5 0 0 1-12.4 7.6L3.5 20.5l1-4.5A8.5 8.5 0 1 1 20.5 12z"/><path d="M12 9l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="currentColor" stroke-width="1.2"/></svg>',
+  network: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="9" height="7" rx="1.5"/><rect x="13" y="14" width="9" height="7" rx="1.5"/><path d="M6.5 10v6.5H13M17.5 14V7.5H11"/></svg>',
   update: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 16.5v-9M8 11.5l4-4 4 4"/></svg>',
   play: '<path d="M8 5.5v13a1 1 0 0 0 1.5.9l10-6.5a1 1 0 0 0 0-1.7l-10-6.5A1 1 0 0 0 8 5.5z"/>',
   pause: '<rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/>',
@@ -352,6 +353,7 @@ const formSeconds = () => (S.form.source === "youtube" ? ytSeconds() : S.form.se
 
 function estimateText(m, seconds, short = false) {
   if (!m) return "";
+  if (m.kind === "remote") return rmEstimate(m, seconds, short);  // on a paired computer (remote.js)
   if (m.kind === "hosted") return short ? "Usually a few minutes, plus the upload" : `${esc(m.service)} usually takes a few minutes, plus the upload`;
   const sp = m.speed || { rtf: m.rtf };
   const slow = S.status.power === "power-saver" && !sp.measured;  // a measured speed already includes it
@@ -380,6 +382,7 @@ function speakerHint(m, speakers) {
 // What a local model's speaker labels will be short of: no speaker model downloaded, or one that tells apart fewer
 // people than were asked for (the server gives it no more than that)
 function speakerLimits(m, speakers) {
+  if (m?.kind === "remote") return rmSpeakerLimits(m, speakers);  // remote.js
   if (m?.kind !== "local" || speakers === "none") return "";
   if (!S.status.speakers_ready) return " <b>No speaker model is downloaded, so local models will skip speaker labels.</b>";
   const sm = speakerModelUsed(), most = Number(sm?.max_speakers);
@@ -408,16 +411,21 @@ function modelCard(m) {
   </div>`;
 }
 
+// The model picked on the form: one of this computer's, or one a paired computer listed (remote.js)
+const formModel = () => (S.form.source !== "youtube" && rmChoice() ? rmModel(rmChoice(), S.form.model) : model(S.form.model));
+
 function renderNew() {
   stopJobPoll();
   hidePlayer();
   formDefaults();
-  const f = S.form, m = model(f.model), st = S.status;
+  const f = S.form, m = formModel(), st = S.status;
   const src = f.file ? { name: f.file.name, size: f.file.size } : f.path;
   const custom = !SPEAKER_CHOICES.some(([v]) => v === f.speakers);
   const hosted = m && m.kind === "hosted";
   const yt = f.source === "youtube", picked = yt ? ytPicked().length : 0;
-  const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : src && !S.uploading) && m && m.ready && (!hosted || f.confirm);
+  const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); YouTube links run here
+  const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : src && !S.uploading) && m && m.ready && (!hosted || f.confirm)
+    && (!rc || rc.consented || f.confirm);
   const startLabel = yt ? (YT.adding ? "Adding…" : picked > 1 ? `Start ${picked} transcriptions` : "Start transcription")
     : S.uploading ? "Uploading…" : "Start transcription";
   view.innerHTML = `
@@ -452,8 +460,9 @@ function renderNew() {
   </div>
 
   <div class="card">
-    <div class="step-head"><span class="step-num">2</span> Model <span class="aside">Local models are free and private; hosted ones are usually more accurate</span></div>
-    <div class="model-grid" id="modelGrid" role="radiogroup" aria-label="Model">${st.models.map(modelCard).join("")}</div>
+    <div class="step-head"><span class="step-num">2</span> Model <span class="aside">${rc ? `The models installed on <bdi>${esc(rc.name)}</bdi>` : "Local models are free and private; hosted ones are usually more accurate"}</span></div>
+    ${yt ? "" : rmWhere()}
+    <div class="model-grid" id="modelGrid" role="radiogroup" aria-label="Model">${rc ? rmGrid(rc) : st.models.map(modelCard).join("")}</div>
   </div>
 
   <div class="card">
@@ -488,6 +497,7 @@ function renderNew() {
       <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : "this recording"} to ${esc(m.service)}</label>
     </div>
   </div>` : ""}
+  ${rc && m ? rmConsent(rc) : ""}
 
   <div class="start-row">
     <div class="estimate">${m?.ready ? (yt && picked && !ytForModel().length ? "No model needs to run: every picked video has captions made by people" : estimateText(m, formSeconds())) : ""}</div>
@@ -500,14 +510,14 @@ function renderNew() {
 
 function renderModelGrid() {
   const grid = $("#modelGrid");
-  if (!grid) return;
+  if (!grid || (S.form.source !== "youtube" && rmChoice())) return;  // a paired computer's models are its own
   grid.innerHTML = S.status.models.map(modelCard).join("");
   bindModelCards();
 }
 
 function bindModelCards() {
   const f = S.form;
-  $$(".model-card").forEach((card) => {
+  $$(".model-card[data-model]").forEach((card) => {
     const pick = (e) => {
       if (e.target.closest("[data-open-settings], [data-dl], [data-dl-cancel]")) return;
       const m = model(card.dataset.model);
@@ -575,7 +585,7 @@ function bindNew() {
     if (!(n >= 1 && n <= 20)) return;
     f.speakers = String(n);
     $$("#spk button").forEach((b) => b.setAttribute("aria-pressed", "false"));
-    const m = model(f.model);  // the hint follows the number without redrawing the field being typed in
+    const m = formModel();  // the hint follows the number without redrawing the field being typed in
     $("#spkHint").innerHTML = speakerHint(m, f.speakers) + speakerLimits(m, f.speakers);
   };
   $$("#lang button").forEach((b) => (b.onclick = () => { f.language = b.dataset.v; renderNew(); }));
@@ -592,14 +602,16 @@ function bindNew() {
   if (pr) pr.oninput = (e) => (f.prompt = e.target.value);
   const cu = $("#confirmUpload");
   if (cu) cu.onchange = () => { f.confirm = cu.checked; renderNew(); };
+  bindRemoteForm();  // where it runs (remote.js)
   $("#startBtn").onclick = start;
 }
 
 async function start() {
-  const f = S.form, m = model(f.model);
+  const f = S.form, m = formModel();
   const params = { model: m.id, speakers: f.speakers, language: f.language, prompt: m.prompt ? f.prompt : "",
     title: f.title.trim(), confirm_upload: m.kind === "hosted" && f.confirm ? "1" : "0" };
   if (f.source === "youtube") return ytStart(params);  // youtube.js
+  if (m.kind === "remote") Object.assign(params, { run_on: m.computer.id, confirm_send: f.confirm ? "1" : "0" });
   try {
     let job;
     if (f.path) {
@@ -617,7 +629,8 @@ async function start() {
     }
     S.uploading = null;
     if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
-    S.form = { file: null, path: null, seconds: null, model: f.model, speakers: f.speakers, language: f.language, prompt: f.prompt, title: "", confirm: false, source: f.source };
+    S.form = { file: null, path: null, seconds: null, model: f.model, speakers: f.speakers, language: f.language, prompt: f.prompt, title: "", confirm: false, source: f.source, runOn: f.runOn };
+    if (m.kind === "remote") await refreshStatus();  // that computer isn't asked about again (remote.js)
     await refreshJobs();
     location.hash = `#/job/${job.id}`;
   } catch (e) {
@@ -645,6 +658,8 @@ const STAGES = {
 };
 
 function stageInfo(j) {
+  const sent = rmStage(j);  // on a paired computer (remote.js)
+  if (sent) return sent;
   const m = model(j.model);
   if (j.status === "queued") return { label: j.kind === "local" ? "Waiting for the previous local job" : "Waiting to start", pct: null };
   if (j.status === "preparing") {
@@ -716,7 +731,8 @@ function renderJob() {
       <div class="row"><span class="stage" id="stageLabel">${esc(si.label)}</span><span class="hint" id="stageDetail" style="margin:0">${esc(si.detail || "")}</span><span class="times" id="stageTimes">${etaText(j)}</span></div>
       <div class="progress${si.pct == null ? " indeterminate" : ""}" id="stageBar"><i style="width:${(si.pct || 0).toFixed(1)}%"></i></div>
       <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The video is downloaded first (up to 720p, to play beside the transcript), then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
-        : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open." : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
+        : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open."
+        : j.kind === "remote" ? rmNote(j) : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
       <div style="margin-top:12px"><button class="btn btn-sm btn-danger" id="cancelBtn">${ICON.stop} Cancel</button></div>
     </div>`;
   } else if (["failed", "interrupted", "cancelled"].includes(j.status)) {
@@ -726,7 +742,7 @@ function renderJob() {
       ${j.error ? `<div dir="auto">${esc(j.error).replace(/\n/g, "<br>")}</div>` : ""}
       ${hasLines ? `<p class="hint">The transcript below is what was finished before it stopped.</p>` : ""}
       ${S.log ? `<details style="margin-top:8px"><summary class="hint" style="cursor:pointer">Show log</summary><pre class="log">${esc(S.log)}</pre></details>` : ""}
-      <div style="margin-top:12px"><button class="btn btn-sm" data-rerun="${esc(j.model)}">${ICON.redo} Try again</button></div>
+      ${rmSent(j) ? rmFailedActions(j) : `<div style="margin-top:12px"><button class="btn btn-sm" data-rerun="${esc(j.model)}">${ICON.redo} Try again</button></div>`}
     </div>`;
   }
 
@@ -755,6 +771,7 @@ function renderJob() {
   </div>
   ${statusCard}
   ${j.download_note ? `<div class="card yt-notice">${ICON.info}<span>${esc(j.download_note)}.</span></div>` : ""}
+  ${j.remote_note ? `<div class="card yt-notice rm-notice">${ICON.info}<span>${esc(j.remote_note)}.</span></div>` : ""}
   ${hasLines || !active || slot ? `
   <div class="job-body${slot ? " has-video" : ""}">
     <div>
@@ -824,6 +841,7 @@ function detailsPanel() {
     where = `Graphics card · ${{ vulkan: "Vulkan", cuda: "CUDA", metal: "Metal", rocm: "ROCm" }[kind] || kind}`;
     fallback = ICON.gpu;
   } else { device = gpuName(pc.cpu) || "Processor"; where = kind.startsWith("cpu (") ? "Processor (the graphics card failed)" : "Processor"; fallback = ICON.cpu; }
+  if (run.remote) where = `Ran on ${run.remote} · ${where}`;  // a paired computer (app/remote.py)
   const stats = [
     run.rtf != null ? [`${Number(run.rtf).toFixed(2)}×`, "real time"] : null,
     run.seconds != null ? [human(run.seconds), rec.duration ? `for ${clock(rec.duration)}` : "took"] : null,
@@ -852,7 +870,7 @@ function detailsPanel() {
     </div>
     ${rec.name ? `<section class="det-sec"><h4>${ICON.wave} Recording</h4><div class="det-main" dir="auto">${esc(rec.name)}</div>${chips(recChips)}</section>` : ""}
     <section class="det-sec"><h4>${ICON.layers} Model</h4><div class="det-row det-model">${modelTile(model(mod.id) || mod)}<div class="det-main">${esc(mod.title || S.job.model_title || "")}</div></div>${chips(modChips)}${said ? `<div class="det-sub">${esc(said)}</div>` : ""}</section>
-    ${recorded || machine || pc.cpu ? `<section class="det-sec"><h4>${ICON.laptop} Computer</h4>
+    ${recorded || machine || pc.cpu ? `<section class="det-sec"><h4>${ICON.laptop} ${run.remote ? `Computer: <bdi>${esc(run.remote)}</bdi>` : "Computer"}</h4>
       ${found(machine, "Computer model", ICON.laptop, "")}${found(gpuName(pc.cpu), "Processor", ICON.cpu, pc.threads ? `${pc.threads} threads${pc.ram_gb ? ` · ${Math.round(pc.ram_gb)} GB RAM` : ""}` : "")}${found(os, "System", ICON.laptop, pc.arch || "")}</section>` : ""}
     <details class="more" id="moreDetails"${S.moreDetails ? " open" : ""}><summary>All details</summary>${rows(null)}</details>
     ${copy}</div>`;
@@ -1005,6 +1023,7 @@ function bindJob() {
   if (follow) follow.onchange = () => (S.follow = follow.checked);
   bindCourseBar(j);  // youtube.js
   bindAi();  // assistants.js: hide it, or its course, from assistants
+  bindRemoteJob();  // remote.js: try again on the computer it was sent to
   bindTranscript();
   bindEditbar();
 }
@@ -1820,21 +1839,23 @@ function updateVideoPrep() {
 // ---------------------------------------------------------------------------------------------
 // Settings
 // ---------------------------------------------------------------------------------------------
-// Settings: one tab at a time (Models, Add models, Hosted services, Speed, Assistants, About, Updates), so nothing
+// Settings: one tab at a time (Models, Add models, Hosted services, Speed, Assistants, Other computers, About, Updates), so nothing
 // needs a long scroll; a hosted service's key form opens only for the service being edited.
 const SET = { tab: "models", add: "recommended", openKey: null, details: {}, animate: null };  // details: the open row of each tab
 const SET_TABS = [["models", "laptop", "Models"], ["add", "plus", "Add models"], ["hosted", "cloud", "Hosted services"],
-  ["speed", "bolt", "Speed"], ["assistants", "assistant", "Assistants"], ["about", "info", "About"], ["updates", "update", "Updates"]];
+  ["speed", "bolt", "Speed"], ["assistants", "assistant", "Assistants"], ["remote", "network", "Other computers"], ["about", "info", "About"],
+  ["updates", "update", "Updates"]];
 
 function openSettings(focus) {
   if (!S.status) return;  // still starting up
   if (focus === "speed" || focus === "power") SET.tab = "speed";
-  else if (focus === "assistants" || focus === "updates") SET.tab = focus;
+  else if (focus === "assistants" || focus === "updates" || focus === "remote") SET.tab = focus;
   else if (focus && model(focus)?.kind === "hosted") { Object.assign(SET, { tab: "hosted", openKey: focus }); SET.details.hosted = null; }
   renderSettings(focus);
   $("#settings").showModal();
   if (SET.tab === "assistants") loadAssistants();  // what assistants asked since it was last open
   if (SET.tab === "updates") loadUpdates();  // updates.js
+  if (SET.tab === "remote") loadRemote();  // remote.js
 }
 
 function setStatus(kind, text, icon = "") {
@@ -1996,7 +2017,7 @@ function renderSettings(focus) {
     `<button type="button" role="tab" id="tab-${t}" data-set-tab="${t}" aria-selected="${SET.tab === t}" aria-controls="set-panel" tabindex="${SET.tab === t ? 0 : -1}">
       ${ICON[icon]}<span>${label}</span>${counts[t] ? `<small>${counts[t]}</small>` : ""}</button>`).join("")}</nav>`;
   const panel = { models: modelsPanel, add: addPanel, hosted: hostedPanel, speed: speedPanel, assistants: assistantsPanel,
-    about: aboutPanel, updates: updatesPanel }[SET.tab](items, hosted);
+    remote: remotePanel, about: aboutPanel, updates: updatesPanel }[SET.tab](items, hosted);
   // Redrawing the same tab (download progress every 1.5 s, a row opened) keeps the panel where it was scrolled,
   // the row of tabs on a narrow screen too, and the focus on a tab or switch drawn again
   const old = $("#set-panel"), top = old?.getAttribute("aria-labelledby") === `tab-${SET.tab}` ? old.scrollTop : 0;
@@ -2208,6 +2229,7 @@ function bindSettings(focus) {
     $(`#tab-${SET.tab}`)?.focus();
     if (SET.tab === "assistants") loadAssistants();
     if (SET.tab === "updates") loadUpdates();
+    if (SET.tab === "remote") loadRemote();
   }));
   const tabs = $$(".set-nav [role=tab]");
   tabs.forEach((b, i) => (b.onkeydown = (e) => {
@@ -2240,11 +2262,13 @@ function bindSettings(focus) {
     if (key === "threads" && !(value >= 1 && value <= cores)) { el.value = threads; return; }
     try { S.status = await api.post("/api/settings", { [key]: value }); renderTop(); renderSettings(); if (S.route.name === "new") renderModelGrid(); toast("Saved"); }
     catch (e) { toast(e.message, "error"); }
+    if (key === "remote_serve") loadRemote();  // listening or not, its addresses and code (remote.js)
   }));
   const open = $("#openFolder");
   if (open) open.onclick = async () => { try { await api.post("/api/open-folder"); } catch (e) { toast(e.message, "error"); } };
   bindHub();
   bindAssistants();  // assistants.js
+  bindRemote();  // remote.js
   bindUpdates();  // updates.js
   $$("[data-forget-model]").forEach((b) => (b.onclick = () => forgetModel(b.dataset.forgetModel)));
   if (focus && focus !== "speed" && focus !== "power") { const el = $(`[data-key="${focus}"]`); if (el) setTimeout(() => el.focus(), 50); }

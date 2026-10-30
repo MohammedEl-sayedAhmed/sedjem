@@ -311,6 +311,7 @@ def main(argv=None):
     threading.Thread(target=server.serve_forever, daemon=True, name="sedjem-server").start()
     app.updates.start()  # checks for updates in the background, if the user agreed to it
     app.usage.start()  # sends the anonymous usage counts, while they are allowed (app/usage.py)
+    app.remote.start()  # runs jobs for other computers, if that is switched on (app/remote.py)
     port_file = cfg.storage / "port"  # so that starting it again finds this one, whichever port it has
     try:
         port_file.write_text(str(server.server_address[1]), encoding="utf-8")
@@ -346,6 +347,7 @@ def main(argv=None):
         pass
     finally:
         app.runner.shutdown()
+        app.remote.stop()
         server.shutdown()
         server.server_close()
         try:

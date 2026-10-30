@@ -19,12 +19,14 @@ Local models that aren't on the computer yet can be downloaded from the app, fro
 or from *Settings → Models*. Downloads resume after a dropped connection and are checked against a
 pinned checksum.
 
-*Settings* has seven tabs. *Models* lists the models on the computer, with their downloads and
+*Settings* has eight tabs. *Models* lists the models on the computer, with their downloads and
 removal, and under *Speaker labels* the speaker models, with the choice of the one that labels the
 speakers ([speaker models](#speaker-models)). *Add models* has two views: *Recommended* and *From
 Hugging Face*. *Hosted services* holds the API keys, *Speed* the graphics card, power mode and
 processor threads, *Assistants* what assistants connected over MCP may see, how to connect them and
-what they asked ([assistants](11-assistants.md)), *About* the version, the licence, the folder where
+what they asked ([assistants](11-assistants.md)), *Other computers* the pairing with another computer of yours that
+runs transcriptions for this one, and the switch that lets this one run them for others
+([running jobs on another computer](15-remote-runs.md)), *About* the version, the licence, the folder where
 the app keeps its data and the switch for the anonymous usage counts ([usage counts](13-usage-counts.md)),
 and *Updates* the version that runs and what is newer ([updates](12-updates.md)).
 
@@ -672,7 +674,11 @@ the speaker step with a stand-in model process).
 - The server listens on 127.0.0.1 only, answers only requests addressed to that host, and refuses
   changes that don't carry the app's own header, so other websites open in the same browser can't
   use it.
-- With local models, the recording and its transcript never leave the computer.
+- With local models, the recording and its transcript never leave the computer, unless you pick a paired computer
+  under *Run on*: then the recording goes to that computer alone, over the local network and encrypted, and is deleted
+  there once the transcript is back. Other computers can send recordings here only after *Run jobs for other computers*
+  is turned on, which opens a port of its own that answers only private addresses
+  ([running jobs on another computer](15-remote-runs.md)).
 - Checking or adding a model from Hugging Face asks huggingface.co for that model's details and
   files, and nothing else.
 - Checking or adding a YouTube link asks YouTube, through yt-dlp, for that video or playlist and its
@@ -742,6 +748,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/transcript.py` | lines from words, and the exports |
 | `app/compare.py` | transcriptions of one recording: grouping them, their main transcript and labels, lining them up by time, and combining them into a new version |
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
+| `app/remote.py` | running jobs on another computer: pairing, the serving side's HTTPS server, sending a job and collecting its transcript ([running jobs on another computer](15-remote-runs.md)) |
 | `sysinfo.py` | this computer and a recording's format (PyAV), for the details and `transcribe.py`'s `.meta.json` |
 | `app/static/` | the interface (HTML, CSS and JavaScript, no build step) |
 | `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the speaker models, the details, the video (on short clips made by `tests/media.py`), and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
@@ -769,6 +776,7 @@ Every change needs the header `X-Sedjem: 1`.
 | `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
 | `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, …}` | one transcription per video (all of them without `entries`), queued in playlist order |
 | `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
+| `POST /api/jobs` with `run_on` and `confirm_send`, `GET /api/remote` and the rest of `/api/remote/` | a transcription on a paired computer, and the pairing ([running jobs on another computer](15-remote-runs.md#for-scripts)) |
 | `GET /api/updates`, `POST /api/updates/check`, `/settings`, `/skip`, `/install` | *Settings → Updates*: the state, *Check now*, the switch and channel, *Skip this version*, *Update now* ([updates](12-updates.md)) |
 
 ## Limits

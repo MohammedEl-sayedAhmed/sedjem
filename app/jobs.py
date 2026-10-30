@@ -15,6 +15,10 @@ order the jobs were added (a playlist's in playlist order): video.mp4, or only t
 and captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
 recording, and a job with captions takes them as its transcript instead of going to a model. A finished
 YouTube job writes its files to the courses folder (app/courses.py).
+
+A job sent to a paired computer (app/remote.py) has "remote": {"id", "name"} and kind "remote": it is prepared here,
+then a queue of its own sends audio.flac there and brings the transcript back. Jobs that other computers send here are
+kept apart from the library, in a store of their own (Joined), and run through the same local queue as the app's own.
 """
 import json
 import os
@@ -123,6 +127,49 @@ class Store:
         write_json(self.dir(jid) / "transcript.json", data)
 
 
+class Joined:
+    """The app's own jobs and the jobs it runs for other computers (app/remote.py), as one store for the Runner. A job
+    is in the store that has its folder, and a new one goes to the served store when it has "served". Listing gives the
+    app's own only: jobs run for other computers are never in the library, and never run again after a restart."""
+
+    def __init__(self, own, served):
+        self.own, self.served = own, served
+        self.root, self.lock = own.root, own.lock
+
+    def of(self, jid):
+        return self.served if ID_RE.match(jid or "") and (self.served.root / jid).is_dir() else self.own
+
+    def create(self, meta):
+        store, other = (self.served, self.own) if meta.get("served") else (self.own, self.served)
+        if (other.root / meta["id"]).exists():  # an id is used once across both: drawn again (new_job)
+            raise FileExistsError(meta["id"])
+        return store.create(meta)
+
+    def new_id(self):
+        return self.own.new_id()
+
+    def list(self):
+        return self.own.list()
+
+    def dir(self, jid):
+        return self.of(jid).dir(jid)
+
+    def get(self, jid):
+        return self.of(jid).get(jid)
+
+    def update(self, jid, **fields):
+        return self.of(jid).update(jid, **fields)
+
+    def delete(self, jid):
+        return self.of(jid).delete(jid)
+
+    def transcript(self, jid):
+        return self.of(jid).transcript(jid)
+
+    def save_transcript(self, jid, data):
+        return self.of(jid).save_transcript(jid, data)
+
+
 def probe_seconds(path):
     """Duration of any audio or video file, in seconds; None if unknown."""
     import av
@@ -136,18 +183,25 @@ def probe_seconds(path):
         return None
 
 
-def convert(source, dest, on_progress, cancelled):
+def convert(source, dest, on_progress, cancelled, limits=None):
     """Decode any audio or video file to 16 kHz mono FLAC with PyAV (the FFmpeg libraries that
-    faster-whisper already ships), so no separate ffmpeg install is needed on any platform."""
+    faster-whisper already ships), so no separate ffmpeg install is needed on any platform.
+    limits, for a recording another computer sent (app/remote.py): {"format", "rate", "channels", "seconds"}: read only as
+    that format, refused above that rate or number of channels, and stopped once that much is decoded (a few hundred KB
+    of FLAC silence can stand for thousands of hours)."""
     import av
+    limits = limits or {}
     tmp = dest.with_name(dest.stem + ".tmp.flac")
     try:
-        with av.open(str(source)) as container:
+        with av.open(str(source), format=limits.get("format")) as container:
             stream = next((s for s in container.streams if s.type == "audio"), None)
             if stream is None:
                 raise engines.EngineError("the file has no audio track")
+            if (stream.sample_rate or 0) > limits.get("rate", float("inf")) \
+                    or (stream.channels or 0) > limits.get("channels", float("inf")):
+                raise engines.EngineError("the recording has too high a rate or too many channels")
             resampler = av.AudioResampler(format="s16", layout="mono", rate=16000)
-            last = 0.0
+            last, decoded = 0.0, 0.0  # seconds decoded, counted from the samples (a frame's time can be missing)
             with sf.SoundFile(str(tmp), "w", samplerate=16000, channels=1, subtype="PCM_16", format="FLAC") as out:
                 for packet in container.demux(stream):  # the last packet flushes the decoder
                     if cancelled():
@@ -157,6 +211,9 @@ def convert(source, dest, on_progress, cancelled):
                     except av.error.InvalidDataError:  # a damaged packet: skip it
                         continue
                     for frame in frames:
+                        decoded += frame.samples / (frame.sample_rate or 16000)
+                        if decoded > limits.get("seconds", float("inf")):
+                            raise engines.EngineError(f"the recording is longer than {limits['seconds'] / 3600:g} hours")
                         for f in resampler.resample(frame):
                             out.write(f.to_ndarray().reshape(-1))
                         if frame.time is not None and time.time() - last > 0.5:
@@ -164,6 +221,8 @@ def convert(source, dest, on_progress, cancelled):
                             on_progress(frame.time)
                 for f in resampler.resample(None):
                     out.write(f.to_ndarray().reshape(-1))
+            if limits and not decoded:  # (the forced demuxer reads nothing from a file of another format)
+                raise engines.EngineError("the recording has no FLAC audio")
     except BaseException:
         tmp.unlink(missing_ok=True)
         raise
@@ -201,7 +260,9 @@ class Runner:
         self.store, self.cfg = store, cfg
         self.gpus = gpus or (lambda: None)  # the graphics cards the app found, for the job details
         self.on_end = ended or (lambda job, lines, stage: None)  # the anonymous usage counts (app/usage.py)
-        self.queues = {"download": queue.Queue(), "prepare": queue.Queue(), "video": queue.Queue(), "local": queue.Queue(), "hosted": queue.Queue()}
+        self.queues = {"download": queue.Queue(), "prepare": queue.Queue(), "video": queue.Queue(), "local": queue.Queue(),
+                       "hosted": queue.Queue(), "remote": queue.Queue()}
+        self.remote = None  # app/remote.py's Remote, which sends jobs to paired computers (set by the app)
         self.cancelled = set()
         self.procs = {}  # job id -> running transcribe.py process
         self.videos = set()  # jobs whose video.mp4 is waiting or being made
@@ -209,7 +270,7 @@ class Runner:
         self.unwanted = set()  # jobs whose video should stop (the job is being deleted)
         self.saved_profile = None
         for name, fn in (("download", self.download), ("prepare", self.prepare), ("video", self.make_video),
-                         ("local", self.work), ("hosted", self.work)):
+                         ("local", self.work), ("hosted", self.work), ("remote", self.send)):
             threading.Thread(target=self.loop, args=(name, fn), daemon=True, name=f"sedjem-{name}").start()
 
     # ---- queueing -----------------------------------------------------------------------------
@@ -260,7 +321,7 @@ class Runner:
             except Exception as e:  # never let one job kill the worker
                 if name != "video":  # (the video is extra: make_video says why it has none)
                     self.store.update(jid, status="failed", stage=None, error=f"{type(e).__name__}: {e}", finished=now())
-                    self.ended(jid, stage={"prepare": "read", "local": "model"}.get(name, name))
+                    self.ended(jid, stage={"prepare": "read", "local": "model", "remote": "model"}.get(name, name))
 
     def ended(self, jid, lines=None, stage=None):
         """A job finished, failed or was cancelled: the usage counts take their numbers from it (app/usage.py).
@@ -281,8 +342,10 @@ class Runner:
         return found if found.is_file() else None
 
     def drop_upload(self, job, source):
-        """Delete an uploaded recording once audio.flac (and the video) are made from it, unless kept."""
-        if source and not job.get("source_path") and source.name != video.NAME and not self.cfg.keep_original:
+        """Delete an uploaded recording once audio.flac (and the video) are made from it, unless kept (never one that
+        another computer sent)."""
+        if source and not job.get("source_path") and source.name != video.NAME \
+                and (not self.cfg.keep_original or job.get("served")):
             source.unlink(missing_ok=True)
     def download(self, jid, _):
         """Download a YouTube job's video (app/youtube.py), then hand it to prepare."""
@@ -316,6 +379,8 @@ class Runner:
         making of video.mp4 when it has a picture."""
         job = self.store.get(jid)
         if not job or job["status"] == "cancelled" or jid in self.cancelled:
+            if job and job.get("served"):  # another computer's recording isn't kept for a job that won't run
+                self.drop_upload(job, self.source(job, self.store.dir(jid)))
             return
         folder = self.store.dir(jid)
         audio, movie = folder / "audio.flac", folder / video.NAME
@@ -326,9 +391,14 @@ class Runner:
             total = probe_seconds(source)
             self.store.update(jid, status="preparing", stage="converting", done=0, total=total,
                               source=sysinfo.recording(source, job.get("source_name")))  # before an upload is deleted
+            from . import remote  # imported here because it uses this module
+            limits = {"format": "flac", "rate": remote.MAX_RATE, "channels": remote.MAX_CHANNELS,
+                      "seconds": remote.LONGEST_HOURS * 3600} if job.get("served") else None
             try:
-                convert(source, audio, lambda t: self.store.update(jid, done=t), lambda: jid in self.cancelled)
+                convert(source, audio, lambda t: self.store.update(jid, done=t), lambda: jid in self.cancelled, limits)
             except engines.Cancelled:
+                if job.get("served"):  # cancelled while converting: another computer's recording isn't kept
+                    self.drop_upload(job, source)
                 return
             except engines.EngineError:
                 raise
@@ -343,7 +413,7 @@ class Runner:
             self.drop_upload(job, source)
         info = sf.info(str(audio))
         model = self.cfg.models.get(job["model"])
-        if model is None and not job.get("captions"):
+        if model is None and not job.get("captions") and job.get("kind") != "remote":  # (a paired computer's model)
             raise engines.EngineError(f"unknown model {job['model']}")
         from .compare import try_fingerprint  # the same recording added again joins this one's group
         ready = {"done": None, "total": None, "audio_s": round(info.duration, 2), "queued": now(),
@@ -351,7 +421,7 @@ class Runner:
         if job.get("captions"):  # captions made by people: they are the transcript, and no model runs
             return self.finish_captions(jid, ready)
         self.store.update(jid, status="queued", stage=None, **ready)
-        self.queues[model["kind"]].put(jid)
+        self.queues["remote" if job.get("kind") == "remote" else model["kind"]].put(jid)
 
     def finish_captions(self, jid, fields):
         """A YouTube job with captions made by people: its transcript is the captions, with one speaker."""
@@ -415,6 +485,63 @@ class Runner:
             self.cancelled.discard(jid)
             if kind == "local" and self.queues["local"].empty():
                 self.performance(False)
+
+    def send(self, jid, _):
+        """Run a job on the paired computer it is for (app/remote.py). If that computer doesn't answer when the job
+        starts, it runs here instead when the same model is here, and says so; a computer that stops answering later
+        fails the job with that offer, and nothing switches by itself midway."""
+        from . import remote  # imported here because it uses this module
+        job = self.store.get(jid)
+        if not job or job["status"] != "queued" or jid in self.cancelled:
+            return
+        folder, name = self.store.dir(jid), (job.get("remote") or {}).get("name") or "the other computer"
+        self.store.update(jid, status="running", stage="starting", started=now(), done=None, total=None, error=None,
+                          elapsed=None, remote_lost=None)
+        t0 = time.time()
+        last_write = [0.0, None]
+
+        def on_progress(state):
+            if time.time() - last_write[0] > 0.4 or state.get("stage") != last_write[1]:
+                last_write[:] = [time.time(), state.get("stage")]
+                self.store.update(jid, stage=state.get("stage"), done=state.get("done"), total=state.get("total"),
+                                  elapsed=state.get("elapsed") if state.get("elapsed") is not None else round(time.time() - t0, 1))
+
+        try:
+            note(folder, f"Sending it to {name}.")
+            result = self.remote.send(job, folder, on_progress, lambda: jid in self.cancelled)
+        except remote.Unreachable as e:
+            note(folder, f"{name} didn't answer: {e}.")
+            model = self.cfg.models.get(job["model"])
+            if model and model["kind"] == "local" and self.cfg.availability(model)[0]:
+                self.store.update(jid, status="queued", stage=None, started=None, elapsed=None, kind="local",
+                                  model_title=model["title"], remote={**job["remote"], "fallback": True},
+                                  remote_note=f"{name} didn't answer when this started, so it ran on this computer")
+                self.queues["local"].put(jid)
+                return
+            self.store.update(jid, status="failed", stage=None, done=None, total=None, finished=now(),
+                              error=f"{name} didn't answer ({e}), and {job.get('model_title') or job['model']} isn't "
+                                    f"installed on this computer, so it couldn't run here instead. Try again once {name} "
+                                    f"is on, or download the model in Settings.")
+            self.ended(jid, stage="model")
+        except engines.Cancelled:
+            self.store.update(jid, status="cancelled", stage=None, finished=now())
+        except Exception as e:
+            note(folder, f"Stopped: {e}.")
+            self.store.update(jid, status="failed", stage=None, done=None, total=None, finished=now(),
+                              error=str(e) or type(e).__name__, remote_lost=isinstance(e, remote.Lost) or None)
+            self.ended(jid, stage="model")
+        else:
+            took = time.time() - t0
+            self.store.save_transcript(jid, {"lines": result["lines"], "edited": False, "model": job["model"]})
+            self.store.update(jid, status="done", stage=None, done=None, total=None, finished=now(),
+                              seconds=round(took, 1), rtf=round(took / max(1e-6, job.get("audio_s") or 1), 3),
+                              **result["meta"])
+            note(folder, f"The transcript came back from {name}.")
+            from . import history  # imported here because it uses this module's helpers
+            history.current(self.store, jid, self.cfg)  # version 0 is the model's output, as for a job run here
+            self.ended(jid, result["lines"])
+        finally:
+            self.cancelled.discard(jid)
 
     def performance(self, on):
         """With performance_while_running: switch to the performance profile while local jobs run. Switching
@@ -491,15 +618,17 @@ class Runner:
             time.sleep(0.05)
 
     # ---- new jobs ---------------------------------------------------------------------------------
-    def rerun(self, jid, model_id, options):
-        """A new job on the same audio (and video) with another model or other options."""
+    def rerun(self, jid, model_id, options, **extra):
+        """A new job on the same audio (and video) with another model or other options (extra: for a paired computer,
+        its "remote", "kind" and "model_title", as POST /api/jobs gives them)."""
         old = self.store.get(jid)
         folder = self.store.dir(jid)
         shown = old.get("video") if (folder / video.NAME).exists() else None
         youtube_fields = {k: old[k] for k in ("source_url", "youtube_id", "course") if old.get(k)}  # still the lecture
         new = self.new_job(title=old["title"], source_name=old.get("source_name"), model_id=model_id,
                            options=options, rerun_of=jid, source=old.get("source"),  # the same recording
-                           fingerprint=old.get("fingerprint"), **({"video": shown} if shown else {}), **youtube_fields)
+                           fingerprint=old.get("fingerprint"), **({"video": shown} if shown else {}), **youtube_fields,
+                           **extra)
         for name in ("audio.flac", video.NAME):
             if name == "audio.flac" or shown:
                 link_or_copy(folder / name, self.store.dir(new["id"]) / name)
@@ -555,7 +684,8 @@ class Runner:
         return self.store.get(new)
 
     def new_job(self, title, source_name, model_id, options, **extra):
-        model = self.cfg.models[model_id]
+        # a job for a paired computer names that computer's model, which needn't be here (extra has its title)
+        model = {"title": model_id, "kind": "remote"} if extra.get("kind") == "remote" else self.cfg.models[model_id]
         for _ in range(50):  # a playlist adds many jobs in the same second: an id that is taken is drawn again
             meta = {"id": self.store.new_id(), "title": title, "source_name": source_name, "created": now(),
                     "model": model_id, "model_title": model["title"], "kind": model["kind"], "options": options,

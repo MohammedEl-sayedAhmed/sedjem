@@ -15,7 +15,8 @@ Recordings, transcripts and their versions, speaker names, API keys, settings an
 on the computer: `%LOCALAPPDATA%\Sedjem` on Windows, `~/.local/share/sedjem` for the Linux build, and the project
 folder when Sedjem runs from source ([where things are kept](10-desktop.md#where-things-are-kept)). The models it
 downloads are kept there too. Its server answers only on the computer itself (127.0.0.1), and its interface loads
-nothing from the internet. Uninstalling keeps the data folder; deleting the folder removes everything.
+nothing from the internet. It listens on the network only if you let it run jobs for
+[another computer of yours](#another-computer-of-yours). Uninstalling keeps the data folder; deleting the folder removes everything.
 
 ## What Sedjem contacts, and when
 
@@ -114,6 +115,22 @@ the disk sends nothing either.
 
 Their totals are published once a month, as the app's are ([usage counts](13-usage-counts.md#public-totals)): a
 country or a site that linked to the website is named only when at least three visitors came from it that month.
+
+## Another computer of yours
+
+Sedjem can send a recording to another computer of yours on the same network, which transcribes it and sends the
+transcript back ([running jobs on another computer](15-remote-runs.md)). Nothing goes to a third party, and nothing is
+sent until the two computers are paired with a one-time code.
+
+- What travels: the recording as 16 kHz FLAC, with the model and the options, from the computer that sends it; and
+  back, the transcript with the facts of the run (the device, the model's file, the memory used, the version of Sedjem,
+  and the other computer's maker, model, processor, memory, system and graphics cards).
+- To whom: only the computer it was paired with, over the local network (private addresses, or Tailscale's), encrypted,
+  with that computer's certificate checked each time. The form asks before the first recording goes to each computer.
+- What stays there: the recording and its job are kept apart from that computer's own library and deleted once the
+  transcript is back, or a day after the job ended.
+- Switching it off: *Run jobs for other computers* in *Settings → Other computers* is off by default; turning it off
+  stops the port and deletes the recordings sent there. Removing a computer from either list ends the pairing.
 
 ## Assistants
 

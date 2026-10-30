@@ -2,7 +2,8 @@
 
 A job records the recording in the prepare step (job["source"], from sysinfo.recording) and the rest
 when it starts running (run_facts). details() gathers everything known about a job into four groups,
-recording, model, run and computer, with raw values; the API and the JSON export give it as it is.
+recording, model, run and computer, with raw values; the API and the JSON export give it as it is. A job run on a
+paired computer (app/remote.py) has that computer's facts, and its name as where it ran.
 groups() turns it into labelled lines for the job page and the Markdown export, and summary() into the
 few lines at the top of the text and WebVTT exports. Older jobs lack some fields; their lines are left out.
 """
@@ -68,6 +69,7 @@ def details(job, lines=None, edited=None):
     each a dict of raw values, None where unknown. lines: the transcript, for the number of speakers found;
     edited: whether it was corrected by hand."""
     opts, source, machine = _dict(job.get("options")), _dict(job.get("source")), _dict(job.get("machine"))
+    remote = _dict(job.get("remote"))
     name = source.get("name") or job.get("source_name")
     found = None if lines is None else len({x.get("speaker") for x in lines if x.get("speaker") is not None})
     return {
@@ -87,7 +89,10 @@ def details(job, lines=None, edited=None):
                 "detected_language": job.get("detected_language"), "speakers": opts.get("speakers"),
                 "speakers_found": found, "voiceprint_model": job.get("voiceprint_model"),
                 "vocabulary": opts.get("prompt") or None, "edited": edited, "app_version": job.get("app_version"),
-                "computer_recorded": bool(machine)},
+                "computer_recorded": bool(machine),
+                # the paired computer it ran on, and why it ran here instead when it did
+                "remote": remote.get("name") if job.get("status") == "done" and not remote.get("fallback") else None,
+                "note": job.get("remote_note")},
         "computer": {k: machine.get(k) for k in sysinfo.MACHINE_KEYS},
     }
 
@@ -215,10 +220,14 @@ def took(run):
 
 
 def ran_on(d):
-    """The graphics card or processor for a local model, the service for a hosted one."""
+    """The graphics card or processor for a local model, the service for a hosted one; a paired computer's name first
+    (Office-PC, graphics card: NVIDIA GeForce RTX 3060 (CUDA))."""
     if d["model"].get("kind") == "hosted":
         return d["model"].get("service") or d["model"].get("title")
-    return device_label(d["run"].get("device"))
+    device, name = device_label(d["run"].get("device")), d["run"].get("remote")
+    if name:
+        return f"{name}, {device[:1].lower()}{device[1:]}" if device else name
+    return device
 
 
 def language(run):
@@ -296,6 +305,7 @@ def groups(d):
           ("Language", language(run), False),
           ("Speakers", speakers(run), False),
           ("Vocabulary", run.get("vocabulary"), False),
+          ("Note", run.get("note"), False),
           ("Edited", run.get("edited") and "Yes, corrected by hand", False),
           ("Power mode", POWER.get(run.get("power"), run.get("power")), True),
           ("Threads", threads_used(run, pc), True),
@@ -328,7 +338,7 @@ def summary(d, title=None):
     rows = [("Title", title),
             ("Recording", _join([rec.get("name"), clock(rec.get("duration")), audio_text(rec)])),
             ("Model", _join([model_name(model), took(run) and f"took {took(run)}"])),
-            ("Ran on", _join([None if hosted else computer_name(pc), ran_on(d)])),
+            ("Ran on", _join([None if hosted or run.get("remote") else computer_name(pc), ran_on(d)])),
             ("Status", None if done else run.get("status")),
             ("Made", done and _join([when(run.get("finished")), version and f"with Sedjem {version}"], " "))]
     return [f"{label}: {' '.join(str(value).split())}" for label, value in rows if value]
