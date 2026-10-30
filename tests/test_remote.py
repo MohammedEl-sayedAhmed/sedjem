@@ -238,7 +238,7 @@ class Limits(unittest.TestCase):
         self.assertAlmostEqual(sf.info(str(self.tmp / "audio.flac")).duration, 1.0, places=1)
 
     def test_errors_in_fixed_words(self):
-        secret = "/home/someone/.local/share/sedjem/remote/jobs/20261030-120000-abcd/source.flac"
+        secret = "/home/you/.local/share/sedjem/remote/jobs/20261030-120000-abcd/source.flac"
         failed = {"status": "failed", "error": f"InvalidDataError: [Errno 1094995529] {secret}"}
         self.assertNotIn("/home", remote.served_error(failed))
         self.assertIn("couldn't be read there", remote.served_error(failed))
@@ -714,7 +714,7 @@ class TwoComputers(unittest.TestCase):
         self.a.app.remote.save_computers([computer])
 
     def test_the_lines_so_far_come_in_batches(self):
-        b, token = self.b.app.remote, self.token()
+        token = self.token()
         many = [{"start": float(i), "end": i + 0.5, "speaker": "1", "text": f"line {i} " + "x" * 100} for i in range(6000)]
         with mock.patch.object(self.b.app.runner, "submit"):
             _, made = self.raw("POST", "/v1/jobs?model=cohere", token, flac(self.a.home / "l.flac"),

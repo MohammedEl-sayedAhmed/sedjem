@@ -7,7 +7,6 @@ runs the jobs, with a stand-in for its models (as in tests/test_remote.py).
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_remote.py" -v
 """
 import re
-import time
 import unittest
 from unittest import mock
 
