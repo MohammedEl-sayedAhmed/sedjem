@@ -58,6 +58,17 @@ merge two speakers that the model split, edit the text, change a line's speaker,
 audio again with another model to compare (the runs share one audio file, so this takes no extra
 space).
 
+*Run again with* lists the models that are ready, and the ones that have not run on the recording
+yet come first. A model that already made a transcript of it, or is making one, is listed below
+them as already run, and choosing it opens that transcript instead of starting another run. When
+the model made more than one, it opens the recording's main transcript if that is one of them, else
+the newest. A run that failed or was cancelled does not count, and neither does a branch, since no
+model made its text. Which transcripts belong to the same recording is decided as described in
+[comparing and combining transcripts](#comparing-and-combining-transcripts). *Again with other
+options*, at the end of the menu, runs this transcript's model on the recording once more, with the
+speakers, language and vocabulary starting as this transcript's and open to change. It makes a new
+transcript and leaves this one as it is.
+
 A recording with a picture also gets a video on its page, at the top of the side column (above the
 transcript, and kept in view, in a narrow window). The bar at the bottom then plays the video instead
 of the audio, so the transcript follows it the same way: the line being played is highlighted,
