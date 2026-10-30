@@ -96,13 +96,19 @@ class GitHubError(Exception):
         self.status = status
 
 
-def call(token, path, method="GET"):
+def call(token, path, method="GET", body=None):
+    """One request to GitHub's API; `body`, when given, is sent as JSON (.github/scripts/release.py creates tags)."""
     headers = {"Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28",
                "User-Agent": "sedjem-preview-plan"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
+    data = None
+    if body is not None:
+        data = json.dumps(body).encode()
+        headers["Content-Type"] = "application/json"
     try:
-        with urllib.request.urlopen(urllib.request.Request(API + path, method=method, headers=headers), timeout=60) as resp:
+        with urllib.request.urlopen(urllib.request.Request(API + path, data=data, method=method, headers=headers),
+                                    timeout=60) as resp:
             data = resp.read()
     except urllib.error.HTTPError as e:
         raise GitHubError(e.code, e.read().decode(errors="replace")[:300]) from None

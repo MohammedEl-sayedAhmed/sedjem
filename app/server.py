@@ -16,7 +16,6 @@ import threading
 import time
 import urllib.parse
 from datetime import datetime
-from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 

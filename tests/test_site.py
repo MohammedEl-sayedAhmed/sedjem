@@ -1047,6 +1047,7 @@ class SiteTest(unittest.TestCase):
             self.assertIn(f"\nname: {name}\n", (ROOT / ".github" / "workflows" / path).read_text(encoding="utf-8"))
         self.assertIn("\n  push:\n", workflow)
         self.assertIn("github.event.workflow_run.conclusion == 'success' &&\n"
+                      "       github.event.workflow_run.head_repository.full_name == github.repository &&\n"
                       "       (github.event.workflow_run.head_branch == 'main' || github.event.workflow_run.event == 'push'))", workflow)
         (download,) = re.findall(r"\n      - name: Download the stats.*?\n(?=\n      - )", workflow, re.S)
         for name in build.STATS:

@@ -5,6 +5,9 @@ own data or the network.
 The browser: the Chromium that `playwright install chromium` downloads if it is there, else the installed
 Chrome or Edge (GitHub's runners have both). Set SEDJEM_UI_HEADED=1 to watch the tests, and
 SEDJEM_UI_REQUIRED=1 (as CI does) to fail instead of skipping when Playwright or a browser is missing.
+With SEDJEM_UI_TRACES set to a folder (as CI does), a test that fails leaves there its Playwright trace,
+<test>.zip (open it with `playwright show-trace` or at https://trace.playwright.dev), and a screenshot of its
+page, <test>.png.
 
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui*.py" -v
 Needs: pip install -r requirements-dev.txt
@@ -38,6 +41,7 @@ except ImportError:
     sync_playwright = None
 
 REQUIRED = os.environ.get("SEDJEM_UI_REQUIRED") == "1"
+TRACES = os.environ.get("SEDJEM_UI_TRACES")
 
 # What the app's GPU check and the computer look like in the demo (a laptop with an Intel GPU)
 GPU = {"devices": [{"name": "Intel(R) Iris(R) Xe Graphics (ADL GT2)", "kind": "vulkan", "type": "igpu", "memory": 0}],
@@ -65,7 +69,7 @@ def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, video=
     folder = Path(home) / "app_data" / "jobs" / jid
     folder.mkdir(parents=True)
     t = np.arange(int(seconds * 16000)) / 16000
-    freq = 180 + zlib.crc32(jid.encode()) % 200
+    freq = 180 + zlib.crc32(jid.encode()) % 2_000_000 / 10_000  # 200 tones were few: two ids shared one now and then
     sf.write(folder / "audio.flac", (0.05 * np.sin(2 * np.pi * freq * t)).astype(np.float32), 16000)
     if video:
         make_clip(folder / "video.mp4", *video, seconds=seconds)
@@ -109,6 +113,11 @@ class UiTestCase(unittest.TestCase):
     `config`, TOML for the data folder's config.toml (a stand-in key for the usage counts, say)."""
     jobs = ()
     config = ""
+    outcome = None
+
+    def run(self, result=None):
+        self.outcome = result  # where unittest records failures, for tearDown to see whether this test failed
+        return super().run(result)
 
     @classmethod
     def setUpClass(cls):
@@ -153,6 +162,8 @@ class UiTestCase(unittest.TestCase):
 
     def setUp(self):
         self.context = self.browser.new_context(viewport={"width": 1280, "height": 800}, accept_downloads=True)
+        if TRACES:
+            self.context.tracing.start(screenshots=True, snapshots=True)
         self.page = self.context.new_page()
         self.page.set_default_timeout(10_000)
         self.errors = []
@@ -169,8 +180,30 @@ class UiTestCase(unittest.TestCase):
             self.errors.append(text)
 
     def tearDown(self):
+        if TRACES:
+            self.keep_trace()
         self.context.close()
         self.assertEqual(self.errors, [], "the page logged errors")
+
+    def failed(self):
+        """Whether this test has failed so far: an assertion or an error in it, or an error its page logged."""
+        if self.errors or self.outcome is None:
+            return True
+        return any(getattr(t, "test_case", t) is self for t, _ in self.outcome.failures + self.outcome.errors)
+
+    def keep_trace(self):
+        """The trace and a screenshot of a failed test, into the SEDJEM_UI_TRACES folder; nothing of one that passed."""
+        if not self.failed():
+            self.context.tracing.stop()
+            return
+        folder = Path(TRACES)
+        folder.mkdir(parents=True, exist_ok=True)
+        name = "".join(c if c.isalnum() or c in "._-" else "_" for c in self.id())
+        try:
+            self.page.screenshot(path=str(folder / f"{name}.png"), full_page=True)
+        except PlaywrightError as e:  # a page that crashed or closed has no picture; the trace still has its last one
+            print(f"\n(no screenshot of {self.id()}: {str(e).splitlines()[0]})", file=sys.stderr)
+        self.context.tracing.stop(path=str(folder / f"{name}.zip"))
 
     def open(self, route="#/new"):
         """Load the app at a route and wait until it has its status. The first page a browser opens can take long

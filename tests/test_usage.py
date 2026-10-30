@@ -797,7 +797,7 @@ class Workflows(unittest.TestCase):
     def test_the_tests_run_unmasked_and_the_app_is_told_not_to_send(self):
         tests = self.flow("tests.yml")
         suite = tests["jobs"]["test"]
-        step = next(s for s in suite["steps"] if "unittest" in str(s.get("run")))
+        step = next(s for s in suite["steps"] if "run_tests.py" in str(s.get("run")))
         for env in (tests.get("env"), suite.get("env"), step.get("env")):
             self.assertFalse({"SEDJEM_NO_USAGE", "DO_NOT_TRACK"} & set(env or {}), env)
         self.assertEqual(tests["jobs"]["windows-source"]["env"]["SEDJEM_NO_USAGE"], "1", ".\\app.cmd runs Sedjem itself")
@@ -1563,12 +1563,6 @@ class Docs(unittest.TestCase):
             self.assertIn(words, privacy)
         self.assertNotIn("With local models, nothing leaves the computer", app)
         self.assertIn("[Usage counts](13-usage-counts.md)", (ROOT / "docs" / "README.md").read_text(encoding="utf-8"))
-
-    def test_plain_style(self):
-        for name in ("docs/13-usage-counts.md", "README.md", "docs/09-app.md", ".github/release-notes/v0.3.1.md"):
-            text = (ROOT / name).read_text(encoding="utf-8")
-            self.assertNotIn("—", text, name)
-        self.assertNotIn("**", self.page)
 
     def test_the_release(self):
         from app import __version__

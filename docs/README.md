@@ -93,6 +93,7 @@ the usual measure (DER) and the charts are in [speaker labels](04-speaker-labels
 | [Desktop app](10-desktop.md) | Sedjem on Windows and Linux: running, building, the installer, what has been verified |
 | [Assistants](11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, the tools, resources and prompts, what assistants may see, the log |
 | [Updates](12-updates.md) | the two channels, the first-start question and what is sent to GitHub, *Update now* for each kind of install, updating by hand, nightly previews |
+| [The pipeline](14-pipeline.md) | what runs when for each change and release, reading a failed run, cutting and undoing a release, the security checks, the rules for public text, signing |
 | [Usage counts](13-usage-counts.md) | the anonymous counts sent to Aptabase: each event and each value, when, what is never sent, where it goes, turning them off, and the public totals |
 | [Privacy policy](privacy.md) | everything Sedjem contacts and when, with each service's own privacy policy, what stays on the computer, no account, and turning the usage counts off |
 | [Name and logo](brand/README.md) | what Sedjem means, the idea behind the logo, its versions and files, and how to use them |

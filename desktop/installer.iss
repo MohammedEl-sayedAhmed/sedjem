@@ -94,6 +94,39 @@ begin
   Result := ExpandConstant('{param:UPDATE|0}') = '1';
 end;
 
+// Sedjem starts its update and then quits, so setup can reach the files before the old Sedjem has let go of them,
+// and a silent setup then gives up (exit code 5). An update first waits, up to a minute, until Sedjem.exe can be
+// opened for writing, which Windows refuses while the program runs. Older versions update the same way.
+function SedjemHasQuit: Boolean;
+var
+  Exe: String;
+  I: Integer;
+  F: TFileStream;
+begin
+  Result := True;
+  Exe := ExpandConstant('{app}\Sedjem.exe');
+  if not FileExists(Exe) then
+    exit;
+  for I := 1 to 120 do
+  begin
+    try
+      F := TFileStream.Create(Exe, fmOpenReadWrite or fmShareExclusive);
+      F.Free;
+      exit;
+    except
+      Sleep(500);
+    end;
+  end;
+  Result := False;
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if IsUpdate and not SedjemHasQuit then
+    Result := 'Sedjem is still running, so it can''t be updated. Quit Sedjem, then update it again.';
+end;
+
 // The Privacy page, after the licence in an installation by hand: what Sedjem sends, a link to the privacy policy,
 // and the box for the anonymous usage counts (docs/privacy.md, docs/13-usage-counts.md), which counts as Sedjem's
 // first-start notice. The choice is left beside Sedjem.exe in installer.json, {"usage_counts": the box, "changed":

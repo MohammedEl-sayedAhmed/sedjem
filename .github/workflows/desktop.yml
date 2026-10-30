@@ -1,32 +1,57 @@
-# Build and check the desktop app on Windows and Linux, and publish it.
-# Runs when started by hand (Actions → Desktop build → Run workflow, or `gh workflow run desktop.yml`), for a
-# version tag, and when the Nightly preview workflow (preview.yml) calls it with a version and a commit. Started
-# by hand it only builds and checks. A tag or a call also publishes the Windows installer, the Linux build and
-# their checksums on GitHub (.github/scripts/preview_plan.py checks the version first):
-#   vX.Y.Z                       a release; X.Y.Z must match app/__init__.py (git tag v0.3.0 && git push origin v0.3.0)
+# Build and check the desktop app on Windows and Linux, and publish it (docs/14-pipeline.md).
+# Runs when started by hand (Actions → Desktop build → Run workflow, or `gh workflow run desktop.yml`), for a pull
+# request that changes how the app is built or started, for a version tag, and when the Release workflow
+# (release.yml) or the Nightly preview workflow (preview.yml) calls it with a version and a commit. Started by hand
+# or for a pull request it only builds and checks. A tag or a call also publishes the Windows installer, the Linux
+# build and their checksums on GitHub (.github/scripts/preview_plan.py checks the version first):
+#   vX.Y.Z                       a release, normally from release.yml; X.Y.Z must match app/__init__.py. A tag
+#                                pushed by hand (git tag v0.3.0 && git push origin v0.3.0) is published too, but
+#                                skips the Release workflow's checks
 #   vX.Y.Z-preview.YYYYMMDD[.N]  a pre-release, normally from preview.yml; X.Y.Z must be the next patch after
 #                                the newest release
-# A release (never a preview or a build by hand) is also sent to winget once the WINGET_TOKEN secret exists
-# (docs/10-desktop.md).
+# A release waits for the approval of the "release" environment when it asks for one, and is then sent to winget
+# once the WINGET_TOKEN secret exists (docs/10-desktop.md); a preview or a build by hand never is.
 name: Desktop build
 
 on:
   workflow_dispatch:
   push:
     tags: ["v*"]
+  # built and checked, never published: the installer, the build and how they start
+  pull_request:
+    paths:
+      - "desktop/**"
+      - "requirements*.txt"
+      - "app/__main__.py"
+      - "app/desktop.py"
+      - "app.sh"
+      - "app.cmd"
+      - ".github/workflows/**"
+      - ".github/scripts/preview_plan.py"
+      - ".github/scripts/release.py"
+      - ".github/scripts/run_tests.py"
   workflow_call:
     inputs:
       version:
-        description: "The preview to build and publish, such as 0.2.1-preview.20261021"
+        description: "The version to build and publish: a release, such as 0.3.2, or a preview, such as 0.2.1-preview.20261021"
         type: string
         required: true
       commit:
         description: "The full sha of the commit to build"
         type: string
         required: true
+    secrets:
+      WINGET_TOKEN:
+        description: "For the winget job; release.yml passes it, preview.yml doesn't"
+        required: false
 
 permissions:
   contents: read
+
+# A new push to a pull request cancels the build it replaces; every other build runs to the end.
+concurrency:
+  group: desktop-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 # A Sedjem started here (the self-tests, the installed build) never sends anonymous usage counts (app/usage.py)
 env:
@@ -45,7 +70,7 @@ jobs:
       publish: ${{ steps.version.outputs.publish }}
       winget: ${{ steps.winget.outputs.winget }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ inputs.commit || github.sha }}
           persist-credentials: false
@@ -57,11 +82,11 @@ jobs:
           CALLED_WITH: ${{ inputs.version }}
         run: |
           app=$(python3 -c "import app; print(app.__version__)")
-          if [ -n "$CALLED_WITH" ]; then           # a nightly preview, from preview.yml
+          if [ -n "$CALLED_WITH" ]; then           # a release from release.yml, or a nightly preview from preview.yml
             version=$CALLED_WITH publish=true
           elif [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_TYPE" = tag ]; then   # a pushed tag
             version=${GITHUB_REF_NAME#v} publish=true
-          else                                      # by hand (even on a tag): built and checked, not published
+          else                                      # by hand (even on a tag) or for a pull request: not published
             version=$app publish=false
           fi
           # adds channel (stable or preview) and base (the release a preview follows) to the outputs
@@ -95,18 +120,16 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.version.outputs.commit }}
+          persist-credentials: false
 
-      - uses: actions/setup-python@v5
+      # No pip cache here: this workflow publishes, and a cache written by one run could be restored into a release
+      # build (CodeQL's actions/cache-poisoning). Each build downloads its packages afresh.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: |
-            requirements.txt
-            requirements-desktop.txt
-            requirements-dev.txt
 
       - name: Install
         run: |
@@ -114,10 +137,21 @@ jobs:
           python -m pip install -r requirements.txt -r requirements-desktop.txt -r requirements-dev.txt
 
       - name: Tests (the hosted services are local stand-ins; no models needed)
-        run: python -m unittest discover -s tests -v
+        run: python .github/scripts/run_tests.py --title "Tests before the build on $RUNNER_OS"
         env:
           # the browser tests (tests/test_ui*.py) run in the runner's Chrome; fail rather than skip without it
           SEDJEM_UI_REQUIRED: "1"
+          # a failed browser test leaves its Playwright trace and a screenshot here (tests/ui_support.py)
+          SEDJEM_UI_TRACES: ui-failures
+
+      - name: Upload the failed browser tests' traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-failures-desktop-${{ matrix.os }}
+          path: ui-failures
+          retention-days: 14
+          if-no-files-found: ignore
 
       - name: Self-test from source
         run: python -m app.desktop --self-test --report selftest-source.json
@@ -203,7 +237,7 @@ jobs:
       - name: Upload the Windows installer
         # before the update test, so that an installer whose test fails can still be tried by hand
         if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Sedjem-windows-setup
           path: dist/Sedjem-*-setup.exe
@@ -322,13 +356,101 @@ jobs:
           if (-not (Test-Path (Join-Path $data "keep.txt"))) { throw "the uninstaller removed the data folder" }
           "The update installed $env:VERSION over itself, kept the data and started Sedjem; silent installations left the usage counts' setting alone and /USAGECOUNTS=0 turned it off; the uninstaller works"
 
+      - name: Update over the newest release (Windows)
+        # The newest release, installed and running, updated by this build's installer the way Update now does it
+        # (app/updates.py): setup starts in its update mode and Sedjem quits. The new version must replace the old
+        # one, keep the data folder and start from the installed folder, and the uninstaller must still remove it.
+        if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
+        timeout-minutes: 15
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+          COMMIT: ${{ needs.version.outputs.commit }}
+        run: |
+          $setup = (Resolve-Path "dist\Sedjem-${env:VERSION}-setup.exe").Path
+          $previous = Join-Path $env:RUNNER_TEMP "newest release"
+          $dir = Join-Path $env:RUNNER_TEMP "Sedjem over the release"
+          $exe = Join-Path $dir "Sedjem.exe"
+          $data = Join-Path $env:LOCALAPPDATA "Sedjem"
+          $portFile = Join-Path $data "app_data\port"
+          $entry = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall\{6F3C2E9A-4B71-4D5C-9A2E-8B1F0C7D3E45}_is1"
+          function Invoke-Setup([string]$file, [string[]]$arguments) {
+            $p = Start-Process -FilePath $file -ArgumentList $arguments -PassThru
+            $null = $p.Handle  # keeps the exit code readable once it has exited
+            if (-not $p.WaitForExit(300000)) { throw "$file $arguments was still running after 5 minutes" }
+            if ($p.ExitCode -ne 0) { throw "$file $arguments exited with $($p.ExitCode)" }
+          }
+          function Wait-Sedjem([string]$failure) {
+            # the status of the Sedjem that answers at the port it noted, with its address
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            while ($clock.Elapsed.TotalSeconds -lt 120) {
+              try {
+                $port = "$(Get-Content -Raw -ErrorAction Stop $portFile)".Trim()
+                $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" -TimeoutSec 3
+                if ($status.app -eq "sedjem") {
+                  "Sedjem $($status.version) answered at port $port" | Out-Host
+                  return @{ url = "http://127.0.0.1:$port"; version = "$($status.version)" }
+                }
+              } catch { }
+              Start-Sleep -Seconds 1
+            }
+            $log = Join-Path $data "app_data\sedjem.log"
+            if (Test-Path $log) { Get-Content $log -Tail 40 | Out-Host }
+            throw "${failure}: nothing answered at the port in $portFile within two minutes"
+          }
+
+          "1. The newest release's installer"
+          foreach ($i in 1..3) {
+            gh release download --repo $env:GITHUB_REPOSITORY --pattern "*-setup.exe" --dir $previous --clobber
+            if ($LASTEXITCODE -eq 0) { break }
+            Start-Sleep -Seconds 10
+          }
+          $old = @(Get-ChildItem -Path $previous -Filter "*-setup.exe")
+          if ($old.Count -ne 1) { throw "the newest release has $($old.Count) files named *-setup.exe" }
+          $oldVersion = $old[0].Name -replace '^Sedjem-(.+)-setup\.exe$', '$1'
+
+          "2. Sedjem $oldVersion installed into $dir, and started"
+          Invoke-Setup $old[0].FullName @("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=`"$dir`"")
+          New-Item -ItemType Directory -Force -Path (Join-Path $data "app_data") | Out-Null
+          Set-Content -Path (Join-Path $data "kept-over-the-update.txt") -Value "kept"
+          Remove-Item -Force -ErrorAction SilentlyContinue $portFile
+          Start-Process -FilePath $exe -ArgumentList "--server" | Out-Null
+          $running = Wait-Sedjem "Sedjem $oldVersion didn't start"
+          if ($running.version -ne $oldVersion) { throw "the newest release answered as $($running.version), not $oldVersion" }
+
+          "3. This build's installer in its update mode, then Sedjem quits, as Update now does"
+          $p = Start-Process -FilePath $setup -ArgumentList @("/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS", "/UPDATE=1") -PassThru
+          $null = $p.Handle
+          Invoke-RestMethod -Method Post "$($running.url)/api/quit" -Headers @{ "X-Sedjem" = "1" } | Out-Null
+          if (-not $p.WaitForExit(300000)) { throw "the update was still running after 5 minutes" }
+          if ($p.ExitCode -ne 0) { throw "the update exited with $($p.ExitCode)" }
+
+          "4. The new Sedjem, started by setup from $dir"
+          $running = Wait-Sedjem "Sedjem didn't start after the update from $oldVersion"
+          if ($running.version -ne $env:VERSION) { throw "after the update Sedjem $($running.version) answered, not $env:VERSION" }
+          $stamp = Get-Content -Raw (Join-Path $dir "_internal\app\_build.json") | ConvertFrom-Json
+          if ($stamp.commit -ne $env:COMMIT) { throw "the installed build is from $($stamp.commit), not $env:COMMIT" }
+          $processes = @(Get-Process -Name Sedjem -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe })
+          if ($processes.Count -eq 0) { throw "what answers at $($running.url) is not $exe" }
+          if ((Get-Content -Raw (Join-Path $data "kept-over-the-update.txt")).Trim() -ne "kept") { throw "the data folder was changed" }
+          Invoke-RestMethod -Method Post "$($running.url)/api/quit" -Headers @{ "X-Sedjem" = "1" } | Out-Null
+          foreach ($p in $processes) { if (-not $p.WaitForExit(30000)) { Stop-Process -Id $p.Id -Force } }
+
+          "5. The uninstaller"
+          Invoke-Setup (Join-Path $dir "unins000.exe") @("/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART")
+          foreach ($i in 1..60) { if (-not (Test-Path $exe) -and -not (Test-Path $entry)) { break }; Start-Sleep -Seconds 1 }
+          if (Test-Path $exe) { throw "the uninstaller left Sedjem.exe" }
+          if (Test-Path $entry) { throw "the uninstaller left the entry in Installed apps" }
+          "Sedjem $oldVersion, installed and running, was updated to $env:VERSION as Update now does it, kept the data and started again"
+
       - name: Self-test reports
         if: always()
         run: cat selftest-*.json || true
 
       - name: Upload the Windows build folder (when there is no installer)
         if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') == ''
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Sedjem-windows
           path: dist/Sedjem
@@ -342,33 +464,36 @@ jobs:
 
       - name: Upload the Linux archive
         if: runner.os == 'Linux' && needs.version.outputs.publish == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: Sedjem-linux
           path: dist/Sedjem-*-linux-x64.tar.gz
           retention-days: 7
 
   release:
-    # A release tag publishes a release; a preview, a pre-release of its commit, with notes saying what it is.
+    # A release tag publishes a release, after the approval of the "release" environment when it asks for one
+    # (docs/14-pipeline.md); a preview, a pre-release of its commit, with notes saying what it is.
     if: needs.version.outputs.publish == 'true'
     needs: [version, build]
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    environment: ${{ needs.version.outputs.channel == 'stable' && 'release' || '' }}
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ needs.version.outputs.commit }}
+          fetch-depth: 0  # the tags and the commits since the previous release, for notes drafted from them
           persist-credentials: false
 
       # by name: a version without the Windows installer or the Linux archive must not be published
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Sedjem-windows-setup
           path: release
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: Sedjem-linux
           path: release
@@ -393,14 +518,13 @@ jobs:
           else
             # every release page links the privacy policy
             privacy="[Privacy policy](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/privacy.md)"
+            # the notes written for this release, else a draft from the titles of the commits since the last one
+            python3 ../.github/scripts/release.py notes "$VERSION" --commit "$COMMIT"
             notes="../.github/release-notes/$tag.md"
-            if [ -f "$notes" ]; then
-              { cat "$notes"; printf '\n---\n\n%s\n' "$privacy"; } > ../release-notes.md
-              set -- --notes-file ../release-notes.md
-            else
-              set -- --generate-notes --notes "$privacy"  # put before GitHub's notes
-            fi
-            gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" "$@"
+            { cat "$notes"; printf '\n---\n\n%s\n' "$privacy"; } > ../release-notes.md
+            # the tag must be there already (release.yml makes it, or it was pushed), never made here from main
+            gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" --verify-tag \
+              --notes-file ../release-notes.md
           fi
 
   winget:

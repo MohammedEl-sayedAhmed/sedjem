@@ -384,8 +384,8 @@ HOSTED = {"elevenlabs": elevenlabs, "speechmatics": speechmatics}
 
 
 def run_hosted(cfg, model, job_dir, job, on_progress, cancelled):
-    from . import hosted_openai  # adds OpenAI, Groq and Mistral to HOSTED
+    from . import hosted_openai  # noqa: F401 (importing it adds OpenAI, Groq and Mistral to HOSTED)
     if not cfg.api_key(model):
         raise EngineError(f"no API key for {model['title']}: add it in Settings")
-    from . import hosted_more  # adds Gemini, Deepgram, AssemblyAI and Azure Speech to HOSTED
+    from . import hosted_more  # noqa: F401 (importing it adds Gemini, Deepgram, AssemblyAI and Azure Speech to HOSTED)
     return HOSTED[model["engine"]](cfg, model, job_dir, job, on_progress, cancelled)
