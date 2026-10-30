@@ -380,7 +380,7 @@ class Wiring(unittest.TestCase):
             self.skipTest("no PyYAML")
         data = yaml.safe_load(workflow("desktop.yml"))
         on = triggers(data)
-        self.assertEqual(set(on), {"workflow_dispatch", "push", "workflow_call"})
+        self.assertEqual(set(on), {"workflow_dispatch", "push", "pull_request", "workflow_call"})
         self.assertEqual(set(on["workflow_call"]["inputs"]), {"version", "commit"})
         self.assertEqual(data["permissions"], {"contents": "read"})
         jobs = data["jobs"]
@@ -390,7 +390,8 @@ class Wiring(unittest.TestCase):
         build = steps(jobs["build"])
         self.assertEqual(build["Build"]["env"], {"SEDJEM_VERSION": "${{ needs.version.outputs.version }}",
                                                  "SEDJEM_CHANNEL": "${{ needs.version.outputs.channel }}"})
-        self.assertEqual(build["actions/checkout@v4"]["with"]["ref"], "${{ needs.version.outputs.commit }}")
+        checkout = next(s for s in jobs["build"]["steps"] if s.get("uses", "").startswith("actions/checkout@"))
+        self.assertEqual(checkout["with"]["ref"], "${{ needs.version.outputs.commit }}")
         publish = steps(jobs["release"])["Publish"]["run"]
         for part in ("--prerelease", '--target "$COMMIT"', "preview_plan.py notes", "SHA256SUMS.txt"):
             self.assertIn(part, publish)

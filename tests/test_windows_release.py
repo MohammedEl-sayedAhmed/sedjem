@@ -408,7 +408,8 @@ class Workflow(unittest.TestCase):
         stable = run[run.index("\nelse\n"):]  # previews keep their own notes (preview_plan.py notes)
         self.assertIn('privacy="[Privacy policy](https://github.com/$GITHUB_REPOSITORY/blob/main/docs/privacy.md)"', stable)
         self.assertIn("""{ cat "$notes"; printf '\\n---\\n\\n%s\\n' "$privacy"; } > ../release-notes.md""", stable)
-        self.assertIn('--generate-notes --notes "$privacy"', stable)
+        # the notes written for the release, or a draft from its commits (.github/scripts/release.py)
+        self.assertLess(stable.index('release.py notes "$VERSION"'), stable.index('cat "$notes"'))
         self.assertNotIn("code-signing", run.lower())
 
     def test_winget_gets_a_release_once_its_token_exists(self):
@@ -588,9 +589,7 @@ class Policies(unittest.TestCase):
         self.assertIn('href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md"', about)
 
     def test_it_reads_plainly_and_claims_nothing_untested(self):
-        text = (ROOT / "docs" / "privacy.md").read_text(encoding="utf-8")
-        self.assertNotIn("**", text, "no bold")
-        self.assertNotIn("\u2014", text, "no em dashes")
+        # no bold and no em dashes, as in every doc: tests/test_public_text.py
         self.assertFalse((ROOT / "docs" / "code-signing.md").exists())
         for path in ("README.md", "docs/10-desktop.md", "docs/12-updates.md"):
             with self.subTest(path):
