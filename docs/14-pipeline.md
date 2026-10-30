@@ -17,7 +17,7 @@ the rules for public text, and the choices still open.
 | CodeQL (`codeql.yml`) | every push to main and pull request, and on Mondays | CodeQL's security queries on the Python, the JavaScript and the workflows |
 | Security (`security.yml`) | every push to main and pull request, and on Mondays | pip-audit on the requirement files, and the dependency review of a pull request |
 | Dependabot (`.github/dependabot.yml`) | on Mondays | pull requests that update the pip requirements and the actions |
-| Pages (`pages.yml`) | pushes to main that change the website | the website ([site/build.py](../site/build.py)) |
+| Pages (`pages.yml`) | pushes to main that change the website, after each day's stats, after a release, by hand | the website ([site/build.py](../site/build.py)), built from main; it never follows a run for a fork's pull request |
 | Repository stats (`stats.yml`) | once a day | the numbers and charts on the `stats` branch |
 
 The quick checks are one job, `checks`, of a minute or two, and the slower jobs of the Tests workflow start only

@@ -28,8 +28,7 @@ assert spec and spec.loader
 rt = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(rt)
 
-# pages.yml belongs to the website's pull request (#30), which changes it; its actions are pinned once that is in
-UNPINNED = {"pages.yml"}
+UNPINNED = set()  # every workflow's actions are pinned
 # What may write, and where: everything else reads at most
 WRITERS = {
     ("desktop.yml", "release"): {"contents"},
@@ -37,7 +36,7 @@ WRITERS = {
     ("release.yml", "tag"): {"contents"}, ("release.yml", "build"): {"contents"},
     ("codeql.yml", "analyze"): {"security-events"},
     ("stats.yml", None): {"contents"},
-    ("pages.yml", None): {"pages", "id-token"},
+    ("pages.yml", None): {"pages", "id-token"}, ("pages.yml", "on-main"): {"actions"},
 }
 REQUIRED_CHECKS = {"checks", "test (ubuntu-24.04)", "test (windows-latest)", "windows-source"}
 
@@ -113,7 +112,11 @@ class Workflows(unittest.TestCase):
         for name in self.names:
             with self.subTest(name):
                 self.assertNotIn("pull_request_target", text(name), "a fork's pull request gets no secrets")
-                self.assertNotIn("workflow_run", text(name))
+                if name == "pages.yml":  # it follows the stats and the Desktop build, never a fork's run
+                    self.assertIn("github.event.workflow_run.head_repository.full_name == github.repository",
+                                  self.flows[name]["jobs"]["build"]["if"])
+                else:
+                    self.assertNotIn("workflow_run", text(name))
         found = {name: re.findall(r"secrets\.(\w+)", text(name)) for name in self.names}
         self.assertEqual({k: v for k, v in found.items() if v},
                          {"desktop.yml": ["WINGET_TOKEN", "WINGET_TOKEN"], "release.yml": ["WINGET_TOKEN"],
