@@ -40,7 +40,10 @@ The records below were written on 30 October 2026, after the decisions, from the
 they cite; each timestamp is that of the commit that carried the decision out, in UTC. Records 2 to 5 come from
 [PR #34](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/34) and record 6 from
 [PR #30](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/30); PR #30 merged the same day. Records 7 to 11 come
-from [PR #39](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/39), running jobs on another computer.
+from [PR #39](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/39), running jobs on another computer. Records
+12 to 14 were written with the change they record, which pins everything the pipeline installs by hash
+([ADR 14](../adr/0014-everything-the-builds-install-is-pinned-by-hash.md)), each stamped with the time it was
+decided.
 
 ## Index
 
@@ -57,3 +60,6 @@ from [PR #39](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/39), running 
 | AgDR-0009 | [A pinned certificate, and a token for each computer](AgDR-0009-pinned-certificate-and-a-token-for-each-computer.md) | executed | The certificate's fingerprint, pinned at pairing, is compared before anything is sent, and each computer has a revocable token kept hashed, instead of an authority or client certificates. |
 | AgDR-0010 | [Serving off by default, private addresses only, with limits and quotas](AgDR-0010-serving-off-by-default-with-limits-and-quotas.md) | executed | The port opens only when turned on, refuses addresses outside private ranges before TLS, and caps connections, recordings and each computer's jobs and space; private isn't taken as trusted. |
 | AgDR-0011 | [Jobs run for another computer kept apart from the library, and not resumed](AgDR-0011-served-jobs-kept-apart-and-not-resumed.md) | executed | A store of their own joined to the one job runner, so they share the local queue but never show in the library; deleted when collected or after a day, and marked interrupted after a restart. |
+| AgDR-0012 | [Locks made by uv's universal resolution, checked for each system](AgDR-0012-locks-from-uv-universal-checked-per-system.md) | executed | One lock for each use, made on any computer, resolved again for Linux and Windows to add what the universal resolution missed, such as sherpa-onnx-core; proxy-tools built with a locked setuptools. |
+| AgDR-0013 | [The locks kept current by a quick check and one command, not by Dependabot](AgDR-0013-locks-kept-current-by-a-check-not-dependabot.md) | executed | Dependabot makes hashed locks only from .in files, so it stays on the requirement files, and the quick checks fail with the command until the locks are made again. |
+| AgDR-0014 | [Setups from source and Update now keep the requirement files](AgDR-0014-source-setups-keep-the-requirement-files.md) | executed | Copies that run from source and older versions that update stay as they are; the locks cover what is built and checked. |

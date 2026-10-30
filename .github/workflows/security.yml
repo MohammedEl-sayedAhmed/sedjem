@@ -1,7 +1,7 @@
-# The dependencies' known vulnerabilities (docs/14-pipeline.md): pip-audit on the requirement files, for every
-# push to main and pull request and once a week, since a vulnerability can be published for a version already in
-# use; and for a pull request, GitHub's dependency review of what it adds or changes, the workflows' actions
-# included. Dependabot (.github/dependabot.yml) proposes the updates.
+# The dependencies' known vulnerabilities (docs/14-pipeline.md): pip-audit on the locks, every package the
+# workflows install, for every push to main and pull request and once a week, since a vulnerability can be
+# published for a version already in use; and for a pull request, GitHub's dependency review of what it adds or
+# changes, the workflows' actions included. Dependabot (.github/dependabot.yml) proposes the updates.
 name: Security
 
 on:
@@ -34,13 +34,21 @@ jobs:
         with:
           python-version: "3.12"
 
-      # pip-audit resolves the three files together, as the Tests workflow installs them, and looks every package
-      # up in the Python Packaging Advisory Database and OSV. Its version is pinned here, outside Dependabot's view.
+      # pip-audit looks up every package of each lock in .github/locks/, the dependencies' dependencies too, in the
+      # Python Packaging Advisory Database and OSV. It is given each lock's pins without their markers, which would
+      # leave out the packages that only Windows installs on this Linux runner. It comes from the tools' lock, at
+      # the version in .github/locks/tools.in.
       - name: pip-audit
         run: |
-          python -m pip install pip-audit==2.10.1
-          pip-audit --progress-spinner off --desc on \
-            -r requirements.txt -r requirements-desktop.txt -r requirements-dev.txt
+          python -m pip install --require-hashes -r .github/locks/tools.txt
+          status=0
+          for lock in .github/locks/*.txt; do
+            echo "::group::$lock"
+            python .github/scripts/locks.py pins "$lock" > "$RUNNER_TEMP/pins.txt"
+            pip-audit --progress-spinner off --desc on --disable-pip --no-deps -r "$RUNNER_TEMP/pins.txt" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
 
   dependency-review:
     if: github.event_name == 'pull_request'
