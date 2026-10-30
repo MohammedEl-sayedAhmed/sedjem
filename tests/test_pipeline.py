@@ -227,6 +227,13 @@ class DesktopBuild(unittest.TestCase):
         cls.data = load("desktop.yml")
         cls.jobs = cls.data["jobs"]
 
+    def test_the_build_that_publishes_restores_no_cache(self):
+        # a cache written by an earlier run could otherwise be restored into a release (actions/cache-poisoning)
+        for job in self.jobs.values():
+            for s in job.get("steps", []):
+                self.assertNotIn("cache", s.get("with", {}), s.get("uses") or s.get("name"))
+                self.assertNotIn("actions/cache", s.get("uses", ""))
+
     def test_pull_requests_that_change_the_build_are_built_and_never_published(self):
         paths = triggers(self.data)["pull_request"]["paths"]
         for path in ("desktop/build.py", "desktop/installer.iss", "requirements.txt", "requirements-desktop.txt",

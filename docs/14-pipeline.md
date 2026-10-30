@@ -36,9 +36,10 @@ The Desktop build runs for a pull request that changes `desktop/`, a requirement
 and checks, and never publishes then. Other changes wait for the nightly build.
 
 A new push to a pull request cancels the runs it replaces. On main every commit keeps its own Tests run, since
-the nightly preview and the Release workflow look for a passed run of the commit itself. The test jobs and the
-Desktop build keep pip's downloads in a cache between runs. The browser tests drive the runner's own Chrome, so
-there is no Playwright browser to download or cache.
+the nightly preview and the Release workflow look for a passed run of the commit itself. The test jobs keep pip's
+downloads in a cache between runs. The Desktop build doesn't: it publishes, and a cache written by an earlier run
+could be restored into a release (CodeQL calls this cache poisoning), so each build downloads its packages afresh.
+The browser tests drive the runner's own Chrome, so there is no Playwright browser to download or cache.
 
 ## Before main
 
