@@ -12,7 +12,7 @@ dir = "ltr"
 locale = "en_US"
 title = "Sedjem: Egyptian Arabic–English meetings, transcribed on your own computer"
 description = "Sedjem turns Egyptian Arabic–English meetings and calls into transcripts on your own computer. The English words stay in English, and each speaker is told apart by voice."
-social_alt = "The Sedjem logo, the line “Transcripts of Egyptian Arabic–English meetings, made on your own computer” and a sprint planning transcript in the app"
+social_alt = "The Sedjem logo and the line “Meetings don’t speak one language.” over three lines of a made-up sprint planning in Egyptian Arabic and English, each speaker’s name in its own colour"
 skip = "Skip to the content"
 other = "العربية"  # the link to the other page, in its own language
 

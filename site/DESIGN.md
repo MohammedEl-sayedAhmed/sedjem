@@ -557,6 +557,19 @@ element with the key, the address and the version, so a local preview sends noth
 they are in data-download and data-place; the hero's is the label on show. Without a key in build.py the script is
 left out.
 
+## The share pictures
+
+A link to either page shows its own picture in LinkedIn, WhatsApp, X, Slack and the like: images/og-en.png for the
+English page and images/og-ar.png for the Arabic one, 1200 by 630 pixels, the size those apps ask for. Each is the
+hero on the light page in a smaller frame: the logo, the headline in two lines, the line of the page's title under it,
+the ear beside them as a thicker line, and three lines of the made-up transcript in the same tray and card, right to
+left, with the speakers' names in their colours and the English words in English. The Arabic one is laid out right
+to left, with the Arabic names. The type is a step up from the page's (64 px headline, 27 px lines, 22 px names) so
+that it reads on a thumbnail about 500 px wide, and nothing that matters leaves the middle 1100 by 560, as some apps
+crop the edges. docs/images/make/og.py draws both from the copy, content.py, the logo and the fonts, checks that
+middle and that no line runs past its end, and saves each as a full colour PNG, packed tighter but losslessly.
+og:image:alt and twitter:image:alt describe it in the page's language.
+
 ## Accessibility
 
 The same on both pages: a skip link, header, nav, main and footer landmarks, one h1 and no skipped levels; a 2 px

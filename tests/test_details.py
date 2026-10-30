@@ -1,6 +1,7 @@
 """Tests for the details kept with every transcript: this computer and a recording (sysinfo.py), the
 details built from a job (app/report.py), the exports that carry them, the job API, and transcribe.py's
-.meta.json. Other systems' sources (the Windows registry, missing files) are simulated. No model,
+.meta.json, and when a recording was made (its tags, else the file's modified time, which an upload keeps
+from the browser). Other systems' sources (the Windows registry, missing files) are simulated. No model,
 GPU or network is needed; the hosted service is a local stand-in.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
@@ -19,7 +20,7 @@ import types
 import unittest
 import urllib.error
 import urllib.request
-from datetime import datetime
+from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
@@ -44,7 +45,8 @@ LOCAL_JOB = {
     "options": {"speakers": "auto", "language": "ar", "prompt": ""}, "status": "done", "speaker_names": {"1": "Mona"},
     "source": {"name": "Weekly sync.m4a", "extension": "m4a", "format": "mov,mp4,m4a,3gp,3g2,mj2",
                "format_name": "QuickTime / MOV", "codec": "aac", "codec_name": "AAC (Advanced Audio Coding)",
-               "sample_rate": 44100, "channels": 2, "bit_rate": 127000, "size": 48213342, "duration": 3735.4, "video": None},
+               "sample_rate": 44100, "channels": 2, "bit_rate": 127000, "size": 48213342, "duration": 3735.4, "video": None,
+               "recorded": "2026-09-25T18:02:40+03:00"},
     "audio_s": 3735.38, "queued": "2026-09-25T21:41:10+03:00", "started": "2026-09-25T21:41:11+03:00",
     "finished": "2026-09-25T22:01:05+03:00", "engine": "cohere",
     "model_file": "cohere-transcribe-arabic-07-2026-Q4_K_M.gguf", "threads": 10, "gpu_setting": "auto",
@@ -83,6 +85,28 @@ def tone(seconds, rate=44100, channels=2):
     t = np.arange(int(rate * seconds)) / rate
     x = (0.2 * np.sin(2 * np.pi * 440 * t)).astype(np.float32)
     return np.stack([x] * channels, axis=1) if channels > 1 else x
+
+
+MTIME = 1_700_000_000  # 14 Nov 2023: the modified time of the files below
+
+
+def tagged(path, codec="pcm_s16le", **tags):
+    """A short silent recording with these tags in its container (the format follows the extension), modified at
+    MTIME."""
+    import av
+    with av.open(str(path), "w") as c:
+        for key, value in tags.items():
+            c.metadata[key] = value
+        s = c.add_stream(codec, rate=16000)
+        s.layout = "mono"
+        float_ = codec == "aac"
+        frame = av.AudioFrame.from_ndarray(np.zeros((1, 1024), np.float32 if float_ else np.int16),
+                                           format="fltp" if float_ else "s16", layout="mono")
+        frame.sample_rate = 16000
+        for packet in [*s.encode(frame), *s.encode(None)]:
+            c.mux(packet)
+    os.utime(path, (MTIME, MTIME))
+    return path
 
 
 def fake_winreg(values):
@@ -293,7 +317,28 @@ class RecordingTests(unittest.TestCase):
         self.assertEqual((info["name"], info["extension"], info["size"], info["codec"], info["duration"]),
                          ("notes.txt", "txt", 9, None, None))
         info = sysinfo.recording(self.tmp / "gone.m4a")
-        self.assertEqual((info["name"], info["extension"], info["size"], info["format"]), ("gone.m4a", "m4a", None, None))
+        self.assertEqual((info["name"], info["extension"], info["size"], info["format"], info["recorded"]),
+                         ("gone.m4a", "m4a", None, None, None))
+
+    def test_when_it_was_made(self):
+        """recorded: the time in the file's tags (an m4a's creation time is in UTC; a WAV's date has no time, so it is
+        midnight here), else the file's modified time, also when a tag is only a year, a clock that was never set, a
+        time still to come or not a date at all."""
+        here = lambda d: d.astimezone().isoformat(timespec="seconds")
+        phone = tagged(self.tmp / "phone.m4a", "aac", creation_time="2025-03-14T09:26:53.000000Z")
+        self.assertEqual(sysinfo.recording(phone)["recorded"], here(datetime(2025, 3, 14, 9, 26, 53, tzinfo=timezone.utc)))
+        dated = tagged(self.tmp / "dated.wav", date="2024-11-02")
+        self.assertEqual(sysinfo.recording(dated)["recorded"], here(datetime(2024, 11, 2)))
+        self.assertEqual(sysinfo.recording(dated)["recorded"], sysinfo.recording(dated, name="Call.WAV")["recorded"],
+                         "an upload, stored under another name")
+        for n, date in enumerate(("2019", "1904-01-01T00:00:00Z", "2999-01-01", "last Tuesday")):
+            with self.subTest(date=date):
+                info = sysinfo.recording(tagged(self.tmp / f"odd{n}.wav", date=date))
+                self.assertEqual(info["recorded"], sysinfo.local_time(MTIME))
+        plain = tagged(self.tmp / "plain.wav")
+        self.assertEqual(sysinfo.recording(plain)["recorded"], sysinfo.local_time(MTIME))
+        os.utime(plain, (0, 0))  # a file from a computer whose clock was never set
+        self.assertIsNone(sysinfo.recording(plain)["recorded"])
 
 
 # ---------------------------------------------------------------------------------------------
@@ -317,6 +362,7 @@ class DetailsTests(unittest.TestCase):
             ("Recording", "Bit rate"): ("127 kb/s", True),
             ("Recording", "Size"): ("48 MB", True),
             ("Recording", "Length"): ("1:02:15", True),
+            ("Recording", "Recorded"): ("2026-09-25 18:02", True),
             ("Model", "Name"): ("Cohere Transcribe Arabic", False),
             ("Model", "ID"): ("cohere", True),
             ("Model", "Engine"): ("Cohere (transcribe.cpp)", True),
@@ -654,6 +700,34 @@ class ApiTests(unittest.TestCase):
         self.assertEqual(status, 201, new)
         again = self.wait(new["id"])["job"]
         self.assertEqual(again["source"], j["source"], "a rerun keeps the recording's details")
+
+    def test_the_date_the_recording_was_made_is_kept(self):
+        """An upload keeps the file's modified time from the browser (lastModified, in ms) and a file read in place
+        has its own; the WAV has no date in its tags, so that is when it was made. A re-run keeps it, and the list
+        gives it. Without one from the browser (or with nonsense), it is when the file was uploaded."""
+        os.utime(self.wav, (1_650_000_000, 1_650_000_000))  # 15 Apr 2022
+        upload = "/api/jobs?model=elevenlabs&speakers=auto&name=Call.wav&confirm_upload=1"
+        sent = lambda query: self.call("POST", upload + query, raw=self.wav.read_bytes(), headers={"Content-Type": "audio/wav"})
+        made = {}
+        for how, send in (("browser", lambda: sent("&modified=1600000000000")),  # 13 Sep 2020
+                          ("in place", lambda: self.call("POST", "/api/jobs", {"path": str(self.wav), "model": "elevenlabs",
+                                                                               "confirm_upload": True})),
+                          ("nonsense", lambda: sent("&modified=soon"))):
+            status, job = send()
+            self.assertEqual(status, 201, job)
+            made[how] = self.wait(job["id"])["job"]
+        self.assertEqual(made["browser"]["source"]["recorded"], sysinfo.local_time(1_600_000_000))
+        self.assertEqual(made["in place"]["source"]["recorded"], sysinfo.local_time(1_650_000_000))
+        uploaded = datetime.fromisoformat(made["nonsense"]["source"]["recorded"])
+        self.assertLess(abs((uploaded - datetime.fromisoformat(made["nonsense"]["created"])).total_seconds()), 60)
+
+        status, new = self.call("POST", f"/api/jobs/{made['browser']['id']}/rerun", {"model": "elevenlabs", "confirm_upload": True})
+        self.assertEqual(status, 201, new)
+        self.assertEqual(self.wait(new["id"])["job"]["source"]["recorded"], sysinfo.local_time(1_600_000_000))
+        listed = {j["id"]: j for j in self.call("GET", "/api/jobs")[1]["jobs"]}
+        for j in made.values():
+            self.assertEqual(listed[j["id"]]["recorded"], j["source"]["recorded"])
+        self.assertEqual(listed[new["id"]]["recorded"], sysinfo.local_time(1_600_000_000))
 
 
 # ---------------------------------------------------------------------------------------------

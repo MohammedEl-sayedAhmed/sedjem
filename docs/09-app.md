@@ -58,6 +58,17 @@ merge two speakers that the model split, edit the text, change a line's speaker,
 audio again with another model to compare (the runs share one audio file, so this takes no extra
 space).
 
+*Run again with* lists the models that are ready, and the ones that have not run on the recording
+yet come first. A model that already made a transcript of it, or is making one, is listed below
+them as already run, and choosing it opens that transcript instead of starting another run. When
+the model made more than one, it opens the recording's main transcript if that is one of them, else
+the newest. A run that failed or was cancelled does not count, and neither does a branch, since no
+model made its text. Which transcripts belong to the same recording is decided as described in
+[comparing and combining transcripts](#comparing-and-combining-transcripts). *Again with other
+options*, at the end of the menu, runs this transcript's model on the recording once more, with the
+speakers, language and vocabulary starting as this transcript's and open to change. It makes a new
+transcript and leaves this one as it is.
+
 A recording with a picture also gets a video on its page, at the top of the side column (above the
 transcript, and kept in view, in a narrow window). The bar at the bottom then plays the video instead
 of the audio, so the transcript follows it the same way: the line being played is highlighted,
@@ -85,9 +96,9 @@ light and dark themes, the layout works in a narrow window, and the page loads n
 [privacy](#privacy) says).
 
 Each transcription keeps a record of how it was made: the recording (name, format, codec, sample
-rate, channels, bit rate, size, length), the model (its engine and file, or the service and API
-model), the run (processor or graphics card, power mode, threads, times, speed, peak memory, speaker
-model, app version) and the computer (maker and model, operating system, processor, memory, graphics
+rate, channels, bit rate, size, length, and when it was made), the model (its engine and file, or
+the service and API model), the run (processor or graphics card, power mode, threads, times, speed,
+peak memory, speaker model, app version) and the computer (maker and model, operating system, processor, memory, graphics
 cards). The *Details* panel shows the main lines, with the makers' logos next to the hardware and the
 system, *More details* the rest, and *Copy details* copies all of it. The exports carry it too:
 plain text starts with a short header, WebVTT with a `NOTE`, Markdown ends with a Details section
@@ -95,6 +106,28 @@ and JSON has a `details` object. SRT has no place for comments and stays as it w
 made before this was added show fewer details. In the text, subtitle and Markdown exports, a line
 that is mostly Arabic starts with a right-to-left mark, so players and editors show it right to
 left even when it begins with an English word.
+
+The sidebar lists the transcriptions, newest first, under Today and a heading for each month (with
+the year for another year). The search box above it filters them by title, model, course or branch
+name, and the menu beside the search changes the order: newest or oldest first by the date they were
+added, title A to Z or Z to A, longest or shortest first, last changed (the newest saved version
+first), or the recording's own date. The date orders keep the headings for today and the months; the
+title and length orders have none. A recording with several transcripts stays one item, ordered by
+its main transcript when it has one, else by its newest transcript (for last changed, the one changed
+last). A course stays one item too, ordered by its newest lecture, by its own title, or by the length
+of its lectures together, and its lectures stay in lecture order. A recording whose length isn't known
+yet comes last in both length orders. The search works on top of the order, and the order is
+remembered in the browser, like the theme; an order it doesn't know goes back to newest first. The
+menu is a labelled list that works with the keyboard and screen readers, and it stays beside the
+search in a narrow window.
+
+The recording's own date comes from the file's tags when they have one: the creation time that
+phones, recorders and cameras write into MP4, M4A, MOV and Matroska files, or the date of a WAV or MP3
+file. A bare year, a clock that was never set (before 1990) or a time still to come doesn't count, and
+the file's modified time is used instead. An upload keeps the modified time the browser gives for the
+file, as a copy would, and a file read in place has its own. The date is kept with the transcription
+when the recording is prepared, re-runs and branches keep it, and it shows as Recorded under *More
+details*. Transcriptions made before this was added sort by the date they were added.
 
 ## YouTube videos and courses
 
@@ -724,9 +757,9 @@ Every change needs the header `X-Sedjem: 1`.
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
 | `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
-| `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&confirm_upload=` | the body is the file |
+| `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&modified=&confirm_upload=` | the body is the file; `modified` is the file's modified time in milliseconds, kept as the recording's date when its tags have none |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
-| `GET /api/jobs`, `GET /api/jobs/<id>` | the list; one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |
+| `GET /api/jobs`, `GET /api/jobs/<id>` | the list, newest first, each with `changed` (when its latest version was saved, else when it finished or was added) and `recorded` (when the recording was made, else when it was added); one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |
 | `PATCH /api/jobs/<id>` | `title`, `speaker_names`, `lines`, or `merge: {from, into}`; with `base_version`, 409 and no change when that isn't the latest version |
 | `POST /api/jobs/<id>/cancel`, `POST /api/jobs/<id>/rerun`, `DELETE /api/jobs/<id>` | |
 | `POST /api/jobs/<id>/branch` with `{"version": …, "name": …}` | a branch: a new transcript of the recording that starts as that version |
