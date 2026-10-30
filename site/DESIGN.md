@@ -496,8 +496,8 @@ MIT; ArzEn, CC BY-SA 4.0; AMI, CC BY 4.0), says the meetings are a private set, 
 labels and the tables in the repository. The private meetings are only ever that set, with pooled numbers: no meeting,
 excerpt or file is named, and the build reads only their pooled rows.
 
-A card's figure is the best of Sedjem's own bars, and the line under its title names that model, and the test set where
-the card has two. Under them, bars to compare: one grid for the whole chart, so every bar starts on the same zero line
+A card's figure is the best of Sedjem's own bars, except on the speaker labels' card, which leads with the default,
+TitaNet-small, on ArzEn; the line under its title names that model, and the test set where the card has two. Under them, bars to compare: one grid for the whole chart, so every bar starts on the same zero line
 (on the right on the Arabic page), each row the model's short name, its bar and its value at its end, a heading over a
 group (the three models that were also tried, or a test set), and a note under the bars that says which way is better.
 Sedjem's own bars are the brand's teal, #14a3a1, and the others, the models also tried and ElevenLabs, the palette's grey,

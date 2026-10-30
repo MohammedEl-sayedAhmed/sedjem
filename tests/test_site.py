@@ -1609,7 +1609,8 @@ class BenchmarksTest(unittest.TestCase):
         Perle of the three models Sedjem runs and the three also tried, the speech TitaNet-small and Nemotron give to
         the wrong speaker on ArzEn and AMI, the recorded meetings' difference from ElevenLabs and their time for an hour
         (their mean speed, times 60 minutes), and the words TitaNet-small and ElevenLabs give to the wrong speaker on
-        meetings of two or three people. A card's figure is the best of Sedjem's own bars, and its line names that
+        meetings of two or three people. A card's figure is the best of Sedjem's own bars (on the speaker labels' card, the
+        default, TitaNet-small, on ArzEn), and its line names that
         model, and the test set on the speaker labels' card."""
         e = self.expected()
         self.assertEqual((e["wer"][1][0][3], e["english"][1][1][3], e["speakers"][1][0][3]), ("13.4%", "90%", "9.0%"))
@@ -1629,7 +1630,8 @@ class BenchmarksTest(unittest.TestCase):
                     self.assertEqual([r if isinstance(r, str) else (r[1], r[2]) for r in c["rows"]], shown)
                     ours = [b for b in bars if b[1] not in ("Audar", "R2T2", "Qwen3-ASR", "ElevenLabs")]
                     number = lambda b: float(b[3].split()[0].rstrip("%"))  # noqa: E731
-                    lead = (min if better == "lower" else max)(ours, key=number)
+                    lead = (next(b for b in bars if b[1] == "TitaNet-small") if key == "nemotron"  # the default leads
+                            else (min if better == "lower" else max)(ours, key=number))
                     value = lead[3].split()[0].rstrip("%")
                     self.assertEqual(c["figure"], (value, unit(lead[3]) if "min" in lead[3] else lead[3]))
                     self.assertIn(lead[2], c["line"])

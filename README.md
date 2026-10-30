@@ -123,8 +123,8 @@ recording on your machine unless you choose a hosted service.
 
 | Model | Runs on | Word error rate, Egyptian test set | English terms kept in English | One hour of audio takes |
 |---|---|---|---|---|
-| Cohere Transcribe Arabic | your computer | 13.4% | 77% | about 20 min |
-| whisper-medium code-switching (default) | your computer | 18.5% | 90% | 30–45 min |
+| Cohere Transcribe Arabic | your computer | 13.4% | 77% | about 16 min |
+| whisper-medium code-switching (default) | your computer | 18.5% | 90% | about 32 min |
 | Whisper large-v3 with an Egyptian style hint | your computer | 20.8% | 88% | about 2 h |
 | ElevenLabs Scribe v2 | ElevenLabs | 13.1% (published) | not measured | not measured |
 
@@ -134,8 +134,9 @@ recording on your machine unless you choose a hosted service.
 
 The test set is 40 Egyptian Arabic–English clips from the public
 [Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch) benchmark. Times were measured on
-the project's test laptop, with an Intel Core i5-1245U and no NVIDIA GPU (details in
-[the results](docs/03-results.md)); other computers will differ. ElevenLabs' figure comes from
+the project's test laptop, with an Intel Core i5-1245U and no NVIDIA GPU: for Cohere and
+whisper-medium, the mean on the recorded meetings with speaker labels on, and for Whisper large-v3,
+on the Perle clips (details in [the results](docs/03-results.md)); other computers will differ. ElevenLabs' figure comes from
 [Perle's paper](https://arxiv.org/abs/2605.19069), on its own clips, so it can't be compared
 directly with the project's.
 

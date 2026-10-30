@@ -850,7 +850,8 @@ def numbers(words, lang, gh, totals):
 
 # ---- the benchmarks: the same figure cards, each over bars to compare, from the numbers of the docs' charts --------
 #
-# A card's figure is the best of Sedjem's own bars, its model and test set named in the line under its title. Under them
+# A card's figure is the best of Sedjem's own bars (the speaker labels' card: the default, TitaNet-small), its model and
+# test set named in the line under its title. Under them
 # a bar for each model from one zero line, Sedjem's in the brand's teal and the rest in grey, each named, with its value
 # at its end; a heading over a group (the models also tried, or a test set); and which way is better. A share of the
 # words and the minutes for an hour run to the whole, 100% or an hour, drawn as the bar's track; the speaker labels'
@@ -891,7 +892,8 @@ def measured(src):
     cards = {
         "wer": dict(better="lower", note="lower", top=100, unit="%", bars=[perle(m, "wer") for m in PERLE]),
         "english": dict(better="higher", note="higher", top=100, unit="%", bars=[perle(m, "en_kept") for m in PERLE]),
-        "nemotron": dict(better="lower", note="lower", top=None, unit="%",
+        # led by the default speaker model, TitaNet-small (docs/adr/0009), though Nemotron's share is lower
+        "nemotron": dict(better="lower", note="lower", top=None, unit="%", lead="titanet",
                          bars=[speaker(m, corpus) for corpus in ("arzen", "ami") for m in ("titanet", "nemotron")]),
         "meetings": dict(better="lower", note="closer", top=100, unit="%",
                          bars=[bar("cohere", src.published("meetings", "pooled", "cohere_wer")),
@@ -906,7 +908,10 @@ def measured(src):
 
 
 def lead(card):
-    """The bar a card's figure is: the best of Sedjem's own, the first of them on a tie."""
+    """The bar a card's figure is: the first of the model the card names in "lead", else the best of Sedjem's own, the
+    first of them on a tie."""
+    if card.get("lead"):
+        return next(b for b in card["bars"] if b[0] == card["lead"])
     ours = [b for b in card["bars"] if b[0] in IN_SEDJEM]
     return (min if card["better"] == "lower" else max)(ours, key=lambda b: b[2])
 
