@@ -3,10 +3,10 @@
 machine() describes the computer: maker and model, operating system, processor, threads, memory, and
 the graphics cards the caller found (the app passes its own GPU check; nothing is probed here).
 recording() describes an audio or video file through PyAV: container, codec, sample rate, channels,
-bit rate, size and length. Neither ever raises; whatever can't be found is None. transcribe.py writes
-both into its .meta.json and the app keeps them with each job. Nothing here is sent anywhere; the
-anonymous usage counts (app/usage.py) send only the processor's maker, the memory and the number of threads, in
-broad ranges.
+bit rate, size, length, and when it was made. Neither ever raises; whatever can't be found is None.
+transcribe.py writes both into its .meta.json and the app keeps them with each job. Nothing here is
+sent anywhere; the anonymous usage counts (app/usage.py) send only the processor's maker, the memory
+and the number of threads, in broad ranges.
 """
 import functools
 import os
@@ -30,7 +30,11 @@ DESKTOPS = {"kde": "KDE Plasma", "gnome": "GNOME", "x-cinnamon": "Cinnamon", "ci
 CPUINFO = Path("/proc/cpuinfo")
 MACHINE_KEYS = ("manufacturer", "model", "os", "cpu", "threads", "ram_gb", "arch", "gpus")
 RECORDING_KEYS = ("name", "extension", "format", "format_name", "codec", "codec_name", "sample_rate", "channels",
-                  "bit_rate", "size", "duration", "video")
+                  "bit_rate", "size", "duration", "video", "recorded")
+# The tags that say when a recording was made, most trusted first: Apple's (with the local offset), the creation
+# time of MP4, MOV, M4A and Matroska files (in UTC), and the date of WAV and MP3 files
+MADE_TAGS = ("com.apple.quicktime.creationdate", "creation_time", "date")
+FIRST_YEAR = 1990  # an earlier date is a clock that was never set (QuickTime counts from 1904, Unix from 1970)
 # What firmware and Windows write when the maker left a field empty
 PLACEHOLDERS = {"", "none", "n/a", "na", "not applicable", "not specified", "not available", "default string",
                 "default", "oem", "o.e.m.", "system product name", "system version", "system manufacturer",
@@ -226,12 +230,30 @@ def _cover_art(stream):
         return stream.codec_context.name in ("mjpeg", "png", "bmp", "gif", "webp")
 
 
+def _made(value):
+    """When a recording was made, from a tag's text (ISO 8601: a date, or a date and time) or a datetime, as the
+    app writes times (local_time); None for anything else, such as a bare year, a clock that was never set or a
+    time still to come. A time without an offset is taken as this computer's."""
+    try:
+        d = value if isinstance(value, datetime) else datetime.fromisoformat(str(value).strip())
+        d = d.astimezone()
+    except (ValueError, OverflowError, OSError):
+        return None
+    if d.year < FIRST_YEAR or d.timestamp() > time.time() + 86400:
+        return None
+    return d.isoformat(timespec="seconds")
+
+
 def _probe(path, info):
     import av
     with av.open(str(path)) as c:
         audio = next(iter(c.streams.audio), None)
         video = next((s for s in c.streams.video if not _cover_art(s)), None)
         info.update(format=_safe(lambda: c.format.name), format_name=_safe(lambda: c.format.long_name))
+        tags = [_safe(lambda: dict(c.metadata)) or {}] + [_safe(lambda s=s: dict(s.metadata)) or {} for s in c.streams]
+        made = next((m for key in MADE_TAGS for t in tags if (m := _made(t.get(key)))), None)
+        if made:  # else the file's modified time stays
+            info["recorded"] = made
         if video is not None:
             info["video"] = _safe(lambda: getattr(video.codec_context.codec, "canonical_name", None)
                                   or video.codec_context.name)
@@ -254,14 +276,16 @@ def recording(path, name=None):
     """An audio or video file: {"name", "extension", "format" and "format_name" (the container, e.g. "wav",
     "WAV / WAVE (Waveform Audio)"), "codec" and "codec_name" (the audio's, e.g. "aac", "AAC (Advanced Audio
     Coding)"), "sample_rate", "channels", "bit_rate" (bits per second), "size" (bytes), "duration" (seconds),
-    "video" (its codec, if there is a video track)}. name: the file's own name when it is stored under
-    another one (an upload is saved as source.<ext>)."""
+    "video" (its codec, if there is a video track), "recorded" (when it was made: the time in its tags, else
+    the file's modified time, which an upload keeps from the browser)}. name: the file's own name when it is
+    stored under another one (an upload is saved as source.<ext>)."""
     info = dict.fromkeys(RECORDING_KEYS)
     try:
         path = Path(path)
         name = str(name or path.name)
         info.update(name=name, extension=Path(name).suffix.lstrip(".").lower() or None,
-                    size=_safe(lambda: path.stat().st_size))
+                    size=_safe(lambda: path.stat().st_size),
+                    recorded=_safe(lambda: _made(datetime.fromtimestamp(path.stat().st_mtime))))
         _probe(path, info)
     except Exception:  # noqa: BLE001 — not a media file, or unreadable: what was found so far stays
         pass

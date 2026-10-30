@@ -233,10 +233,13 @@ def device_class(device):
 def summary(job):
     """A job as the list and the group give it. main: whether it is its recording's main transcript (the list and the
     group say it of the group's one main transcript, app/compare.py); branch: {name, from: {id, version}} for a
-    branch, else None."""
+    branch, else None; recorded: when the recording was made (sysinfo.recording), or for a job made before that was
+    kept, or not prepared yet, when it was added."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
             "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course", "branch")
-    return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True}
+    source = job.get("source") if isinstance(job.get("source"), dict) else {}
+    return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True,
+            "recorded": source.get("recorded") or job.get("created")}
 
 
 # ---- assistants (app/assistants.py) -----------------------------------------------------------------
@@ -462,11 +465,15 @@ class Handler(BaseHTTPRequestHandler):
         self.json(self.app.status())
 
     def list_jobs(self, _params):
-        jobs = self.app.store.list()
-        compare.fill_later(self.app.store, jobs)  # fingerprints of older jobs, for the groups
+        """{"jobs": [...]}, newest first, each with its recording's group, whether it is the main transcript, and
+        changed: when its latest version was saved (history/index.json), else when it finished or was added."""
+        store = self.app.store
+        jobs = store.list()
+        compare.fill_later(store, jobs)  # fingerprints of older jobs, for the groups
         groups = compare.group_ids(jobs)
         mains = compare.mains(jobs, groups)  # one main transcript per recording, at most
-        self.json({"jobs": [{**summary(j), "group": groups[j["id"]], "main": mains.get(groups[j["id"]]) == j["id"]}
+        self.json({"jobs": [{**summary(j), "group": groups[j["id"]], "main": mains.get(groups[j["id"]]) == j["id"],
+                             "changed": history.latest_time(store, j["id"]) or j.get("finished") or j.get("created")}
                             for j in jobs]})
 
     def ready_model(self, p, default=None):
@@ -523,6 +530,12 @@ class Handler(BaseHTTPRequestHandler):
             except BaseException:
                 self.app.store.delete(job["id"])
                 raise
+            # The file keeps its own modified time (the browser's lastModified, in ms), as a copy would: it is the
+            # recording's date when its tags have none (sysinfo.recording)
+            try:
+                os.utime(dest, (time.time(), float(p["modified"]) / 1000))
+            except (KeyError, ValueError, OverflowError, OSError):
+                pass
         runner.submit(job["id"])
         self.json(summary(self.app.store.get(job["id"])), 201)
 

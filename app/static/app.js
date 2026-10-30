@@ -258,26 +258,70 @@ function jobPercent(j) {
   return 0;
 }
 
+// The orders of the list, chosen next to its search: {value: [label, what an item is ordered by, direction]}. The
+// date orders have a heading for today and one for each month; the others have none.
+const SORTS = {
+  newest: ["Newest first", "added", -1],
+  oldest: ["Oldest first", "added", 1],
+  title: ["Title A to Z", "title", 1],
+  "title-desc": ["Title Z to A", "title", -1],
+  longest: ["Longest first", "length", -1],
+  shortest: ["Shortest first", "length", 1],
+  changed: ["Last changed", "changed", -1],
+  recorded: ["Recording date", "recorded", -1],
+};
+const DATED = new Set(["added", "changed", "recorded"]);
+const SORT_KEY = "sedjem-sort";  // localStorage: the order chosen, newest first when what is kept is unknown
+const sortKept = () => { try { const v = localStorage.getItem(SORT_KEY); return Object.hasOwn(SORTS, v) ? v : "newest"; } catch { return "newest"; } };
+const stamp = (iso) => Date.parse(iso) || 0;
+const byTitle = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
+
+// What an item is ordered by. A recording: its main transcript, else its newest one (for last changed, the one
+// changed last). A course: its newest lecture by that date, its title, and its lectures' length together. The
+// API gives each job when it was last changed and when its recording was made (else when it was added).
+function sortKeys(r) {
+  const latest = (k) => Math.max(...r.jobs.map((j) => stamp(j[k])));
+  if (r.course) {
+    return { title: r.course.title || "Course", added: latest("created"), changed: latest("changed"), recorded: latest("recorded"),
+      length: r.lectures.reduce((t, j) => t + (j.audio_s || 0), 0) || null, id: r.jobs[0].id };
+  }
+  const j = r.main || r.newest;
+  return { title: j.title || "Untitled", added: stamp(j.created), changed: r.main ? stamp(j.changed) : latest("changed"),
+    recorded: stamp(j.recorded), length: j.audio_s || null, id: j.id };
+}
+
+// The heading over an item in a date order: Today, else its month ("October", "March 2025" in another year)
+function dateHeading(t) {
+  const d = new Date(t), now = new Date();
+  if (d.toDateString() === now.toDateString()) return "Today";
+  return d.toLocaleDateString([], { month: "long", year: d.getFullYear() === now.getFullYear() ? undefined : "numeric" });
+}
+
 function renderSidebar() {
   const q = $("#jobSearch").value.trim().toLowerCase();
   const hit = (j) => !q || (j.title || "").toLowerCase().includes(q) || (j.model_title || "").toLowerCase().includes(q)
     || (j.course?.title || "").toLowerCase().includes(q) || (j.branch?.name || "").toLowerCase().includes(q);
   // a recording once, with its transcripts (compare.js); a course once, with its lectures (youtube.js)
   const recordings = jobGroups(S.jobs.filter((j) => !j.course)).filter((r) => r.jobs.some(hit));
-  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit)).map((c) => ({ ...c, newest: c.jobs[0] }))]
-    .sort((a, b) => b.newest.created.localeCompare(a.newest.created) || b.newest.id.localeCompare(a.newest.id));
+  const [, by, dir] = SORTS[$("#jobSort").value] || SORTS.newest;
+  const items = [...recordings, ...courseGroups(S.jobs).filter((c) => c.jobs.some(hit))].map((r) => ({ ...r, keys: sortKeys(r) }));
+  items.sort((a, b) => {
+    const x = a.keys[by], y = b.keys[by];
+    if ((x == null) !== (y == null)) return x == null ? 1 : -1;  // a length not known yet (or never read) goes last
+    return dir * (by === "title" ? byTitle.compare(x, y) : x - y)
+      || b.keys.added - a.keys.added || b.keys.id.localeCompare(a.keys.id);  // then newest first
+  });
   if (!items.length) {
     $("#jobList").innerHTML = `<div class="empty-list">${S.jobs.length ? "No matches" : "Your transcriptions will appear here."}</div>`;
     return;
   }
-  const today = new Date().toDateString();
   let group = null;
   $("#jobList").innerHTML = items.map((r) => {
-    const j = r.newest;
-    const g = new Date(j.created).toDateString() === today ? "Today" : "Earlier";
-    const head = g !== group ? `<div class="job-group">${(group = g)}</div>` : "";
+    const g = DATED.has(by) ? dateHeading(r.keys[by]) : null;
+    const head = g && g !== group ? `<div class="job-group">${esc((group = g))}</div>` : "";
     if (r.course) return head + courseItem(r);
     if (r.jobs.length > 1) return head + groupItem(r);
+    const j = r.newest;
     const activeCls = S.route.name === "job" && S.route.id === j.id ? " active" : "";
     const bar = ACTIVE.has(j.status) ? `<div class="bar"><i style="width:${jobPercent(j).toFixed(1)}%"></i></div>` : "";
     return `${head}<a class="job-item${activeCls}" href="#/job/${j.id}">
@@ -556,7 +600,8 @@ async function start() {
     } else {
       S.uploading = { loaded: 0, total: f.file.size };
       renderNew();
-      job = await api.upload(f.file, { ...params, name: f.file.name }, (loaded, total) => {
+      // its modified time is the recording's date when the file's tags have none (sysinfo.recording)
+      job = await api.upload(f.file, { ...params, name: f.file.name, modified: f.file.lastModified }, (loaded, total) => {
         S.uploading = { loaded, total };
         const bar = $(".progress i"), text = $("#uploadText");
         if (bar) bar.style.width = `${(loaded / total * 100).toFixed(1)}%`;
@@ -2300,6 +2345,12 @@ $("#themeBtn").onclick = () => {
 };
 $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
 $("#jobSearch").oninput = renderSidebar;
+$("#jobSort").innerHTML = Object.entries(SORTS).map(([v, [label]]) => `<option value="${v}">${label}</option>`).join("");
+$("#jobSort").value = sortKept();
+$("#jobSort").onchange = (e) => {
+  try { localStorage.setItem(SORT_KEY, e.target.value); } catch { /* private mode */ }
+  renderSidebar();
+};
 
 // keep the direction right while a line, title or name is being typed
 document.addEventListener("input", (e) => {

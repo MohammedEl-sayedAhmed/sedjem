@@ -121,6 +121,9 @@ a { color: var(--accent); }
   border-right: 1px solid var(--border);
   min-height: 0;
 }
+.side-tools { display: flex; gap: 6px; }  /* the search, and the order of the list beside it */
+.side-tools .search { flex: 1; min-width: 0; }
+.side-tools select { flex: none; min-width: 140px; font-size: 13.5px; white-space: nowrap; }  /* wide enough for every order: the row stays put */
 .job-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; margin: 0 -4px; padding: 0 4px; }
 .sidebar-foot { font-size: 12px; color: var(--faint); padding: 6px 6px 0; border-top: 1px solid var(--border); }
 
