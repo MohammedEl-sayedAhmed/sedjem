@@ -200,6 +200,15 @@ jobs:
             throw "the installer names itself $($info.ProductName) $($info.ProductVersion), not Sedjem $env:VERSION"
           }
 
+      - name: Upload the Windows installer
+        # before the update test, so that an installer whose test fails can still be tried by hand
+        if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: Sedjem-windows-setup
+          path: dist/Sedjem-*-setup.exe
+          retention-days: 7
+
       - name: Installer update mode (Windows)
         # The installer into a temporary folder, then again over itself the way Sedjem's own updates run it. The
         # update must replace the program (leaving none of the old files), keep the data folder, start the new
@@ -224,23 +233,28 @@ jobs:
             # not Start-Process -Wait, which would also wait for the Sedjem that setup starts
             $p = Start-Process -FilePath $file -ArgumentList $arguments -PassThru
             $null = $p.Handle  # keeps the exit code readable once it has exited
-            $p.WaitForExit()
+            if (-not $p.WaitForExit(300000)) {
+              Get-Process | Where-Object { $_.MainWindowTitle } | ForEach-Object { "window: $($_.Name) | $($_.MainWindowTitle)" } | Out-Host
+              throw "$file $arguments was still running after 5 minutes"
+            }
             if ($p.ExitCode -ne 0) { throw "$file $arguments exited with $($p.ExitCode)" }
           }
           function Get-Installed { Get-Process -Name Sedjem -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } }
           function Wait-Sedjem([string]$failure) {
             # the address of the Sedjem that answers at the port it noted
-            foreach ($i in 1..120) {
+            $clock = [Diagnostics.Stopwatch]::StartNew()
+            while ($clock.Elapsed.TotalSeconds -lt 120) {  # two minutes in all, however slow each try is
               try {  # the port file may not be there yet, or be half written
                 $port = "$(Get-Content -Raw -ErrorAction Stop $portFile)".Trim()
-                $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" -TimeoutSec 5
+                $status = Invoke-RestMethod "http://127.0.0.1:$port/api/status" -TimeoutSec 3
                 if ($status.app -eq "sedjem") { "Sedjem $($status.version) answered at port $port" | Out-Host; return "http://127.0.0.1:$port" }
               } catch { }
               Start-Sleep -Seconds 1
             }
             $log = Join-Path $data "app_data\sedjem.log"
             if (Test-Path $log) { Get-Content $log -Tail 40 | Out-Host }
-            throw "${failure}: nothing answered at the port in $portFile"
+            Get-Process -Name Sedjem -ErrorAction SilentlyContinue | ForEach-Object { "still running: $($_.Path) ($($_.Id))" } | Out-Host
+            throw "${failure}: nothing answered at the port in $portFile within two minutes"
           }
           function Stop-Sedjem([string]$url) {
             $running = @(Get-Installed)
@@ -311,14 +325,6 @@ jobs:
       - name: Self-test reports
         if: always()
         run: cat selftest-*.json || true
-
-      - name: Upload the Windows installer
-        if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') != ''
-        uses: actions/upload-artifact@v4
-        with:
-          name: Sedjem-windows-setup
-          path: dist/Sedjem-*-setup.exe
-          retention-days: 7
 
       - name: Upload the Windows build folder (when there is no installer)
         if: runner.os == 'Windows' && hashFiles('dist/Sedjem-*-setup.exe') == ''
