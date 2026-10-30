@@ -15,7 +15,7 @@
 
 #define AppVersion GetEnv("SEDJEM_VERSION")
 #if AppVersion == ""
-  #define AppVersion "0.3.1"
+  #define AppVersion "0.3.2"
 #endif
 
 ; the version as the four numbers of setup's own version resource: 0.3.1-preview.20261030 is 0.3.1.0
