@@ -90,6 +90,12 @@
      4.5:1 a name of this size needs, so Karim takes the app's darker orange (its --s7), 5.0:1 */
   --s1: #2563eb; --s2: #b45309; --s3: #7c3aed; --s4: #0f766e;
   --ear: #14a3a1;              /* the logo's ear, drawn as a line */
+  /* the numbers' charts: the brand's teal for a series, a light teal for the second part of a whole (Linux, the older
+     releases), told apart by lightness and the 2 px gap between parts, with the legend naming each; and a grey for
+     the part that adds up the rest (previews, other countries) */
+  --series-1: #14a3a1;
+  --series-2: #6dbeba;
+  --series-rest: #8a95a3;
   --view-light: block;         /* of a view drawn for each theme, the one on show */
   --view-dark: none;
 
@@ -110,6 +116,9 @@
   --fs-line: 18px;             /* the hero's transcript, the same on both pages */
   --fs-register: 24px;
   --fs-code: 14px;
+  --fs-figure: 32px;           /* a card's number in the numbers */
+  --fs-kpi: 40px;              /* a figure card's number, beside its title */
+  --fs-tick: 12px;             /* the dates along a chart */
 
   --margin: 16px;
   --gap: 16px;
@@ -129,7 +138,7 @@
   :root { --fs-display: 34px; }
 }
 @media (min-width: 700px) {
-  :root { --margin: 32px; --gap: 24px; --section: 64px; --inset: 48px; --fs-display: 52px; --fs-title: 32px; --fs-lede: 20px; }
+  :root { --margin: 32px; --gap: 24px; --section: 64px; --inset: 48px; --fs-display: 52px; --fs-title: 32px; --fs-lede: 20px; --fs-figure: 40px; }
 }
 @media (min-width: 1000px) {
   :root { --fs-register: 28px; }
@@ -154,6 +163,7 @@ html:lang(ar) {
   --lh-display: 1.3; --lh-title: 1.3; --lh-lede: 1.7; --lh-body: 1.8; --lh-small: 1.7;
   --track-display: 0; --track-title: 0;
   --fs-table: var(--fs-small);  /* the table's Latin model names fit their column at Arabic's smaller step */
+  --fs-tick: 14px;
   --measure: 30em;
 }
 @media (min-width: 370px) {
@@ -192,6 +202,8 @@ html:lang(ar) {
     --wrong: #9aa5b3;
     --s1: #6ea0ff; --s2: #ff8f5c; --s3: #b794ff; --s4: #3fcfbf;
     --ear: #0e7c7b;            /* quieter on the dark page, so the headline leads */
+    --series-rest: #6f7a88;
+    --series-2: #2f7f7c;
     --view-light: none;
     --view-dark: block;
   }
@@ -217,6 +229,8 @@ html:lang(ar) {
   --wrong: #9aa5b3;
   --s1: #6ea0ff; --s2: #ff8f5c; --s3: #b794ff; --s4: #3fcfbf;
   --ear: #0e7c7b;            /* quieter on the dark page, so the headline leads */
+  --series-rest: #6f7a88;
+  --series-2: #2f7f7c;
   --view-light: none;
   --view-dark: block;
 }
@@ -540,8 +554,126 @@ html:lang(ar) .results .num { text-align: start; }
   .spec { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 32px; }
   .spec-foot { grid-column: 1 / -1; }
 }
+/* ---------- the numbers: a grid of cards, each a figure build.py draws, the claim over it and its sources under it.
+   One column on a phone and a tablet; from 1000 px three to a row, the anonymous counts' month across a row of its
+   own. ---------- */
+.numbers .bento, .numbers-source { grid-column: 1 / -1; }
+.bento { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.numbers-source { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+@media (min-width: 1000px) {
+  .numbers .sec-grid { row-gap: 32px; }
+  .bento { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
+  .bento .span-2 { grid-column: span 2; }
+  .bento .span-3 { grid-column: 1 / -1; }
+}
+/* a card: the card's surface with a hairline edge and, in the dark theme, a lit top edge; in the counts' card its
+   title small and muted, then each number, large, over its label */
+.card {
+  display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px 16px; border-radius: 8px;
+  background: var(--card); box-shadow: inset 0 0 0 1px var(--line), inset 0 1px 0 var(--highlight);
+}
+@media (min-width: 700px) {
+  .card { padding: 24px; }
+}
+.card h3 { color: var(--muted); font-size: var(--fs-small); font-weight: 500; line-height: var(--lh-small); }
+.card h4 { margin: 0 0 8px; color: var(--muted); font-size: var(--fs-small); font-weight: 500; line-height: var(--lh-small); }
+.stat { display: flex; flex-direction: column; gap: 4px; }
+.stat data { font-size: var(--fs-figure); font-weight: 600; line-height: 1.1; letter-spacing: var(--track-title); }
+.stat span { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.stat-small data { font-size: var(--fs-lede); letter-spacing: 0; }
+
+/* a figure card: the number large beside its title and one line about it, as a dashboard shows a figure, then a
+   small picture across the card: a line with no axes, or a thin bar of parts */
+.figure-card { gap: 0; }  /* the picture keeps to the bottom (margin-top: auto), whatever the hidden table after it */
+.kpi { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.kpi-figure data {
+  display: block; font-size: var(--fs-kpi); font-weight: 600; line-height: 1; letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+.kpi-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.figure-card .kpi-text h3 { color: var(--text); font-weight: 600; }
+.kpi-text p { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+
+/* the small line: the marks in SVG, across in per cent and down in pixels; the Arabic page mirrors them, so time runs
+   from the right. A smooth line over a wash that fades downwards, its last stretch dashed to a dot, a ring at each
+   release. */
+.plot { --gutter: 0px; position: relative; margin-top: auto; padding-top: 20px; }
+.chart { display: block; width: 100%; height: var(--h); overflow: visible; }
+html[dir="rtl"] .chart { transform: scaleX(-1); }
+.chart .line { fill: none; stroke: var(--series-1); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.chart .line-tail { stroke-dasharray: 3 4; }
+.chart .wash { stroke: none; }
+.chart .dot { fill: var(--series-1); stroke: var(--card); stroke-width: 2; }
+.chart .mark { fill: var(--card); stroke: var(--series-1); stroke-width: 1.5; }
+
+/* the tooltip site.js adds: the value first, then its day, and a hairline at the day */
+.tip {
+  position: absolute; z-index: 1; bottom: calc(100% - var(--top));
+  inset-inline-start: calc(var(--gutter) + (100% - var(--gutter)) * var(--at) / 100); display: flex;
+  flex-direction: column; padding: 6px 10px; border-radius: 4px; background: var(--card); color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 8px 24px rgba(15, 18, 22, 0.16); font-size: var(--fs-tick);
+  line-height: 1.4; white-space: nowrap; pointer-events: none; translate: -50% -8px;
+}
+html[dir="rtl"] .tip { translate: 50% -8px; }
+.tip[hidden], .cross[hidden] { display: none; }
+.tip strong { color: var(--text); font-size: var(--fs-small); font-weight: 600; }
+.cross {
+  position: absolute; top: 20px; inset-inline-start: calc(var(--gutter) + (100% - var(--gutter)) * var(--at) / 100);
+  width: 1px; height: var(--h); background: var(--line-strong); pointer-events: none;
+}
+
+/* ranked bars: each part's name, its bar from one baseline with its end rounded, and its value at the end; the part
+   that adds up the rest in grey, last */
+.rank { display: grid; gap: 10px; margin: auto 0 0; padding: 0; list-style: none; font-size: var(--fs-small); }
+.rank li { display: grid; grid-template-columns: minmax(4.5em, max-content) minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+.rank-bar { position: relative; height: 10px; }
+.rank-bar::before {
+  content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: calc(var(--v) * 1%); min-width: 2px;
+  border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--series-1);
+}
+.rank-rest .rank-bar::before { background: var(--series-rest); }
+.rank-value { font-weight: 500; font-variant-numeric: tabular-nums; }
+.rank-name { overflow-wrap: anywhere; }
+
+/* one whole in parts: a thin bar of blocks 2 px apart, and a legend of each part's name and share */
+.parts { display: grid; gap: 12px; margin-top: auto; padding-top: 20px; }
+.split { display: flex; gap: 2px; height: 8px; }
+.part { flex: var(--v) 1 0; min-width: 4px; border-radius: 4px; }
+.part-windows, .part-latest { background: var(--series-1); }
+.part-linux, .part-older { background: var(--series-2); }
+.part-other, .part-previews { background: var(--series-rest); }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--fs-small); }
+.legend li { display: flex; align-items: center; gap: 8px; }
+.key { width: 10px; height: 10px; border-radius: 2px; }
+.legend .share { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+
+/* the anonymous counts: the numbers beside the countries, the website's under them; before the first month, a calm
+   hatched card with the line that says when they come */
+.counts { display: grid; gap: 24px; }
+.stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; align-content: start; }
+.model { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-small); }
+.model span { color: var(--text); }
+.website { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+.website h4 { grid-column: 1 / -1; margin: 0; }
+@media (min-width: 700px) {
+  .counts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+}
+#numbers-counts:has(.soon) {
+  justify-content: center;
+  background: repeating-linear-gradient(135deg, var(--line) 0 1px, transparent 1px 10px), var(--card);
+}
+.soon { max-width: var(--measure); }
 
 /* ---------- the downloads ---------- */
+/* under a download, the latest release's file: its name and size, and its SHA256 in mono, which one click selects
+   whole and which wraps rather than scrolls */
+.file { margin: 16px 0 0; font-size: var(--fs-small); line-height: var(--lh-small); }
+.file div + div { margin-top: 8px; }
+.file dt { color: var(--muted); }
+.file dd { margin: 2px 0 0; }
+.file-name { overflow-wrap: anywhere; }
+.file data { color: var(--muted); white-space: nowrap; }
+.sum { display: block; font: 400 var(--fs-code)/1.6 var(--mono); overflow-wrap: anywhere; user-select: all; -webkit-user-select: all; }
 .get { scroll-margin-top: 24px; }
 .get .fine { margin-top: 12px; color: var(--muted); font-size: var(--fs-small); }
 .way { margin-top: 32px; }
@@ -580,6 +712,9 @@ html:lang(ar) .results .num { text-align: start; }
 
 /* ---------- forced colours: borders the theme drew with shadows ---------- */
 @media (forced-colors: active) {
-  .frame, .btn, .srt, .code-box, .menu-panel, .spec { border: 1px solid CanvasText; }
-  .bar::before { background: CanvasText; }
+  .frame, .btn, .srt, .code-box, .menu-panel, .spec, .card { border: 1px solid CanvasText; }
+  .bar::before, .rank-bar::before, .part { background: CanvasText; }
+  .chart .line { stroke: CanvasText; }
+  .chart .dot { fill: CanvasText; }
+  .chart .mark { stroke: CanvasText; }
 }

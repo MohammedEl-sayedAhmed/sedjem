@@ -82,8 +82,8 @@
   else wire();
 })();
 
-/* The hero's download is for the reader's own system: Linux's on a Linux computer, and Windows' anywhere else, as
-   it is without this file. The link beside it names the other one and the source. */
+/* The hero's download is for the reader's own system: Linux's on a Linux computer, its label and its file, and
+   Windows' anywhere else, as it is without this file. The link beside it names the other one and the source. */
 (function () {
   "use strict";
   var agent = navigator.userAgent || "", data = navigator.userAgentData;
@@ -93,6 +93,9 @@
   function linux() {
     Array.prototype.forEach.call(document.querySelectorAll("[data-os]"), function (label) {
       label.hidden = label.getAttribute("data-os") !== "linux";
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-href-linux]"), function (link) {
+      link.setAttribute("href", link.getAttribute("data-href-linux"));
     });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", linux);
@@ -139,4 +142,77 @@
     running.forEach(function (a) { a.finish(); });
     root.classList.remove("will-reveal");
   });
+})();
+
+/* The numbers' charts: a pointer over a chart, or a tap, shows the nearest day's value and date, with a hairline at
+   the day; once a chart has the keyboard's focus, the arrow keys move along it. build.py puts where each point is on
+   the chart (data-points: its place across in per cent and its height), and its value and day are the same row of the
+   table under the chart, which screen readers read, so without this file nothing is missing. */
+(function () {
+  "use strict";
+  function wire() {
+    Array.prototype.forEach.call(document.querySelectorAll(".plot[data-points]"), function (plot) {
+      var card = plot.closest(".card"), rows = card ? card.querySelectorAll("table tbody tr") : [];
+      var points = plot.getAttribute("data-points").split(" ").map(function (p) { return p.split(",").map(Number); });
+      if (!points.length || points.length !== rows.length) return;
+      var rtl = window.getComputedStyle(plot).direction === "rtl", at = points.length - 1;
+      var tip = document.createElement("div"), value = document.createElement("strong"), day = document.createElement("span");
+      var cross = document.createElement("div");
+      tip.className = "tip";
+      cross.className = "cross";
+      tip.hidden = cross.hidden = true;
+      tip.setAttribute("aria-hidden", "true");
+      cross.setAttribute("aria-hidden", "true");
+      tip.appendChild(value);
+      tip.appendChild(day);
+      plot.appendChild(cross);
+      plot.appendChild(tip);
+      var columns = plot.querySelectorAll("[data-i]");
+
+      function show(i) {
+        at = Math.max(0, Math.min(points.length - 1, i));
+        var p = points[at], cells = rows[at].cells;
+        value.textContent = cells[1].textContent;
+        day.textContent = cells[0].textContent;
+        tip.style.setProperty("--at", p[0]);
+        tip.style.setProperty("--top", (20 + p[1]) + "px");
+        cross.style.setProperty("--at", p[0]);
+        tip.hidden = cross.hidden = false;
+        Array.prototype.forEach.call(columns, function (col) {
+          col.classList.toggle("is-on", col.getAttribute("data-i") === String(at));
+        });
+      }
+      function hide() {
+        tip.hidden = cross.hidden = true;
+        Array.prototype.forEach.call(columns, function (col) { col.classList.remove("is-on"); });
+      }
+      function nearest(event) {
+        var box = plot.querySelector(".chart").getBoundingClientRect();
+        var across = ((rtl ? box.right - event.clientX : event.clientX - box.left) / box.width) * 100, best = 0;
+        points.forEach(function (p, i) {
+          if (Math.abs(p[0] - across) < Math.abs(points[best][0] - across)) best = i;
+        });
+        return best;
+      }
+      plot.addEventListener("pointermove", function (event) { show(nearest(event)); });
+      plot.addEventListener("pointerdown", function (event) { show(nearest(event)); });
+      plot.addEventListener("pointerleave", hide);
+      // the keyboard's way in, named by its card's title; screen readers have the table under it
+      var title = card.querySelector("h3");
+      plot.tabIndex = 0;
+      plot.setAttribute("role", "img");
+      if (title) plot.setAttribute("aria-label", title.textContent);
+      // the focus starts at the newest day, unless a tap that gave it the focus has just shown one
+      plot.addEventListener("focus", function () { if (tip.hidden) show(points.length - 1); });
+      plot.addEventListener("blur", hide);
+      plot.addEventListener("keydown", function (event) {
+        var step = { ArrowLeft: rtl ? 1 : -1, ArrowRight: rtl ? -1 : 1, Home: -points.length, End: points.length }[event.key];
+        if (!step) return;
+        event.preventDefault();
+        show(at + step);
+      });
+    });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  else wire();
 })();
