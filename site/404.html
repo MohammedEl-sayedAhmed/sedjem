@@ -10,12 +10,13 @@
   <meta name="theme-color" content="#0f1216" media="(prefers-color-scheme: dark)">
   <link rel="icon" href="{{base}}icon.svg" type="image/svg+xml">
   <!-- GitHub Pages serves this page for a missing address at any depth, so it carries its own styles and the logo
-       tile, and only its fonts and tab icon come from the site's path; where they can't be found it still reads the
-       same. One page in both languages: English from the left edge, Arabic from the right. It has no theme button,
-       but takes the theme picked on the other pages (site.js keeps it under the same key). -->
+       tile, and only its fonts, tab icon and counts (counts.js) come from the site's path; where they can't be found
+       it still reads the same. One page in both languages: English from the left edge, Arabic from the right. It
+       has no theme button, but takes the theme picked on the other pages (site.js keeps it under the same key). -->
   <script>
     try { var theme = localStorage.getItem("sedjem-site-theme"); if (theme === "light" || theme === "dark") document.documentElement.setAttribute("data-theme", theme); } catch (e) {}
   </script>
+{{counts}}
   <style>
     @font-face { font-family: "IBM Plex Sans"; font-weight: 400; font-display: swap; src: url("{{base}}fonts/ibm-plex-sans-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }
     @font-face { font-family: "IBM Plex Sans"; font-weight: 600; font-display: swap; src: url("{{base}}fonts/ibm-plex-sans-latin-600-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F; }

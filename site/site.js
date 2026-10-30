@@ -1,9 +1,10 @@
-/* The theme. The page follows the system's light or dark setting until the reader picks one with the button in the
-   header (in the menu, on a phone). A press goes from the system's theme to the other one, then to the system's own
-   pinned, then back to following the system, so the first press always changes what the page looks like. The pick
-   is kept in this browser under the site's own key and put on the page here, in the head, before the page is first
-   drawn, so the other theme never shows first. Without this file the page follows the system, and the button isn't
-   shown. */
+/* The theme. The page follows the system's light or dark setting until the reader switches with the button in the
+   header (in the menu, on a phone). Each press switches to the other theme, so every press changes what the page
+   looks like. A switch to the system's own theme is no pick: the page follows the system again and nothing is kept.
+   Any other is kept in this browser under the site's own key and put on the page here, in the head, before the page
+   is first drawn, so the other theme never shows first. The button's icon is the theme on show (the stylesheet
+   draws it, so it follows the system too) and its name says what a press does. Without this file the page follows
+   the system, and the button isn't shown. */
 (function () {
   "use strict";
   var KEY = "sedjem-site-theme";
@@ -19,14 +20,18 @@
     }
   }
 
-  function current() {
-    var choice = root.getAttribute("data-theme");
-    return choice === "light" || choice === "dark" ? choice : "system";
+  function systems() {
+    return system && system.matches ? "dark" : "light";
   }
 
-  function next(choice) {
-    var own = system && system.matches ? "dark" : "light", other = own === "dark" ? "light" : "dark";
-    return choice === "system" ? other : choice === other ? own : "system";
+  // the theme on show: the reader's pick, or the system's
+  function shown() {
+    var choice = root.getAttribute("data-theme");
+    return choice === "light" || choice === "dark" ? choice : systems();
+  }
+
+  function other() {
+    return shown() === "dark" ? "light" : "dark";
   }
 
   function apply(choice) {
@@ -47,17 +52,20 @@
     var buttons = document.querySelectorAll("[data-theme-switch]");
     function name() {
       Array.prototype.forEach.call(buttons, function (button) {
-        var text = button.getAttribute("data-" + current());
+        var text = button.getAttribute("data-to-" + other());
         button.setAttribute("aria-label", text);
         button.setAttribute("title", text);
-        var shown = button.querySelector(".theme-name");
-        if (shown) shown.textContent = text;
+        var visible = button.querySelector(".theme-name");
+        if (visible) visible.textContent = text;
       });
     }
     name();
+    // while the page follows the system, a change of the system's theme changes what a press does
+    if (system && system.addEventListener) system.addEventListener("change", name);
+    else if (system && system.addListener) system.addListener(name);
     Array.prototype.forEach.call(buttons, function (button) {
       button.addEventListener("click", function () {
-        var choice = next(current());
+        var to = other(), choice = to === systems() ? "system" : to;
         apply(choice);
         try {
           if (choice === "system") window.localStorage.removeItem(KEY);

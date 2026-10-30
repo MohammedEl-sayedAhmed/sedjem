@@ -24,11 +24,10 @@ docs = "التوثيق"
 github = "GitHub"
 menu = "القائمة"  # new
 
-# the theme button's name, for the theme in force
+# the theme button's name, which says what a press does: on a light page it switches to dark, on a dark one to light
 [theme]
-system = "المظهر: زي الجهاز"  # new
-light = "المظهر: فاتح"  # new
-dark = "المظهر: غامق"  # new
+to_dark = "حوّل للمظهر الغامق"  # new
+to_light = "حوّل للمظهر الفاتح"  # new
 
 [hero]
 h1 = "الاجتماعات مش بتتكلم لغة واحدة."
@@ -81,6 +80,7 @@ panel_alt = "قسم المتكلمين في البرنامج لاجتماع ال
 h2 = "التسجيل بتاعك بيفضل على جهازك"
 lede = "الموديلات بتشتغل على البروسيسور أو كارت الشاشة بتاعك. مفيش حساب، والتسجيل مش بيترفع غير لو اخترت خدمة أونلاين وسمحت بده، كل مرة."  # trimmed
 counts = "Sedjem كمان بيبعت شوية أرقام مجهولة عن الاستخدام، زي الإصدار والبلد وعدد النصوص اللي عملها، عشان المشروع يعرف بيتستخدم فين. عمره ما بيبعت تسجيلاتك ولا نصوصك ولا أسامي ملفاتك. وتقدر تقفلها من الإعدادات."
+website = "والموقع نفسه بيعدّ الزيارات والضغط على التحميل بأرقام مجهولة، من غير cookies، وبيحترم Do Not Track."  # new
 docs = "الخصوصية بالتفصيل"  # new
 caption = "الموديلات اللي على جهازك، زي ما بتعرضها إعدادات البرنامج."  # new
 row_alt = "إعدادات البرنامج، الموديلات اللي على الجهاز: whisper-medium code-switching واخد 778 MB، وCohere Transcribe Arabic واخد 1.6 GB، الاتنين متنزّلين، وWhisper large-v3 لسه متنزلش"  # new

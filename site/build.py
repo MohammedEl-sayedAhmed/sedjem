@@ -7,9 +7,11 @@ in docs/images/make/content.py, the meeting the README screenshots show, and the
 Arabic page gives the speakers Arabic names. The ear beside the hero is the brand icon's, read from docs/brand/. The
 pictures of the app are the captures in site/captures/, made by
 docs/images/make/screenshots.py (its "site" shot) and shrink.py, each in a desktop and a phone form, light and dark,
-as lossless WebP with a PNG for browsers without WebP. Next to the pages go the stylesheet, the script, the 404 page and only the files they use: the logo from docs/brand/, the
+as lossless WebP with a PNG for browsers without WebP. Next to the pages go the stylesheet, the scripts, the 404 page and only the files they use: the logo from docs/brand/, the
 captures, the social card from docs/images/, the font files the stylesheet names from docs/video/fonts/ with their
-licence, and the app's icon. Standard library only.
+licence, and the app's icon. Each page counts its visits anonymously with counts.js, which sends to Aptabase only
+from the published host (COUNTS_HOST), so a local preview sends nothing; without a key (COUNTS_KEY) the build
+leaves it out. Standard library only.
 
     python site/build.py [out_dir]            # out_dir defaults to _site/ at the top of the repository
     python -m http.server 8000 -d _site       # then open http://127.0.0.1:8000/ and http://127.0.0.1:8000/ar/
@@ -42,6 +44,13 @@ ICON = ROOT / "docs" / "brand" / "sedjem-icon-colour.svg"  # the hero's ear, and
 URL = "https://mohammedel-sayedahmed.github.io/sedjem/"
 BASE = urlsplit(URL).path  # /sedjem/, where the 404 page finds the site's files
 
+# The anonymous counts (counts.js; docs/privacy.md, "The website"): the website's own Aptabase app, whose key is public
+# as it is in the page, and the one host the pages send from. An empty key leaves the counting out of the build.
+COUNTS_KEY = "A-EU-3941212028"
+COUNTS_HOST = urlsplit(URL).hostname
+COUNTS_KEY_FORMAT = re.compile(r"A-EU-[A-Za-z0-9]{1,64}")  # a key of Aptabase's EU region, the one the counts go to
+COUNTS_ENDPOINT = "https://eu.aptabase.com/api/v0/event"  # one event a request
+
 # Each language's page: its folder in the site, and the fonts its first view needs first
 LANGS = {
     "en": {"folder": "", "preload": ("ibm-plex-sans-latin-600", "ibm-plex-sans-latin-400", "ibm-plex-sans-arabic-arabic-400")},
@@ -49,6 +58,7 @@ LANGS = {
 }
 PAGES = ("index.html", "ar/index.html", "404.html")
 COPIED = ("styles.css", "site.js")
+COUNTER = "counts.js"  # copied too when the pages count
 # Every other file the site publishes: its path in the site, and where it comes from in the repository. The font
 # files are added from the stylesheet's @font-face rules, so only the weights it uses are published.
 FILES = {
@@ -175,8 +185,7 @@ def srt(m, lang):
     return "\n\n".join(cues)
 
 
-ICONS = {  # the theme button's three faces: half a circle filled for the system's theme, a sun, the app's moon
-    "system": '<circle cx="12" cy="12" r="8.5"/><path class="solid" d="M12 3.5a8.5 8.5 0 0 0 0 17z"/>',
+ICONS = {  # the theme button's two faces, the theme on show: a sun on a light page, the app's moon on a dark one
     "light": '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2'
              'M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>',
     "dark": '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
@@ -184,15 +193,16 @@ ICONS = {  # the theme button's three faces: half a circle filled for the system
 
 
 def theme_button(words, where):
-    """The theme button, in the header's row from 700 px or in the phone's menu, where its name shows too."""
-    name = words["theme.system"]
+    """The theme button, in the header's row from 700 px or in the phone's menu, where its name shows too. The
+    stylesheet shows the icon of the theme on show, and the name says what a press does: here the light page's, which
+    site.js changes on a dark one."""
+    name = words["theme.to_dark"]
     icons = "".join(f'<svg class="icon-{k}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">{v}</svg>'
                     for k, v in ICONS.items())
     shown = f'<span class="theme-name" aria-hidden="true">{name}</span>' if where == "menu" else ""
     indent = "      " if where == "menu" else "  "
-    return (f'{indent}<button class="theme theme-{where}" type="button" data-theme-switch data-system="{name}" '
-            f'data-light="{words["theme.light"]}" data-dark="{words["theme.dark"]}" aria-label="{name}" '
-            f'title="{name}">{icons}{shown}</button>')
+    return (f'{indent}<button class="theme theme-{where}" type="button" data-theme-switch data-to-dark="{name}" '
+            f'data-to-light="{words["theme.to_light"]}" aria-label="{name}" title="{name}">{icons}{shown}</button>')
 
 
 def png_size(path):
@@ -257,6 +267,17 @@ def icon():
                        '<svg class="mark" viewBox="0 0 64 64" role="img" aria-label="Sedjem">', 1)
 
 
+def counts(src, page, key, host):
+    """The script that counts a page, with what it needs on its element: the page, the key, the address, the host it
+    may send from and the version the page offers. Nothing without a key."""
+    if not key:
+        return ""
+    if not COUNTS_KEY_FORMAT.fullmatch(key):
+        raise SystemExit(f"{key!r} is not a key of Aptabase's EU region")
+    return (f'  <script src="{src}" defer data-page="{page}" data-key="{key}" data-endpoint="{COUNTS_ENDPOINT}" '
+            f'data-host="{html.escape(host)}" data-version="{html.escape(version())}"></script>')
+
+
 def latin_runs(text):
     """Arabic copy with each run of Latin words in its own left-to-right span, marked as English and not to be
     translated, so a name, a term or a path keeps its own order inside the right-to-left line."""
@@ -316,8 +337,9 @@ def prepare(out):
     return out
 
 
-def build(out=ROOT / "_site"):
-    """Build the site into out and return it."""
+def build(out=ROOT / "_site", counts_key=COUNTS_KEY, counts_host=COUNTS_HOST):
+    """Build the site into out and return it. counts_host is the one host whose pages send their counts (the tests
+    build pages that count on 127.0.0.1), and an empty counts_key leaves the counting out."""
     out = prepare(Path(out))
     m = meeting()
     css = (SITE / "styles.css").read_text(encoding="utf-8")
@@ -332,13 +354,15 @@ def build(out=ROOT / "_site"):
                       theme_wide=theme_button(words[lang], "wide"), theme_menu=theme_button(words[lang], "menu"),
                       preloads=preloads(page["preload"], root), other_lang=other,
                       other_href=root + LANGS[other]["folder"], other_dir=words[other]["page.dir"],
-                      other_locale=words[other]["page.locale"])
+                      other_locale=words[other]["page.locale"],
+                      counts=counts(root + COUNTER, lang, counts_key, counts_host))
         values.update({f"shot_{name}": shot(name, words[lang][alt], root) for name, alt in SHOTS.items()})
         (out / page["folder"]).mkdir(parents=True, exist_ok=True)
         (out / page["folder"] / "index.html").write_text(fill(template, values), encoding="utf-8", newline="\n")
-    (out / "404.html").write_text(fill((SITE / "404.html").read_text(encoding="utf-8"), {"base": BASE, "icon": icon()}),
+    not_found = {"base": BASE, "icon": icon(), "counts": counts(BASE + COUNTER, "404", counts_key, counts_host)}
+    (out / "404.html").write_text(fill((SITE / "404.html").read_text(encoding="utf-8"), not_found),
                                   encoding="utf-8", newline="\n")
-    for name in COPIED:
+    for name in COPIED + ((COUNTER,) if counts_key else ()):
         shutil.copyfile(SITE / name, out / name)
     files = dict(FILES, **{f: f"{FONTS}/{Path(f).name}" for f in fonts(css)},
                  **{f"captures/{p.name}": p.relative_to(ROOT).as_posix() for p in sorted(CAPTURES.glob("*.*"))})

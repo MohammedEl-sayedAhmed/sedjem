@@ -333,10 +333,10 @@ figcaption, caption { color: var(--muted); font-size: var(--fs-small); line-heig
   .get-short, .menu { display: none; }
 }
 
-/* the theme button: the system's theme, the other one, or the system's pinned, in turn (site.js), its icon the
-   choice in force: half a circle filled while it follows the system, a sun, a moon. It is there only when site.js
-   is there to work it. In the header the icon's edge, not the button's, meets the end of the column; in the menu
-   it carries its name. */
+/* the theme button: each press switches to the other theme (site.js). Its icon is the theme on show, a sun on a
+   light page and the app's moon on a dark one, drawn from the theme's tokens, so it follows the system's setting too
+   while no theme is picked. It is there only when site.js is there to work it. In the header the icon's edge, not
+   the button's, meets the end of the column; in the menu it carries its name. */
 .theme {
   display: none; align-items: center; gap: 12px; padding: 0; border: 0; border-radius: 999px;
   background: none; color: var(--text); font: 500 var(--fs-small)/1.2 var(--font); cursor: pointer;
@@ -346,11 +346,11 @@ figcaption, caption { color: var(--muted); font-size: var(--fs-small); line-heig
 .theme-wide:hover { background: var(--hover); }
 .theme:focus-visible { border-radius: 999px; }
 .theme svg {
-  display: none; flex: none; width: 20px; height: 20px;
+  flex: none; width: 20px; height: 20px;
   fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round;
 }
-.theme svg .solid { fill: currentColor; stroke: none; }
-:root:not([data-theme]) .icon-system, :root[data-theme="light"] .icon-light, :root[data-theme="dark"] .icon-dark { display: block; }
+.theme .icon-light { display: var(--view-light); }
+.theme .icon-dark { display: var(--view-dark); }
 .can-switch-theme .theme-menu {
   display: flex; justify-content: flex-start; width: 100%; min-height: 44px; margin-top: 4px; padding: 8px 0;
   border-top: 1px solid var(--line); border-radius: 0; text-align: start;
@@ -360,28 +360,30 @@ figcaption, caption { color: var(--muted); font-size: var(--fs-small); line-heig
 }
 
 /* ---------- hero: the words on eight columns and the ear in the last three, both from the headline's top; the
-   transcript across the column under them. Under 1000 px the ear isn't drawn and the transcript follows the words.
+   transcript across the column under them. Under 1000 px the ear is smaller and above the words, on the end side,
+   and the transcript follows the words.
    ---------- */
 .hero { padding: 24px 0 var(--section); }
 .hero-grid { display: grid; grid-template-columns: minmax(0, 1fr); row-gap: 32px; }
 .lead { max-width: var(--measure); margin-top: 20px; color: var(--text); }
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 16px 24px; margin-top: 32px; }
 .others { font-size: var(--fs-small); font-weight: 500; }
-.ear { display: none; }
+/* the brand icon's own ear, a thin line, unflipped on the Arabic page, where its place mirrors: here over the
+   headline, one row gap above it, its end on the column's end, so the headline keeps its whole measure */
+.ear {
+  display: block; order: -1; justify-self: end;
+  width: auto; height: 96px; fill: none; stroke: var(--ear); stroke-width: 1.5;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ear path { vector-effect: non-scaling-stroke; }
 @media (min-width: 700px) {
   .hero { padding-top: 40px; }
 }
 @media (min-width: 1000px) {
   .hero-grid { grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gap); row-gap: 48px; }
   .hero-text { grid-column: 1 / span 8; grid-row: 1; padding-inline-end: var(--gap); }
-  /* the brand icon's own ear, a thin line: its top level with the headline's and its end on the column's end, the
-     drawing unflipped on the Arabic page, where its place mirrors */
-  .ear {
-    display: block; grid-column: 10 / -1; grid-row: 1; justify-self: end; align-self: start;
-    width: auto; height: 320px; fill: none; stroke: var(--ear); stroke-width: 1.5;
-    stroke-linecap: round; stroke-linejoin: round;
-  }
-  .ear path { vector-effect: non-scaling-stroke; }
+  /* beside the headline: its top level with the headline's and its end on the column's end */
+  .ear { order: 0; grid-column: 10 / -1; grid-row: 1; align-self: start; height: 320px; }
   .hero-figure { grid-column: 1 / -1; grid-row: 2; }
   /* across the column, the transcript on eight parts and its export on the four beside it, read after it */
   .hero-figure .frame { display: grid; grid-template-columns: minmax(0, 8fr) minmax(0, 4fr); gap: 4px; }

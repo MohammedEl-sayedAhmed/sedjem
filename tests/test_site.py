@@ -7,12 +7,15 @@ come from docs/images/make/content.py and the version from app/__init__.py, the 
 the two pages carry the same sections, numbers and images and point to each other, the theme button is named in each
 language and the dark theme is one set of tokens, the transcript, the download and the menu are whole without
 JavaScript, the speakers' names are in colours that read on the card, the pictures of the app keep every pixel and
-are set at their own size, and the first view stays small. Offline, standard library only.
+are set at their own size, and the first view stays small. The anonymous counts go only to Aptabase, only from the
+published site, never with Do Not Track or Global Privacy Control, and hold only the values the privacy policy lists.
+Offline, standard library only.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
 import fnmatch
 import importlib.util
+import json
 import math
 import posixpath
 import re
@@ -68,6 +71,14 @@ REGISTERS = [
 ]
 # How each page writes the version in the hero's small print
 VERSION_IN = {"en": "Version {}.", "ar": "الإصدار {}."}
+# The anonymous counts (site/counts.js; docs/privacy.md, "The website"): each event with its props and their values
+# (None for the referrer, a host name), the system props, and the one address they go to
+COUNTED = {"page_view": {"page": ["en", "ar", "404"], "device": ["phone", "tablet", "desktop"],
+                         "theme": ["light", "dark", "system"], "referrer": None},
+           "download": {"platform": ["windows", "linux", "source"], "place": ["hero", "get"], "page": ["en", "ar", "404"]}}
+SYSTEM_PROPS = ["locale", "appVersion", "isDebug", "sdkVersion", "osName"]
+ENDPOINT = "https://eu.aptabase.com/api/v0/event"
+PAGE_OF = {"index.html": "en", "ar/index.html": "ar", "404.html": "404"}  # each page's name in the counts
 # Numbers the Arabic copy spells out: "about 2 h" is حوالي ساعتين, two hours in the dual, and "1 h takes" is ساعة صوت
 # بتاخد, an hour of audio takes
 SPELLED = {"ساعتين": "2", "ساعة صوت بتاخد": "1"}
@@ -302,7 +313,98 @@ class SiteTest(unittest.TestCase):
             self.assertNotIn("@import", css)
             for url in re.findall(r'url\(\s*["\']?([^"\')]+)', css):
                 self.assertFalse(urlsplit(url).scheme or urlsplit(url).netloc, f"{where}: {url}")
+        # The pages send one thing elsewhere, the counts: one fetch in counts.js, to the address on its element, which
+        # is the one absolute address in the pages outside their links and cards
         self.assertNotRegex((self.out / "site.js").read_text(encoding="utf-8"), r"https?://|fetch\(|XMLHttpRequest")
+        counter = (self.out / build.COUNTER).read_text(encoding="utf-8")
+        self.assertEqual(counter.count("fetch("), 1)
+        self.assertNotRegex(counter, r"https?://|XMLHttpRequest|sendBeacon|WebSocket|EventSource|import\(|\.src\b|new Image")
+        for page, (root, _) in self.pages.items():
+            elsewhere = {value for node in root.iter() if node.tag not in ("a", "link", "meta")
+                         for value in node.attrs.values() if value and re.match(r"\s*(?:[a-z]+:)?//", value)}
+            self.assertEqual(elsewhere, {ENDPOINT}, page)
+            self.assertEqual(urlsplit(ENDPOINT).hostname, "eu.aptabase.com")
+            for script in root.find(lambda n: n.tag == "script" and "src" not in n.attrs):
+                self.assertNotRegex(script.text(), r"//|fetch\(|XMLHttpRequest|sendBeacon", page)
+
+    def test_each_page_counts_once_with_the_websites_key(self):
+        """Each page, the 404 page too, has one counting script, deferred, from the site itself, with the website's own
+        Aptabase key, the EU address, the published host, the page and the version on its element. Every script is
+        the site's own."""
+        self.assertRegex(build.COUNTS_KEY, r"^A-EU-\d{10}$")
+        self.assertEqual(build.COUNTS_HOST, "mohammedel-sayedahmed.github.io")
+        self.assertEqual(build.COUNTS_ENDPOINT, ENDPOINT)
+        for page, (root, _) in self.pages.items():
+            scripts = root.find(lambda n: n.tag == "script")
+            with self.subTest(page):
+                for script in scripts:
+                    if "src" in script.attrs:
+                        self.assertIsNotNone(self.local(page, script.attrs["src"]), "a script from another site")
+                (counter,) = [n for n in scripts if "data-key" in n.attrs]
+                self.assertEqual(self.local(page, counter.attrs["src"]), self.out / build.COUNTER)
+                self.assertIn("defer", counter.attrs)
+                self.assertEqual({k: v for k, v in counter.attrs.items() if k.startswith("data-")},
+                                 {"data-page": PAGE_OF[page], "data-key": build.COUNTS_KEY, "data-endpoint": ENDPOINT,
+                                  "data-host": build.COUNTS_HOST, "data-version": build.version()})
+
+    def test_the_counts_check_before_they_send_and_hold_only_the_listed_values(self):
+        """counts.js stops before anything is sent when Do Not Track or Global Privacy Control is on or the page isn't
+        on the published host; keeps nothing in the browser; and sends only the two events, with the props, values and
+        system props the privacy policy lists, checked again on the way out. The download links name what they are
+        from the same lists."""
+        js = (self.out / build.COUNTER).read_text(encoding="utf-8")
+        code = re.sub(r"/\*.*?\*/|//[^\n]*", "", js, flags=re.S)
+        before = code[:code.index("function send(")]
+        self.assertRegex(before, r'\n  if \(nav\.doNotTrack === "1" \|\| window\.doNotTrack === "1" \|\| '
+                                 r'nav\.globalPrivacyControl === true\) return;')
+        self.assertRegex(before, r'\n  if \(!script \|\| !window\.fetch \|\| location\.hostname !== script\.getAttribute\("data-host"\)\) return;')
+        self.assertNotRegex(code, r"(?i)localStorage|sessionStorage|indexedDB|cookie|caches|openDatabase")
+        self.assertIn('credentials: "omit"', code)
+        self.assertIn("keepalive: true", code)
+        # the events and their props, and the system props, exactly
+        self.assertEqual(json.loads(re.search(r"var EVENTS = (\{.*?\});", code, re.S).group(1)), COUNTED)
+        system = re.search(r"var SYSTEM = \{(.*?)\};", code, re.S).group(1)
+        self.assertEqual(re.findall(r"(?:^|,)\s*(\w+):", system), SYSTEM_PROPS)
+        self.assertIn('sdkVersion: "sedjem-site@1"', system)
+        self.assertIn("isDebug: false", system)
+        self.assertEqual({name: re.findall(r"(\w+):", props) for name, props in re.findall(r'send\("(\w+)", \{([^}]*)\}\)', code)},
+                         {name: list(props) for name, props in COUNTED.items()})
+        body = re.search(r"body: JSON\.stringify\(\{(.*?)\}\)", code, re.S).group(1)
+        self.assertEqual(re.findall(r"(\w+):", body), ["timestamp", "sessionId", "eventName", "systemProps", "props"])
+        self.assertIn("if (!checked(name, props)) return;", code)
+        # the download links: the hero's platform is its label on show, and the others name theirs
+        for lang, home in self.homes.items():
+            with self.subTest(lang):
+                links = home.find(lambda n: n.tag == "a" and "data-download" in n.attrs)
+                self.assertEqual([(n.attrs["data-download"], n.attrs["data-place"]) for n in links],
+                                 [(None, "hero"), ("windows", "get"), ("linux", "get"), ("source", "get")])
+                self.assertEqual([n.attrs["data-os"] for n in links[0].find(lambda n: "data-os" in n.attrs)], ["windows", "linux"])
+                for link in links:
+                    self.assertEqual(link.attrs["href"].split("/")[2], "github.com")
+        # and the privacy policy names every event and value
+        policy = (ROOT / "docs" / "privacy.md").read_text(encoding="utf-8").split("## The website")[1].split("\n## ")[0]
+        for name, props in COUNTED.items():
+            self.assertIn(f"`{name}`", policy)
+            for values in props.values():
+                for value in values or ():
+                    self.assertIn(f"`{value}`", policy)
+        self.assertIn("https://aptabase.com/legal/privacy", policy)
+        self.assertIn("Global Privacy Control", policy)
+
+    def test_without_a_key_nothing_counts(self):
+        """An empty key leaves the counting out: no script on any page and no counts.js. A key of another kind is
+        refused."""
+        with tempfile.TemporaryDirectory() as tmp:
+            out = build.build(Path(tmp) / "site", counts_key="")
+            self.assertFalse((out / build.COUNTER).exists())
+            for page in build.PAGES:
+                root, errors = parse((out / page).read_text(encoding="utf-8"))
+                self.assertEqual(errors, [])
+                self.assertFalse(root.find(lambda n: n.tag == "script" and "data-key" in n.attrs), page)
+                self.assertNotIn("aptabase", (out / page).read_text(encoding="utf-8"))
+        for key in ("A-US-3941212028", "A-SH-1234567890", "A-EU-", "eu-3941212028"):
+            with self.subTest(key), self.assertRaises(SystemExit):
+                build.counts(build.COUNTER, "en", key, build.COUNTS_HOST)
 
     def test_every_colour_is_from_the_palette(self):
         found = 0
@@ -508,11 +610,11 @@ class SiteTest(unittest.TestCase):
         self.assertEqual(tables["en"], tables["ar"])
         # and every one of them is used: by the template, or by build.py for the theme buttons and the pictures
         template = (ROOT / "site" / "index.html").read_text(encoding="utf-8")
-        used = set(re.findall(r"\{\{(\w+\.\w+)\}\}", template)) | {"theme.system", "theme.light", "theme.dark"}
+        used = set(re.findall(r"\{\{(\w+\.\w+)\}\}", template)) | {"theme.to_dark", "theme.to_light"}
         self.assertEqual(used | set(build.SHOTS.values()), tables["en"])
 
     def test_copy_follows_the_house_style(self):
-        for name in ("index.html", "ar/index.html", "404.html", "styles.css", "site.js"):
+        for name in ("index.html", "ar/index.html", "404.html", "styles.css", "site.js", build.COUNTER):
             self.assertNotIn("—", (self.out / name).read_text(encoding="utf-8"), name)
         for name in ("build.py", "DESIGN.md", "copy/en.toml", "copy/ar.toml"):
             self.assertNotIn("—", (ROOT / "site" / name).read_text(encoding="utf-8"), name)
@@ -652,8 +754,8 @@ class SiteTest(unittest.TestCase):
 
     def test_nothing_blinks_or_loops(self):
         """One motion only, and it ends: no endless or blinking animation anywhere, the cursor included."""
-        script = (self.out / "site.js").read_text(encoding="utf-8")
-        for where, text in [*self.styles, ("site.js", script)]:
+        scripts = [(name, (self.out / name).read_text(encoding="utf-8")) for name in ("site.js", build.COUNTER)]
+        for where, text in [*self.styles, *scripts]:
             with self.subTest(where):
                 self.assertNotRegex(text, r"infinite|Infinity|@keyframes|setInterval|blink")
 
@@ -684,8 +786,10 @@ class SiteTest(unittest.TestCase):
                     self.assertIn(px(value), radii, value)
 
     def test_the_theme_button(self):
-        """The header's theme button has a name in the page's language for each of its three states, its icons are
-        hidden from screen readers, and site.js and the 404 page keep the reader's pick under the same key."""
+        """The header's theme button is named for what a press does, switching to the dark theme or to the light one,
+        in the page's language, with the same title and, in the phone's menu, the same name on show; its icons are a
+        sun and a moon, hidden from screen readers, and the stylesheet shows the one for the theme on show, from the
+        tokens that show each theme's views. site.js and the 404 page keep the reader's pick under the same key."""
         names = {}
         for lang, home in self.homes.items():
             buttons = home.find(lambda n: n.tag == "button" and "data-theme-switch" in n.attrs)
@@ -694,16 +798,24 @@ class SiteTest(unittest.TestCase):
                 with self.subTest(lang, where=button.classes()[1]):
                     self.assertTrue(button.inside(lambda n: n.tag == "header"))
                     self.assertEqual(button.attrs.get("type"), "button")
-                    names[lang] = [button.attrs[f"data-{state}"] for state in ("system", "light", "dark")]
-                    self.assertEqual(len(set(names[lang])), 3)
-                    self.assertEqual(button.attrs["aria-label"], names[lang][0])
+                    names[lang] = [button.attrs["data-to-dark"], button.attrs["data-to-light"]]
+                    self.assertEqual(len(set(names[lang])), 2)
+                    # a light page as far as the build knows; site.js names it for the theme on show
+                    self.assertEqual((button.attrs["aria-label"], button.attrs["title"]), (names[lang][0], names[lang][0]))
                     icons = button.find(lambda n: n.tag == "svg")
-                    self.assertEqual([icon.classes() for icon in icons], [["icon-system"], ["icon-light"], ["icon-dark"]])
+                    self.assertEqual([icon.classes() for icon in icons], [["icon-light"], ["icon-dark"]])
                     self.assertEqual({icon.attrs.get("aria-hidden") for icon in icons}, {"true"})
+                    shown = button.find(lambda n: "theme-name" in n.classes())
+                    self.assertEqual([n.text() for n in shown], [names[lang][0]] if "theme-menu" in button.classes() else [])
             self.assertTrue(buttons[1].inside(lambda n: n.tag == "details"))
+        self.assertEqual(names["en"], ["Switch to the dark theme", "Switch to the light theme"])
         self.assertTrue(all(ARABIC.search(name) for name in names["ar"]))
-        self.assertFalse(any(ARABIC.search(name) for name in names["en"]))
-        key = re.search(r'var KEY = "([^"]+)";', (self.out / "site.js").read_text(encoding="utf-8")).group(1)
+        css = re.sub(r"/\*.*?\*/", "", self.css, flags=re.S)
+        self.assertRegex(css, r"\n\.theme \.icon-light \{ display: var\(--view-light\); \}\n\.theme \.icon-dark \{ display: var\(--view-dark\); \}")
+        self.assertNotIn("icon-system", css)
+        script = (self.out / "site.js").read_text(encoding="utf-8")
+        self.assertIn('button.getAttribute("data-to-" + other())', script)
+        key = re.search(r'var KEY = "([^"]+)";', script).group(1)
         self.assertIn(f'localStorage.getItem("{key}")', (self.out / "404.html").read_text(encoding="utf-8"))
 
     def test_the_dark_theme_is_one_set_of_tokens(self):
@@ -804,7 +916,7 @@ class SiteTest(unittest.TestCase):
     def test_the_first_view_stays_small(self):
         fonts = sorted(set(re.findall(r'url\("(fonts/[^"]+\.woff2)"\)', self.css)))
         for page in HOMES.values():
-            files = [page, "styles.css", "site.js", "brand/sedjem-logo-colour.svg", "brand/sedjem-logo-colour-dark.svg", *fonts]
+            files = [page, "styles.css", "site.js", build.COUNTER, "brand/sedjem-logo-colour.svg", "brand/sedjem-logo-colour-dark.svg", *fonts]
             size = sum((self.out / f).stat().st_size for f in files)
             self.assertLessEqual(size, FIRST_VIEW_BUDGET, f"{page}: {size} bytes")
         # only the faces DESIGN.md names, and only the weights the stylesheet uses
@@ -817,7 +929,7 @@ class SiteTest(unittest.TestCase):
         published = sorted(p.relative_to(self.out).as_posix() for p in self.out.rglob("*") if p.is_file())
         fonts = sorted(set(re.findall(r'url\("(fonts/[^"]+\.woff2)"\)', self.css)))
         captures = [f"captures/{p.name}" for p in build.CAPTURES.iterdir()]
-        self.assertEqual(published, sorted([*build.PAGES, *build.COPIED, *build.FILES, *fonts, *captures]))
+        self.assertEqual(published, sorted([*build.PAGES, *build.COPIED, build.COUNTER, *build.FILES, *fonts, *captures]))
         # the logo, the icon and the screenshots are the repository's files, unchanged
         for target, source in build.FILES.items():
             self.assertEqual((self.out / target).read_bytes(), (ROOT / source).read_bytes(), target)
@@ -836,7 +948,7 @@ class SiteTest(unittest.TestCase):
         workflow = (ROOT / ".github" / "workflows" / "pages.yml").read_text(encoding="utf-8")
         paths = re.search(r"\n    paths:\n((?:      - .+\n)+)", workflow).group(1)
         patterns = [p.strip()[2:].strip('"') for p in paths.splitlines()]
-        sources = ["site/index.html", "site/styles.css", "site/build.py", "site/copy/ar.toml", "docs/images/make/content.py",
+        sources = ["site/index.html", "site/styles.css", "site/counts.js", "site/build.py", "site/copy/ar.toml", "docs/images/make/content.py",
                    "app/__init__.py", *build.FILES.values(),
                    *(f"{build.FONTS}/{Path(f).name}" for f in re.findall(r'url\("(fonts/[^"]+)"\)', self.css))]
         for source in sources:

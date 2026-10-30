@@ -208,8 +208,9 @@ tests/test_site.py checks the stylesheet against it. Change them together with t
 Sedjem is the ancient Egyptian verb "to hear", written with the sign of an ear; the logo's tile is that ear, and
 the wordmark ends in a typing cursor. The page is a quiet, type-led product page whose pictures are the app's own:
 the transcript in the hero, written in live HTML, and claim-sized captures of the app further down. The one drawing
-is the ear, once, large and quiet beside the headline: the brand icon's own paths as a thin teal line, taken from
-docs/brand at build time rather than redrawn, and quieter on the dark page so the headline leads.
+is the ear, once, large and quiet beside the headline (smaller, over it, below 1000 px): the brand icon's own paths
+as a thin teal line, taken from docs/brand at build time rather than redrawn, and quieter on the dark page so the
+headline leads.
 
 Each section makes one claim and proves it beside itself: the claim on five columns, the proof on the seven next to
 it, a hairline between sections. The proof is the app (a capture), a measurement (the table) or a fact (the list).
@@ -337,6 +338,7 @@ At 1440 by 900 the first screen holds the headline, the lead, the download, the 
 ```
  16 |<---------------- 358 ---------------->| 16
     [sedjem_]           (Download)  (menu)
+                                   (ear, 96 px)
     Meetings don't
     speak one language.        (34 px)
     Sedjem turns Egyptian ...
@@ -354,6 +356,8 @@ At 1440 by 900 the first screen holds the headline, the lead, the download, the 
 
 The header is one row: the logo, a small download button and a menu. The menu is a details disclosure, so it opens
 without JavaScript, and holds the docs, GitHub, the other language and, with JavaScript, the theme with its name.
+Below 1000 px the ear is 96 px tall and sits over the headline, one row gap (32 px) above it at every width, its end
+on the column's end (the left on the Arabic page, the drawing unflipped), so the headline keeps its whole measure.
 Each capture has a phone form, taken from a phone-sized window of the app, so the phone never shows a desktop
 window shrunk. The table turns into one block per model; the commands scroll sideways in a box that takes the
 keyboard's focus and has a name, and its end edge fades them out while more of them is to the side. The subtitles
@@ -431,18 +435,21 @@ docs/03-results.md.
 
 ## Light, dark and the reader's pick
 
-The page follows the system's light or dark setting until the reader picks one with the theme button: an icon at
-the end of the header's row, or a row with its name in the phone's menu. A press goes from the system's theme to the
-other one, then to the system's own pinned, then back to following the system, so the first press always changes
-what the page looks like. The icon is the choice in force: half a circle filled while the page follows the system, a
-sun for light, and the app's moon for dark. Its name says the same in the page's language: "Theme: follows the
-system", "Theme: light", "Theme: dark", and المظهر: زي الجهاز, المظهر: فاتح, المظهر: غامق.
+The page follows the system's light or dark setting until the reader switches with the theme button: an icon at the
+end of the header's row, or a row with its name in the phone's menu. The icon is the theme on show, a sun on a light
+page and the app's moon on a dark one, while the page follows the system too; the stylesheet draws it from
+--view-light and --view-dark, so it changes with the system's setting. Each press switches to the other theme, so
+every press changes what the page looks like. The name says what a press does, in the page's language: "Switch to
+the dark theme" and "Switch to the light theme", حوّل للمظهر الغامق and حوّل للمظهر الفاتح; it is also the button's title
+and, in the menu, its name on show.
 
-- The pick is kept in localStorage under sedjem-site-theme, the site's own key, since the pages share their address
-  with any other GitHub Pages site of the account; a browser that refuses storage keeps the pick until the page is
-  left. site.js puts it on the page in the head, before the page is first drawn, as data-theme with the colour
-  scheme to match and the theme-color for the browser's bars, so the other theme never shows first. The 404 page
-  reads the same key.
+- A switch to the system's own theme is no pick: the page follows the system again and the kept pick is removed.
+  That is how the page goes back to following the system.
+- Any other pick is kept in localStorage under sedjem-site-theme, the site's own key, since the pages share their
+  address with any other GitHub Pages site of the account; a browser that refuses storage keeps the pick until the
+  page is left. site.js puts it on the page in the head, before the page is first drawn, as data-theme with the
+  colour scheme to match and the theme-color for the browser's bars, so the other theme never shows first. The 404
+  page reads the same key.
 - Without scripts the button isn't shown and the page follows the system.
 - The dark set is written twice, under the media query for the system's dark (unless the reader picked light) and
   under data-theme="dark", because a media query and an attribute can't share a block; the tests keep the two the
@@ -454,6 +461,17 @@ system", "Theme: light", "Theme: dark", and المظهر: زي الجهاز, ا�
 The hero has one download, for the reader's own system: site.js shows Linux's on a Linux computer and Windows'
 anywhere else, which is also what the page shows without JavaScript. The link beside it names the other system and
 the source, and goes to the downloads section, where both are, with the licence and version line.
+
+## The counts
+
+The pages load nothing from other sites, but they count their visits anonymously (docs/privacy.md, "The website").
+counts.js, deferred so that it never holds the page up, sends a page_view each time a page is opened and a download
+when a download link is clicked, to Aptabase, with fetch and nothing else. Each value is from a fixed list but the
+referrer, which is a host name. It sets no cookie and uses no storage, sends nothing when the browser asks for Do Not
+Track or Global Privacy Control, and sends only from the published host, which build.py puts on the script's
+element with the key, the address and the version, so a local preview sends nothing. The download links say what
+they are in data-download and data-place; the hero's is the label on show. Without a key in build.py the script is
+left out.
 
 ## Accessibility
 
@@ -514,6 +532,12 @@ structure, and asked for these, on the phone too:
   new designs.
 - And the critic's small fixes: each Latin name one left-to-right run on the Arabic page, "من الكود", the English
   interface said once, the commands' edge fade, and no subtitles on a phone.
+
+After the site went live, the user asked for two more:
+
+- The theme button read backwards: following the system, its half-filled circle looked like the other theme. The
+  icon is now the theme on show, a sun or a moon, and each press switches to the other theme, as above.
+- The ear was missing on phones. Below 1000 px it is back, smaller, over the headline on the end side.
 
 Checked against the tells: no gradient but the logo tile's own and the commands' edge fade, no glow, glass, blur,
 grain or orb; no cards in

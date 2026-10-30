@@ -22,11 +22,10 @@ docs = "Docs"
 github = "GitHub"
 menu = "Menu"
 
-# the theme button's name, for the theme in force
+# the theme button's name, which says what a press does: on a light page it switches to dark, on a dark one to light
 [theme]
-system = "Theme: follows the system"
-light = "Theme: light"
-dark = "Theme: dark"
+to_dark = "Switch to the dark theme"
+to_light = "Switch to the light theme"
 
 [hero]
 h1 = "Meetings don’t speak one language."
@@ -79,6 +78,7 @@ panel_alt = "The app’s Speakers panel for the made-up sprint planning: {{share
 h2 = "Your recording stays on your computer"
 lede = "The models run on your own processor or graphics card. There is no account, and a recording is uploaded only if you choose a hosted service and allow it, each time."
 counts = '<span translate="no">Sedjem</span> also sends a few anonymous usage counts, such as its version, your country and how many transcriptions it made, so the project knows where it’s used. Never your recordings, transcripts or file names. You can switch them off in Settings.'
+website = "The website itself counts page views and download clicks anonymously, without cookies, and honours Do Not Track."
 docs = "Privacy, in full"
 caption = "The models on this computer, as the app’s Settings show them."
 row_alt = "The app’s Settings, Models on this computer: whisper-medium code-switching, taking 778 MB, and Cohere Transcribe Arabic, taking 1.6 GB, both downloaded, and Whisper large-v3 still to download"

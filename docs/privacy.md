@@ -2,7 +2,7 @@
 
 Sedjem is a transcription app that runs on your own computer. This policy says what it sends over the internet, to
 whom and when, and what stays on the computer. It covers the desktop app, its Windows installer and Sedjem run from
-the source code.
+the source code, and [the website](#the-website) has a section of its own.
 
 ## No account
 
@@ -76,6 +76,41 @@ page of the Windows installer. Any of these turns them off:
 - `DO_NOT_TRACK=1` or `SEDJEM_NO_USAGE=1` in the environment Sedjem starts from
 
 Once they are off, nothing is counted, and the counts not sent yet are deleted.
+
+## The website
+
+Sedjem's website, [mohammedel-sayedahmed.github.io/sedjem](https://mohammedel-sayedahmed.github.io/sedjem/), counts
+its visits anonymously, so that the project knows how people find it and what they download. GitHub Pages serves it,
+and sees each visit as any web host does, under GitHub's
+[privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement). The
+pages load nothing from other sites; the counts are the one thing they send elsewhere.
+
+What is counted:
+
+- `page_view`, each time a page is opened: which page (`en`, `ar`, or `404` for the page of a missing address), the
+  size of the window as `phone` (under 700 pixels wide), `tablet` (under 1100) or `desktop`, the theme on show
+  (`light`, `dark`, or `system` when the page follows the system's), and the site whose link led there, as its host
+  name alone, such as `github.com`, or `none`
+- `download`, when a download button or link is clicked: `windows`, `linux` or `source`, where it was, at the top of
+  the page (`hero`) or in the *Get Sedjem* section (`get`), and which page
+
+Each event also has its time, a session number, the browser's language (such as `ar-EG`), the system in one word
+(Windows, macOS, Linux, Android, iOS or other) and the version of Sedjem the page offers. The session number is the
+second the page was opened followed by eight random digits; it is drawn again each time a page is opened and kept
+nowhere, so it only ties a page view to the downloads clicked on that same page.
+
+The counts go to Aptabase ([privacy policy](https://aptabase.com/legal/privacy)) at `eu.aptabase.com`, in its EU
+region, as an app of their own, apart from the desktop app's. Like any server, Aptabase sees the IP address and the
+browser's `User-Agent`; by its terms it uses them only in memory, to find the country and region and to make a
+pseudonymous hash that changes every day, and doesn't store them.
+
+The website never sets a cookie and keeps nothing in the browser for the counts (only the theme picked with its
+button is kept there). It never sends the full address of the page that linked to it, anything typed or read on the
+page, scrolling or time spent on it, or anything that would tie one visit to another.
+
+Nothing is counted when the browser has Do Not Track or Global Privacy Control turned on, or when a blocker stops
+requests to Aptabase. A copy of the pages anywhere but the published address, a local preview or a page opened from
+the disk sends nothing either.
 
 ## Assistants
 

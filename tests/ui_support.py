@@ -88,12 +88,13 @@ def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, video=
     return jid
 
 
-def launch(playwright):
+def launch(playwright, args=()):
+    """The browser, with args for its command line."""
     headless = os.environ.get("SEDJEM_UI_HEADED") != "1"
     tried = []
     for options in ({}, {"channel": "chrome"}, {"channel": "msedge"}):
         try:
-            return playwright.chromium.launch(headless=headless, **options)
+            return playwright.chromium.launch(headless=headless, args=list(args), **options)
         except PlaywrightError as e:
             tried.append(f"{options or 'bundled'}: {str(e).splitlines()[0]}")
     message = "no Chromium for Playwright (" + "; ".join(tried) + ")"

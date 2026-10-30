@@ -38,6 +38,9 @@
        one never shows first, and marks the page for the transcript's arrival, so no line is shown and then hidden.
        Without it the page follows the system's theme, every line is simply there, and the download is Windows'. -->
   <script src="{{root}}site.js"></script>
+  <!-- The anonymous counts (counts.js): deferred, so they never hold the page up, and sent only from the published
+       site. build.py leaves them out without a key. -->
+{{counts}}
 </head>
 <body id="top">
 <a class="skip" href="#main">{{page.skip}}</a>
@@ -79,9 +82,10 @@
       <div class="hero-text">
         <h1 id="hero-title">{{hero.h1}}</h1>
         <p class="lead">{{hero.lead}}</p>
-        <!-- the button is for the reader's own system once site.js has looked; Windows' without it -->
+        <!-- the button is for the reader's own system once site.js has looked; Windows' without it. data-download and
+             data-place say what a download link is for the counts; the hero's platform is the label on show -->
         <p class="actions">
-          <a class="btn btn-primary btn-large" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest"><span data-os="windows">{{hero.windows}}</span><span data-os="linux" hidden>{{hero.linux}}</span></a>
+          <a class="btn btn-primary btn-large" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest" data-download data-place="hero"><span data-os="windows">{{hero.windows}}</span><span data-os="linux" hidden>{{hero.linux}}</span></a>
           <a class="others" href="#download"><span data-os="windows">{{hero.others_windows}}</span><span data-os="linux" hidden>{{hero.others_linux}}</span></a>
         </p>
       </div>
@@ -187,7 +191,7 @@
       <div class="claim">
         <h2 id="local">{{local.h2}}</h2>
         <p class="lede">{{local.lede}}</p>
-        <p>{{local.counts}}</p>
+        <p>{{local.counts}} {{local.website}}</p>
         <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md">{{local.docs}}</a></p>
       </div>
       <figure class="proof shot">
@@ -287,12 +291,12 @@
         <div class="way">
           <h3>{{get.windows}}</h3>
           <p>{{get.windows_text}}</p>
-          <a class="btn btn-primary" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest">{{hero.windows}}</a>
+          <a class="btn btn-primary" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest" data-download="windows" data-place="get">{{hero.windows}}</a>
         </div>
         <div class="way">
           <h3>{{get.linux}}</h3>
           <p>{{get.linux_text}}</p>
-          <a class="btn" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest">{{hero.linux}}</a>
+          <a class="btn" href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest" data-download="linux" data-place="get">{{hero.linux}}</a>
         </div>
       </div>
       <div class="proof">
@@ -304,7 +308,7 @@ cd sedjem
 uv venv .venv --python 3.12
 uv pip install --python .venv -r requirements.txt
 ./app.sh</code></pre></div>
-          <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem#readme">{{get.source_link}}</a></p>
+          <p class="docs"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem#readme" data-download="source" data-place="get">{{get.source_link}}</a></p>
         </div>
         <div class="way">
           <h3>{{get.start}}</h3>
