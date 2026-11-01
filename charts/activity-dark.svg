@@ -1,41 +1,37 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="550" viewBox="0 0 800 550" role="img" aria-labelledby="title desc" font-family='system-ui, -apple-system, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
 <title id="title">Sedjem on GitHub: downloads, stars and forks, clones and page views</title>
-<desc id="desc">Four charts on one time axis, from 26 September 2026 to 31 October 2026. Downloads of the app, all releases, as a running total: 43 on 31 October 2026, recorded since 19 October 2026. Releases: v0.1.0 on 26 September 2026, v0.2.0 on 19 October 2026, v0.2.1-preview.20261029 on 29 October 2026, v0.3.0 on 29 October 2026, v0.3.1 on 29 October 2026, v0.3.2 on 30 October 2026, v0.3.3-preview.20261031 on 31 October 2026. Stars: 8, the first on 28 September 2026. Forks: none yet. Clones per day: 1,071 since 5 October 2026, the most 627 on 30 October 2026. Page views per day: 366 since 5 October 2026, the most 101 on 30 October 2026.</desc>
+<desc id="desc">Four charts on one time axis, from 26 September 2026 to 1 November 2026. Downloads of the app, all releases, as a running total: 52 on 1 November 2026, recorded since 19 October 2026. Releases: v0.1.0 on 26 September 2026, v0.2.0 on 19 October 2026, v0.2.1-preview.20261029 on 29 October 2026, v0.3.0 on 29 October 2026, v0.3.1 on 29 October 2026, v0.3.2 on 30 October 2026, v0.3.3-preview.20261031 on 31 October 2026. Stars: 8, the first on 28 September 2026. Forks: none yet. Clones per day: 1,149 since 5 October 2026, the most 627 on 30 October 2026. Page views per day: 380 since 5 October 2026, the most 101 on 30 October 2026.</desc>
 <rect x="0.5" y="0.5" width="799" height="549" rx="6" fill="#0d1117" stroke="#3d444d"/>
 <text x="20" y="32" font-size="15" fill="#e6edf3" font-weight="600">Sedjem on GitHub</text>
-<text x="780" y="32" font-size="12" fill="#9198a1" text-anchor="end">26 Sep to 31 Oct 2026</text>
-<g data-panel="downloads" data-x="2026-09-26 2026-10-31 58.11 8.22" data-y="50 234 114">
+<text x="780" y="32" font-size="12" fill="#9198a1" text-anchor="end">26 Sep to 1 Nov 2026</text>
+<g data-panel="downloads" data-x="2026-09-26 2026-11-01 58 8" data-y="60 234 114">
 <text x="20" y="66" font-size="13" fill="#e6edf3" font-weight="600">Downloads of the app, all releases</text>
 <text x="20" y="84" font-size="12" fill="#9198a1">Running total of the installer and the Linux archive</text>
-<line x1="54" y1="210" x2="350" y2="210" stroke="#2d333b"/>
-<text x="48" y="214" font-size="11" fill="#9198a1" text-anchor="end">10</text>
-<line x1="54" y1="186" x2="350" y2="186" stroke="#2d333b"/>
-<text x="48" y="190" font-size="11" fill="#9198a1" text-anchor="end">20</text>
-<line x1="54" y1="162" x2="350" y2="162" stroke="#2d333b"/>
-<text x="48" y="166" font-size="11" fill="#9198a1" text-anchor="end">30</text>
-<line x1="54" y1="138" x2="350" y2="138" stroke="#2d333b"/>
-<text x="48" y="142" font-size="11" fill="#9198a1" text-anchor="end">40</text>
+<line x1="54" y1="194" x2="350" y2="194" stroke="#2d333b"/>
+<text x="48" y="198" font-size="11" fill="#9198a1" text-anchor="end">20</text>
+<line x1="54" y1="154" x2="350" y2="154" stroke="#2d333b"/>
+<text x="48" y="158" font-size="11" fill="#9198a1" text-anchor="end">40</text>
 <line x1="54" y1="114" x2="350" y2="114" stroke="#2d333b"/>
-<text x="48" y="118" font-size="11" fill="#9198a1" text-anchor="end">50</text>
+<text x="48" y="118" font-size="11" fill="#9198a1" text-anchor="end">60</text>
 <line x1="54" y1="234" x2="350" y2="234" stroke="#3d444d"/>
 <text x="48" y="238" font-size="11" fill="#9198a1" text-anchor="end">0</text>
-<text x="74.56" y="250" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
-<text x="189.67" y="250" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
-<text x="304.78" y="250" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
-<g data-release="v0.3.3-preview.20261031" data-date="2026-10-31"><line x1="345.89" y1="106" x2="345.89" y2="234" stroke="#656c76"/><text x="251.74" y="102" font-size="11" fill="#9198a1">v0.3.3-preview.20261031</text></g>
-<g data-release="v0.3.2" data-date="2026-10-30"><line x1="337.67" y1="114" x2="337.67" y2="234" stroke="#656c76"/></g>
-<g data-release="v0.3.1" data-date="2026-10-29"><line x1="329.44" y1="114" x2="329.44" y2="234" stroke="#656c76"/></g>
-<g data-release="v0.3.0" data-date="2026-10-29"><line x1="329.44" y1="114" x2="329.44" y2="234" stroke="#656c76"/></g>
-<g data-release="v0.2.1-preview.20261029" data-date="2026-10-29"><line x1="329.44" y1="114" x2="329.44" y2="234" stroke="#656c76"/></g>
-<g data-release="v0.2.0" data-date="2026-10-19"><line x1="247.22" y1="114" x2="247.22" y2="234" stroke="#656c76"/></g>
-<g data-release="v0.1.0" data-date="2026-09-26"><line x1="58.11" y1="106" x2="58.11" y2="234" stroke="#656c76"/><text x="42.71" y="102" font-size="11" fill="#9198a1">v0.1.0</text></g>
-<text x="239.22" y="211.6" font-size="11" fill="#9198a1" text-anchor="end" data-note="downloads">Recorded from 19 Oct</text>
-<path d="M247.22,207.6 L255.44,202.8 L263.67,198 L271.89,195.6 L296.56,195.6 L304.78,193.2 L313,190.8 L321.22,190.8 L329.44,174 L337.67,138 L345.89,130.8 L345.89,234 L247.22,234 Z" fill="#14a3a1" fill-opacity="0.12"/>
-<path d="M247.22,207.6 L255.44,202.8 L263.67,198 L271.89,195.6 L296.56,195.6 L304.78,193.2 L313,190.8 L321.22,190.8 L329.44,174 L337.67,138 L345.89,130.8" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="downloads" data-points="2026-10-19:11 2026-10-20:13 2026-10-21:15 2026-10-22:16 2026-10-25:16 2026-10-26:17 2026-10-27:18 2026-10-28:18 2026-10-29:25 2026-10-30:40 2026-10-31:43"/>
-<circle cx="345.89" cy="130.8" r="4" fill="#14a3a1"/>
-<text x="353.89" y="134.8" font-size="12" fill="#e6edf3" font-weight="600" data-label="downloads">43</text>
+<text x="74" y="250" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
+<text x="186" y="250" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
+<text x="298" y="250" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
+<g data-release="v0.3.3-preview.20261031" data-date="2026-10-31"><line x1="338" y1="106" x2="338" y2="234" stroke="#656c76"/><text x="251.74" y="102" font-size="11" fill="#9198a1">v0.3.3-preview.20261031</text></g>
+<g data-release="v0.3.2" data-date="2026-10-30"><line x1="330" y1="114" x2="330" y2="234" stroke="#656c76"/></g>
+<g data-release="v0.3.1" data-date="2026-10-29"><line x1="322" y1="114" x2="322" y2="234" stroke="#656c76"/></g>
+<g data-release="v0.3.0" data-date="2026-10-29"><line x1="322" y1="114" x2="322" y2="234" stroke="#656c76"/></g>
+<g data-release="v0.2.1-preview.20261029" data-date="2026-10-29"><line x1="322" y1="114" x2="322" y2="234" stroke="#656c76"/></g>
+<g data-release="v0.2.0" data-date="2026-10-19"><line x1="242" y1="114" x2="242" y2="234" stroke="#656c76"/></g>
+<g data-release="v0.1.0" data-date="2026-09-26"><line x1="58" y1="106" x2="58" y2="234" stroke="#656c76"/><text x="42.6" y="102" font-size="11" fill="#9198a1">v0.1.0</text></g>
+<text x="234" y="216" font-size="11" fill="#9198a1" text-anchor="end" data-note="downloads">Recorded from 19 Oct</text>
+<path d="M242,212 L250,208 L258,204 L266,202 L290,202 L298,200 L306,198 L314,198 L322,184 L330,154 L338,148 L346,130 L346,234 L242,234 Z" fill="#14a3a1" fill-opacity="0.12"/>
+<path d="M242,212 L250,208 L258,204 L266,202 L290,202 L298,200 L306,198 L314,198 L322,184 L330,154 L338,148 L346,130" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="downloads" data-points="2026-10-19:11 2026-10-20:13 2026-10-21:15 2026-10-22:16 2026-10-25:16 2026-10-26:17 2026-10-27:18 2026-10-28:18 2026-10-29:25 2026-10-30:40 2026-10-31:43 2026-11-01:52"/>
+<circle cx="346" cy="130" r="4" fill="#14a3a1"/>
+<text x="354" y="134" font-size="12" fill="#e6edf3" font-weight="600" data-label="downloads">52</text>
 </g>
-<g data-panel="stars" data-x="2026-09-26 2026-10-31 458.11 8.22" data-y="10 234 114">
+<g data-panel="stars" data-x="2026-09-26 2026-11-01 458 8" data-y="10 234 114">
 <text x="420" y="66" font-size="13" fill="#e6edf3" font-weight="600">Stars and forks</text>
 <text x="420" y="84" font-size="12" fill="#9198a1">Running totals, from the day of each star and fork</text>
 <line x1="454" y1="210" x2="750" y2="210" stroke="#2d333b"/>
@@ -50,18 +46,18 @@
 <text x="448" y="118" font-size="11" fill="#9198a1" text-anchor="end">10</text>
 <line x1="454" y1="234" x2="750" y2="234" stroke="#3d444d"/>
 <text x="448" y="238" font-size="11" fill="#9198a1" text-anchor="end">0</text>
-<text x="474.56" y="250" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
-<text x="589.67" y="250" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
-<text x="704.78" y="250" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
+<text x="474" y="250" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
+<text x="586" y="250" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
+<text x="698" y="250" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
 <line x1="420" y1="98" x2="434" y2="98" stroke="#14a3a1" stroke-width="2" stroke-linecap="round"/>
 <text x="440" y="102" font-size="12" fill="#9198a1">8 stars</text>
 <text x="497.84" y="102" font-size="12" fill="#9198a1">No forks yet</text>
-<path d="M474.56,234 L474.56,198 L482.78,198 L482.78,186 L704.78,186 L704.78,186 L713,186 L713,174 L721.22,174 L721.22,162 L729.44,162 L729.44,138 L745.89,138 L745.89,138" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="stars" data-points="2026-09-28:3 2026-09-29:4 2026-10-26:4 2026-10-27:5 2026-10-28:6 2026-10-29:8 2026-10-31:8"/>
-<circle cx="745.89" cy="138" r="4" fill="#14a3a1"/>
+<path d="M474,234 L474,198 L482,198 L482,186 L698,186 L698,186 L706,186 L706,174 L714,174 L714,162 L722,162 L722,138 L746,138 L746,138" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="stars" data-points="2026-09-28:3 2026-09-29:4 2026-10-26:4 2026-10-27:5 2026-10-28:6 2026-10-29:8 2026-11-01:8"/>
+<circle cx="746" cy="138" r="4" fill="#14a3a1"/>
 </g>
-<g data-panel="clones" data-x="2026-09-26 2026-10-31 58.11 8.22" data-y="800 462 342">
+<g data-panel="clones" data-x="2026-09-26 2026-11-01 58 8" data-y="800 462 342">
 <text x="20" y="294" font-size="13" fill="#e6edf3" font-weight="600">Clones per day</text>
-<text x="20" y="312" font-size="12" fill="#9198a1">1,071 in all since 5 Oct 2026</text>
+<text x="20" y="312" font-size="12" fill="#9198a1">1,149 in all since 5 Oct 2026</text>
 <line x1="54" y1="432" x2="350" y2="432" stroke="#2d333b"/>
 <text x="48" y="436" font-size="11" fill="#9198a1" text-anchor="end">200</text>
 <line x1="54" y1="402" x2="350" y2="402" stroke="#2d333b"/>
@@ -72,38 +68,39 @@
 <text x="48" y="346" font-size="11" fill="#9198a1" text-anchor="end">800</text>
 <line x1="54" y1="462" x2="350" y2="462" stroke="#3d444d"/>
 <text x="48" y="466" font-size="11" fill="#9198a1" text-anchor="end">0</text>
-<text x="74.56" y="478" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
-<text x="189.67" y="478" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
-<text x="304.78" y="478" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
+<text x="74" y="478" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
+<text x="186" y="478" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
+<text x="298" y="478" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
 <rect x="20" y="320" width="10" height="10" rx="2" fill="#176a69"/>
 <text x="36" y="330" font-size="12" fill="#9198a1">Clones</text>
 <rect x="92.16" y="320" width="10" height="10" rx="2" fill="#14a3a1"/>
 <text x="108.16" y="330" font-size="12" fill="#9198a1">Unique cloners</text>
-<g data-date="2026-10-07" data-count="1" data-unique="1"><path d="M146.01,462 L146.01,461.93 Q146.01,461.85 146.08,461.85 L151.03,461.85 Q151.1,461.85 151.1,461.93 L151.1,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-08" data-count="1" data-unique="1"><path d="M154.23,462 L154.23,461.93 Q154.23,461.85 154.3,461.85 L159.25,461.85 Q159.33,461.85 159.33,461.93 L159.33,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-10" data-count="1" data-unique="1"><path d="M170.67,462 L170.67,461.93 Q170.67,461.85 170.75,461.85 L175.7,461.85 Q175.77,461.85 175.77,461.93 L175.77,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-11" data-count="1" data-unique="1"><path d="M178.9,462 L178.9,461.93 Q178.9,461.85 178.97,461.85 L183.92,461.85 Q183.99,461.85 183.99,461.93 L183.99,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-14" data-count="1" data-unique="1"><path d="M203.56,462 L203.56,461.93 Q203.56,461.85 203.64,461.85 L208.59,461.85 Q208.66,461.85 208.66,461.93 L208.66,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-15" data-count="1" data-unique="1"><path d="M211.78,462 L211.78,461.93 Q211.78,461.85 211.86,461.85 L216.81,461.85 Q216.88,461.85 216.88,461.93 L216.88,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-17" data-count="3" data-unique="3"><path d="M228.23,462 L228.23,461.77 Q228.23,461.55 228.45,461.55 L233.1,461.55 Q233.33,461.55 233.33,461.77 L233.33,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-18" data-count="2" data-unique="2"><path d="M236.45,462 L236.45,461.85 Q236.45,461.7 236.6,461.7 L241.4,461.7 Q241.55,461.7 241.55,461.85 L241.55,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-19" data-count="52" data-unique="24"><path d="M244.67,456.4 L244.67,455.3 Q244.67,454.2 245.77,454.2 L248.67,454.2 Q249.77,454.2 249.77,455.3 L249.77,456.4 Z" fill="#176a69"/><path d="M244.67,462 L244.67,458.4 L249.77,458.4 L249.77,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-20" data-count="149" data-unique="38"><path d="M252.9,454.3 L252.9,442.2 Q252.9,439.65 255.44,439.65 L255.44,439.65 Q257.99,439.65 257.99,442.2 L257.99,454.3 Z" fill="#176a69"/><path d="M252.9,462 L252.9,456.3 L257.99,456.3 L257.99,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-21" data-count="31" data-unique="17"><path d="M261.12,459.45 L261.12,458.4 Q261.12,457.35 262.17,457.35 L265.17,457.35 Q266.22,457.35 266.22,458.4 L266.22,459.45 Z" fill="#176a69"/><path d="M261.12,462 L261.12,459.45 L266.22,459.45 L266.22,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-22" data-count="24" data-unique="12"><path d="M269.34,460.2 L269.34,459.3 Q269.34,458.4 270.24,458.4 L273.54,458.4 Q274.44,458.4 274.44,459.3 L274.44,460.2 Z" fill="#176a69"/><path d="M269.34,462 L269.34,460.2 L274.44,460.2 L274.44,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-23" data-count="12" data-unique="6"><path d="M277.56,461.1 L277.56,460.65 Q277.56,460.2 278.01,460.2 L282.21,460.2 Q282.66,460.2 282.66,460.65 L282.66,461.1 Z" fill="#176a69"/><path d="M277.56,462 L277.56,461.1 L282.66,461.1 L282.66,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-24" data-count="2" data-unique="2"><path d="M285.78,462 L285.78,461.85 Q285.78,461.7 285.93,461.7 L290.73,461.7 Q290.88,461.7 290.88,461.85 L290.88,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-25" data-count="19" data-unique="10"><path d="M294.01,460.5 L294.01,459.82 Q294.01,459.15 294.68,459.15 L298.43,459.15 Q299.1,459.15 299.1,459.82 L299.1,460.5 Z" fill="#176a69"/><path d="M294.01,462 L294.01,460.5 L299.1,460.5 L299.1,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-26" data-count="3" data-unique="3"><path d="M302.23,462 L302.23,461.77 Q302.23,461.55 302.45,461.55 L307.1,461.55 Q307.33,461.55 307.33,461.77 L307.33,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-27" data-count="6" data-unique="4"><path d="M310.45,461.4 L310.45,461.25 Q310.45,461.1 310.6,461.1 L315.4,461.1 Q315.55,461.1 315.55,461.25 L315.55,461.4 Z" fill="#176a69"/><path d="M310.45,462 L310.45,461.4 L315.55,461.4 L315.55,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-28" data-count="28" data-unique="8"><path d="M318.67,460.8 L318.67,459.3 Q318.67,457.8 320.17,457.8 L322.27,457.8 Q323.77,457.8 323.77,459.3 L323.77,460.8 Z" fill="#176a69"/><path d="M318.67,462 L318.67,460.8 L323.77,460.8 L323.77,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-29" data-count="107" data-unique="17"><path d="M326.9,457.45 L326.9,448.5 Q326.9,445.95 329.44,445.95 L329.44,445.95 Q331.99,445.95 331.99,448.5 L331.99,457.45 Z" fill="#176a69"/><path d="M326.9,462 L326.9,459.45 L331.99,459.45 L331.99,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-30" data-count="627" data-unique="76"><path d="M335.12,448.6 L335.12,370.5 Q335.12,367.95 337.67,367.95 L337.67,367.95 Q340.22,367.95 340.22,370.5 L340.22,448.6 Z" fill="#176a69"/><path d="M335.12,462 L335.12,450.6 L340.22,450.6 L340.22,462 Z" fill="#14a3a1"/></g>
-<text x="337.67" y="361.95" font-size="11" fill="#e6edf3" text-anchor="middle" font-weight="600" data-label="most">627</text>
+<g data-date="2026-10-07" data-count="1" data-unique="1"><path d="M143.52,462 L143.52,461.93 Q143.52,461.85 143.59,461.85 L148.41,461.85 Q148.48,461.85 148.48,461.93 L148.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-08" data-count="1" data-unique="1"><path d="M151.52,462 L151.52,461.93 Q151.52,461.85 151.59,461.85 L156.41,461.85 Q156.48,461.85 156.48,461.93 L156.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-10" data-count="1" data-unique="1"><path d="M167.52,462 L167.52,461.93 Q167.52,461.85 167.59,461.85 L172.41,461.85 Q172.48,461.85 172.48,461.93 L172.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-11" data-count="1" data-unique="1"><path d="M175.52,462 L175.52,461.93 Q175.52,461.85 175.59,461.85 L180.41,461.85 Q180.48,461.85 180.48,461.93 L180.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-14" data-count="1" data-unique="1"><path d="M199.52,462 L199.52,461.93 Q199.52,461.85 199.59,461.85 L204.41,461.85 Q204.48,461.85 204.48,461.93 L204.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-15" data-count="1" data-unique="1"><path d="M207.52,462 L207.52,461.93 Q207.52,461.85 207.59,461.85 L212.41,461.85 Q212.48,461.85 212.48,461.93 L212.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-17" data-count="3" data-unique="3"><path d="M223.52,462 L223.52,461.77 Q223.52,461.55 223.75,461.55 L228.26,461.55 Q228.48,461.55 228.48,461.77 L228.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-18" data-count="2" data-unique="2"><path d="M231.52,462 L231.52,461.85 Q231.52,461.7 231.67,461.7 L236.33,461.7 Q236.48,461.7 236.48,461.85 L236.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-19" data-count="52" data-unique="24"><path d="M239.52,456.4 L239.52,455.3 Q239.52,454.2 240.62,454.2 L243.38,454.2 Q244.48,454.2 244.48,455.3 L244.48,456.4 Z" fill="#176a69"/><path d="M239.52,462 L239.52,458.4 L244.48,458.4 L244.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-20" data-count="149" data-unique="38"><path d="M247.52,454.3 L247.52,442.13 Q247.52,439.65 250,439.65 L250,439.65 Q252.48,439.65 252.48,442.13 L252.48,454.3 Z" fill="#176a69"/><path d="M247.52,462 L247.52,456.3 L252.48,456.3 L252.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-21" data-count="31" data-unique="17"><path d="M255.52,459.45 L255.52,458.4 Q255.52,457.35 256.57,457.35 L259.43,457.35 Q260.48,457.35 260.48,458.4 L260.48,459.45 Z" fill="#176a69"/><path d="M255.52,462 L255.52,459.45 L260.48,459.45 L260.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-22" data-count="24" data-unique="12"><path d="M263.52,460.2 L263.52,459.3 Q263.52,458.4 264.42,458.4 L267.58,458.4 Q268.48,458.4 268.48,459.3 L268.48,460.2 Z" fill="#176a69"/><path d="M263.52,462 L263.52,460.2 L268.48,460.2 L268.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-23" data-count="12" data-unique="6"><path d="M271.52,461.1 L271.52,460.65 Q271.52,460.2 271.97,460.2 L276.03,460.2 Q276.48,460.2 276.48,460.65 L276.48,461.1 Z" fill="#176a69"/><path d="M271.52,462 L271.52,461.1 L276.48,461.1 L276.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-24" data-count="2" data-unique="2"><path d="M279.52,462 L279.52,461.85 Q279.52,461.7 279.67,461.7 L284.33,461.7 Q284.48,461.7 284.48,461.85 L284.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-25" data-count="19" data-unique="10"><path d="M287.52,460.5 L287.52,459.82 Q287.52,459.15 288.19,459.15 L291.8,459.15 Q292.48,459.15 292.48,459.82 L292.48,460.5 Z" fill="#176a69"/><path d="M287.52,462 L287.52,460.5 L292.48,460.5 L292.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-26" data-count="3" data-unique="3"><path d="M295.52,462 L295.52,461.77 Q295.52,461.55 295.75,461.55 L300.25,461.55 Q300.48,461.55 300.48,461.77 L300.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-27" data-count="6" data-unique="4"><path d="M303.52,461.4 L303.52,461.25 Q303.52,461.1 303.67,461.1 L308.33,461.1 Q308.48,461.1 308.48,461.25 L308.48,461.4 Z" fill="#176a69"/><path d="M303.52,462 L303.52,461.4 L308.48,461.4 L308.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-28" data-count="28" data-unique="8"><path d="M311.52,460.8 L311.52,459.3 Q311.52,457.8 313.02,457.8 L314.98,457.8 Q316.48,457.8 316.48,459.3 L316.48,460.8 Z" fill="#176a69"/><path d="M311.52,462 L311.52,460.8 L316.48,460.8 L316.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-29" data-count="107" data-unique="17"><path d="M319.52,457.45 L319.52,448.43 Q319.52,445.95 322,445.95 L322,445.95 Q324.48,445.95 324.48,448.43 L324.48,457.45 Z" fill="#176a69"/><path d="M319.52,462 L319.52,459.45 L324.48,459.45 L324.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-30" data-count="627" data-unique="76"><path d="M327.52,448.6 L327.52,370.43 Q327.52,367.95 330,367.95 L330,367.95 Q332.48,367.95 332.48,370.43 L332.48,448.6 Z" fill="#176a69"/><path d="M327.52,462 L327.52,450.6 L332.48,450.6 L332.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-31" data-count="78" data-unique="29"><path d="M335.52,455.65 L335.52,452.78 Q335.52,450.3 338,450.3 L338,450.3 Q340.48,450.3 340.48,452.78 L340.48,455.65 Z" fill="#176a69"/><path d="M335.52,462 L335.52,457.65 L340.48,457.65 L340.48,462 Z" fill="#14a3a1"/></g>
+<text x="330" y="361.95" font-size="11" fill="#e6edf3" text-anchor="middle" font-weight="600" data-label="most">627</text>
 </g>
-<g data-panel="views" data-x="2026-09-26 2026-10-31 458.11 8.22" data-y="150 462 342">
+<g data-panel="views" data-x="2026-09-26 2026-11-01 458 8" data-y="150 462 342">
 <text x="420" y="294" font-size="13" fill="#e6edf3" font-weight="600">Page views per day</text>
-<text x="420" y="312" font-size="12" fill="#9198a1">366 in all since 5 Oct 2026</text>
+<text x="420" y="312" font-size="12" fill="#9198a1">380 in all since 5 Oct 2026</text>
 <line x1="454" y1="422" x2="750" y2="422" stroke="#2d333b"/>
 <text x="448" y="426" font-size="11" fill="#9198a1" text-anchor="end">50</text>
 <line x1="454" y1="382" x2="750" y2="382" stroke="#2d333b"/>
@@ -112,37 +109,38 @@
 <text x="448" y="346" font-size="11" fill="#9198a1" text-anchor="end">150</text>
 <line x1="454" y1="462" x2="750" y2="462" stroke="#3d444d"/>
 <text x="448" y="466" font-size="11" fill="#9198a1" text-anchor="end">0</text>
-<text x="474.56" y="478" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
-<text x="589.67" y="478" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
-<text x="704.78" y="478" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
+<text x="474" y="478" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
+<text x="586" y="478" font-size="11" fill="#9198a1" text-anchor="middle">12 Oct</text>
+<text x="698" y="478" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
 <rect x="420" y="320" width="10" height="10" rx="2" fill="#176a69"/>
 <text x="436" y="330" font-size="12" fill="#9198a1">Views</text>
 <rect x="489.04" y="320" width="10" height="10" rx="2" fill="#14a3a1"/>
 <text x="505.04" y="330" font-size="12" fill="#9198a1">Unique visitors</text>
-<g data-date="2026-10-05" data-count="3" data-unique="2"><path d="M529.56,460.4 L529.56,460 Q529.56,459.6 529.96,459.6 L534.26,459.6 Q534.66,459.6 534.66,460 L534.66,460.4 Z" fill="#176a69"/><path d="M529.56,462 L529.56,460.4 L534.66,460.4 L534.66,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-06" data-count="14" data-unique="4"><path d="M537.78,456.8 L537.78,453.35 Q537.78,450.8 540.33,450.8 L540.33,450.8 Q542.88,450.8 542.88,453.35 L542.88,456.8 Z" fill="#176a69"/><path d="M537.78,462 L537.78,458.8 L542.88,458.8 L542.88,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-07" data-count="1" data-unique="1"><path d="M546.01,462 L546.01,461.6 Q546.01,461.2 546.41,461.2 L550.7,461.2 Q551.1,461.2 551.1,461.6 L551.1,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-08" data-count="1" data-unique="1"><path d="M554.23,462 L554.23,461.6 Q554.23,461.2 554.63,461.2 L558.93,461.2 Q559.33,461.2 559.33,461.6 L559.33,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-10" data-count="2" data-unique="2"><path d="M570.67,462 L570.67,461.2 Q570.67,460.4 571.47,460.4 L574.97,460.4 Q575.77,460.4 575.77,461.2 L575.77,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-11" data-count="7" data-unique="2"><path d="M578.9,458.4 L578.9,457.4 Q578.9,456.4 579.9,456.4 L582.99,456.4 Q583.99,456.4 583.99,457.4 L583.99,458.4 Z" fill="#176a69"/><path d="M578.9,462 L578.9,460.4 L583.99,460.4 L583.99,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-12" data-count="2" data-unique="2"><path d="M587.12,462 L587.12,461.2 Q587.12,460.4 587.92,460.4 L591.42,460.4 Q592.22,460.4 592.22,461.2 L592.22,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-13" data-count="5" data-unique="2"><path d="M595.34,460.4 L595.34,459.2 Q595.34,458 596.54,458 L599.24,458 Q600.44,458 600.44,459.2 L600.44,460.4 Z" fill="#176a69"/><path d="M595.34,462 L595.34,460.4 L600.44,460.4 L600.44,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-14" data-count="1" data-unique="1"><path d="M603.56,462 L603.56,461.6 Q603.56,461.2 603.96,461.2 L608.26,461.2 Q608.66,461.2 608.66,461.6 L608.66,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-15" data-count="5" data-unique="3"><path d="M611.78,459.6 L611.78,458.8 Q611.78,458 612.58,458 L616.08,458 Q616.88,458 616.88,458.8 L616.88,459.6 Z" fill="#176a69"/><path d="M611.78,462 L611.78,459.6 L616.88,459.6 L616.88,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-16" data-count="14" data-unique="2"><path d="M620.01,458.4 L620.01,453.35 Q620.01,450.8 622.56,450.8 L622.56,450.8 Q625.1,450.8 625.1,453.35 L625.1,458.4 Z" fill="#176a69"/><path d="M620.01,462 L620.01,460.4 L625.1,460.4 L625.1,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-17" data-count="15" data-unique="5"><path d="M628.23,456 L628.23,452.55 Q628.23,450 630.78,450 L630.78,450 Q633.33,450 633.33,452.55 L633.33,456 Z" fill="#176a69"/><path d="M628.23,462 L628.23,458 L633.33,458 L633.33,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-18" data-count="3" data-unique="2"><path d="M636.45,460.4 L636.45,460 Q636.45,459.6 636.85,459.6 L641.15,459.6 Q641.55,459.6 641.55,460 L641.55,460.4 Z" fill="#176a69"/><path d="M636.45,462 L636.45,460.4 L641.55,460.4 L641.55,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-19" data-count="12" data-unique="6"><path d="M644.67,455.2 L644.67,453.8 Q644.67,452.4 646.07,452.4 L648.37,452.4 Q649.77,452.4 649.77,453.8 L649.77,455.2 Z" fill="#176a69"/><path d="M644.67,462 L644.67,457.2 L649.77,457.2 L649.77,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-20" data-count="48" data-unique="2"><path d="M652.9,458.4 L652.9,426.15 Q652.9,423.6 655.44,423.6 L655.44,423.6 Q657.99,423.6 657.99,426.15 L657.99,458.4 Z" fill="#176a69"/><path d="M652.9,462 L652.9,460.4 L657.99,460.4 L657.99,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-22" data-count="1" data-unique="1"><path d="M669.34,462 L669.34,461.6 Q669.34,461.2 669.74,461.2 L674.04,461.2 Q674.44,461.2 674.44,461.6 L674.44,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-24" data-count="5" data-unique="1"><path d="M685.78,461.2 L685.78,459.6 Q685.78,458 687.38,458 L689.28,458 Q690.88,458 690.88,459.6 L690.88,461.2 Z" fill="#176a69"/><path d="M685.78,462 L685.78,461.2 L690.88,461.2 L690.88,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-25" data-count="3" data-unique="1"><path d="M694.01,461.2 L694.01,460.4 Q694.01,459.6 694.81,459.6 L698.3,459.6 Q699.1,459.6 699.1,460.4 L699.1,461.2 Z" fill="#176a69"/><path d="M694.01,462 L694.01,461.2 L699.1,461.2 L699.1,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-26" data-count="2" data-unique="2"><path d="M702.23,462 L702.23,461.2 Q702.23,460.4 703.03,460.4 L706.53,460.4 Q707.33,460.4 707.33,461.2 L707.33,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-27" data-count="20" data-unique="7"><path d="M710.45,454.4 L710.45,448.55 Q710.45,446 713,446 L713,446 Q715.55,446 715.55,448.55 L715.55,454.4 Z" fill="#176a69"/><path d="M710.45,462 L710.45,456.4 L715.55,456.4 L715.55,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-28" data-count="50" data-unique="12"><path d="M718.67,450.4 L718.67,424.55 Q718.67,422 721.22,422 L721.22,422 Q723.77,422 723.77,424.55 L723.77,450.4 Z" fill="#176a69"/><path d="M718.67,462 L718.67,452.4 L723.77,452.4 L723.77,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-29" data-count="51" data-unique="11"><path d="M726.9,451.2 L726.9,423.75 Q726.9,421.2 729.44,421.2 L729.44,421.2 Q731.99,421.2 731.99,423.75 L731.99,451.2 Z" fill="#176a69"/><path d="M726.9,462 L726.9,453.2 L731.99,453.2 L731.99,462 Z" fill="#14a3a1"/></g>
-<g data-date="2026-10-30" data-count="101" data-unique="4"><path d="M735.12,456.8 L735.12,383.75 Q735.12,381.2 737.67,381.2 L737.67,381.2 Q740.22,381.2 740.22,383.75 L740.22,456.8 Z" fill="#176a69"/><path d="M735.12,462 L735.12,458.8 L740.22,458.8 L740.22,462 Z" fill="#14a3a1"/></g>
-<text x="737.67" y="375.2" font-size="11" fill="#e6edf3" text-anchor="middle" font-weight="600" data-label="most">101</text>
+<g data-date="2026-10-05" data-count="3" data-unique="2"><path d="M527.52,460.4 L527.52,460 Q527.52,459.6 527.92,459.6 L532.08,459.6 Q532.48,459.6 532.48,460 L532.48,460.4 Z" fill="#176a69"/><path d="M527.52,462 L527.52,460.4 L532.48,460.4 L532.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-06" data-count="14" data-unique="4"><path d="M535.52,456.8 L535.52,453.28 Q535.52,450.8 538,450.8 L538,450.8 Q540.48,450.8 540.48,453.28 L540.48,456.8 Z" fill="#176a69"/><path d="M535.52,462 L535.52,458.8 L540.48,458.8 L540.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-07" data-count="1" data-unique="1"><path d="M543.52,462 L543.52,461.6 Q543.52,461.2 543.92,461.2 L548.08,461.2 Q548.48,461.2 548.48,461.6 L548.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-08" data-count="1" data-unique="1"><path d="M551.52,462 L551.52,461.6 Q551.52,461.2 551.92,461.2 L556.08,461.2 Q556.48,461.2 556.48,461.6 L556.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-10" data-count="2" data-unique="2"><path d="M567.52,462 L567.52,461.2 Q567.52,460.4 568.32,460.4 L571.68,460.4 Q572.48,460.4 572.48,461.2 L572.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-11" data-count="7" data-unique="2"><path d="M575.52,458.4 L575.52,457.4 Q575.52,456.4 576.52,456.4 L579.48,456.4 Q580.48,456.4 580.48,457.4 L580.48,458.4 Z" fill="#176a69"/><path d="M575.52,462 L575.52,460.4 L580.48,460.4 L580.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-12" data-count="2" data-unique="2"><path d="M583.52,462 L583.52,461.2 Q583.52,460.4 584.32,460.4 L587.68,460.4 Q588.48,460.4 588.48,461.2 L588.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-13" data-count="5" data-unique="2"><path d="M591.52,460.4 L591.52,459.2 Q591.52,458 592.72,458 L595.28,458 Q596.48,458 596.48,459.2 L596.48,460.4 Z" fill="#176a69"/><path d="M591.52,462 L591.52,460.4 L596.48,460.4 L596.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-14" data-count="1" data-unique="1"><path d="M599.52,462 L599.52,461.6 Q599.52,461.2 599.92,461.2 L604.08,461.2 Q604.48,461.2 604.48,461.6 L604.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-15" data-count="5" data-unique="3"><path d="M607.52,459.6 L607.52,458.8 Q607.52,458 608.32,458 L611.68,458 Q612.48,458 612.48,458.8 L612.48,459.6 Z" fill="#176a69"/><path d="M607.52,462 L607.52,459.6 L612.48,459.6 L612.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-16" data-count="14" data-unique="2"><path d="M615.52,458.4 L615.52,453.28 Q615.52,450.8 618,450.8 L618,450.8 Q620.48,450.8 620.48,453.28 L620.48,458.4 Z" fill="#176a69"/><path d="M615.52,462 L615.52,460.4 L620.48,460.4 L620.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-17" data-count="15" data-unique="5"><path d="M623.52,456 L623.52,452.48 Q623.52,450 626,450 L626,450 Q628.48,450 628.48,452.48 L628.48,456 Z" fill="#176a69"/><path d="M623.52,462 L623.52,458 L628.48,458 L628.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-18" data-count="3" data-unique="2"><path d="M631.52,460.4 L631.52,460 Q631.52,459.6 631.92,459.6 L636.08,459.6 Q636.48,459.6 636.48,460 L636.48,460.4 Z" fill="#176a69"/><path d="M631.52,462 L631.52,460.4 L636.48,460.4 L636.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-19" data-count="12" data-unique="6"><path d="M639.52,455.2 L639.52,453.8 Q639.52,452.4 640.92,452.4 L643.08,452.4 Q644.48,452.4 644.48,453.8 L644.48,455.2 Z" fill="#176a69"/><path d="M639.52,462 L639.52,457.2 L644.48,457.2 L644.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-20" data-count="48" data-unique="2"><path d="M647.52,458.4 L647.52,426.08 Q647.52,423.6 650,423.6 L650,423.6 Q652.48,423.6 652.48,426.08 L652.48,458.4 Z" fill="#176a69"/><path d="M647.52,462 L647.52,460.4 L652.48,460.4 L652.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-22" data-count="1" data-unique="1"><path d="M663.52,462 L663.52,461.6 Q663.52,461.2 663.92,461.2 L668.08,461.2 Q668.48,461.2 668.48,461.6 L668.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-24" data-count="5" data-unique="1"><path d="M679.52,461.2 L679.52,459.6 Q679.52,458 681.12,458 L682.88,458 Q684.48,458 684.48,459.6 L684.48,461.2 Z" fill="#176a69"/><path d="M679.52,462 L679.52,461.2 L684.48,461.2 L684.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-25" data-count="3" data-unique="1"><path d="M687.52,461.2 L687.52,460.4 Q687.52,459.6 688.32,459.6 L691.68,459.6 Q692.48,459.6 692.48,460.4 L692.48,461.2 Z" fill="#176a69"/><path d="M687.52,462 L687.52,461.2 L692.48,461.2 L692.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-26" data-count="2" data-unique="2"><path d="M695.52,462 L695.52,461.2 Q695.52,460.4 696.32,460.4 L699.68,460.4 Q700.48,460.4 700.48,461.2 L700.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-27" data-count="20" data-unique="7"><path d="M703.52,454.4 L703.52,448.48 Q703.52,446 706,446 L706,446 Q708.48,446 708.48,448.48 L708.48,454.4 Z" fill="#176a69"/><path d="M703.52,462 L703.52,456.4 L708.48,456.4 L708.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-28" data-count="50" data-unique="12"><path d="M711.52,450.4 L711.52,424.48 Q711.52,422 714,422 L714,422 Q716.48,422 716.48,424.48 L716.48,450.4 Z" fill="#176a69"/><path d="M711.52,462 L711.52,452.4 L716.48,452.4 L716.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-29" data-count="51" data-unique="11"><path d="M719.52,451.2 L719.52,423.68 Q719.52,421.2 722,421.2 L722,421.2 Q724.48,421.2 724.48,423.68 L724.48,451.2 Z" fill="#176a69"/><path d="M719.52,462 L719.52,453.2 L724.48,453.2 L724.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-30" data-count="101" data-unique="4"><path d="M727.52,456.8 L727.52,383.68 Q727.52,381.2 730,381.2 L730,381.2 Q732.48,381.2 732.48,383.68 L732.48,456.8 Z" fill="#176a69"/><path d="M727.52,462 L727.52,458.8 L732.48,458.8 L732.48,462 Z" fill="#14a3a1"/></g>
+<g data-date="2026-10-31" data-count="14" data-unique="7"><path d="M735.52,454.4 L735.52,452.6 Q735.52,450.8 737.32,450.8 L738.68,450.8 Q740.48,450.8 740.48,452.6 L740.48,454.4 Z" fill="#176a69"/><path d="M735.52,462 L735.52,456.4 L740.48,456.4 L740.48,462 Z" fill="#14a3a1"/></g>
+<text x="730" y="375.2" font-size="11" fill="#e6edf3" text-anchor="middle" font-weight="600" data-label="most">101</text>
 </g>
 <text x="20" y="515" font-size="11" fill="#9198a1">From GitHub's API, read every day by the Repository stats workflow. Clones include those by build machines.</text>
 <text x="20" y="530" font-size="11" fill="#9198a1">Stars and forks are dated from GitHub's lists of today's stargazers and forks.</text>
