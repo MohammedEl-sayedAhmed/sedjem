@@ -1,6 +1,6 @@
 # Sedjem statistics
 
-Updated on 2026-11-02 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
+Updated on 2026-11-03 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
 <a href="charts/activity-light.svg#gh-light-mode-only"><img src="charts/activity-light.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
 <a href="charts/activity-dark.svg#gh-dark-mode-only"><img src="charts/activity-dark.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
@@ -9,9 +9,9 @@ Updated on 2026-11-02 by the Repository stats workflow on main (`.github/workflo
 
 | | |
 |---|---|
-| Downloads of the app, all releases | 54 |
-| Clones since 2026-10-05 | 1,364 (337 unique per day, added up) |
-| Page views since 2026-10-05 | 383 (85 unique per day, added up) |
+| Downloads of the app, all releases | 58 |
+| Clones since 2026-10-05 | 1,417 (361 unique per day, added up) |
+| Page views since 2026-10-05 | 394 (90 unique per day, added up) |
 | Stars, forks, watchers | 8, 0, 0 |
 
 ## Downloads by release
@@ -22,7 +22,7 @@ Updated on 2026-11-02 by the Repository stats workflow on main (`.github/workflo
 | v0.3.3-preview.20261031 | Sedjem-0.3.3-preview.20261031-setup.exe | 0 |
 | v0.3.3-preview.20261031 | SHA256SUMS.txt | 0 |
 | v0.3.2 | Sedjem-0.3.2-linux-x64.tar.gz | 5 |
-| v0.3.2 | Sedjem-0.3.2-setup.exe | 7 |
+| v0.3.2 | Sedjem-0.3.2-setup.exe | 11 |
 | v0.3.2 | SHA256SUMS.txt | 1 |
 | v0.3.1 | Sedjem-0.3.1-linux-x64.tar.gz | 1 |
 | v0.3.1 | Sedjem-0.3.1-setup.exe | 9 |
@@ -44,6 +44,7 @@ Updated on 2026-11-02 by the Repository stats workflow on main (`.github/workflo
 
 | Day | Clones | Unique cloners | Views | Unique visitors |
 |---|---|---|---|---|
+| 2026-11-02 | 53 | 24 | 11 | 5 |
 | 2026-11-01 | 215 | 80 | 3 | 2 |
 | 2026-10-31 | 78 | 29 | 14 | 7 |
 | 2026-10-30 | 627 | 76 | 101 | 4 |
@@ -73,13 +74,13 @@ Updated on 2026-11-02 by the Repository stats workflow on main (`.github/workflo
 | 2026-10-06 | 0 | 0 | 14 | 4 |
 | 2026-10-05 | 0 | 0 | 3 | 2 |
 
-## Where visitors came from (the 14 days to 2026-11-02)
+## Where visitors came from (the 14 days to 2026-11-03)
 
 | Site | Views | Unique visitors |
 |---|---|---|
 | linkedin.com | 10 | 8 |
 | github.com | 8 | 7 |
-| com.linkedin.android | 4 | 4 |
+| com.linkedin.android | 5 | 5 |
 | lnkd.in | 2 | 1 |
 | mohammedel-sayedahmed.github.io | 1 | 1 |
 | web.telegram.org | 1 | 1 |
