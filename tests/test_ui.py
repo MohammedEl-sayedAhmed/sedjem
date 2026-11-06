@@ -4,6 +4,7 @@ Run: .venv/bin/python -m unittest discover -s tests -p "test_ui*.py" -v
 """
 import os
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from ui_support import LINES, UiTestCase
@@ -255,6 +256,12 @@ class PageErrors(unittest.TestCase):
         self.assertEqual(page.errors, ["Failed to load resource: the server responded with a status of 404 (Not Found)",
                                        "Failed to load resource: net::ERR_CONNECTION_REFUSED",
                                        "Uncaught TypeError: x is undefined"])
+
+    def test_the_website_tests_go_by_the_same_rule(self):
+        # tests/test_ui_site.py collects its pages' errors itself; it lets through only what this module does
+        site = (Path(__file__).parent / "test_ui_site.py").read_text(encoding="utf-8")
+        self.assertIn('m.type == "error" and not machine_trouble(m.text)', site)
+
 
 if __name__ == "__main__":
     unittest.main()

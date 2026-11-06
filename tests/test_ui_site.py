@@ -38,7 +38,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import site_support as fixture
-from ui_support import REQUIRED, launch, sync_playwright
+from ui_support import REQUIRED, launch, machine_trouble, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -147,7 +147,8 @@ class SiteInBrowserTest(unittest.TestCase):
         page.outside, page.errors, page.requests, page.sent = [], [], [], sent
         page.on("request", lambda r: page.requests.append(r.url) if r.url.startswith(base) else page.outside.append(r.url))
         page.on("pageerror", lambda e: page.errors.append(str(e)))
-        page.on("console", lambda m: page.errors.append(m.text) if m.type == "error" else None)
+        # an error the page logs fails the test, unless the machine ran out of socket buffers (ui_support)
+        page.on("console", lambda m: page.errors.append(m.text) if m.type == "error" and not machine_trouble(m.text) else None)
         page.goto(base + path, wait_until="load", referer=referer)
         return page
 

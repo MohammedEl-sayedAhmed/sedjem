@@ -92,6 +92,17 @@ def demo_job(home, jid, title="Sprint review", lines=LINES, seconds=21.0, video=
     return jid
 
 
+def machine_trouble(text):
+    """Whether an error a page logged is the machine's trouble rather than the page's: Windows on a CI machine
+    sometimes runs out of socket buffers (WSAENOBUFS, which Chrome shows as net::ERR_NO_BUFFER_SPACE). Such an error
+    is noted in the log instead of failing the test; the page asks again, and the test's own checks still run. The
+    app's tests (UiTestCase) and the website's (test_ui_site.py) both go by it."""
+    if "net::ERR_NO_BUFFER_SPACE" in text:
+        print(f"\n(the machine ran out of socket buffers: {text})", file=sys.stderr, flush=True)
+        return True
+    return False
+
+
 def launch(playwright, args=()):
     """The browser, with args for its command line."""
     headless = os.environ.get("SEDJEM_UI_HEADED") != "1"
@@ -171,12 +182,8 @@ class UiTestCase(unittest.TestCase):
         self.page.on("console", lambda m: m.type == "error" and self.console_error(m.text))
 
     def console_error(self, text):
-        """An error the page logged: it fails the test. Except one: Windows on a CI machine sometimes runs out of
-        socket buffers (WSAENOBUFS, which Chrome shows as net::ERR_NO_BUFFER_SPACE). That is the machine's trouble,
-        not the page's, so it is noted in the log instead; the app asks again, and the test's own checks still run."""
-        if "net::ERR_NO_BUFFER_SPACE" in text:
-            print(f"\n(the machine ran out of socket buffers: {text})", file=sys.stderr, flush=True)
-        else:
+        """An error the page logged: it fails the test, unless it is the machine's trouble (machine_trouble)."""
+        if not machine_trouble(text):
             self.errors.append(text)
 
     def tearDown(self):
