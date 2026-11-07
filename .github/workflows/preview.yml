@@ -1,0 +1,74 @@
+# Nightly preview builds: once a day, main's newest commit whose Tests workflow passed on Windows and Linux is
+# built and published as a pre-release, unless the newest release or the newest preview already contains it.
+# Its version is the next patch after the newest release and the date (v0.2.1-preview.20261021 after 0.2.0; a
+# second one the same day gets .2). The build is the Desktop build workflow (desktop.yml), with all its checks;
+# a tag pushed with this workflow's token wouldn't start it, so it is called directly. Previews are removed after
+# a week together with their tags, except the newest; releases are never touched.
+# .github/scripts/preview_plan.py makes the decisions; its docstring explains them. Runs by hand too
+# (Actions → Nightly preview → Run workflow, or `gh workflow run preview.yml`).
+#
+# Deciding and pruning don't check out the repository (GitHub would count each run as a clone, as for stats.yml):
+# the script is fetched through the API.
+name: Nightly preview
+
+on:
+  schedule:
+    - cron: "41 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly-preview
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read  # the Tests workflow's runs
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      version: ${{ steps.plan.outputs.version }}
+      commit: ${{ steps.plan.outputs.commit }}
+    steps:
+      - name: Is there something new to build?
+        id: plan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl -sSfL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/.github/scripts/preview_plan.py?ref=$GITHUB_SHA" \
+            -o "$RUNNER_TEMP/preview_plan.py"
+          python3 "$RUNNER_TEMP/preview_plan.py" plan --repo "$GITHUB_REPOSITORY"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.build == 'true'
+    permissions:
+      contents: write  # for its release job, which publishes the pre-release; its other jobs only read
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ needs.plan.outputs.version }}
+      commit: ${{ needs.plan.outputs.commit }}
+
+  prune:
+    # also when nothing was built, or the build failed: old previews go either way, and the newest stays
+    needs: [plan, build]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write  # deletes pre-releases and their tags
+    steps:
+      - name: Remove previews older than a week
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          curl -sSfL -H "Authorization: Bearer $GITHUB_TOKEN" -H "Accept: application/vnd.github.raw" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/contents/.github/scripts/preview_plan.py?ref=$GITHUB_SHA" \
+            -o "$RUNNER_TEMP/preview_plan.py"
+          python3 "$RUNNER_TEMP/preview_plan.py" prune --repo "$GITHUB_REPOSITORY"

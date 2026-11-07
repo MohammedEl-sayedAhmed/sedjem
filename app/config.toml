@@ -1,0 +1,516 @@
+# Sedjem — settings for the transcription app.
+#
+# Run from source: ./app.sh (browser tab) or .venv/bin/python -m app.desktop (desktop window).
+# Paths below are relative to the data folder: the project folder when run from source, a per-user
+# folder in the desktop build (%LOCALAPPDATA%\Sedjem on Windows, ~/.local/share/sedjem on Linux).
+# Personal overrides go in <data folder>/app_data/config.toml (same layout): a [[models]] entry there
+# with the same id replaces only the fields it lists. API keys are entered in the app (Settings),
+# which saves them to app_data/secrets.json, or come from the environment variables in key_env.
+
+[server]
+host = "127.0.0.1"          # local only: the app has no login, so don't expose it on a network
+port = 8765
+open_browser = true         # ./app.sh opens a browser tab (the desktop app opens its own window)
+
+[storage]
+dir = "app_data"            # one folder per transcription: 16 kHz audio, transcript, log (git-ignored)
+keep_original = false       # also keep the uploaded file (a video can be 100x the size of the audio)
+max_upload_gb = 4
+courses = "courses"         # transcripts of YouTube videos and playlists as Markdown and SRT files (git-ignored)
+
+[defaults]
+model = "whisper-medium"
+speakers = "auto"           # "none", "auto" (estimate the number) or a number
+language = "ar"             # "ar", "en" or "auto"
+
+[updates]
+# Settings → Updates (app/updates.py, docs/12-updates.md): the repository whose releases and tested commits
+# are offered, and GitHub's API, asked without a login. Whether Sedjem checks by itself is asked on first start.
+repo = "MohammedEl-sayedAhmed/sedjem"
+api = "https://api.github.com"
+
+[usage]
+# Anonymous usage counts (app/usage.py, docs/13-usage-counts.md), sent to Aptabase: the app key of Sedjem's app
+# there. An A-EU- key sends to Aptabase's EU region, an A-US- key to its US region; host is only for a self-hosted
+# Aptabase (an A-SH- key). Without a key nothing is counted or sent. The switch is in Settings → About.
+app_key = "A-EU-6918990781"
+host = ""
+
+[local]
+# python = ""               # interpreter for local runs; default: the one running the app
+threads = 10                # CPU threads for the local models
+# The speaker model that tells the speakers apart: an id from [[local.speaker_models]] below, also chosen in
+# Settings → Models. While the chosen one isn't downloaded TitaNet-small is used, and without it there are no labels.
+speaker_model = "titanet-small"
+# Switch the computer to the performance power profile while local jobs run, and back afterwards
+# (Linux, powerprofilesctl). Power-saver makes local models about 3-5x slower. Also a switch in Settings.
+performance_while_running = false
+# "auto": use a graphics card when one works (Cohere through Vulkan on any GPU; Whisper on NVIDIA GPUs
+# once the NVIDIA libraries below are downloaded), else the CPU. "cpu": never. Also a switch in Settings.
+device = "auto"
+
+# Files the app downloads (Settings → Models), pinned to a revision and checked by size and SHA-256.
+
+# Speaker models, for speaker labels (speakers.py). path is what the speaker step gets (--voiceprint-model): a file,
+# or a folder of files. note is the line Settings shows under the title, with the download size after it; maker
+# picks the logo; max_speakers, for a model that tells apart only so many people, lowers a larger number given for a
+# recording. TitaNet-small's download is called "voiceprints". How they compare: docs/04-speaker-labels.md.
+[[local.speaker_models]]
+id = "titanet-small"
+title = "TitaNet-small"
+maker = "NVIDIA"
+note = "Voiceprints grouped into speakers; the default"
+path = "models/diarization/nemo_en_titanet_small.onnx"
+
+[[local.speaker_models.files]]
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx"
+path = "models/diarization/nemo_en_titanet_small.onnx"
+size = 40257283
+sha256 = "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e"
+
+[[local.speaker_models]]
+id = "titanet-large"
+title = "TitaNet-large"
+maker = "NVIDIA"
+note = "The larger TitaNet"
+path = "models/diarization/nemo_en_titanet_large.onnx"
+
+[[local.speaker_models.files]]
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_large.onnx"
+path = "models/diarization/nemo_en_titanet_large.onnx"
+size = 101405493
+sha256 = "d51abcf31717ef28162f26acb9d44dd4127c3d44c9b8624f699f3425daca8e77"
+
+[[local.speaker_models]]
+id = "campplus"
+title = "3D-Speaker CAM++"
+maker = "Alibaba"           # 3D-Speaker, by Alibaba's speech lab
+note = "Voiceprints, trained on Chinese and English"
+path = "models/diarization/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+
+[[local.speaker_models.files]]
+url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+path = "models/diarization/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx"
+size = 28281164
+sha256 = "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+
+[[local.speaker_models]]
+id = "nemotron-3-diarization"
+title = "Nemotron-3-Diarization"
+maker = "NVIDIA"
+note = "One model finds who speaks when; OpenMDW 1.1 licence, which allows commercial use"
+path = "models/diarization/Nemotron-3-Diarization"
+max_speakers = 8
+
+[[local.speaker_models.files]]
+url = "https://huggingface.co/nvidia/Nemotron-3-Diarization/resolve/f667ed73aee57d40cc39428eb768b4fd87a0a29e/config.json"
+path = "models/diarization/Nemotron-3-Diarization/config.json"
+size = 1458
+sha256 = "dd795ec07ffa09acf18d231aa3fa8642aa5c521760953754e02559a7413b6873"
+
+[[local.speaker_models.files]]
+url = "https://huggingface.co/nvidia/Nemotron-3-Diarization/resolve/f667ed73aee57d40cc39428eb768b4fd87a0a29e/processor_config.json"
+path = "models/diarization/Nemotron-3-Diarization/processor_config.json"
+size = 623
+sha256 = "91726746788a024a2f0f2f699a6c3667f0d74e6a0e9288fc44fe3018e23af68e"
+
+[[local.speaker_models.files]]
+url = "https://huggingface.co/nvidia/Nemotron-3-Diarization/resolve/f667ed73aee57d40cc39428eb768b4fd87a0a29e/model.safetensors"
+path = "models/diarization/Nemotron-3-Diarization/model.safetensors"
+size = 396954592
+sha256 = "c074d86335b3b794f8fa5edc25594558f128bdb3914d27806a3a5a2e44963cb6"
+
+# NVIDIA's cuBLAS (and NVRTC, which it can use) for the Whisper models on an NVIDIA GPU, taken from
+# NVIDIA's pip packages. Settings offers the download only when an NVIDIA GPU is found; only the listed
+# files are unpacked from each package, which is then deleted.
+[[local.cuda_files]]
+platform = "win32"
+url = "https://files.pythonhosted.org/packages/20/e2/fc9a0e985249d873150276d5afb02e39a66817fedbf1a385724393e505ed/nvidia_cublas_cu12-12.9.2.10-py3-none-win_amd64.whl"
+path = "models/nvidia-cuda/nvidia_cublas_cu12-12.9.2.10-py3-none-win_amd64.whl"
+size = 553162896
+sha256 = "623f43027d40d44ceadf0043f002bd25cf353e8f13ce90b9a87057019f560661"
+unpack = { "nvidia/cublas/bin/cublas64_12.dll" = 102518272, "nvidia/cublas/bin/cublasLt64_12.dll" = 668673536 }
+
+[[local.cuda_files]]
+platform = "win32"
+url = "https://files.pythonhosted.org/packages/52/de/823919be3b9d0ccbf1f784035423c5f18f4267fb0123558d58b813c6ec86/nvidia_cuda_nvrtc_cu12-12.9.86-py3-none-win_amd64.whl"
+path = "models/nvidia-cuda/nvidia_cuda_nvrtc_cu12-12.9.86-py3-none-win_amd64.whl"
+size = 76408187
+sha256 = "72972ebdcf504d69462d3bcd67e7b81edd25d0fb85a2c46d3ea3517666636349"
+unpack = { "nvidia/cuda_nvrtc/bin/nvrtc64_120_0.dll" = 89832960, "nvidia/cuda_nvrtc/bin/nvrtc-builtins64_129.dll" = 7217664 }
+
+[[local.cuda_files]]
+platform = "linux"
+url = "https://files.pythonhosted.org/packages/cb/c0/0a517bfe63ccd3b92eb254d264e28fca3c7cab75d07daea315250fb1bf73/nvidia_cublas_cu12-12.9.2.10-py3-none-manylinux_2_27_x86_64.whl"
+path = "models/nvidia-cuda/nvidia_cublas_cu12-12.9.2.10-py3-none-manylinux_2_27_x86_64.whl"
+size = 581240110
+sha256 = "e4f53a8ca8c5d6e8c492d0d0a3d565ecb59a751b19cfdaa4f6da0ab2104c1702"
+unpack = { "nvidia/cublas/lib/libcublas.so.12" = 105140976, "nvidia/cublas/lib/libcublasLt.so.12" = 749210000 }
+
+[[local.cuda_files]]
+platform = "linux"
+url = "https://files.pythonhosted.org/packages/b8/85/e4af82cc9202023862090bfca4ea827d533329e925c758f0cde964cb54b7/nvidia_cuda_nvrtc_cu12-12.9.86-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl"
+path = "models/nvidia-cuda/nvidia_cuda_nvrtc_cu12-12.9.86-py3-none-manylinux2010_x86_64.manylinux_2_12_x86_64.whl"
+size = 89568129
+sha256 = "210cf05005a447e29214e9ce50851e83fc5f4358df8b453155d5e1918094dcb4"
+unpack = { "nvidia/cuda_nvrtc/lib/libnvrtc.so.12" = 106244480, "nvidia/cuda_nvrtc/lib/libnvrtc-builtins.so.12.9" = 7202760 }
+
+# Deno, the JavaScript runtime yt-dlp uses to answer YouTube's challenge for YouTube links (app/youtube.py),
+# taken from the deno package on PyPI for this system and processor. The new transcription page offers the
+# download when no Deno, Node.js or QuickJS is found on the computer.
+[[local.deno_files]]
+platform = "win32"
+arch = "x86_64"
+url = "https://files.pythonhosted.org/packages/7e/0b/3ca6468ec928d817ce6ef062ddfa11e71a3c68035c3401057d7cb33845f6/deno-2.9.5-py3-none-win_amd64.whl"
+path = "models/deno/deno-2.9.5-py3-none-win_amd64.whl"
+size = 41615800
+sha256 = "570d4ee6f1ddb16d14848d36dac6cd2f586d8a0c94cf9c3e6b5da130da2597d5"
+unpack = { "deno-2.9.5.data/scripts/deno.exe" = 97408288 }
+
+[[local.deno_files]]
+platform = "linux"
+arch = "x86_64"
+url = "https://files.pythonhosted.org/packages/60/54/c6e0fb4b5e96dd7611bc75c8137046d7436666bd2e278f686e36d6a805af/deno-2.9.5-py3-none-manylinux_2_27_x86_64.whl"
+path = "models/deno/deno-2.9.5-py3-none-manylinux_2_27_x86_64.whl"
+size = 41642333
+sha256 = "e5aec0419739fd0359663a78765d4feda19d1d0b60a682d25add9b78e19f95b4"
+unpack = { "deno-2.9.5.data/scripts/deno" = 95582008 }
+
+[[local.deno_files]]
+platform = "linux"
+arch = "arm64"
+url = "https://files.pythonhosted.org/packages/a4/b4/5d462bc738b2172043a470ab97d7b6f3e7a287fa1916065e777e034ef1b1/deno-2.9.5-py3-none-manylinux_2_27_aarch64.whl"
+path = "models/deno/deno-2.9.5-py3-none-manylinux_2_27_aarch64.whl"
+size = 39908447
+sha256 = "bccec0965917b6daa323f9ce6ad8e884e0854506b0cdaec9de41bdac7620109a"
+unpack = { "deno-2.9.5.data/scripts/deno" = 84842080 }
+
+[[local.deno_files]]
+platform = "darwin"
+arch = "arm64"
+url = "https://files.pythonhosted.org/packages/ce/3a/d60dac70124d045dfc6f01bbd181e2865904ecca5710b2d319869ff59727/deno-2.9.5-py3-none-macosx_11_0_arm64.whl"
+path = "models/deno/deno-2.9.5-py3-none-macosx_11_0_arm64.whl"
+size = 38520058
+sha256 = "696dffb666d6336a3527857b2f9b665db33b07883bb6adc3595dbb3b78748cf1"
+unpack = { "deno-2.9.5.data/scripts/deno" = 80900512 }
+
+[[local.deno_files]]
+platform = "darwin"
+arch = "x86_64"
+url = "https://files.pythonhosted.org/packages/a8/99/1a1ff9e40e82d857b426a86d2159e3560000c2f98edb0f63170256582067/deno-2.9.5-py3-none-macosx_10_12_x86_64.whl"
+path = "models/deno/deno-2.9.5-py3-none-macosx_10_12_x86_64.whl"
+size = 42353187
+sha256 = "d321f54f82cb535904a108afd970c1c3e1db23716db1ab0cda5e0ca993dbf824"
+unpack = { "deno-2.9.5.data/scripts/deno" = 97740224 }
+
+# ---------------------------------------------------------------------------------------------
+# Models. kind = "local" runs on this computer through transcribe.py; kind = "hosted" uploads the
+# recording to the service (the app asks for confirmation every time).
+# rtf = processing time / audio length measured on the test laptop in performance mode, for estimates
+# (rtf_gpu: the same on its integrated GPU). Once a model has run here, the app uses its measured speed.
+# maker: who made the model, shown in Settings with the repository its files come from.
+# ---------------------------------------------------------------------------------------------
+
+[[models]]
+id = "whisper-medium"
+kind = "local"
+engine = "whisper"
+whisper_model = "models/whisper-medium-arabic-codeswitched-ct2"
+title = "whisper-medium code-switching"
+maker = "OpenAI Whisper, fine-tuned by Seif-Eldeen-Sameh"  # the base model and who fine-tuned it, from the model card
+tagline = "Keeps English terms in English"
+facts = ["18.5% WER on the public Egyptian set", "48.8% different from ElevenLabs on real meetings",
+         "English kept: 90% / 57%", "Word timestamps"]
+rtf = 0.55
+prompt = true               # accepts a vocabulary / style hint
+
+[[models.files]]
+url = "https://huggingface.co/Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2/resolve/7676461a26fc6d62d1d852f54749c24d9cc383f7/model.bin"
+path = "models/whisper-medium-arabic-codeswitched-ct2/model.bin"
+size = 774731149
+sha256 = "1bbc9ac07f1dc576295805b81505681b0b6a184e268194659a04ca15733f7d4f"
+
+[[models.files]]
+url = "https://huggingface.co/Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2/resolve/7676461a26fc6d62d1d852f54749c24d9cc383f7/config.json"
+path = "models/whisper-medium-arabic-codeswitched-ct2/config.json"
+size = 2257
+sha256 = "3622a2ddc41ec0e0fd4e68c13c6830f03b90c38d89aaad184de02c8c642cf807"
+
+[[models.files]]
+url = "https://huggingface.co/Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2/resolve/7676461a26fc6d62d1d852f54749c24d9cc383f7/vocabulary.json"
+path = "models/whisper-medium-arabic-codeswitched-ct2/vocabulary.json"
+size = 1068103
+sha256 = "5ad28279db5e546349708b9a74736e2c018737ac5a600f1048f1f26c99b85b47"
+
+[[models.files]]  # the Whisper tokenizer, so the model runs offline
+url = "https://huggingface.co/openai/whisper-tiny/resolve/169d4a4341b33bc18d8881c4b69c2e104e1cc0af/tokenizer.json"
+path = "models/whisper-medium-arabic-codeswitched-ct2/tokenizer.json"
+size = 2480466
+sha256 = "27fc476bfe7f17299480be2273fc0608e4d5a99aba2ab5dec5374b4482d1a566"
+
+[[models]]
+id = "cohere"
+kind = "local"
+engine = "cohere"
+cohere_model = "models/cohere-transcribe-arabic-07-2026-gguf/cohere-transcribe-arabic-07-2026-Q4_K_M.gguf"
+title = "Cohere Transcribe Arabic"
+maker = "Cohere"               # Cohere Labs; the GGUF build is handy-computer's
+tagline = "Arabic-heavy meetings, fastest"
+facts = ["13.4% WER on the public Egyptian set", "43.8% different from ElevenLabs on real meetings",
+         "Fewest errors on Arabic words", "English kept: 77% / 46%"]
+rtf = 0.3
+rtf_gpu = 0.15
+prompt = false
+
+[[models.files]]
+url = "https://huggingface.co/handy-computer/cohere-transcribe-arabic-07-2026-gguf/resolve/5e6b33c211458ac69347d297abb6d47a250c328f/cohere-transcribe-arabic-07-2026-Q4_K_M.gguf"
+path = "models/cohere-transcribe-arabic-07-2026-gguf/cohere-transcribe-arabic-07-2026-Q4_K_M.gguf"
+size = 1558162848
+sha256 = "4671080cd10ffc6166e1e1b36216f9b51e1455f170d55c59cff7b81332ad4621"
+
+[[models]]
+id = "large-v3"
+kind = "local"
+engine = "whisper"
+whisper_model = "models/faster-whisper-large-v3"  # gets the Egyptian style hint automatically
+fallback = "large-v3"       # or stock large-v3 from the Hugging Face cache, if it is there
+title = "Whisper large-v3 + hint"
+maker = "OpenAI Whisper"       # converted for faster-whisper by Systran
+tagline = "Stock Whisper, slow"
+facts = ["20.8% WER on the public Egyptian set", "English kept: 88%", "Slower than real time on a laptop processor"]
+rtf = 1.8
+prompt = true
+
+[[models.files]]
+url = "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/model.bin"
+path = "models/faster-whisper-large-v3/model.bin"
+size = 3087284237
+sha256 = "69f74147e3334731bc3a76048724833325d2ec74642fb52620eda87352e3d4f1"
+
+[[models.files]]
+url = "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/config.json"
+path = "models/faster-whisper-large-v3/config.json"
+size = 2394
+sha256 = "a9306624f5ec14270a014b647e5c316b6e03a662c369758d1b90697a7b0655b9"
+
+[[models.files]]
+url = "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/preprocessor_config.json"
+path = "models/faster-whisper-large-v3/preprocessor_config.json"
+size = 340
+sha256 = "7ccc62c6f2765af1f3b46c00c9b5894426835a05021c8b9c01eecb6dfb542711"
+
+[[models.files]]
+url = "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/tokenizer.json"
+path = "models/faster-whisper-large-v3/tokenizer.json"
+size = 2480617
+sha256 = "6d8cbd7cd0d8d5815e478dac67b85a26bbe77c1f5e0c6d76d1ce2abc0e5f21ca"
+
+[[models.files]]
+url = "https://huggingface.co/Systran/faster-whisper-large-v3/resolve/edaa852ec7e145841d8ffdb056a99866b5f0a478/vocabulary.json"
+path = "models/faster-whisper-large-v3/vocabulary.json"
+size = 1068114
+sha256 = "c69260f2ab26d659b7c398f9a2b2b48ed0df16c3b47d7326782fd9cba71690c1"
+
+[[models]]
+id = "elevenlabs"
+kind = "hosted"
+engine = "elevenlabs"
+title = "ElevenLabs Scribe"
+tagline = "Best published result for Egyptian–English"
+facts = ["13.1% WER on Perle's Egyptian subset (published)", "Speaker labels built in",
+         "4.5 h a month free, then $0.22/h", "Trains on your audio unless you opt out"]
+service = "ElevenLabs"
+base_url = "https://api.elevenlabs.io"
+key_env = "ELEVENLABS_API_KEY"
+key_url = "https://elevenlabs.io/app/settings/api-keys"
+api_model = "scribe_v2"
+tag_audio_events = false    # true adds (laughter), (applause), ... to the text
+delete_after = true         # delete the transcript from your ElevenLabs history once fetched
+prompt = true               # sent as key terms (ElevenLabs charges about 20% more for those requests)
+rtf = 0.05
+
+# Gemini, Deepgram, AssemblyAI and Azure run through app/hosted_more.py. privacy, prompt_hint and
+# speakers_hint are the texts the app shows for the model.
+[[models]]
+id = "gemini"
+kind = "hosted"
+engine = "gemini"
+title = "Google Gemini"
+tagline = "Google's speech-to-text model"
+facts = ["Egyptian Arabic (ar-EG) with code-switching", "Speaker labels for up to 8 people",
+         "Free tier, then about $0.30/h", "Free tier uses your audio for training and human review"]
+service = "Google"
+base_url = "https://generativelanguage.googleapis.com"
+key_env = "GEMINI_API_KEY"
+key_url = "https://aistudio.google.com/apikey"
+api_model = "gemini-3.5-transcribe"  # a general model such as "gemini-3.8-flash" gets instructions and a JSON schema instead
+language_codes = []         # for Arabic + English: none, so it detects the language, which follows code-switching; English sends en-US
+max_minutes = 29            # per request: 30 min is the limit with word times, so longer recordings go in parts
+inline_limit_mb = 20        # a larger request uploads the part with the Files API instead
+delete_after = true         # delete uploaded files from the Files API once transcribed
+prompt = false              # the transcribe model can't combine key terms with word times; true adds them to a general model's instructions
+privacy = "On the free tier Google uses it to improve its products and human reviewers may read it; with billing turned on it doesn't (and never for users in the EEA, Switzerland or the UK). The app asks Google not to store the request and deletes uploaded files afterwards."
+prompt_hint = "Added to the instructions of a general Gemini model."
+speakers_hint = "Gemini finds the speakers itself, up to 8 (3 or more is experimental); any choice other than No labels turns labels on."
+rtf = 0.1
+
+[[models]]
+id = "deepgram"
+kind = "hosted"
+engine = "deepgram"
+title = "Deepgram Nova-3"
+tagline = "Fast; one language per recording"
+facts = ["Egyptian Arabic (ar-EG) among 17 Arabic codes", "No Arabic–English code-switching",
+         "$200 free credit, then $0.26/h", "Not used for training: the app opts out"]
+service = "Deepgram"
+base_url = "https://api.deepgram.com"
+key_env = "DEEPGRAM_API_KEY"
+key_url = "https://console.deepgram.com/"
+api_model = "nova-3"
+language = "ar-EG"          # for Arabic + English and auto-detect (Deepgram can't detect Arabic); or "ar", "ar-SA", ...
+diarize_model = "latest"    # speaker labels (the older diarize=true is deprecated)
+mip_opt_out = true          # keep the audio out of Deepgram's model training (sent with every request)
+prompt = true               # sent as key terms ($0.0013/min extra)
+privacy = "The app tells Deepgram not to use it for model training (mip_opt_out), so Deepgram keeps it only while it processes the request. Deepgram doesn't store transcripts."
+prompt_hint = "Sent as key terms (up to 100). Deepgram charges $0.0013 a minute more for requests with key terms."
+speakers_hint = "Deepgram works out the number of speakers itself; any choice other than No labels turns labels on."
+rtf = 0.02
+
+[[models]]
+id = "assemblyai"
+kind = "hosted"
+engine = "assemblyai"
+title = "AssemblyAI"
+tagline = "Universal-3.5 Pro, with code-switching"
+facts = ["Arabic with code-switching (Universal-3.5 Pro)", "Speaker labels for $0.02/h more",
+         "$50 free credit (up to 185 h), then $0.21/h", "Free accounts can't opt out of training"]
+service = "AssemblyAI"
+base_url = "https://api.assemblyai.com"  # EU: https://api.eu.assemblyai.com (audio stays in the EU and isn't used for training)
+key_env = "ASSEMBLYAI_API_KEY"
+key_url = "https://www.assemblyai.com/dashboard/home"
+speech_models = ["universal-3-5-pro", "universal-2"]  # Universal-2 takes languages Universal-3.5 Pro doesn't
+expected_languages = ["ar", "en"]  # language detection hints for Arabic + English
+delete_after = true         # delete the transcript and the uploaded audio from AssemblyAI once fetched
+prompt = true               # sent as key terms ($0.05/h extra)
+privacy = "AssemblyAI may use it to train its models. Free accounts can't opt out; paid accounts can, under Data controls in the dashboard. The app deletes the transcript and the uploaded audio there once it has the transcript."
+prompt_hint = "Sent as key terms (up to 6 words each). AssemblyAI charges $0.05/h more for them."
+speakers_hint = "AssemblyAI takes the number as the exact count of speakers; use Auto-detect if you aren't sure."
+rtf = 0.1
+
+[[models]]
+id = "azure"
+kind = "hosted"
+engine = "azure"
+title = "Azure AI Speech"
+tagline = "Egyptian Arabic locale, stores nothing"
+facts = ["Egyptian Arabic locale (ar-EG)", "No code-switching: one language per recording",
+         "$0.36/h, no free tier for this API", "Doesn't store your audio or transcript"]
+service = "Microsoft Azure"
+key_env = "AZURE_SPEECH_KEY"
+key_url = "https://portal.azure.com/"
+region = "westeurope"       # the region of your Speech resource, set in Settings (a key works only in its region)
+region_env = "AZURE_SPEECH_REGION"
+# endpoint = "https://<resource>.cognitiveservices.azure.com"  # instead of the region, e.g. a custom domain
+api_version = "2025-10-15"
+locale = "ar-EG"            # for Arabic + English; English sends en-US, auto-detect lets it pick ar-EG or en-US
+max_speakers = 10           # the most speakers auto-detect looks for (2-35)
+max_minutes = 115           # per request (the REST reference says under 2 hours); longer recordings go in parts
+prompt = false              # true sends the vocabulary as a phrase list (listed for ar-SA and en-US, not ar-EG)
+privacy = "Microsoft doesn't keep audio or transcripts from fast transcription. The recording is processed in the region of your Speech resource."
+prompt_hint = "Sent as a phrase list. Azure's language table lists phrase lists for ar-SA and en-US, not ar-EG."
+speakers_hint = "Azure takes the number as the most speakers to find (2 to 35); Auto-detect looks for up to 10."
+rtf = 0.05
+
+[[models]]
+id = "speechmatics"
+kind = "hosted"
+engine = "speechmatics"
+title = "Speechmatics"
+tagline = "Arabic–English bilingual model"
+facts = ["Arabic–English bilingual language pack", "Speaker labels built in",
+         "$100 free credit (about 250 h), then $0.40/h", "Doesn't train on your audio unless you opt in"]
+service = "Speechmatics"
+base_url = "https://eu1.asr.api.speechmatics.com/v2"   # EU; US: us1.asr..., Australia: au1.asr...
+key_env = "SPEECHMATICS_API_KEY"
+key_url = "https://portal.speechmatics.com/settings/api-keys"
+language = "ar_en"          # the bilingual pack; "ar" for Arabic only
+api_model = "enhanced"      # "enhanced" ($0.40/h) or "standard" ($0.24/h)
+speaker_sensitivity = 0.5   # 0-1, higher finds more speakers (batch jobs can't be told how many)
+delete_after = true         # delete the job (audio and transcript) from Speechmatics once fetched
+prompt = true               # sent as custom vocabulary
+rtf = 0.15
+
+# OpenAI, Groq and Mistral (app/hosted_openai.py). The upload is the audio as Opus in WebM, split at
+# pauses into parts that fit the service's limits (max_part_mb, max_part_s).
+[[models]]
+id = "openai"
+kind = "hosted"
+engine = "openai"
+title = "OpenAI"
+tagline = "Doesn't keep or train on your recordings"
+facts = ["gpt-transcribe, not tested on Egyptian speech", "Speaker labels from gpt-4o-transcribe-diarize",
+         "No free tier; $0.27/h, $0.36/h with labels", "Doesn't train on your audio or keep it"]
+service = "OpenAI"
+base_url = "https://api.openai.com/v1"
+key_env = "OPENAI_API_KEY"
+key_url = "https://platform.openai.com/api-keys"
+api_model = "gpt-transcribe"  # or gpt-4o-transcribe ($0.36/h), gpt-4o-mini-transcribe ($0.18/h), whisper-1 ($0.36/h)
+diarize_model = "gpt-4o-transcribe-diarize"  # used when speaker labels are on ($0.36/h); "": the speaker model here
+carry_speakers = true       # later parts get clips of up to 4 voices heard before, so those keep their numbers
+upload_format = "webm"      # Opus in WebM, about 14 MB an hour at 32 kbps; also "ogg", "mp3" or "flac"
+upload_kbps = 32
+max_part_mb = 24            # OpenAI takes files of up to 25 MB
+max_part_s = 600            # parts for the diarize model and whisper-1; a Tier 1 account takes 10,000 tokens a minute
+max_output_tokens = 2000    # the 4o models' limit: a part whose reply reaches it is sent again in halves
+piece_s = 25                # gpt-transcribe and gpt-4o-(mini-)transcribe give no times: a request per 25 s or less
+prompt = true               # keywords for gpt-transcribe, the prompt for the other models (none for diarize)
+rtf = 0.1
+privacy = "OpenAI does not train on it and keeps no copy of transcription requests."
+prompt_hint = "Sent as keywords to gpt-transcribe, or as the prompt to other OpenAI models. Not used with speaker labels, because gpt-4o-transcribe-diarize takes no vocabulary."
+speakers_hint = "Labels come from gpt-4o-transcribe-diarize, which finds the speakers itself; the number isn't sent. A recording over 10 minutes goes in parts, and each part gets short clips of up to 4 voices heard before, so those people keep their numbers."
+
+[[models]]
+id = "groq"
+kind = "hosted"
+engine = "groq"
+title = "Groq Whisper large-v3"
+tagline = "Stock Whisper with the Egyptian hint, on Groq's servers"
+facts = ["Not measured; the same model got 20.8% WER locally", "Speaker labels from the speaker model on this computer",
+         "Free: 8 h of audio a day, then $0.111/h", "Keeps no copy by default"]
+service = "Groq"
+base_url = "https://api.groq.com/openai/v1"
+key_env = "GROQ_API_KEY"
+key_url = "https://console.groq.com/keys"
+api_model = "whisper-large-v3"  # or whisper-large-v3-turbo ($0.04/h, weaker on Arabic)
+upload_format = "webm"      # also "ogg", "mp3" or "flac" (lossless, about 3.5 times the size)
+upload_kbps = 32
+max_part_mb = 24            # 25 MB per file on the free plan (100 MB on the developer plan)
+max_part_s = 3600
+prompt = true               # added after the Egyptian style hint (Whisper prompts are limited to 224 tokens)
+rtf = 0.02
+privacy = "Groq keeps no copy by default, but may log requests for up to 30 days to look into errors or abuse."
+prompt_hint = "Added after the Egyptian style hint that Whisper gets. Whisper prompts are short, so terms past about 200 characters are left out."
+speakers_hint = "Groq gives no speaker labels, so they come from the speaker model on this computer, as for the local models (chosen in Settings, under Models). Each line goes to the person heard most during it."
+
+[[models]]
+id = "mistral"
+kind = "hosted"
+engine = "mistral"
+title = "Mistral Voxtral"
+tagline = "Voxtral Mini Transcribe 2, with speaker labels"
+facts = ["Arabic is one of its 13 languages; not tested by the project", "Speaker labels; it detects the language itself",
+         "$0.18/h; free plan limits not published", "May train on your audio unless you opt out"]
+service = "Mistral"
+base_url = "https://api.mistral.ai/v1"
+key_env = "MISTRAL_API_KEY"
+key_url = "https://console.mistral.ai/api-keys"
+api_model = "voxtral-mini-2602"  # Voxtral Mini Transcribe 2, also called voxtral-mini-latest
+upload_format = "webm"      # the docs list WAV, MP3, FLAC, OGG and WEBM
+upload_kbps = 32
+max_part_mb = 100           # the limits page says 500 MB
+max_part_s = 3480           # the limits page says 60 min per request (its transcription FAQ says about 3 h)
+prompt = true               # sent as context bias, up to 100 terms
+rtf = 0.05
+privacy = "Mistral may use it to improve its models unless you switched off Anonymous improvement data (Admin, Privacy)."
+prompt_hint = "Sent as context bias, up to 100 terms. Mistral says this is tuned for English and experimental for other languages."
+speakers_hint = "Voxtral finds the speakers itself; the number isn't sent. A recording over 58 minutes goes in parts, and each part gets its own speaker numbers, so merge them afterwards."

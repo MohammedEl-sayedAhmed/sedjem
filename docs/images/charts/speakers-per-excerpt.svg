@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="512" viewBox="0 0 800 512" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Speaker labels per excerpt: TitaNet-small and ElevenLabs</title>
+<rect x="0.5" y="0.5" width="799" height="511" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Speaker labels per excerpt: TitaNet-small and ElevenLabs</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">Both scored against the hand-corrected labels, which started from ElevenLabs' own.</text>
+<rect x="24" y="72" width="12" height="12" rx="3" fill="#4b5563"/>
+<text x="42" y="82" font-size="12" fill="#4b5563">TitaNet-small, true number of speakers</text>
+<rect x="288.72" y="72" width="12" height="12" rx="3" fill="#b4524a"/>
+<text x="306.72" y="82" font-size="12" fill="#4b5563">ElevenLabs' own labels</text>
+<text x="156" y="112" font-size="13" fill="#1f2937" font-weight="600">Words given to the wrong speaker, %</text>
+<text x="156" y="127" font-size="11" fill="#6b7280">lower is better</text>
+<text x="140" y="156" font-size="13" fill="#1f2937" text-anchor="end">m1</text>
+<text x="140" y="170" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m1/people">2</tspan> people</text>
+<text x="140" y="196" font-size="13" fill="#1f2937" text-anchor="end">m2</text>
+<text x="140" y="210" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m2/people">3</tspan> people</text>
+<text x="140" y="236" font-size="13" fill="#1f2937" text-anchor="end">m3</text>
+<text x="140" y="250" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m3/people">3</tspan> people</text>
+<text x="140" y="276" font-size="13" fill="#1f2937" text-anchor="end">m4</text>
+<text x="140" y="290" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m4/people">3</tspan> people</text>
+<text x="140" y="316" font-size="13" fill="#1f2937" text-anchor="end">m5</text>
+<text x="140" y="330" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m5/people">2</tspan> people</text>
+<text x="140" y="356" font-size="13" fill="#1f2937" text-anchor="end">m6</text>
+<text x="140" y="370" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m6/people">5</tspan> people</text>
+<line x1="24" y1="384" x2="776" y2="384" stroke="#e5e7eb"/>
+<text x="140" y="408" font-size="13" fill="#1f2937" text-anchor="end">Pooled</text>
+<text x="140" y="422" font-size="11" fill="#6b7280" text-anchor="end">two or three people</text>
+<text x="140" y="448" font-size="13" fill="#1f2937" text-anchor="end">Pooled</text>
+<text x="140" y="462" font-size="11" fill="#6b7280" text-anchor="end">all six</text>
+<g data-axis="x" data-scale="0 40 156 636">
+<line x1="156" y1="138" x2="156" y2="378" stroke="#9ca3af" data-tick="0"/>
+<line x1="156" y1="390" x2="156" y2="470" stroke="#9ca3af" data-tick="0"/>
+<text x="156" y="486" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="276" y1="138" x2="276" y2="378" stroke="#e5e7eb" data-tick="10"/>
+<line x1="276" y1="390" x2="276" y2="470" stroke="#e5e7eb" data-tick="10"/>
+<text x="276" y="486" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="396" y1="138" x2="396" y2="378" stroke="#e5e7eb" data-tick="20"/>
+<line x1="396" y1="390" x2="396" y2="470" stroke="#e5e7eb" data-tick="20"/>
+<text x="396" y="486" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="516" y1="138" x2="516" y2="378" stroke="#e5e7eb" data-tick="30"/>
+<line x1="516" y1="390" x2="516" y2="470" stroke="#e5e7eb" data-tick="30"/>
+<text x="516" y="486" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<line x1="636" y1="138" x2="636" y2="378" stroke="#e5e7eb" data-tick="40"/>
+<line x1="636" y1="390" x2="636" y2="470" stroke="#e5e7eb" data-tick="40"/>
+<text x="636" y="486" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="40">40</text>
+<path d="M156,145 L207.2,145 Q211.2,145 211.2,149 L211.2,153 Q211.2,157 207.2,157 L156,157 Z" fill="#4b5563" data-ref="data/meetings/m1/whisper_wrong_speaker"/>
+<text x="217.2" y="154.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/whisper_wrong_speaker">4.6</tspan>%</text>
+<path d="M156,159 L156,159 Q156,159 156,159 L156,171 Q156,171 156,171 L156,171 Z" fill="#b4524a" data-ref="data/meetings/m1/elevenlabs_wrong_speaker"/>
+<text x="162" y="168.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/elevenlabs_wrong_speaker">0.0</tspan>%</text>
+<path d="M156,185 L245.6,185 Q249.6,185 249.6,189 L249.6,193 Q249.6,197 245.6,197 L156,197 Z" fill="#4b5563" data-ref="data/meetings/m2/whisper_wrong_speaker"/>
+<text x="255.6" y="194.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/whisper_wrong_speaker">7.8</tspan>%</text>
+<path d="M156,199 L156,199 Q156,199 156,199 L156,211 Q156,211 156,211 L156,211 Z" fill="#b4524a" data-ref="data/meetings/m2/elevenlabs_wrong_speaker"/>
+<text x="162" y="208.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/elevenlabs_wrong_speaker">0.0</tspan>%</text>
+<path d="M156,225 L276.8,225 Q280.8,225 280.8,229 L280.8,233 Q280.8,237 276.8,237 L156,237 Z" fill="#4b5563" data-ref="data/meetings/m3/whisper_wrong_speaker"/>
+<text x="286.8" y="234.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/whisper_wrong_speaker">10.4</tspan>%</text>
+<path d="M156,239 L157.8,239 Q159.6,239 159.6,240.8 L159.6,249.2 Q159.6,251 157.8,251 L156,251 Z" fill="#b4524a" data-ref="data/meetings/m3/elevenlabs_wrong_speaker"/>
+<text x="165.6" y="248.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/elevenlabs_wrong_speaker">0.3</tspan>%</text>
+<path d="M156,265 L183.2,265 Q187.2,265 187.2,269 L187.2,273 Q187.2,277 183.2,277 L156,277 Z" fill="#4b5563" data-ref="data/meetings/m4/whisper_wrong_speaker"/>
+<text x="193.2" y="274.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/whisper_wrong_speaker">2.6</tspan>%</text>
+<path d="M156,279 L159,279 Q162,279 162,282 L162,288 Q162,291 159,291 L156,291 Z" fill="#b4524a" data-ref="data/meetings/m4/elevenlabs_wrong_speaker"/>
+<text x="168" y="288.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/elevenlabs_wrong_speaker">0.5</tspan>%</text>
+<path d="M156,305 L350,305 Q354,305 354,309 L354,313 Q354,317 350,317 L156,317 Z" fill="#4b5563" data-ref="data/meetings/m5/whisper_wrong_speaker"/>
+<text x="360" y="314.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/whisper_wrong_speaker">16.5</tspan>%</text>
+<path d="M156,319 L478.4,319 Q482.4,319 482.4,323 L482.4,327 Q482.4,331 478.4,331 L156,331 Z" fill="#b4524a" data-ref="data/meetings/m5/elevenlabs_wrong_speaker"/>
+<text x="488.4" y="328.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/elevenlabs_wrong_speaker">27.2</tspan>%</text>
+<path d="M156,345 L612.8,345 Q616.8,345 616.8,349 L616.8,353 Q616.8,357 612.8,357 L156,357 Z" fill="#4b5563" data-ref="data/meetings/m6/whisper_wrong_speaker"/>
+<text x="622.8" y="354.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/whisper_wrong_speaker">38.4</tspan>%</text>
+<path d="M156,359 L296,359 Q300,359 300,363 L300,367 Q300,371 296,371 L156,371 Z" fill="#b4524a" data-ref="data/meetings/m6/elevenlabs_wrong_speaker"/>
+<text x="306" y="368.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/elevenlabs_wrong_speaker">12.0</tspan>%</text>
+<path d="M156,397 L260,397 Q264,397 264,401 L264,405 Q264,409 260,409 L156,409 Z" fill="#4b5563" data-ref="data/meetings_two_or_three_people/whisper_wrong_speaker"/>
+<text x="270" y="406.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings_two_or_three_people/whisper_wrong_speaker">9.0</tspan>%</text>
+<path d="M156,411 L222.8,411 Q226.8,411 226.8,415 L226.8,419 Q226.8,423 222.8,423 L156,423 Z" fill="#b4524a" data-ref="data/meetings_two_or_three_people/elevenlabs_wrong_speaker"/>
+<text x="232.8" y="420.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings_two_or_three_people/elevenlabs_wrong_speaker">5.9</tspan>%</text>
+<path d="M156,437 L292.4,437 Q296.4,437 296.4,441 L296.4,445 Q296.4,449 292.4,449 L156,449 Z" fill="#4b5563" data-ref="data/meetings/pooled/whisper_wrong_speaker"/>
+<text x="302.4" y="446.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/pooled/whisper_wrong_speaker">11.7</tspan>%</text>
+<path d="M156,451 L230,451 Q234,451 234,455 L234,459 Q234,463 230,463 L156,463 Z" fill="#b4524a" data-ref="data/meetings/pooled/elevenlabs_wrong_speaker"/>
+<text x="240" y="460.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/pooled/elevenlabs_wrong_speaker">6.5</tspan>%</text>
+</g>
+</svg>

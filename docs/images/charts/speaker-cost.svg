@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="366" viewBox="0 0 800 366" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Speaker labels: time and size</title>
+<rect x="0.5" y="0.5" width="799" height="365" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Speaker labels: time and size</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">On the test laptop's processor with four threads, in the balanced power mode.</text>
+<text x="262" y="86" font-size="13" fill="#1f2937" font-weight="600">Seconds for ten minutes of audio</text>
+<text x="262" y="101" font-size="11" fill="#6b7280">the whole speaker step, lower is faster</text>
+<text x="556" y="86" font-size="13" fill="#1f2937" font-weight="600">Size, MB</text>
+<text x="556" y="101" font-size="11" fill="#6b7280">the model files</text>
+<text x="188" y="143" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-small (default)</text>
+<text x="188" y="196" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-large</text>
+<text x="188" y="249" font-size="13" fill="#1f2937" text-anchor="end">3D-Speaker CAM++</text>
+<text x="188" y="302" font-size="13" fill="#1f2937" text-anchor="end">Nemotron-3-Diarization</text>
+<g data-axis="x" data-scale="0 40 262 482">
+<line x1="262" y1="112" x2="262" y2="324" stroke="#9ca3af" data-tick="0"/>
+<text x="262" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="317" y1="112" x2="317" y2="324" stroke="#e5e7eb" data-tick="10"/>
+<text x="317" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="372" y1="112" x2="372" y2="324" stroke="#e5e7eb" data-tick="20"/>
+<text x="372" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="427" y1="112" x2="427" y2="324" stroke="#e5e7eb" data-tick="30"/>
+<text x="427" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<line x1="482" y1="112" x2="482" y2="324" stroke="#e5e7eb" data-tick="40"/>
+<text x="482" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="40">40</text>
+<path d="M262,122 L301.91,122 Q305.91,122 305.91,126 L305.91,132 Q305.91,136 301.91,136 L262,136 Z" fill="#4b5563" data-ref="arzen/TitaNet-small/seconds"/>
+<text x="254" y="133" font-size="11" fill="#4b5563" text-anchor="end">ArzEn</text>
+<text x="311.91" y="133.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/TitaNet-small/seconds" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|TitaNet-small voiceprints (default)|Seconds per 10 minutes">8</tspan> s</text>
+<path d="M262,141 L291.62,141 Q295.62,141 295.62,145 L295.62,151 Q295.62,155 291.62,155 L262,155 Z" fill="#4b5563" data-ref="ami/TitaNet-small/seconds"/>
+<text x="254" y="152" font-size="11" fill="#4b5563" text-anchor="end">AMI</text>
+<text x="301.62" y="152.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/TitaNet-small/seconds" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|TitaNet-small voiceprints (default)|Seconds per 10 minutes">6</tspan> s</text>
+<path d="M262,175 L361.71,175 Q365.71,175 365.71,179 L365.71,185 Q365.71,189 361.71,189 L262,189 Z" fill="#aab2bd" data-ref="arzen/TitaNet-large/seconds"/>
+<text x="254" y="186" font-size="11" fill="#4b5563" text-anchor="end">ArzEn</text>
+<text x="371.71" y="186.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/TitaNet-large/seconds" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|TitaNet-large voiceprints|Seconds per 10 minutes">19</tspan> s</text>
+<path d="M262,194 L342.91,194 Q346.91,194 346.91,198 L346.91,204 Q346.91,208 342.91,208 L262,208 Z" fill="#aab2bd" data-ref="ami/TitaNet-large/seconds"/>
+<text x="254" y="205" font-size="11" fill="#4b5563" text-anchor="end">AMI</text>
+<text x="352.91" y="205.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/TitaNet-large/seconds" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|TitaNet-large voiceprints|Seconds per 10 minutes">15</tspan> s</text>
+<path d="M262,228 L318.84,228 Q322.84,228 322.84,232 L322.84,238 Q322.84,242 318.84,242 L262,242 Z" fill="#aab2bd" data-ref="arzen/3D-Speaker CAM++/seconds"/>
+<text x="254" y="239" font-size="11" fill="#4b5563" text-anchor="end">ArzEn</text>
+<text x="328.84" y="239.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/3D-Speaker CAM++/seconds" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|3D-Speaker CAM++ voiceprints|Seconds per 10 minutes">11</tspan> s</text>
+<path d="M262,247 L307.33,247 Q311.33,247 311.33,251 L311.33,257 Q311.33,261 307.33,261 L262,261 Z" fill="#aab2bd" data-ref="ami/3D-Speaker CAM++/seconds"/>
+<text x="254" y="258" font-size="11" fill="#4b5563" text-anchor="end">AMI</text>
+<text x="317.33" y="258.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/3D-Speaker CAM++/seconds" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|3D-Speaker CAM++ voiceprints|Seconds per 10 minutes">9</tspan> s</text>
+<path d="M262,281 L419.54,281 Q423.54,281 423.54,285 L423.54,291 Q423.54,295 419.54,295 L262,295 Z" fill="#5e8c14" data-ref="arzen/Nemotron, as the app/seconds"/>
+<text x="254" y="292" font-size="11" fill="#4b5563" text-anchor="end">ArzEn</text>
+<text x="429.54" y="292.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="arzen/Nemotron, as the app/seconds" data-doc="docs/04-speaker-labels.md#ArzEn: interviews in Egyptian Arabic and English|Nemotron, one speaker at a time (as the app)|Seconds per 10 minutes">29</tspan> s</text>
+<path d="M262,300 L443.45,300 Q447.45,300 447.45,304 L447.45,310 Q447.45,314 443.45,314 L262,314 Z" fill="#5e8c14" data-ref="ami/Nemotron, as the app/seconds"/>
+<text x="254" y="311" font-size="11" fill="#4b5563" text-anchor="end">AMI</text>
+<text x="453.45" y="311.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="ami/Nemotron, as the app/seconds" data-doc="docs/04-speaker-labels.md#AMI: English meetings with much overlap|Nemotron, one speaker at a time (as the app)|Seconds per 10 minutes">34</tspan> s</text>
+</g>
+<g data-axis="x" data-scale="0 400 556 736">
+<line x1="556" y1="112" x2="556" y2="324" stroke="#9ca3af" data-tick="0"/>
+<text x="556" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="601" y1="112" x2="601" y2="324" stroke="#e5e7eb" data-tick="100"/>
+<text x="601" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="100">100</text>
+<line x1="646" y1="112" x2="646" y2="324" stroke="#e5e7eb" data-tick="200"/>
+<text x="646" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="200">200</text>
+<line x1="691" y1="112" x2="691" y2="324" stroke="#e5e7eb" data-tick="300"/>
+<text x="691" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="300">300</text>
+<line x1="736" y1="112" x2="736" y2="324" stroke="#e5e7eb" data-tick="400"/>
+<text x="736" y="340" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="400">400</text>
+<path d="M556,131.5 L570,131.5 Q574,131.5 574,135.5 L574,141.5 Q574,145.5 570,145.5 L556,145.5 Z" fill="#4b5563" data-ref="data/voiceprints/TitaNet-small (default)/size_mb"/>
+<text x="580" y="142.82" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/TitaNet-small (default)/size_mb">40</tspan> MB</text>
+<path d="M556,184.5 L597.45,184.5 Q601.45,184.5 601.45,188.5 L601.45,194.5 Q601.45,198.5 597.45,198.5 L556,198.5 Z" fill="#aab2bd" data-ref="data/voiceprints/TitaNet-large/size_mb"/>
+<text x="607.45" y="195.82" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/TitaNet-large/size_mb">101</tspan> MB</text>
+<path d="M556,237.5 L564.6,237.5 Q568.6,237.5 568.6,241.5 L568.6,247.5 Q568.6,251.5 564.6,251.5 L556,251.5 Z" fill="#aab2bd" data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/size_mb"/>
+<text x="574.6" y="248.82" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/size_mb">28</tspan> MB</text>
+<path d="M556,290.5 L730.65,290.5 Q734.65,290.5 734.65,294.5 L734.65,300.5 Q734.65,304.5 730.65,304.5 L556,304.5 Z" fill="#5e8c14" data-ref="data/nemotron/Nemotron-3-Diarization/size_mb"/>
+<text x="740.65" y="301.82" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/nemotron/Nemotron-3-Diarization/size_mb">397</tspan> MB</text>
+</g>
+</svg>

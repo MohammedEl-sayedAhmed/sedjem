@@ -1,0 +1,60 @@
+/* Sedjem: running jobs on another computer on the same network (remote.js): Settings → Other computers, the choice of
+   where to run on the New transcription form, and a job run elsewhere. Colours come from app.css, so both themes follow. */
+
+/* ---------- Settings → Other computers ---------- */
+.rm-intro { margin: -4px 0 18px; font-size: 13.5px; }
+.rm-sec + .rm-sec { margin-top: 22px; }
+.rm-sec h4 { font-size: 14px; font-weight: 650; margin: 0 0 8px; }
+.rm-sec h4:focus { outline: none; }
+.rm-sec h4.rm-sub { font-size: 13.5px; margin-top: 16px; }
+.rm-sec .set-list, .rm-sec .set-items { margin-bottom: 0; }
+.rm-empty {
+  margin: 0; padding: 12px 14px; font-size: 13px; line-height: 1.45; color: var(--muted);
+  border: 1px dashed var(--border-strong); border-radius: 12px;
+}
+.rm-empty p { margin: 0 0 8px; }
+.rm-ico { display: grid; place-items: center; width: 32px; height: 32px; flex: none; border-radius: 9px; background: var(--accent-soft); color: var(--accent); }
+.rm-ico svg { width: 17px; height: 17px; }
+.rm-computers .set-item-text b, .rm-clients .set-item-text b { overflow-wrap: anywhere; }
+
+.rm-pair { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 12px; }
+.rm-field { display: flex; flex-direction: column; gap: 5px; flex: 1 1 220px; min-width: 0; font-size: 13px; font-weight: 580; }
+.rm-field input { width: 100%; }
+.rm-code-field { flex: 0 1 150px; }
+.rm-code-field input { font-family: var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.rm-pair [aria-disabled="true"] { opacity: .6; cursor: progress; }
+
+.rm-here { margin: 12px 0 10px; }
+.rm-here code { font-size: 12.5px; padding: 1px 6px; border-radius: 6px; background: var(--sunken); }
+.rm-code-box { margin: 4px 0 10px; }
+.rm-code {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); border-radius: 12px; background: var(--accent-soft);
+}
+.rm-code-text { font: 650 26px/1.1 var(--mono); letter-spacing: .12em; color: var(--text); user-select: all; }
+.rm-code .set-text { flex: 1 1 220px; }
+.rm-print { overflow-wrap: anywhere; }
+.rm-print code { font-size: 11.5px; }
+.rm-error { display: flex; gap: 8px; align-items: flex-start; margin: 10px 0; padding: 10px 12px; font-size: 13px; border-radius: 10px; background: var(--danger-soft); color: var(--danger); }
+.rm-error svg { width: 16px; height: 16px; flex: none; margin-top: 1px; }
+
+/* ---------- New transcription: where it runs ---------- */
+.rm-where-field { margin-bottom: 14px; }
+.rm-where { flex-wrap: wrap; max-width: 100%; }
+.rm-where button { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; }
+.rm-where button svg { width: 15px; height: 15px; flex: none; }
+.rm-where bdi { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.model-grid > .rm-empty { grid-column: 1 / -1; }
+.rm-off { background: var(--warn-soft); border-style: solid; border-color: transparent; color: var(--text); }
+.rm-consent { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--accent-soft); }
+.rm-consent svg { color: var(--accent); }
+.rm-consent input { accent-color: var(--accent); }
+
+/* ---------- a job run on another computer ---------- */
+.rm-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.rm-actions .hint { margin: 0; }
+
+@media (max-width: 720px) {
+  .rm-code-field { flex: 1 1 100%; }
+  .rm-pair .btn { flex: 1 1 100%; }
+}

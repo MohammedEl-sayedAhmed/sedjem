@@ -1,0 +1,22 @@
+name: An idea
+description: Something Sedjem could do, or do better
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: need
+    attributes:
+      label: What it is for
+      description: The task, and what makes it hard with Sedjem now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: idea
+    attributes:
+      label: How Sedjem could help
+
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Other apps that do it, screenshots, links.

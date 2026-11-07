@@ -1,0 +1,138 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="444" viewBox="0 0 800 444" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Cohere on the real meetings: four setups compared</title>
+<rect x="0.5" y="0.5" width="799" height="443" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Cohere on the real meetings: four setups compared</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">Pooled over the six excerpts. Default: TitaNet-small labels, audio cut at speaker changes.</text>
+<text x="24" y="76" font-size="12" fill="#4b5563">Aligned: forced alignment (--align). WeSpeaker: the first voiceprint model.</text>
+<text x="24" y="114" font-size="13" fill="#1f2937" font-weight="600">Word error rate, %</text>
+<text x="24" y="129" font-size="11" fill="#6b7280">lower is better</text>
+<g data-axis="x" data-scale="0 50 104 204">
+<line x1="104" y1="140" x2="104" y2="244" stroke="#9ca3af" data-tick="0"/>
+<text x="104" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="154" y1="140" x2="154" y2="244" stroke="#e5e7eb" data-tick="25"/>
+<text x="154" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<line x1="204" y1="140" x2="204" y2="244" stroke="#e5e7eb" data-tick="50"/>
+<text x="204" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="50">50</text>
+<text x="96" y="157" font-size="12" fill="#1f2937" text-anchor="end">Default</text>
+<path d="M104,145 L187.6,145 Q191.6,145 191.6,149 L191.6,157 Q191.6,161 187.6,161 L104,161 Z" fill="#0e7c7b" data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/wer"/>
+<text x="197.6" y="157.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/wer">43.8</tspan>%</text>
+<text x="96" y="183" font-size="12" fill="#1f2937" text-anchor="end">No labels</text>
+<path d="M104,171 L186.2,171 Q190.2,171 190.2,175 L190.2,183 Q190.2,187 186.2,187 L104,187 Z" fill="#7fb9b8" data-ref="data/cohere_variations/No speaker labels/wer"/>
+<text x="196.2" y="183.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/No speaker labels/wer">43.1</tspan>%</text>
+<text x="96" y="209" font-size="12" fill="#1f2937" text-anchor="end">Aligned</text>
+<path d="M104,197 L186.2,197 Q190.2,197 190.2,201 L190.2,209 Q190.2,213 186.2,213 L104,213 Z" fill="#7fb9b8" data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/wer"/>
+<text x="196.2" y="209.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/wer">43.1</tspan>%</text>
+<text x="96" y="235" font-size="12" fill="#1f2937" text-anchor="end">WeSpeaker</text>
+<path d="M104,223 L194,223 Q198,223 198,227 L198,235 Q198,239 194,239 L104,239 Z" fill="#7fb9b8" data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/wer"/>
+<text x="204" y="235.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/wer">47.0</tspan>%</text>
+</g>
+<text x="274.67" y="114" font-size="13" fill="#1f2937" font-weight="600">Arabic-word errors, %</text>
+<text x="274.67" y="129" font-size="11" fill="#6b7280">lower is better</text>
+<g data-axis="x" data-scale="0 50 354.67 454.67">
+<line x1="354.67" y1="140" x2="354.67" y2="244" stroke="#9ca3af" data-tick="0"/>
+<text x="354.67" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="404.67" y1="140" x2="404.67" y2="244" stroke="#e5e7eb" data-tick="25"/>
+<text x="404.67" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<line x1="454.67" y1="140" x2="454.67" y2="244" stroke="#e5e7eb" data-tick="50"/>
+<text x="454.67" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="50">50</text>
+<text x="346.67" y="157" font-size="12" fill="#1f2937" text-anchor="end">Default</text>
+<path d="M354.67,145 L427.27,145 Q431.27,145 431.27,149 L431.27,157 Q431.27,161 427.27,161 L354.67,161 Z" fill="#0e7c7b" data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/arabic_word_errors"/>
+<text x="437.27" y="157.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/arabic_word_errors">38.3</tspan>%</text>
+<text x="346.67" y="183" font-size="12" fill="#1f2937" text-anchor="end">No labels</text>
+<path d="M354.67,171 L416.07,171 Q420.07,171 420.07,175 L420.07,183 Q420.07,187 416.07,187 L354.67,187 Z" fill="#7fb9b8" data-ref="data/cohere_variations/No speaker labels/arabic_word_errors"/>
+<text x="426.07" y="183.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/No speaker labels/arabic_word_errors">32.7</tspan>%</text>
+<text x="346.67" y="209" font-size="12" fill="#1f2937" text-anchor="end">Aligned</text>
+<path d="M354.67,197 L416.07,197 Q420.07,197 420.07,201 L420.07,209 Q420.07,213 416.07,213 L354.67,213 Z" fill="#7fb9b8" data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/arabic_word_errors"/>
+<text x="426.07" y="209.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/arabic_word_errors">32.7</tspan>%</text>
+<text x="346.67" y="235" font-size="12" fill="#1f2937" text-anchor="end">WeSpeaker</text>
+<path d="M354.67,223 L435.27,223 Q439.27,223 439.27,227 L439.27,235 Q439.27,239 435.27,239 L354.67,239 Z" fill="#7fb9b8" data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/arabic_word_errors"/>
+<text x="445.27" y="235.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/arabic_word_errors">42.3</tspan>%</text>
+</g>
+<text x="525.33" y="114" font-size="13" fill="#1f2937" font-weight="600">English kept, %</text>
+<text x="525.33" y="129" font-size="11" fill="#6b7280">higher is better</text>
+<g data-axis="x" data-scale="0 100 605.33 705.33">
+<line x1="605.33" y1="140" x2="605.33" y2="244" stroke="#9ca3af" data-tick="0"/>
+<text x="605.33" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="655.33" y1="140" x2="655.33" y2="244" stroke="#e5e7eb" data-tick="50"/>
+<text x="655.33" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="50">50</text>
+<line x1="705.33" y1="140" x2="705.33" y2="244" stroke="#e5e7eb" data-tick="100"/>
+<text x="705.33" y="260" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="100">100</text>
+<text x="597.33" y="157" font-size="12" fill="#1f2937" text-anchor="end">Default</text>
+<path d="M605.33,145 L647.33,145 Q651.33,145 651.33,149 L651.33,157 Q651.33,161 647.33,161 L605.33,161 Z" fill="#0e7c7b" data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/en_kept"/>
+<text x="657.33" y="157.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/en_kept">46</tspan>%</text>
+<text x="597.33" y="183" font-size="12" fill="#1f2937" text-anchor="end">No labels</text>
+<path d="M605.33,171 L640.33,171 Q644.33,171 644.33,175 L644.33,183 Q644.33,187 640.33,187 L605.33,187 Z" fill="#7fb9b8" data-ref="data/cohere_variations/No speaker labels/en_kept"/>
+<text x="650.33" y="183.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/No speaker labels/en_kept">39</tspan>%</text>
+<text x="597.33" y="209" font-size="12" fill="#1f2937" text-anchor="end">Aligned</text>
+<path d="M605.33,197 L640.33,197 Q644.33,197 644.33,201 L644.33,209 Q644.33,213 640.33,213 L605.33,213 Z" fill="#7fb9b8" data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/en_kept"/>
+<text x="650.33" y="209.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/en_kept">39</tspan>%</text>
+<text x="597.33" y="235" font-size="12" fill="#1f2937" text-anchor="end">WeSpeaker</text>
+<path d="M605.33,223 L646.33,223 Q650.33,223 650.33,227 L650.33,235 Q650.33,239 646.33,239 L605.33,239 Z" fill="#7fb9b8" data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/en_kept"/>
+<text x="656.33" y="235.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/en_kept">45</tspan>%</text>
+</g>
+<text x="24" y="286" font-size="13" fill="#1f2937" font-weight="600">Wrong speaker, %</text>
+<text x="24" y="301" font-size="11" fill="#6b7280">lower is better</text>
+<g data-axis="x" data-scale="0 30 104 204">
+<line x1="104" y1="312" x2="104" y2="416" stroke="#9ca3af" data-tick="0"/>
+<text x="104" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="154" y1="312" x2="154" y2="416" stroke="#e5e7eb" data-tick="15"/>
+<text x="154" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="15">15</text>
+<line x1="204" y1="312" x2="204" y2="416" stroke="#e5e7eb" data-tick="30"/>
+<text x="204" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<text x="96" y="329" font-size="12" fill="#1f2937" text-anchor="end">Default</text>
+<path d="M104,317 L136.33,317 Q140.33,317 140.33,321 L140.33,329 Q140.33,333 136.33,333 L104,333 Z" fill="#0e7c7b" data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/wrong_speaker"/>
+<text x="146.33" y="329.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/wrong_speaker">10.9</tspan>%</text>
+<text x="96" y="355" font-size="12" fill="#1f2937" text-anchor="end">No labels</text>
+<text x="108" y="355" font-size="11" fill="#6b7280">none</text>
+<text x="96" y="381" font-size="12" fill="#1f2937" text-anchor="end">Aligned</text>
+<path d="M104,369 L139.67,369 Q143.67,369 143.67,373 L143.67,381 Q143.67,385 139.67,385 L104,385 Z" fill="#7fb9b8" data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/wrong_speaker"/>
+<text x="149.67" y="381.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/wrong_speaker">11.9</tspan>%</text>
+<text x="96" y="407" font-size="12" fill="#1f2937" text-anchor="end">WeSpeaker</text>
+<path d="M104,395 L182,395 Q186,395 186,399 L186,407 Q186,411 182,411 L104,411 Z" fill="#7fb9b8" data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/wrong_speaker"/>
+<text x="192" y="407.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/wrong_speaker">24.6</tspan>%</text>
+</g>
+<text x="274.67" y="286" font-size="13" fill="#1f2937" font-weight="600">Speed, × real time</text>
+<text x="274.67" y="301" font-size="11" fill="#6b7280">lower is faster</text>
+<g data-axis="x" data-scale="0 0.5 354.67 454.67">
+<line x1="354.67" y1="312" x2="354.67" y2="416" stroke="#9ca3af" data-tick="0"/>
+<text x="354.67" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="404.67" y1="312" x2="404.67" y2="416" stroke="#e5e7eb" data-tick="0.25"/>
+<text x="404.67" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0.25">0.25</text>
+<line x1="454.67" y1="312" x2="454.67" y2="416" stroke="#e5e7eb" data-tick="0.5"/>
+<text x="454.67" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0.5">0.5</text>
+<text x="346.67" y="329" font-size="12" fill="#1f2937" text-anchor="end">Default</text>
+<path d="M354.67,317 L402.67,317 Q406.67,317 406.67,321 L406.67,329 Q406.67,333 402.67,333 L354.67,333 Z" fill="#0e7c7b" data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/speed"/>
+<text x="412.67" y="329.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/speed">0.26</tspan></text>
+<text x="346.67" y="355" font-size="12" fill="#1f2937" text-anchor="end">No labels</text>
+<path d="M354.67,343 L398.67,343 Q402.67,343 402.67,347 L402.67,355 Q402.67,359 398.67,359 L354.67,359 Z" fill="#7fb9b8" data-ref="data/cohere_variations/No speaker labels/speed"/>
+<text x="408.67" y="355.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/No speaker labels/speed">0.24</tspan></text>
+<text x="346.67" y="381" font-size="12" fill="#1f2937" text-anchor="end">Aligned</text>
+<path d="M354.67,369 L436.67,369 Q440.67,369 440.67,373 L440.67,381 Q440.67,385 436.67,385 L354.67,385 Z" fill="#7fb9b8" data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/speed"/>
+<text x="446.67" y="381.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/speed">0.43</tspan></text>
+<text x="346.67" y="407" font-size="12" fill="#1f2937" text-anchor="end">WeSpeaker</text>
+<path d="M354.67,395 L408.67,395 Q412.67,395 412.67,399 L412.67,407 Q412.67,411 408.67,411 L354.67,411 Z" fill="#7fb9b8" data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/speed"/>
+<text x="418.67" y="407.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/speed">0.29</tspan></text>
+</g>
+<text x="525.33" y="286" font-size="13" fill="#1f2937" font-weight="600">Peak memory, GB</text>
+<text x="525.33" y="301" font-size="11" fill="#6b7280">lower is better</text>
+<g data-axis="x" data-scale="0 5 605.33 705.33">
+<line x1="605.33" y1="312" x2="605.33" y2="416" stroke="#9ca3af" data-tick="0"/>
+<text x="605.33" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="655.33" y1="312" x2="655.33" y2="416" stroke="#e5e7eb" data-tick="2.5"/>
+<text x="655.33" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="2.5">2.5</text>
+<line x1="705.33" y1="312" x2="705.33" y2="416" stroke="#e5e7eb" data-tick="5"/>
+<text x="705.33" y="432" font-size="10" fill="#6b7280" text-anchor="middle" data-tick="5">5</text>
+<text x="597.33" y="329" font-size="12" fill="#1f2937" text-anchor="end">Default</text>
+<path d="M605.33,317 L661.33,317 Q665.33,317 665.33,321 L665.33,329 Q665.33,333 661.33,333 L605.33,333 Z" fill="#0e7c7b" data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/peak_memory_gb"/>
+<text x="671.33" y="329.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels, audio cut at speaker changes (the default)/peak_memory_gb">3.0</tspan></text>
+<text x="597.33" y="355" font-size="12" fill="#1f2937" text-anchor="end">No labels</text>
+<path d="M605.33,343 L661.33,343 Q665.33,343 665.33,347 L665.33,355 Q665.33,359 661.33,359 L605.33,359 Z" fill="#7fb9b8" data-ref="data/cohere_variations/No speaker labels/peak_memory_gb"/>
+<text x="671.33" y="355.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/No speaker labels/peak_memory_gb">3.0</tspan></text>
+<text x="597.33" y="381" font-size="12" fill="#1f2937" text-anchor="end">Aligned</text>
+<path d="M605.33,369 L697.33,369 Q701.33,369 701.33,373 L701.33,381 Q701.33,385 697.33,385 L605.33,385 Z" fill="#7fb9b8" data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/peak_memory_gb"/>
+<text x="707.33" y="381.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/TitaNet-small labels on forced-aligned words (`--align`, experimental)/peak_memory_gb">4.8</tspan></text>
+<text x="597.33" y="407" font-size="12" fill="#1f2937" text-anchor="end">WeSpeaker</text>
+<path d="M605.33,395 L661.33,395 Q665.33,395 665.33,399 L665.33,407 Q665.33,411 661.33,411 L605.33,411 Z" fill="#7fb9b8" data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/peak_memory_gb"/>
+<text x="671.33" y="407.3" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/cohere_variations/First voiceprint model (WeSpeaker ResNet34), cut at speaker changes/peak_memory_gb">3.0</tspan></text>
+</g>
+</svg>

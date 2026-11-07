@@ -1,0 +1,255 @@
+# The words of the Arabic page, https://mohammedel-sayedahmed.github.io/sedjem/ar/, with the same keys as en.toml.
+#
+# Egyptian Arabic, with the English terms left in English in Latin script, the way the readers talk: that is the
+# product's point. Brand and model names, UI labels, file names, code and numbers stay in Latin script and Western
+# digits. Write the Latin words plainly: build.py puts every run of them in its own left-to-right span, marked as
+# English and not to be translated, so each keeps its order inside the right-to-left line. Values are HTML; the
+# [page] table and the keys ending in _alt are plain text for attributes. {{version}} is filled in by build.py.
+# The lines marked "new" weren't in the Arabic copy the page was first written from; those marked "trimmed" are
+# shorter versions of lines that were.
+
+[page]
+lang = "ar"
+dir = "rtl"
+locale = "ar_EG"
+title = "Sedjem: نصوص اجتماعاتك بالعربي المصري والإنجليزي، على جهازك انت"
+description = "Sedjem بيحوّل اجتماعاتك ومكالماتك اللي بالمصري والإنجليزي لنص مكتوب على جهازك انت، والكلمات الإنجليزي بتفضل بالإنجليزي، وكل متكلم بيتعرف من صوته."
+social_alt = "لوجو Sedjem، وجملة «الاجتماعات مش بتتكلم لغة واحدة.» فوق تلات سطور من اجتماع sprint planning متألّف بالعربي المصري والإنجليزي، واسم كل متكلم بلونه"  # new
+skip = "روح للمحتوى"  # new
+other = "English"
+
+[nav]
+download = "التحميل"
+docs = "التوثيق"
+github = "GitHub"
+menu = "القائمة"  # new
+
+# the theme button's name, which says what a press does: on a light page it switches to dark, on a dark one to light
+[theme]
+to_dark = "حوّل للمظهر الغامق"  # new
+to_light = "حوّل للمظهر الفاتح"  # new
+
+[hero]
+h1 = "الاجتماعات مش بتتكلم لغة واحدة."
+lead = "Sedjem بيحوّل اجتماعاتك ومكالماتك اللي بالمصري والإنجليزي لنص مكتوب على جهازك انت. الكلمات الإنجليزي بتفضل بالإنجليزي، وكل متكلم بيتعرف من صوته."
+windows = "تحميل لـ Windows"
+linux = "تحميل لـ Linux"
+others_windows = "Linux، والكود"  # new
+others_linux = "Windows، والكود"  # new
+caption = 'اجتماع sprint planning متألّف زي ما Sedjem بيكتبه<span class="with-srt">، وأول سطوره متصدّرة كترجمة</span>.'  # new
+
+[english]
+h2 = "الكلمات الإنجليزي بتفضل إنجليزي"
+lede = "الفرق المصرية بتتكلم جمل عربي مليانة كلمات إنجليزي. موديلات كتير بتكتب الكلمات دي بحروف عربي، والموديلات اللي Sedjem بيشغّلها بتسيبها بحروفها اللاتيني."  # trimmed
+models = "زي ما بعض الموديلات بتكتبه"
+sedjem = "زي ما Sedjem بيكتبه"
+caption = "نفس الجملة، مكتوبة بالطريقتين."  # trimmed
+
+[voices]
+h2 = "كل صوت بياخد اسمه"
+lede = "موديل بصمة الصوت بيفرّق بين المتكلمين ويحط على كلام كل واحد اسمه، وانت بتسمّي كل واحد مرة واحدة."  # trimmed
+body = 'وكام مرة كلمة بتروح للمتكلم الغلط، تلاقيه في <a href="#benchmarks">نتايج الاختبارات</a>.'  # new
+docs = "ازاي البرنامج بيعرف المتكلمين"  # new
+caption = "قسم المتكلمين في البرنامج، وواجهته بالإنجليزي، ونصيب كل صوت من الكلام."  # new
+panel_alt = "قسم المتكلمين في البرنامج لاجتماع الـ sprint planning المتألّف: {{shares}} من الكلام، وجنب كل اسم زرار Merge into"  # new
+
+[local]
+h2 = "التسجيل بتاعك بيفضل على جهازك"
+lede = "الموديلات بتشتغل على البروسيسور أو كارت الشاشة بتاعك. مفيش حساب، والتسجيل مش بيترفع غير لو اخترت خدمة أونلاين وسمحت بده، كل مرة."  # trimmed
+counts = "Sedjem كمان بيبعت شوية أرقام مجهولة عن الاستخدام، زي الإصدار والبلد وعدد النصوص اللي عملها، عشان المشروع يعرف بيتستخدم فين. عمره ما بيبعت تسجيلاتك ولا نصوصك ولا أسامي ملفاتك. وتقدر تقفلها من الإعدادات."
+website = "والموقع نفسه بيعدّ الزيارات والضغط على التحميل بأرقام مجهولة، من غير cookies، وبيحترم Do Not Track."  # new
+docs = "الخصوصية بالتفصيل"  # new
+caption = "الموديلات اللي على جهازك، زي ما بتعرضها إعدادات البرنامج."  # new
+row_alt = "إعدادات البرنامج، الموديلات اللي على الجهاز: whisper-medium code-switching واخد 778 MB، وCohere Transcribe Arabic واخد 1.6 GB، الاتنين متنزّلين، وWhisper large-v3 لسه متنزلش"  # new
+
+[reading]
+h2 = "دوس على أي سطر تسمعه"  # trimmed
+lede = "النص بيمشي مع التسجيل وهو شغال. دوّر فيه، غيّر أسامي المتكلمين، وصحّح الكلام وانت بتسمع."  # trimmed
+caption = "النص في البرنامج، والسطر اللي بيتسمع متعلّم عليه."  # new
+shot_alt = "النص في البرنامج: سطور عربي فيها مصطلحات إنجليزي، جنب كل سطر وقته والمتكلم، والسطر اللي بيتسمع متعلّم عليه"  # new
+
+[fixing]
+h2 = "كل تصحيح نسخة جديدة"  # new
+lede = "التعديلات بتظهر كـ diff قبل ما تتحفظ، واللي كتبه الموديل بيفضل زي ما هو كنسخة&nbsp;0."  # trimmed
+caption = "سطر اتعدّل، بيتراجع قبل ما يتحفظ."  # new
+shot_alt = "مراجعة التعديلات في البرنامج: سطر عمر زي ما كان بالأحمر، وزي ما بقى بالأخضر، وeight story points متعلّم عليها"  # new
+
+[comparing]
+h2 = "موديلين، وأحسن سطر من كل واحد"  # new
+lede = "شغّل موديلين على نفس التسجيل. Sedjem بيرصّهم جنب بعض، ويعلّم على الكلمات المختلفة، وتاخد أحسن سطر من كل واحد."
+docs = "البرنامج خطوة بخطوة"  # new
+caption = "سطر واحد من موديلين، والكلمة المختلفة متعلّم عليها."  # new
+shot_alt = "مقارنة نصين في البرنامج: سطر عمر زي ما كتبه Cohere وwhisper-medium، والكلمة المختلفة متعلّم عليها، وسطر whisper-medium هو اللي اتاخد"  # new
+
+[facts]
+h2 = "بيشتغل على لابتوب عادي"  # new
+lede = 'مش محتاج كارت شاشة. وساعة الاجتماعات بتاخد قد إيه على لابتوب عادي، تلاقيه في <a href="#benchmarks">نتايج الاختبارات</a>.'  # new
+gpu = "كارت الشاشة"  # new
+gpu_value = "مش شرط، ولو موجود بيسرّع"  # new
+languages = "اللغات"  # new
+languages_value = "العربي المصري والإنجليزي، مع بعض"  # new
+opens = "بيفتح"  # new
+opens_value = "ملفات صوت وفيديو، ولينكات YouTube والـ&nbsp;playlists"  # trimmed
+exports = "بيصدّر"  # new
+exports_value = "نص عادي، SRT، WebVTT، Markdown وJSON"  # trimmed
+download = "التحميل"
+download_value = "حوالي 90&nbsp;MB، وبعدين موديل 778&nbsp;MB أو 1.6&nbsp;GB"  # new
+platforms = "الأنظمة"  # new
+platforms_value = "Windows 10 و11، وLinux على&nbsp;x64"  # trimmed
+assistants = "المساعدين"  # new
+assistants_value = "Claude وCursor وVS Code، عن طريق&nbsp;MCP"  # trimmed
+licence = "الرخصة"
+licence_value = "AGPL-3.0، مجاني ومفتوح المصدر"  # trimmed
+# the spec sheet's two groups
+computer = "على جهازك"  # new
+recordings = "مع تسجيلاتك"  # new
+
+# The benchmarks, as en.toml explains: every number is filled in by build.py from the docs' data
+[benchmarks]
+h2 = "نتايج الاختبارات"  # new
+lede = "اتقاس على مجموعات اختبار مفتوحة وعلى مجموعة خاصة من اجتماعات متسجّلة، على لابتوب فيه Intel Core i5-1245U ومن غير كارت شاشة NVIDIA."  # new
+draft = "الاجتماعات الحقيقية أصعب من أي مجموعة اختبار، فاعتبر النص اللي بيطلع على جهازك مسوّدة: ولو هيتعمل منه محضر الناس هتعتمد عليه، الخدمات اللي بتشتغل أونلاين لسه أدق."
+wer = "نسبة الخطأ في الكلمات"  # new
+wer_line = "{{model}} على&nbsp;Perle"  # new
+wer_table = "نسبة الخطأ في الكلمات على Perle، الأقل أحسن"  # new
+english = "مصطلحات إنجليزي فضلت إنجليزي"  # new
+english_line = "{{model}} على&nbsp;Perle"  # new
+english_table = "المصطلحات الإنجليزي اللي فضلت بحروفها اللاتيني على Perle، الأعلى أحسن"  # new
+nemotron = "كلام راح للمتكلم الغلط"  # new
+nemotron_line = "{{model}} على&nbsp;{{set}}"  # new
+nemotron_table = "الكلام اللي راح للمتكلم الغلط على ArzEn وAMI، وكل موديل بيقدّر عدد الناس بنفسه، الأقل أحسن"  # new
+meetings = "كلمات مختلفة عن ElevenLabs"  # new
+meetings_line = "{{model}} على الاجتماعات&nbsp;المتسجّلة"  # new
+meetings_table = "الكلمات اللي مختلفة عن نص ElevenLabs على الاجتماعات المتسجّلة، الأقل أقرب"  # new
+speed = "لساعة اجتماعات"  # new
+speed_line = "{{model}}، ومعاها أسامي&nbsp;المتكلمين"  # new
+speed_table = "الدقايق اللي بتاخدها ساعة من الاجتماعات المتسجّلة على لابتوب الاختبار، ومعاها أسامي المتكلمين، الأقل أسرع"  # new
+speakers = "كلمات راحت للمتكلم الغلط"  # new
+speakers_line = "{{model}} في اجتماعات فيها اتنين أو&nbsp;تلاتة"  # new
+speakers_table = "الكلمات اللي راحت للمتكلم الغلط في الاجتماعات المتسجّلة اللي فيها اتنين أو تلاتة، الأقل أحسن"  # new
+lower = "الأقل أحسن"  # new
+higher = "الأعلى أحسن"  # new
+closer = "الأقل أقرب"  # new
+faster = "الأقل أسرع"  # new
+tried = "اتجرّبوا كمان"  # new
+tried_row = "{{model}}، اتجرّب كمان"  # new
+hint = "{{model}} مع تلميح للهجة المصرية"
+elevenlabs = "تقسيم ElevenLabs نفسه"  # new
+minute = "دقيقة"  # new
+model = "الموديل"
+test_set = "مجموعة الاختبار"  # new
+sets = 'مجموعات الاختبار: <a href="{{perle}}">Perle</a>، فيها {{clips}} مقطع بالعربي المصري والإنجليزي، برخصة MIT؛ و<a href="{{arzen}}">ArzEn</a>، مقابلات بالعربي المصري والإنجليزي، برخصة CC BY-SA 4.0؛ و<a href="{{ami}}">AMI</a>، اجتماعات بالإنجليزي، برخصة CC BY 4.0؛ ومجموعة خاصة من اجتماعات متسجّلة.'  # new
+more = 'كل رقم، وطريقة القياس، ومجموعات الاختبار موجودين في الريبو على GitHub: <a href="{{results}}">النتايج</a>، و<a href="{{speakers}}">تقسيم المتكلمين</a>، و<a href="{{tables}}">الجداول</a>.'  # new
+
+# The public numbers, as en.toml explains; the numbers in Western digits, as everywhere on the page
+[numbers]
+h2 = "Sedjem بالأرقام"  # new
+lede = "التحميلات والنجوم ومشاهدات الصفحات من GitHub، ومجموع الأرقام المجهولة اللي البرنامج والموقع ده بيبعتوها."  # new
+months = "يناير فبراير مارس أبريل مايو يونيو يوليو أغسطس سبتمبر أكتوبر نوفمبر ديسمبر"  # new
+day = "اليوم"  # new
+downloads_title = "التحميلات"  # new
+downloads = "التحميلات، كل الإصدارات"  # new
+releases_title = "التحميلات حسب الإصدار"  # new
+release = "الإصدار"  # new
+previews = "الإصدارات التجريبية"  # new
+platforms_title = "Windows وLinux"  # new
+platform_share = "من التحميلات لـ {{platform}}"  # new
+platform = "النظام"  # new
+share = "النسبة"  # new
+windows = "Windows"  # new
+linux = "Linux"  # new
+other = "غيرهم"  # new
+views_title = "مشاهدات صفحات المشروع"  # new
+stars_title = "النجوم"  # new
+stars = "النجوم على GitHub"  # new
+app = "في البرنامج، شهر {{month}}"  # new
+installs = "نسخ Sedjem اللي اشتغلت"  # new
+countries = "الدول"  # new
+transcriptions = "النصوص اللي اتعملت"  # new
+hours = "ساعات الصوت"  # new
+model = "أكتر موديل اتستخدم:"  # new
+model_cohere = "Cohere Transcribe Arabic"  # new
+model_whisper_medium = '<bdi dir="ltr"><span translate="no">whisper-medium</span> <span translate="no">code-switching</span></bdi>'  # new: one left-to-right run, as in the table
+model_whisper_large = "Whisper large-v3"  # new
+model_other_local = "موديل تاني على الجهاز"  # new
+model_hosted = "خدمات أونلاين"  # new
+top = "اشتغل فين"  # new
+country = "الدولة"  # new
+other_countries = "دول تانية"  # new
+website = "على الموقع ده"  # new
+page_views = "مشاهدات الصفحات"  # new
+clicks = "ضغطات على التحميل"  # new
+counts = "الأرقام المجهولة"  # new
+not_yet = "البرنامج والموقع ده بيعدّوا بأرقام مجهولة، وأول مجموع شهري ليهم، بتاع نوفمبر 2026، هيطلع في أوائل ديسمبر."  # new
+caption_github = 'أرقام GitHub لحد {{day}}، وبتتقري كل يوم (<a href="{{charts}}">الرسوم البيانية</a>).'  # new
+caption_counts = 'الأرقام المجهولة بتتجمع مرة كل شهر (<a href="{{method}}">طريقة الحساب</a>).'  # new
+
+# The countries the counts' card may name, as en.toml explains
+week_more = "+{{n}} في آخر 7 أيام"  # new
+week_none = "مفيش تحميلات في آخر 7 أيام"  # new
+release_out = "نزل {{release}}"  # new
+older = "إصدارات أقدم"  # new
+latest_title = "تحميلات {{release}}"  # new
+latest_out = "آخر إصدار، نزل {{day}}"  # new
+latest_only = "آخر إصدار"  # new
+platform_rest = "{{platform}}: {{share}}%"  # new
+views_30 = "مشاهدات صفحة المشروع، آخر 30 يوم"  # new
+views_since = "مشاهدات صفحة المشروع من {{first}}"  # new
+views_average = "حوالي {{n}} في اليوم"  # new
+more_since = "+{{n}} من {{day}}"  # new
+since_day = "من {{day}}"  # new
+
+[countries]
+EG = "مصر"  # new
+SA = "السعودية"  # new
+AE = "الإمارات"  # new
+KW = "الكويت"  # new
+QA = "قطر"  # new
+BH = "البحرين"  # new
+OM = "عُمان"  # new
+JO = "الأردن"  # new
+LB = "لبنان"  # new
+PS = "فلسطين"  # new
+IQ = "العراق"  # new
+SY = "سوريا"  # new
+YE = "اليمن"  # new
+LY = "ليبيا"  # new
+TN = "تونس"  # new
+DZ = "الجزائر"  # new
+MA = "المغرب"  # new
+SD = "السودان"  # new
+US = "أمريكا"  # new
+GB = "بريطانيا"  # new
+DE = "ألمانيا"  # new
+FR = "فرنسا"  # new
+NL = "هولندا"  # new
+CA = "كندا"  # new
+TR = "تركيا"  # new
+IN = "الهند"  # new
+PK = "باكستان"  # new
+
+[get]
+h2 = "نزّل Sedjem"
+fine = "مجاني ومفتوح المصدر برخصة AGPL-3.0. الإصدار&nbsp;{{version}}."  # trimmed
+windows = "Windows"
+windows_text = "Windows 10 و11. الـ installer حوالي 90&nbsp;MB وبيتسطّب لحسابك انت، من غير صلاحيات admin. لسه مش موقّع، فـ Windows SmartScreen هيحذرك من ناشر مش معروف: اختار More info وبعدين Run anyway."
+linux = "Linux"
+linux_text = "Linux على x64. فك الملف المضغوط وشغّل Sedjem/Sedjem."
+source = "من الكود"  # new
+source_text = "بـ Python 3.12 وGit وuv:"
+code_alt = "الأوامر اللي بتشغّل Sedjem من الكود"  # new
+source_link = "Windows وطرق تسطيب تانية"
+file = "الملف"  # new
+sha256 = "SHA256"  # new
+start = "أول تشغيل"  # new
+start_text = "أول ما تفتحه، نزّل موديل من Settings → Models: يا إما whisper-medium (778&nbsp;MB)، يا إما Cohere Transcribe Arabic (1.6&nbsp;GB). موديل المتكلمين TitaNet-small (40&nbsp;MB) بينزل مع أول واحد. كارت الشاشة مش شرط."
+
+[footer]
+ear = "Sedjem كلمة مصرية قديمة معناها «يسمع»، وبتتكتب بعلامة الودن."
+free = "برنامج حر برخصة"
+docs = "التوثيق"
+releases = "الإصدارات"
+brand = "الاسم واللوجو"
+licence = "الرخصة"
+privacy = "الخصوصية"  # new
+made_up = "النصوص اللي في الصور متألّفة، وكمان الأسامي."

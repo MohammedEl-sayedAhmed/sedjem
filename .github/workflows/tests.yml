@@ -1,0 +1,185 @@
+# The checks of every change, for every push to main and every pull request (docs/14-pipeline.md). The quick
+# checks run first and the slower jobs only after they pass: the test suite on Linux and Windows, with a summary
+# on the run's page (and the coverage on Linux), and the steps of the README for running from source on Windows.
+# The Desktop build workflow runs the same tests before building; this catches problems when they are made, not on
+# release day. main requires the jobs checks, test (ubuntu-24.04), test (windows-latest) and windows-source.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions: {}
+
+# A new push to a pull request cancels the run it replaces. Every commit on main keeps its own run, since the
+# nightly preview and the Release workflow look for a passed run of the commit itself.
+concurrency:
+  group: tests-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  # The quick checks, a minute or two: the locks, the linters, the links in the docs and the repository's rules
+  # for public text (tests/test_public_text.py), which need nothing installed but the pipeline's tools.
+  checks:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      # Everything the workflows install comes from a lock in .github/locks/, made by .github/scripts/locks.py
+      # from the requirement files: one changed without its lock fails here, with the command that makes it again
+      - name: Locks (made from the requirement files as they are; standard library only)
+        run: python .github/scripts/locks.py check
+
+      - name: Python (ruff, as pinned in requirements-dev.txt; ruff.toml)
+        run: |
+          python -m pip install --require-hashes -r .github/locks/tools.txt
+          ruff check --output-format=github .
+
+      - name: JavaScript (node --check)
+        run: git ls-files -z '*.js' | xargs -0 -n 1 node --check
+
+      - name: Shell scripts (shellcheck)
+        run: |
+          shellcheck --version
+          git ls-files -z '*.sh' | xargs -0 shellcheck
+
+      # Ubuntu doesn't package actionlint: the release binary, checked against its SHA-256 from the release's
+      # checksums file. It also runs shellcheck on the workflows' bash steps.
+      - name: Workflows (actionlint)
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          archive="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$archive" \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/$archive"
+          echo "$ACTIONLINT_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color
+
+      - name: Docs links and public text (standard library only)
+        run: python -m unittest tests.test_docs_links tests.test_public_text -v
+
+  test:
+    needs: checks
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: |
+            .github/locks/setuptools.txt
+            .github/locks/ci.txt
+
+      # From the lock, each file checked against its SHA-256, and the runner's pip as it is (docs/14-pipeline.md).
+      # setuptools first: pywebview needs proxy-tools, which comes only as source code, and pip builds it with this
+      # setuptools, never with one it would fetch unchecked for an isolated build
+      - name: Install
+        run: |
+          python -m pip install --require-hashes -r .github/locks/setuptools.txt
+          python -m pip install --require-hashes --no-build-isolation -r .github/locks/ci.txt
+
+      # The browser tests use the runner's Chrome, so there is no Playwright browser to download or cache. No test
+      # is retried: one that fails and then passes goes into an issue as a flaky test (docs/14-pipeline.md).
+      - name: Tests (the hosted services are local stand-ins; no models needed)
+        run: python .github/scripts/run_tests.py ${{ runner.os == 'Linux' && '--coverage' || '' }}
+        env:
+          # the browser tests (tests/test_ui*.py) run in the runner's Chrome; fail rather than skip without it
+          SEDJEM_UI_REQUIRED: "1"
+          # a failed browser test leaves its Playwright trace and a screenshot here (tests/ui_support.py)
+          SEDJEM_UI_TRACES: ui-failures
+
+      - name: Upload the failed browser tests' traces and screenshots
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ui-failures-${{ matrix.os }}
+          path: ui-failures
+          retention-days: 14
+          if-no-files-found: ignore
+
+  # Windows from source, as README.md and docs/10-desktop.md say, in PowerShell (the terminal of VS Code and
+  # Windows Terminal): a .venv made with `py -3.12` with the packages of the two requirement files, here at the
+  # versions of their lock (.github/locks/source.txt), then .\app.cmd, which must start Sedjem (here its server
+  # only, as there is no desktop); and the same with uv, whose self-test must pass.
+  windows-source:
+    needs: checks
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+    # Sedjem itself runs here, outside the test runner, so it is told not to send anonymous usage counts
+    # (app/usage.py). The test job above runs without this, as on a developer's computer: the tests never send.
+    env:
+      SEDJEM_NO_USAGE: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up as the docs say
+        shell: pwsh
+        run: |
+          py -3.12 -m venv .venv || python -m venv .venv
+          .venv\Scripts\pip install --require-hashes -r .github/locks/setuptools.txt
+          .venv\Scripts\pip install --require-hashes --no-build-isolation -r .github/locks/source.txt
+
+      - name: .\app.cmd starts Sedjem
+        shell: pwsh
+        run: |
+          .\app.cmd --server --port 8799
+          $status = $null
+          foreach ($i in 1..90) {
+            try { $status = Invoke-RestMethod http://127.0.0.1:8799/api/status; break } catch { Start-Sleep -Seconds 1 }
+          }
+          if (-not $status -or $status.app -ne "sedjem") { throw "app.cmd did not start Sedjem" }
+          "Sedjem $($status.version) answered, reading $($status.home)"
+          Invoke-RestMethod -Method Post http://127.0.0.1:8799/api/quit -Headers @{ "X-Sedjem" = "1" } | Out-Null
+
+      - name: Self-test from the venv
+        shell: cmd
+        run: .venv\Scripts\python -m app.desktop --self-test --report selftest-venv.json
+
+      - name: Set up with uv as the docs say, and its self-test
+        shell: pwsh
+        run: |
+          python -m pip install --require-hashes -r .github/locks/tools.txt
+          uv venv .venv-uv --python 3.12
+          # uv checks the hashes of the build's setuptools too (--require-build-hashes, a preview of uv 0.13)
+          uv pip install --python .venv-uv --require-hashes --require-build-hashes `
+            --build-constraints .github/locks/setuptools.txt -r .github/locks/source.txt
+          .venv-uv\Scripts\python -m app.desktop --self-test --report selftest-uv.json
+
+      - name: Self-test reports
+        if: always()
+        shell: bash
+        run: cat selftest-venv.json selftest-uv.json || true

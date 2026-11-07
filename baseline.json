@@ -1,0 +1,32 @@
+{
+ "commit": "834d24932ec6a067d590e10fedc7313378c7f5cd",
+ "updated": "2026-11-07",
+ "total": 26,
+ "findings": {
+  "actions/cache-poisoning/poisonable-step:36a450a6d0392741:1": 1,
+  "actions/cache-poisoning/poisonable-step:a92d657e6d51b430:1": 1,
+  "actions/cache-poisoning/poisonable-step:be68822e2d850d4d:1": 1,
+  "actions/cache-poisoning/poisonable-step:e9508e43940fc205:1": 1,
+  "js/biased-cryptographic-random:6d06aebfaf75099f:1": 1,
+  "py/clear-text-storage-sensitive-data:a8a89b94749c411a:1": 1,
+  "py/http-response-splitting:4bc3115637e0f8cc:1": 1,
+  "py/path-injection:16e749b8ad865fed:1": 1,
+  "py/path-injection:37c6930e3c7ea881:1": 1,
+  "py/path-injection:3d28fca077c8de2e:1": 1,
+  "py/path-injection:49d6f69f52fe22c5:1": 1,
+  "py/path-injection:523022964fa2eaf7:1": 1,
+  "py/path-injection:5298697d8bdba594:1": 1,
+  "py/path-injection:615a267846101e6e:1": 1,
+  "py/path-injection:620a70cef44ebf42:1": 1,
+  "py/path-injection:63c6d9264dc2cbc:1": 1,
+  "py/path-injection:75b29f8b17e78c28:1": 2,
+  "py/path-injection:a0709f39bb6d105c:1": 1,
+  "py/path-injection:ac2272d50298fcb9:1": 1,
+  "py/path-injection:b83343d284afc300:1": 1,
+  "py/path-injection:b9803039b3478065:1": 1,
+  "py/path-injection:df0a12ac2d6665ef:1": 1,
+  "py/path-injection:eb0ba503eff7f846:1": 1,
+  "py/polynomial-redos:da6e137abf79d69c:1": 1,
+  "py/redos:d7ec0c5404b59441:1": 1
+ }
+}

@@ -1,0 +1,671 @@
+{
+ "open": {
+  "checks": [
+   {
+    "name": "Cohere Transcribe Arabic 07-2026: identity, license, capabilities",
+    "status": "confirmed",
+    "what_was_checked": "HF model card: Apache-2.0; gated behind a contact-info form; 2B params; Conformer encoder-decoder; released 2026-07-07. The card says: 'does not feature explicit, automatic language detection and exhibits inconsistent performance on code-switched audio'. It has no timestamps and no diarization ('The model does not feature either of these'). language='ar' or 'en' is required. It recommends Transformers >=5.4.0, and vLLM 0.19.0 for production serving. It warns the model is 'eager to transcribe, even non-speech sounds' and recommends VAD or a noise gate.",
+    "correction": "The model card itself does not mention Egyptian and has no dialect or code-switching table. The Egyptian 19.16 and code-switched 27.84 figures appear only in the HF blog, labelled 'Cohere internal evaluations ... grouped across various open-source and internal benchmarks'. The blog's leaderboard table gives MASC-clean as 15.54, which looks like a copy of the MGB-2 value; the card and leaderboard say 19.60.",
+    "urls": [
+     "https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026",
+     "https://huggingface.co/blog/CohereLabs/cohere-transcribe-arabic-07-2026-release"
+    ]
+   },
+   {
+    "name": "Cohere Transcribe Arabic: reported accuracy",
+    "status": "confirmed",
+    "what_was_checked": "Blog Table 2 (vendor-internal): Egyptian 19.16 vs OmniASR 21.38, Cohere multilingual 24.64, Whisper-v3 28.25. Code-switched AR-EN: 27.84 / 35.37 / 40.95 / 36.90. The blog also says English terms were 'correctly transcribed in Latin script' and reports human preference over Whisper in 95.8% of tests. The leaderboard app.py puts it #2 of 37 with avg WER 25.87 / CER 11.80 (SADA 37.47, CV 5.82, MASC-clean 19.60, MASC-noisy 27.07, MGB-2 15.54, Casablanca 49.71).",
+    "correction": "",
+    "urls": [
+     "https://huggingface.co/blog/CohereLabs/cohere-transcribe-arabic-07-2026-release",
+     "https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py"
+    ]
+   },
+   {
+    "name": "Cohere Transcribe Arabic: CPU runtime and speed",
+    "status": "corrected",
+    "what_was_checked": "The transcribe.cpp model doc and the handy-computer GGUF file list. Sizes: Q4_K_M 1.558 GB, Q5_K_M 1.77, Q6_K 1.97, Q8_0 2.41, BF16 4.11. CPU speed on an AMD Ryzen 7 PRO 4750U: Q8_0 4.58x faster than real time (11 s clip) and 4.04x (35.3 s clip); Q4_K_M 4.48x and 3.95x. Vulkan on the Renoir iGPU: 8.2-8.8x. FLEURS 'ar' (the ar_eg split, read speech): 10.95-11.18% WER across quants. The cstr GGUF (CrispASR) is 1.5 GB Q4_K with an Arabic imatrix, or 2.4 GB Q8_0. NAMAA int8 needs bitsandbytes and a CUDA GPU (confirmed).",
+    "correction": "1) transcribe.cpp accepts at most about 400 s (6.7 min) of audio per call. Longer input is rejected with TRANSCRIBE_ERR_INPUT_TOO_LONG, so the claim that it 'handles long audio by internal chunking' is wrong for this runtime; the calls must be split. 2) Both speed samples are English clips (jfk, dots), so speed on Arabic audio has not been measured. 3) cstr's figure of about 1.03-1.08 RTFx at 8 threads (unnamed CPU, 03-2026 parent) conflicts with transcribe.cpp's 4-4.6x. The transcribe.cpp numbers are newer and name the hardware. 4) Another CPU path exists: sayedM/cohere-transcribe-arabic-cpu-friendly (int8 plus a CTC draft head) reports 158.5 s down to 4.82 s on a 33 s Arabic clip on a six-core CPU (community, unverified).",
+    "urls": [
+     "https://raw.githubusercontent.com/handy-computer/transcribe.cpp/main/docs/models/cohere-transcribe-arabic-07-2026.md",
+     "https://huggingface.co/handy-computer/cohere-transcribe-arabic-07-2026-gguf",
+     "https://huggingface.co/cstr/cohere-transcribe-arabic-07-2026-GGUF",
+     "https://huggingface.co/cstr/cohere-transcribe-03-2026-GGUF",
+     "https://huggingface.co/NAMAA-Space/cohere-transcribe-arabic-07-2026-int8",
+     "https://huggingface.co/sayedM/cohere-transcribe-arabic-cpu-friendly"
+    ]
+   },
+   {
+    "name": "Cohere hosted API free trial",
+    "status": "confirmed",
+    "what_was_checked": "Docs confirm: API model name 'cohere-transcribe-arabic-07-2026'; 'free, low-setup experimentation subject to rate limits'; trial keys are 'free but limited in usage'; 5 req/min for audio transcriptions; 1,000 API calls a month on trial keys; 25 MB maximum file size; FLAC/MP3/MPEG/MPGA/OGG/WAV accepted; language is a required field; no timestamps; no speaker identification. Production use without rate limits goes through Model Vault (sales).",
+    "correction": "I found no official statement that trial keys may not be used for production or commercial work on the rate-limits, going-live or transcribe pages, so that part is unverified. No maximum audio duration per request is documented. The 25 MB cap means an 80-minute call must be sent as compressed audio (MP3 or OGG) or split.",
+    "urls": [
+     "https://docs.cohere.com/docs/rate-limits",
+     "https://docs.cohere.com/docs/transcribe-arabic",
+     "https://docs.cohere.com/docs/audio-transcription-quickstart",
+     "https://docs.cohere.com/docs/going-live"
+    ]
+   },
+   {
+    "name": "Audar-ASR-V1-Turbo",
+    "status": "confirmed",
+    "what_was_checked": "Model card: 2.35B params (2.03B decoder, 0.32B encoder). Qwen3-ASR architecture: it loads through the qwen-asr package, ships 'self-contained Qwen3-ASR modeling code', and vLLM serves it as Qwen3ASRForConditionalGeneration. Official GGUFs are in the repo: Q4_K_M 1.282 GB, Q8_0 2.165 GB, plus a BF16 mmproj of 0.642 GB that 'must stay BF16'; it runs with llama-mtmd-cli. 30 s context. Egyptian is named in the training data and in the KTO alignment. The card's limitations say 'Heavily code-switched telephony and low-SNR audio degrade accuracy'. License is AudarAI Community License v1.0, which permits Research Use including evaluation and experimentation; commercial use is limited by thresholds (fewer than 50 staff, under $2M revenue, and others) and hosted API use is prohibited. The leaderboard app.py puts it #1 with avg WER 23.17 / CER 9.23. Tech report (self-reported): Gulf-Emirati long-form 30.02 vs ElevenLabs Scribe v1 35.05 vs Qwen3-ASR-1.7B 42.67. The report notes a punctuation-stripping regex bug in the upstream leaderboard script.",
+    "correction": "'Independently reproduced by the leaderboard maintainers' is Audar's own claim; app.py says only 'Aug 20th 2026: New models included'. The card gives average CER as 9.20, the leaderboard 9.23. No Egyptian or ArzEn number is published. The tech report wrongly calls Cohere Transcribe arabic-07-2026 'a proprietary API system that cannot be run in our harness' (its weights are on HF), so Audar never ran Cohere in its own harness. The third-party mradermacher GGUF ships Q8_0 and f16 mmproj files, whereas Audar says the projector must stay BF16.",
+    "urls": [
+     "https://huggingface.co/audarai/Audar-ASR-V1-Turbo",
+     "https://huggingface.co/api/models/audarai/Audar-ASR-V1-Turbo/tree/main",
+     "https://github.com/AudarAI/Audar-ASR-V1/raw/main/report/Audar-ASR-V1-Technical-Report.pdf",
+     "https://www.audarai.com/license/audarai-community-license-v1.0/",
+     "https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py",
+     "https://huggingface.co/mradermacher/Audar-ASR-V1-Turbo-GGUF"
+    ]
+   },
+   {
+    "name": "Audar-ASR-V1-Flash",
+    "status": "confirmed",
+    "what_was_checked": "Model card: 782M params (596M decoder, 186M encoder). AudarAI Open License v1.0 (commercial use, redistribution and fine-tuning allowed). GGUF: Q4_K_M 0.397 GB, Q8_0 0.639 GB, mmproj 0.379 GB (BF16). 30 s window, with the warning 'Long recordings can drift; chunk at sentence boundaries'. Leaderboard avg 32.04 (SADA 44.36, CV 15.38, MASC-clean 22.56, MASC-noisy 34.19, MGB-2 17.05, Casablanca 58.71).",
+    "correction": "The card does not name its base model; 'Qwen3-ASR-0.6B derivative' remains an inference.",
+    "urls": [
+     "https://huggingface.co/audarai/Audar-ASR-V1-Flash",
+     "https://huggingface.co/api/models/audarai/Audar-ASR-V1-Flash/tree/main?recursive=true"
+    ]
+   },
+   {
+    "name": "QwenCleo-ASR",
+    "status": "confirmed",
+    "what_was_checked": "Card metadata: Apache-2.0, base_model Qwen/Qwen3-ASR-1.7B, library qwen-asr. Training data: 'hundreds of hours of Egyptian podcast speech'. It claims to keep English in Latin script. Results table on 3,699 utterances: QwenCleo 19.85 / 10.52 (code-switched 20.75); Arabic-Whisper-CS 37.98; Nemotron-3.5 38.04; Qwen3-ASR base 41.51; Whisper-v3-turbo fine-tune 50.83; Cohere 03-2026 53.20; MasriSwitch 57.30; Whisper-large-v3 63.94; Whisper-v3-turbo 73.83. The repo has only model.safetensors (4.076 GB), and an HF search found no GGUF. About 3.4k downloads; created 2026-06-13.",
+    "correction": "The model-index gives CER 10.64, but the table says 10.52. The references write English mostly in Latin script ('YouTube', 'already', 'dollars'), which heavily penalizes models that transliterate: Whisper-v3 scores 63.94 overall but 49.25 on the Arabic-only subset. The references are also inconsistent: one reference has 'ستايله' where QwenCleo outputs 'style'. The card documents GPU use only (device_map='cuda:0'; vLLM needs an Ampere GPU). Converting it to GGUF and running it on CPU is still unverified.",
+    "urls": [
+     "https://huggingface.co/mohammedaly22/QwenCleo-ASR",
+     "https://huggingface.co/api/models?search=QwenCleo"
+    ]
+   },
+   {
+    "name": "Metro-ASR-Small accuracy",
+    "status": "corrected",
+    "what_was_checked": "The card's YAML metadata gives WER 28.15 / CER 14.88 (Arabic 22.67, code-switched 32.73). Its 'Performance' section, labelled 'the numbers in this card's metadata', instead shows All 46.85 / 28.41, Arabic-only 37.24 / 17.45, code-switched 36.32 / 17.44. The GitHub README says the evaluation section 'will be filled in once evaluation on a shared public test set is complete'. Speed is confirmed: Core Ultra 7 155H, 4 threads, fp32, 27x-55x faster than real time. 61.6M params, MIT. The technical LM head cut WER from 34.8 to 24.1 on an 11-clip demo set, but raised general-speech WER from 25.6 to 36.9. The optional 5-gram LM is 5.9 GB.",
+    "correction": "The card contradicts itself (28.15 vs 46.85 WER), so treat both numbers as unreliable. Nothing states that its test set is QwenCleo's 3,699-utterance set, and Metro does not appear in QwenCleo's table. The training data includes MohamedRashad/arabic-english-code-switching, which is derived from ArzEn, so its scores on the user's ArzEn clips may be inflated.",
+    "urls": [
+     "https://huggingface.co/mohammedaly22/Metro-ASR-Small",
+     "https://raw.githubusercontent.com/MohammedAly22/metro-asr/main/README.md"
+    ]
+   },
+   {
+    "name": "NVIDIA Nemotron 3.5 ASR Streaming 0.6B",
+    "status": "confirmed",
+    "what_was_checked": "Card: 600M params; OpenMDW-1.1; released on HF 06/04/2026. Arabic (ar-AR) is among the 19 'transcription-ready' locales. FLEURS Arabic WER with LangID: 13.17 at 80 ms, falling to 12.03 at 1120 ms; auto-detect 13.47-12.06. The repo contains an official q8_0 GGUF (0.742 GB). NeMo-Speech.cpp (Apache-2.0) runs it on CPU, Metal and Vulkan, can combine it with Streaming Sortformer 4spk v2 or Nemotron 3 Diarization, and 'handles common mono or stereo PCM WAV sample rates'. The cstr GGUF is Q4_K 458 MB, Q8_0 686 MB, F16 1.29 GB, run with '--backend nemotron' and ar-AR.",
+    "correction": "Its strong FLEURS score does not carry over to dialects. It averages 35.86 on the Arabic leaderboard (Casablanca 69.37), behind Qwen3-ASR-1.7B at 33.36. In QwenCleo's samples it writes 'يوتيوب' instead of 'YouTube'. No laptop CPU speed is published.",
+    "urls": [
+     "https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b",
+     "https://huggingface.co/api/models/nvidia/nemotron-3.5-asr-streaming-0.6b/tree/main",
+     "https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/main/README.md",
+     "https://huggingface.co/cstr/nemotron-3.5-asr-streaming-0.6b-GGUF",
+     "https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py"
+    ]
+   },
+   {
+    "name": "NVIDIA Nemotron 3 Diarization",
+    "status": "corrected",
+    "what_was_checked": "Card: release date September 23, 2026; 100M params; OpenMDW-1.1; up to 8 speakers; 16 kHz mono input; chunked inference with no fixed maximum duration. Runs through NeMo-Speech.cpp ('nemo-speech transcribe --diarize --json'). CALLHOME-Part2 DER is 9.10 at 30.4 s latency (0.25 s collar); DIHARD III 12.73 (no collar). The audio-cpp GGUF is BF16 0.199 GB or Q8_0 0.107 GB. The listed languages include English, Mandarin and Hindi; Arabic is not named.",
+    "correction": "For 2-speaker calls it is not an upgrade on paper. On 2-speaker CALLHOME the older diar_streaming_sortformer_4spk-v2.1 scores 5.68 DER against Nemotron 3 Diarization's 5.98; the gains are on 3 or more speakers. CALLHOME Part 1 is in its training data. Its 0.25 s-collar DER cannot be compared with pyannote community-1's 26.7% (no collar, overlap scored). The Voice Arena '1st at 14.72%' claim comes from secondary press only and was not verified.",
+    "urls": [
+     "https://huggingface.co/nvidia/Nemotron-3-Diarization",
+     "https://huggingface.co/api/models/audio-cpp/Nemotron-3-Diarization-GGUF/tree/main",
+     "https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/main/README.md"
+    ]
+   },
+   {
+    "name": "Audar-Diarization-V1",
+    "status": "corrected",
+    "what_was_checked": "Card: NVIDIA Streaming Sortformer v2.1 extended from 4 to 8 speaker slots; 117.7M params; 16 kHz mono input; session-stable labels for up to 74 minutes. DER at 0.25 s collar: AMI 15.24, AliMeeting 18.70, VoxConverse 8.55, CHiME-6 45.00, CALLHOME (out-of-domain telephony) 10.29. CPU speed not reported. AudarAI Community License.",
+    "correction": "The candidate says none of its benchmarks is telephone speech. That is wrong: the card reports CALLHOME 8 kHz telephony at 10.29% DER. Speaker identity is held for up to 74 min, which is shorter than the user's longest (80 min) calls. The repo shows 0 downloads.",
+    "urls": [
+     "https://huggingface.co/audarai/Audar-Diarization-V1"
+    ]
+   },
+   {
+    "name": "Meta Omnilingual ASR (arz_Arab, sizes, CPU path)",
+    "status": "corrected",
+    "what_was_checked": "lang_ids.py contains arz_Arab (plus arb, apc, ary, aeb, acm, ars, apd). README: CTC and LLM models only accept audio under 40 s; LLM_Unlimited_*_v2 handles any length. Sizes: LLM-300M 6.1 GiB, LLM-7B 30 GiB (about 17 GiB VRAM); RTF about 0.09 is a GPU figure. facebook/omniASR-LLM-7B is tagged Apache-2.0.",
+    "correction": "The claim that LLM-300M-v2 has 'no official quantized or CPU path' and needs a 6.1 GiB download is out of date. CrispASR (community) GGUFs exist: omniasr-llm-300m-v2 q4_k 1.068 GB / q8_0 1.837 GB; omniasr-llm-unlimited-300m-v2 q4_k 1.075 GB; omniASR-CTC-1B-v2 q4_k 0.691 GB. LLM-300M-v2 scores 41.7 WER on Arab Voices arz, which is now testable on the laptop with a small download.",
+    "urls": [
+     "https://raw.githubusercontent.com/facebookresearch/omnilingual-asr/main/src/omnilingual_asr/models/wav2vec2_llama/lang_ids.py",
+     "https://raw.githubusercontent.com/facebookresearch/omnilingual-asr/main/README.md",
+     "https://huggingface.co/cstr/omniasr-llm-unlimited-300m-v2-GGUF",
+     "https://huggingface.co/cstr/omniasr-llm-300m-v2-GGUF",
+     "https://raw.githubusercontent.com/CrispStrobe/CrispASR/main/README.md"
+    ]
+   },
+   {
+    "name": "Arab Voices arz (Egyptian) numbers",
+    "status": "confirmed",
+    "what_was_checked": "Table 2 of arXiv 2601.13319v2, with the E1..M6 legend decoded. Egyptian (arz) WER: MMS 74.32, CTC-300M 58.87, CTC-1B 45.7, CTC-3B 42.28, CTC-7B 45.59, Whisper-v3-turbo 48.16, Whisper-v3 35.69, SeamlessM4T-v2 37.61, Voxtral-Small 43.25, Qwen3-Omni 68.6, LLM-300M 41.7, LLM-1B 49.38, LLM-3B 48.76, LLM-7B 34.8. The arz pool includes ArzEn (11.4 h) and CALLHOME Egyptian telephone speech (17 h).",
+    "correction": "",
+    "urls": [
+     "https://arxiv.org/html/2601.13319v2"
+    ]
+   },
+   {
+    "name": "Open Universal Arabic ASR Leaderboard rows",
+    "status": "confirmed",
+    "what_was_checked": "Parsed app.py: 37 models; latest update 'Aug 20th 2026: Audar Turbo and Flash'. Rows: Audar Turbo 23.17 / 9.23; Cohere Arabic 25.87; omniASR_LLM_7B 28.32; Cohere 03-2026 30.67; Audar Flash 32.04; Qwen3-ASR-1.7B 33.36; Nemotron-3.5 35.86; Whisper-v3 36.86; Whisper-v3-turbo 40.05; Qwen3-ASR-0.6B 42.19; VibeVoice-ASR 52.99.",
+    "correction": "app.py says nothing about the maintainers reproducing results. All test sets are 16 kHz non-telephone audio, and there is no code-switching set.",
+    "urls": [
+     "https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py"
+    ]
+   },
+   {
+    "name": "Microsoft VibeVoice-ASR (7B) and BitNet",
+    "status": "corrected",
+    "what_was_checked": "The card lists ar in its language metadata; MIT license; 60-minute single pass (64K tokens); built-in who/when/what diarization; code-switching claim. cstr GGUF: q4_k about 5 GB, q8_0 9.45 GB, f16 16 GB; input must be 24 kHz. BitNet's language metadata is en, zh, fr, it, ko, pt, vi (no Arabic). VibeASR.cpp README gives i7-13700 RTF 0.37 at 4 threads and 0.33 at 8.",
+    "correction": "The candidate says there are no Arabic numbers, but the Elm leaderboard has microsoft/VibeVoice-ASR at avg WER 52.99 / CER 28.95 (Casablanca 93.37, SADA 69.83). That is far worse than Whisper-large-v3 (36.86) and even Qwen3-ASR-0.6B (42.19). The built-in diarization does not justify a 5 GB download for Egyptian Arabic.",
+    "urls": [
+     "https://huggingface.co/microsoft/VibeVoice-ASR",
+     "https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py",
+     "https://huggingface.co/cstr/vibevoice-asr-GGUF",
+     "https://huggingface.co/microsoft/VibeVoice-ASR-BitNet",
+     "https://raw.githubusercontent.com/microsoft/VibeASR.cpp/main/README.md"
+    ]
+   },
+   {
+    "name": "Google Gemma 4 Arabic ASR evidence",
+    "status": "corrected",
+    "what_was_checked": "Leaderboard app.py and the CrispASR GGUF listing.",
+    "correction": "The candidate says no Arabic ASR figures are published. Google publishes none, but the Elm leaderboard (added Apr 21, 2026) has gemma-4-E4B-it at avg WER 32.98 (Casablanca 58.63) and E2B at 35.87. E4B edges Qwen3-ASR-1.7B (33.36) and beats Whisper-large-v3 (36.86) there. It is still heavy for this laptop (CrispASR e4b q4_k is 4.41 GB) and untested on code-switching.",
+    "urls": [
+     "https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py",
+     "https://huggingface.co/cstr/gemma4-e4b-it-GGUF",
+     "https://raw.githubusercontent.com/CrispStrobe/CrispASR/main/README.md"
+    ]
+   },
+   {
+    "name": "Qwen3-ASR base: limits and aligner",
+    "status": "corrected",
+    "what_was_checked": "GitHub README: Arabic (ar) is among 30 languages, with no Arabic dialects listed. The tech report says a single input can be 'no longer than 20 minutes' and gives FLEURS-ar 16.98 (1.7B) and 25.51 (0.6B). Apache-2.0.",
+    "correction": "Qwen3-ForcedAligner-0.6B supports only zh, en, yue, fr, de, it, ja, ko, pt, ru and es. Arabic is not included, so it cannot give word timestamps for the user's Arabic calls.",
+    "urls": [
+     "https://raw.githubusercontent.com/QwenLM/Qwen3-ASR/main/README.md",
+     "https://arxiv.org/pdf/2601.21337v1"
+    ]
+   },
+   {
+    "name": "Whisper large-v3 / turbo licenses and benchmark numbers",
+    "status": "confirmed",
+    "what_was_checked": "HF license tags: whisper-large-v3 apache-2.0, large-v3-turbo mit. Leaderboard 36.86 / 40.05. QwenCleo table 63.94 / 73.83. Arab Voices arz 35.69 / 48.16.",
+    "correction": "",
+    "urls": [
+     "https://huggingface.co/openai/whisper-large-v3",
+     "https://huggingface.co/openai/whisper-large-v3-turbo",
+     "https://huggingface.co/mohammedaly22/QwenCleo-ASR"
+    ]
+   },
+   {
+    "name": "ElevenLabs Scribe v2 free tier and specs",
+    "status": "corrected",
+    "what_was_checked": "Pricing page: the Free plan is $0 with 10,000 credits a month, Speech to Text costs '330 credits per minute', and there is no rollover on the Free plan. 'Commercial License' starts at Starter ($6/mo). API prices: Scribe v2 $0.22/h, Realtime $0.39/h. STT docs: diarization for up to 32 speakers, files up to 3 GB and 10 h, up to 1000 keyterms in batch, Arabic in the 'Good (>10% to ≤20% WER)' bucket. The Arabic page lists Egyptian.",
+    "correction": "The free tier works out to about 30 minutes of transcription a month (10,000 ÷ 330, derived from the official numbers). One 80-minute call does not fit; one 16-30 minute call does. The Free plan has no commercial license, which is fine for a personal trial. Nothing documents accuracy on 8 kHz telephone audio.",
+    "urls": [
+     "https://elevenlabs.io/pricing",
+     "https://elevenlabs.io/pricing/api",
+     "https://elevenlabs.io/docs/overview/capabilities/speech-to-text",
+     "https://elevenlabs.io/speech-to-text/arabic"
+    ]
+   },
+   {
+    "name": "Perle code-switching benchmark (arXiv 2605.19069)",
+    "status": "confirmed",
+    "what_was_checked": "Abstract (v3, 22 May 2026): five providers, four language pairs, 300 samples per pair, Scribe v2 13.2% WER overall, WER inflates gaps about 3x. PDF: Egyptian WER Scribe 13.1% vs gpt-4o-transcribe 45.9% vs Chirp 3 59.7%. Voice actors recorded on consumer headset or USB microphones; MP3 sent to the APIs; diarize=false. The HF dataset is MIT and not gated.",
+    "correction": "",
+    "urls": [
+     "https://arxiv.org/abs/2605.19069",
+     "https://arxiv.org/pdf/2605.19069",
+     "https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch"
+    ]
+   },
+   {
+    "name": "Speechmatics free credit and Arabic-English claims",
+    "status": "confirmed",
+    "what_was_checked": "Pricing page (updated 31 July 2026): 'Start with $100 in credit, no card required'; Pro from $0.129/hr with a 20% discount; speaker diarization and custom dictionary included. Melia 1 post (Sep 1, 2026): 15.1% on Arabic-English code-switching vs Soniox v5 33.2, AssemblyAI U-3.5 Pro 40.9, Amazon 45.6 ('internal evaluation, no language hints'); ElevenLabs is not in that comparison. Mar 6, 2026 bilingual post: code-switching 6.3% vs Google 9.7%, colloquial 4.5% vs 5.9%; names Gulf, Egyptian and Levantine; diarization supported.",
+    "correction": "The 'Whisper 6.2%' figure was not found in the article. All accuracy numbers are vendor self-reports, and Speechmatics was not in the Perle benchmark.",
+    "urls": [
+     "https://www.speechmatics.com/pricing",
+     "https://www.speechmatics.com/company/articles-and-news/melia-code-switching-arabic-mandarin-tamil",
+     "https://www.speechmatics.com/company/articles-and-news/arabic-english-bilingual-speech-to-text"
+    ]
+   },
+   {
+    "name": "Mistral Voxtral (Transcribe V2 API and Realtime 4B)",
+    "status": "confirmed",
+    "what_was_checked": "News post (Feb 4, 2026): Voxtral Mini Transcribe V2 costs $0.003/min and Realtime $0.006/min. 13 languages including Arabic. Diarization, word timestamps, up to 100 context-bias phrases, up to 3 h per request. Realtime is open weights (Apache 2.0); Transcribe V2 is API-only. HF card: FLEURS Arabic 22.53% at 480 ms; needs a GPU with at least 16 GB. The Mini 3B 2507 language list has no Arabic.",
+    "correction": "No free API tier could be confirmed; the docs tier page returned 404.",
+    "urls": [
+     "https://mistral.ai/news/voxtral-transcribe-2/",
+     "https://docs.mistral.ai/capabilities/audio_transcription",
+     "https://huggingface.co/mistralai/Voxtral-Mini-4B-Realtime-2602",
+     "https://huggingface.co/mistralai/Voxtral-Mini-3B-2507"
+    ]
+   },
+   {
+    "name": "ArzEn leakage via MohamedRashad code-switching dataset",
+    "status": "confirmed",
+    "what_was_checked": "Dataset card: 'built upon ahmedheakl/arzen-llm-speech-ds' plus YouTube; GPL; train split only. Metro-ASR lists it as training data. Arabic-Whisper-CodeSwitching-Edition and its CT2 port are GPL-3.0.",
+    "correction": "",
+    "urls": [
+     "https://huggingface.co/datasets/MohamedRashad/arabic-english-code-switching",
+     "https://huggingface.co/mohammedaly22/Metro-ASR-Small",
+     "https://huggingface.co/MohamedRashad/Arabic-Whisper-CodeSwitching-Edition"
+    ]
+   },
+   {
+    "name": "Published ArzEn numbers (ArzEn-LLM, ArTST)",
+    "status": "confirmed",
+    "what_was_checked": "ArzEn-LLM PDF: ArzEn-ST test has 1,402 sentences and train 3,344; text lowercased; WER 57.9, 34.7, 32.6 (small) and 31.1 (medium), CER 12.0. ACL 2025 ArTST: ArzEn 27.43 (v3 multilingual), 33.71 (v2), 34.85 (v1); Mixat 21.66. It cites 'ArZN (Al-Sabbagh, 2024)' for the Egyptian-English set.",
+    "correction": "",
+    "urls": [
+     "https://arxiv.org/pdf/2406.18120v2",
+     "https://aclanthology.org/2025.acl-long.1427.pdf"
+    ]
+   },
+   {
+    "name": "CrispASR backend coverage",
+    "status": "corrected",
+    "what_was_checked": "README backend table: qwen3 and qwen3-1.7b, confucius4-r2t2, omniasr (CTC 1B and 300M), omniasr-llm (300M-v2 and Unlimited), vibevoice, gemma4-e2b and e4b, voxtral and voxtral4b, cohere (03-2026), and foxnose diarization (WeSpeaker ResNet34-LM plus spectral clustering, 3.18% DER on VoxConverse dev). cstr's card documents the '--backend cohere-ar' alias.",
+    "correction": "The CrispASR 'dolphin' backend is DataoceanAI1/dolphin-cn-dialect-small-streaming (Mandarin and Chinese dialects), not the multilingual Dolphin with the ar-EG token. It does not help with Arabic. The Moonshine backend lists 'English + 6 langs'.",
+    "urls": [
+     "https://raw.githubusercontent.com/CrispStrobe/CrispASR/main/README.md",
+     "https://huggingface.co/cstr/cohere-transcribe-arabic-07-2026-GGUF"
+    ]
+   },
+   {
+    "name": "whisper-medium-arabic-codeswitched CT2 build",
+    "status": "confirmed",
+    "what_was_checked": "The CT2 repo's model.bin is 774.7 MB; MIT license. Card: WER 17.9% vs 52.4% for base whisper-medium on a held-out slice of its own dataset; CPU RTF 2.03 on 2 vCPU.",
+    "correction": "The card text says the int8 build is about 380 MB; the actual file is about 775 MB.",
+    "urls": [
+     "https://huggingface.co/Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2",
+     "https://huggingface.co/api/models/Seif-Eldeen-Sameh/whisper-medium-arabic-codeswitched-ct2/tree/main"
+    ]
+   },
+   {
+    "name": "pyannote community-1 on CALLHOME",
+    "status": "confirmed",
+    "what_was_checked": "Card: CALLHOME part 2 DER is 26.7% (legacy 3.1: 28.5%; paid precision-2: 16.6%), scored with 'no forgiveness collar, nor skipping overlapping speech'. CC-BY-4.0, gated, runs on CPU by default.",
+    "correction": "",
+    "urls": [
+     "https://huggingface.co/pyannote/speaker-diarization-community-1"
+    ]
+   },
+   {
+    "name": "Moonshine tiny Arabic repo id",
+    "status": "corrected",
+    "what_was_checked": "The HF API returns a 307 redirect for UsefulSensors/moonshine-tiny-ar.",
+    "correction": "The repo is now moonshine-ai/moonshine-tiny-ar. GGUF ports exist (handy-computer/moonshine-tiny-ar-gguf, cstr).",
+    "urls": [
+     "https://huggingface.co/moonshine-ai/moonshine-tiny-ar",
+     "https://huggingface.co/api/models?search=moonshine-tiny-ar"
+    ]
+   }
+  ],
+  "missing": [
+   "FREE HOSTED OPTION MISSED, Google Gemini API free tier. Official pricing lists gemini-2.5-flash and gemini-3.x-flash with audio input 'Free of charge' on the free tier. Audio docs: up to 9.5 h of audio per prompt, 32 tokens/s, audio downsampled to 16 kbps, examples of 'Speaker 1/Speaker 2' labelled transcripts with timestamps. Caveats: the pricing page marks free-tier content as 'Used to improve our products: Yes', a privacy concern for meeting recordings. I found no Egyptian or code-switching ASR benchmark for it. https://ai.google.dev/gemini-api/docs/pricing , https://ai.google.dev/gemini-api/docs/audio",
+   "FREE HOSTED OPTION MISSED, Groq free tier running the same Whisper large-v3 the user rated best by ear. whisper-large-v3 and turbo on the free tier: 20 RPM, 2K requests/day, 7.2K audio-seconds/hour, 28.8K audio-seconds/day (8 h/day). 25 MB file cap on free tier. Optional 224-token prompt (useful for the Latin-script prompt-seeding trick). No diarization. https://console.groq.com/docs/rate-limits , https://console.groq.com/docs/speech-to-text",
+   "FREE ALLOWANCES COMPARED (official pages): ElevenLabs Free is about 30 min/month (10,000 credits at 330 credits/min). Speechmatics gives $100 credit with no card, which is hundreds of hours at about $0.13-0.24/h, and has an Arabic-English bilingual model plus diarization. AssemblyAI's free tier is 'up to 185 hours of pre-recorded transcription', no card; Universal-3.5 Pro lists Arabic ('ar') and claims mid-sentence code-switching, but no Arabic WER is published. Deepgram gives $200 credit, no card, but Perle says Arabic is not in Nova-3's code-switching list. Azure F0 gives 5 audio hours/month and supports ar-EG, but scored 54.6% on Perle Egyptian. For a free Scribe-quality test of full 16-80 min calls, Speechmatics' $100 credit is the only large allowance with a vendor-claimed Arabic-English code-switching model (vendor self-report only). https://elevenlabs.io/pricing , https://www.speechmatics.com/pricing , https://www.assemblyai.com/pricing , https://www.assemblyai.com/docs/getting-started/supported-languages , https://www.assemblyai.com/blog/multilingual-speech-to-text-api , https://deepgram.com/pricing , https://azure.microsoft.com/en-us/pricing/details/cognitive-services/speech-services/",
+   "transcribe.cpp (handy-computer) is a second CPU runtime for Cohere Transcribe Arabic, faster than the CrispASR numbers quoted: 4.0-4.6x real time on a Ryzen 7 4750U CPU, 8.2-8.8x on its Vulkan iGPU. Its hard limit is 400 s per call, so the user must split the audio. The i5-1245U has an Iris Xe iGPU, so the Vulkan path may be worth a try (unverified on Intel). https://raw.githubusercontent.com/handy-computer/transcribe.cpp/main/docs/models/cohere-transcribe-arabic-07-2026.md",
+   "VibeVoice-ASR is already on the Arabic leaderboard at 52.99 avg WER, and Gemma-4-E4B at 32.98. Both change how these candidates rank. https://huggingface.co/spaces/elmresearchcenter/open_universal_arabic_asr_leaderboard/raw/main/app.py",
+   "OmniASR-LLM(-Unlimited)-300M-v2 has a roughly 1.07 GB q4_k GGUF for CrispASR. That makes the arz-41.7 model a cheap local A/B instead of a 6.1 GiB download. https://huggingface.co/cstr/omniasr-llm-unlimited-300m-v2-GGUF",
+   "Diarization choice for 2-speaker phone calls: on CALLHOME 2-speaker, Sortformer 4spk-v2.1 scores 5.68 DER and Nemotron 3 Diarization 5.98 (both at 0.25 s collar, offline). Audar-Diarization-V1 reports CALLHOME 10.29. pyannote community-1 is 26.7% under a stricter no-collar protocol, so it is not comparable. NeMo-Speech.cpp bundles Sortformer 4spk v2 and Nemotron 3 Diarization. https://huggingface.co/nvidia/Nemotron-3-Diarization , https://huggingface.co/audarai/Audar-Diarization-V1 , https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/main/README.md",
+   "Qwen3-ForcedAligner does not support Arabic, so a Qwen3-ASR-family pipeline (Audar, QwenCleo, lemura) cannot get Arabic word timestamps from it. Diarize first, then transcribe each segment, which is the pattern the candidate list already suggests. https://raw.githubusercontent.com/QwenLM/Qwen3-ASR/main/README.md",
+   "Metro-ASR-Small's own card reports contradictory WERs (28.15 in metadata vs 46.85 in its Performance table). Do not rank it above QwenCleo or Audar on paper. https://huggingface.co/mohammedaly22/Metro-ASR-Small",
+   "No source among those checked measures any of these models on 8 kHz narrowband telephone audio with Arabic-English code-switching. The Perle benchmark uses headset MP3. Leaderboard sets are 16 kHz broadcast or read speech. Only CALLHOME (inside the Arab Voices arz pool, not reported separately) and Audar's 'code-switched telephony degrades accuracy' note touch it. The user's own calls remain the only valid test."
+  ]
+ },
+ "services": {
+  "checks": [
+   {
+    "name": "ElevenLabs Scribe v2: existence, price, free-tier allowance",
+    "status": "confirmed",
+    "what_was_checked": "The API pricing page lists Scribe v2 at $0.22/h, Realtime at $0.39/h, entity detection at $0.070/h and keyterm prompting at $0.050/h. Its 'Free / Pay as you go' column shows '4 hours 30 minutes' of Scribe included, and it says 'API usage is billed in US dollars, not credits.' Starter is $6/month with 27 hours included. The ElevenCreative pricing page gives Free as 10k credits/month and Speech to Text as 330 credits per minute (about 30 min). So the two official pages really do conflict. Help center: the Free plan's STT concurrency is 8. A second help page says 'a limit on the number of credits that can be used at once... twice the usual monthly quota'.",
+    "urls": [
+     "https://elevenlabs.io/pricing/api",
+     "https://elevenlabs.io/pricing",
+     "https://elevenlabs.io/docs/help-center/product/core-capabilities/speech-to-text/how-many-speech-to-text-requests-can-i-make-and-can-i-increase-it.md",
+     "https://elevenlabs.io/docs/help-center/account/general/is-there-a-limit-to-how-many-credits-i-can-use-at-once.md"
+    ],
+    "correction": "No official page says which of the two allowances applies to an API key on Free. The '2x monthly quota at once' rule is the documented per-job cap. Under the credit model that is 20k credits, about 60 min at 330 credits/min (my arithmetic). One 80-min call may therefore not fit on Free unless the dollar-based 4h30 allowance applies. This is unverified, so test with a short file first."
+   },
+   {
+    "name": "ElevenLabs Scribe v2: Arabic/Egyptian support and accuracy tier",
+    "status": "corrected",
+    "what_was_checked": "The STT docs put Arabic in the 'Good (>10% to ≤20% WER)' tier and do not mention Egyptian. The Arabic landing page lists 'Modern Standard Arabic, Egyptian, Levantine..., Gulf, Maghrebi' but calls the tier 'Good (>10% to ≤25% WER)'.",
+    "urls": [
+     "https://elevenlabs.io/docs/overview/capabilities/speech-to-text",
+     "https://elevenlabs.io/speech-to-text/arabic"
+    ],
+    "correction": "The two official pages disagree on the upper bound of the Arabic tier (20% vs 25%). Egyptian appears only on the marketing landing page, not in the docs."
+   },
+   {
+    "name": "ElevenLabs Scribe v2: code-switching and script",
+    "status": "confirmed",
+    "what_was_checked": "The Apr 2, 2026 blog says 'Scribe v2 transcribes English words in English, regardless of the surrounding language... English words remain in Latin script.' The claim sits in the Indic-English section. No Arabic–English claim was found in the docs.",
+    "urls": [
+     "https://elevenlabs.io/blog/scribe-v2-just-got-an-upgrade",
+     "https://elevenlabs.io/docs/overview/capabilities/speech-to-text"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "ElevenLabs Scribe v2: diarization parameters and file limits",
+    "status": "confirmed",
+    "what_was_checked": "API reference: num_speakers (1–32) is 'The maximum amount of speakers'. diarization_threshold (0.1–0.4, default about 0.22) 'Can only be set when diarize=True and num_speakers=None'. Direct upload must be 'less than 5.0GB' and cloud_storage_url 'less than 2GB'. The capabilities docs and playground say 3 GB and up to 10 hours. Keyterms: up to 1000, each under 50 characters and at most 5 words; requests with more than 100 keyterms have a 20 s minimum billable unit.",
+    "urls": [
+     "https://elevenlabs.io/docs/api-reference/speech-to-text/convert",
+     "https://elevenlabs.io/docs/overview/capabilities/speech-to-text",
+     "https://elevenlabs.io/blog/scribe-v2-just-got-an-upgrade",
+     "https://elevenlabs.io/docs/eleven-creative/playground/speech-to-text.md"
+    ],
+    "correction": "The API reference states entity detection as a '30% surcharge on the base transcription cost', which roughly matches $0.07/h."
+   },
+   {
+    "name": "ElevenLabs: privacy / zero-retention on Free",
+    "status": "corrected",
+    "what_was_checked": "API reference on enable_logging=false: 'zero retention mode will be used... Zero retention mode may only be used by enterprise customers.' The help center says data is used 'to improve the quality of our audio models for everyone'. Opt-out path: Profile > Terms and privacy > Data use > 'Improve the models for everyone'. Billing docs: 'If you are on the free plan, you can use the content non-commercially with attribution.' Free-tier abuse detection can show 'Free Tier usage disabled' on shared IPs or VPNs.",
+    "urls": [
+     "https://elevenlabs.io/docs/api-reference/speech-to-text/convert",
+     "https://elevenlabs.io/docs/help-center/legal/is-my-data-used-to-improve-eleven-labs-ai-models",
+     "https://elevenlabs.io/docs/overview/administration/billing.md",
+     "https://elevenlabs.io/docs/help-center/account/general/what-does-unusual-activity-detected-free-tier-usage-disabled-if-you-are-using-proxy-vpn-you-might-need-to-purchase-a-paid-plan-to-not-trigger-our-abuse-detectors-mean.md"
+    ],
+    "correction": "It is not an open question whether Free may use zero-retention: zero retention is enterprise-only, so Free users cannot use it. The training opt-out toggle is the only control Free users have. The Free license is non-commercial and requires attribution."
+   },
+   {
+    "name": "Perle.ai benchmark (arXiv 2605.19069): headline Egyptian numbers",
+    "status": "confirmed",
+    "what_was_checked": "I read the PDF text (v3, 22 May 2026, all authors @perle.ai). It says: '3.5× advantage on Egyptian Arabic WER of 13.1% vs. 45.9% for the next competitor' and 'ElevenLabs (13.1%) and Google Chirp 3 (59.7%) on Egyptian Arabic'. BERTScore is 0.939 vs 0.804. Mean WER: 13.2 / 38.6 / 39.4 / 43.6 (ElevenLabs / OpenAI / Chirp 3 / Azure). The paper says 'consumer-grade headset or USB microphones'. Voice actors read the reference transcripts 'conversationally'. Normalization: lowercase, punctuation removal, whitespace collapse. ElevenLabs ran with diarize=false. No language hint was given to ElevenLabs, OpenAI or Chirp. Azure got 4 candidate locales (e.g. ar-EG, en-US). Audio was MP3 except for Azure, which got 16 kHz WAV. The 'single script convention' remark is explicitly a hypothesis. The dataset on HF is public, ungated and MIT-licensed.",
+    "urls": [
+     "https://arxiv.org/abs/2605.19069",
+     "https://arxiv.org/pdf/2605.19069",
+     "https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch"
+    ],
+    "correction": "The paper text never says which system is the 45.9% 'next competitor'. Attributing 45.9% to gpt-4o-transcribe, and about 54–55% to Azure, rests only on reading the bar chart (Figure 2), so treat both as unverified."
+   },
+   {
+    "name": "Speechmatics: pricing, free credit, data use",
+    "status": "confirmed",
+    "what_was_checked": "The pricing page HTML reads: 'Last updated 31 July 2026' and 'Start with $100 in credit, no card required'. Batch prices: Melia 1 $0.129/hr, Standard $0.24/hr, Enhanced $0.40/hr. Real-time: Standard $0.24/hr, Enhanced $0.43/hr. Pro gets a 20% discount over 500 hr/month and is billed per second. The FAQ says data is 'never used to improve our models' unless you opt in, with a 33% discount for opting in. Batch data is kept 7 days, and files must be under 1 GB in the POST body.",
+    "urls": [
+     "https://www.speechmatics.com/pricing",
+     "https://docs.speechmatics.com/speech-to-text/batch/limits"
+    ],
+    "correction": "The June 17, 2026 Melia launch post advertised '10 hours per month free', which is now superseded by the $100 credit."
+   },
+   {
+    "name": "Speechmatics: Egyptian Arabic, ar_en pack, Melia 1, diarization",
+    "status": "corrected",
+    "what_was_checked": "Languages doc: 'Global Arabic... including MSA and Arabic spoken in the Gulf, Egypt, and the Levant'. ar_en is 'Ideal when transcribing Arabic and English in the same media file or stream'. Models doc: Melia 1 is batch-only, EU and US regions only, and needs model='melia-1' with language='multi'. It 'matches Standard for accuracy'. Custom dictionary, confidence scores and speaker identification are 'Not yet' supported, and it does not accept the bilingual pack codes. Diarization docs offer only speaker_sensitivity (0–1, default 0.5) and prefer_current_speaker; there is no speaker-count parameter. Diarization adds 10–50% processing time. Output labels speakers S1, S2 and marks unknown speech UU. The bilingual announcement (Mar 6, 2026) claims code-switching WER of 6.3% vs Google 9.7% and names Gulf, Egyptian and Levantine, but not the dataset.",
+    "urls": [
+     "https://docs.speechmatics.com/speech-to-text/languages",
+     "https://docs.speechmatics.com/speech-to-text/models",
+     "https://docs.speechmatics.com/speech-to-text/batch/batch-diarization",
+     "https://www.speechmatics.com/company/articles-and-news/arabic-english-bilingual-speech-to-text",
+     "https://www.speechmatics.com/company/articles-and-news/introducing-melia-multilingual-speech-to-text-model"
+    ],
+    "correction": "Melia 1 is only Standard-level accuracy and has no custom dictionary, so the higher-accuracy test is Enhanced + ar_en at $0.40/h. There is no way to force 2 speakers. The docs still do not say which script English words come out in."
+   },
+   {
+    "name": "Gemini 3.5 Transcribe: model, ar-EG, code-switching, limits, diarization",
+    "status": "confirmed",
+    "what_was_checked": "The model page (last updated 2026-09-01) confirms gemini-3.5-transcribe and gemini-3.5-transcribe-live. 'Arabic (Egypt) ar-EG' is the only Arabic locale. It 'handles multi-language code-switching'. The limit is 'Up to 1 hour per request (up to 30 minutes when speaker diarization or word-level timestamps are enabled)'. Diarization supports 'up to 8 speakers', 'Attribution for 3+ speakers is experimental', and it is incompatible with custom vocabulary. The transcription guide (updated 2026-09-23) adds 'Handles intra-sentence and inter-sentential code-switching' and uses spk_1/spk_2 labels. It also warns 'Enabling word-level timestamps may degrade overall transcription accuracy.' The blog (Aug 26, 2026) says 'up to three speakers (support for 3+ speakers is experimental)', 2.6% / 4.0% WER per Artificial Analysis, FLEURS 5.04 / 5.50, 70% faster than Chirp 3, and calls it a public preview.",
+    "urls": [
+     "https://ai.google.dev/gemini-api/docs/models/gemini-3.5-transcribe",
+     "https://ai.google.dev/gemini-api/docs/transcribe",
+     "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-3-5-transcribe/"
+    ],
+    "correction": "It is a public preview. Asking for word timestamps, which you would need to merge with local diarization, is officially said to degrade accuracy."
+   },
+   {
+    "name": "Gemini 3.5 Transcribe: pricing, free tier, data terms",
+    "status": "corrected",
+    "what_was_checked": "The pricing page HTML for gemini-3.5-transcribe reads: Free tier 'Free of charge'. Paid: '$2.00 or $0.003/min' audio in and '$12.00 or $0.002/min' text out, based on 25 audio tokens/s, 'blended rate of ~$0.005 per min'. 'Used to improve our products': Yes on free, No on paid. The $3.50 / $21.00 figures belong to the -live model. Terms for unpaid use: 'human reviewers may read, annotate, and process your API input and output' and 'Do not submit sensitive, confidential, or personal information'. You must be 18+. Egypt and Saudi Arabia are listed as available regions.",
+    "urls": [
+     "https://ai.google.dev/gemini-api/docs/pricing",
+     "https://ai.google.dev/gemini-api/terms",
+     "https://ai.google.dev/gemini-api/docs/available-regions"
+    ],
+    "correction": "The claim 'Free is not allowed for EEA, UK or Swiss users' is wrong. The terms say that for those users 'the terms under How Google uses Your Data in Paid Services apply to all Services, including Google AI Studio and unpaid quota'. That means free-tier data there is not used for training, which is the opposite of being banned. This does not affect a user in Egypt or Saudi Arabia."
+   },
+   {
+    "name": "Gemini general models (3.5 Flash / Flash-Lite / 2.5 Flash) via prompt",
+    "status": "confirmed",
+    "what_was_checked": "Audio guide: '32 tokens per second of audio (1 minute = 1,920 tokens)', 'Max length: 9.5 hours of audio per prompt', 'Downsampled to 16 Kbps', and multi-channel audio is merged to one. Files API is recommended above 20 MB. The example prompt asks the model to 'Identify distinct speakers (e.g., Speaker 1, Speaker 2)'. Pricing: 3.5 Flash-Lite paid input is $0.30 (text/image/video/audio) and 2.5 Flash audio input is $1.00. Both are free of charge on the free tier.",
+    "urls": [
+     "https://ai.google.dev/gemini-api/docs/audio",
+     "https://ai.google.dev/gemini-api/docs/pricing"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "OpenAI gpt-4o-transcribe-diarize / gpt-transcribe",
+    "status": "confirmed",
+    "what_was_checked": "Guide: 'Files can be up to 25 MB'. 'gpt-4o-transcribe-diarize doesn't support prompts'. It takes up to four known_speaker_references. chunking_strategy 'auto' is needed for audio over 30 s. The languages hint works with gpt-transcribe. The diarize model page shows $2.5 / $10 per 1M tokens, a 16,000-token context window and 2,000 max output tokens, with rate limits for Tiers 1–5 only (no Free row). gpt-transcribe is $0.0045/min, with hints for 'multilingual audio, and code-switching', and also Tiers 1–5 only. The pricing page shows gpt-4o-transcribe at $0.006/min and gpt-4o-mini-transcribe at $0.003/min.",
+    "urls": [
+     "https://developers.openai.com/api/docs/guides/speech-to-text",
+     "https://developers.openai.com/api/docs/models/gpt-4o-transcribe-diarize",
+     "https://developers.openai.com/api/docs/models/gpt-transcribe",
+     "https://developers.openai.com/api/docs/pricing"
+    ],
+    "correction": "No per-minute price for the diarize model appears on the pricing page; $0.006/min is inferred from gpt-4o-transcribe. The 1400/1500 s cap is still community-reported only, but the official 2,000 max output tokens also forces short chunks. There is no free tier, as claimed."
+   },
+   {
+    "name": "Azure AI Speech (F0, ar-EG, MAI-Transcribe)",
+    "status": "confirmed",
+    "what_was_checked": "Pricing footnote: F0 'Real-time Transcription: 5 audio hours free per month', 'shared between Standard and Custom, Batch is not supported'. Quotas page: F0 fast transcription and real-time diarization are 'Not applicable'. On S0, diarization is limited to 240 min per file, and fast transcription to under 500 MB and 5 h. Locale table: ar-EG has fast transcription. The MAI-Transcribe page is a public preview. MAI-Transcribe-1 was 'Deprecated on Aug 20, 2026'. Its code switching is for 'Hinglish and Spanglish', and Arabic is listed only as 'ar'.",
+    "urls": [
+     "https://azure.microsoft.com/en-us/pricing/details/cognitive-services/speech-services/",
+     "https://learn.microsoft.com/en-us/azure/ai-services/speech-service/speech-services-quotas-and-limits",
+     "https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=stt",
+     "https://learn.microsoft.com/en-us/azure/ai-services/speech-service/mai-transcribe"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Google Chirp 3 (ar-EG, Arabic diarization)",
+    "status": "confirmed",
+    "what_was_checked": "The model page lists ar-EG and ar-XA as Preview. The diarization language list is cmn-Hans-CN, de-DE, en-GB, en-IN, en-US, es-ES, es-US, fr-CA, fr-FR, hi-IN, it-IT, ja-JP, ko-KR and pt-BR, with no Arabic.",
+    "urls": [
+     "https://docs.cloud.google.com/speech-to-text/docs/models/chirp-3"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Amazon Transcribe: no ar-EG",
+    "status": "confirmed",
+    "what_was_checked": "The supported-languages table lists only 'Arabic, Gulf ar-AE' and 'Arabic, Modern Standard ar-SA'.",
+    "urls": [
+     "https://docs.aws.amazon.com/transcribe/latest/dg/supported-languages.html"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Deepgram Nova-3: free credit, ar-EG, code-switching, diarization price",
+    "status": "corrected",
+    "what_was_checked": "Pricing page: 'Free $200 Credit', 'No minimums. No expiration. No credit card required'. Nova-3 pre-recorded is $0.0043/min monolingual and $0.0052/min multilingual. Models doc: nova-3 'multi' covers English, Spanish, French, German, Hindi, Russian, Portuguese, Japanese, Italian and Dutch. ar-EG appears in the monolingual Arabic list (ar, ar-AE, ar-SA ... ar-EG ...).",
+    "urls": [
+     "https://deepgram.com/pricing",
+     "https://developers.deepgram.com/docs/models-languages-overview"
+    ],
+    "correction": "The ambiguity is resolved. In the pre-recorded add-ons table, Speaker Diarization is 'Included'. The $0.0020/min diarization price is in the streaming table only."
+   },
+   {
+    "name": "AssemblyAI Universal-3.5 Pro",
+    "status": "confirmed",
+    "what_was_checked": "Pricing: Universal-3.5 Pro $0.21/hr ('18 languages, with native code switching'), Universal-2 $0.15/hr, diarization $0.02/hr, prompting $0.05/hr. Pricing FAQ: 'no credit card required. The free tier includes up to 185 hours of pre-recorded transcription'. Models doc: Arabic is among the 18 languages. Launch blog is dated 7 July 2026. Opt-out doc: 'Free users do not have the ability to opt out of the model improvement program.'",
+    "urls": [
+     "https://www.assemblyai.com/pricing",
+     "https://www.assemblyai.com/docs/getting-started/models",
+     "https://www.assemblyai.com/docs/pre-recorded-audio/supported-languages",
+     "https://www.assemblyai.com/blog/universal-3-5-pro-async",
+     "https://www.assemblyai.com/docs/faq/how-to-opt-out-of-data-sharing-for-our-model-improvement-program"
+    ],
+    "correction": "The pricing page itself states the free tier as '185 hours', not '$50'. The $50 figure comes from AssemblyAI docs as seen in search snippets and was not re-read. In AssemblyAI's own cpWER table, ElevenLabs Scribe v2 has the lowest cpWER on both CallHome telephony sets (14.82 / 16.18 vs U-3.5 Pro 17.18 / 17.78), even though U-3.5 Pro has the best average."
+   },
+   {
+    "name": "Soniox: no free credits",
+    "status": "confirmed",
+    "what_was_checked": "The blog post of Oct 27, 2025 says 'New signups — We will no longer offer free credits going forward.' The pricing page says 'about $0.10/hour for async (file) and $0.12/hour for real-time'.",
+    "urls": [
+     "https://soniox.com/blog/2025-10-27-free-credits-update-for-soniox-api",
+     "https://soniox.com/pricing"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Gladia (Solaria-1)",
+    "status": "confirmed",
+    "what_was_checked": "Pricing: '50€ in free credits, a one-time grant with no monthly reset... roughly 80+ hours of pre-recorded'. Async is $0.61/hr and real-time $0.75/hr. 'Automatic model training opt-out' starts at Growth. The languages table marks Arabic 'Yes' for Solaria-1 and 'No' for Solaria-3, and says 'For conversations mixing languages, use Solaria-1.' Limits: 135 min per request (4h15 on enterprise) and 1000 MB per file.",
+    "urls": [
+     "https://www.gladia.io/pricing",
+     "https://docs.gladia.io/chapters/limits-and-specifications/languages",
+     "https://docs.gladia.io/chapters/limits-and-specifications/supported-formats"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Mistral Voxtral Mini Transcribe V2",
+    "status": "confirmed",
+    "what_was_checked": "News post (datePublished 2026-02-04): $0.003/min, '13 languages' including Arabic, diarization, context biasing, 'up to 3 hours in a single request', and 'approximately 4% word error rate on FLEURS'. Docs repeat the 3 h and diarization claims. Studio quickstart: 'Free mode: API access is enabled by default with no credit card required. Usage and rate limits apply.' Help center: the 'Anonymous improvement data' toggle opts out, but the default is not stated. AssemblyAI's cpWER table lists Voxtral at 19.50 / 19.36 on CallHome.",
+    "urls": [
+     "https://mistral.ai/news/voxtral-transcribe-2/",
+     "https://docs.mistral.ai/studio/audio/speech_to_text",
+     "https://docs.mistral.ai/getting-started/quickstarts/studio/activate-and-generate-api-key",
+     "https://help.mistral.ai/en/articles/455207-can-i-opt-out-of-my-input-or-output-data-being-used-for-training",
+     "https://www.assemblyai.com/blog/universal-3-5-pro-async"
+    ],
+    "correction": "The claims are backed by official sources, so confidence can move up from 'secondary-source'. Two things are still unverified: whether Voxtral transcription falls inside Free-mode limits, and whether data is opted in by default."
+   },
+   {
+    "name": "Cohere Transcribe Arabic",
+    "status": "confirmed",
+    "what_was_checked": "Docs: model id cohere-transcribe-arabic-07-2026, 25MB limit, 'does not automatically identify individual speakers', 'does not output timestamps'. Rate limits: trial keys are 'limited to 1,000 API calls a month', and Audio Transcriptions trial is '5 req / min'. Blog (July 7, 2026) names MSA, Egyptian, Gulf, Levantine and Maghrebi, keeps English terms in Latin script, and reports 25.87 WER. HF card: 2B params, Apache-2.0, 'exhibits inconsistent performance on code-switched audio', 'does not feature explicit, automatic language detection', average 25.87 WER / 11.80 CER, Casablanca 49.71 / 20.66.",
+    "urls": [
+     "https://docs.cohere.com/docs/transcribe-arabic",
+     "https://docs.cohere.com/docs/rate-limits",
+     "https://cohere.com/blog/transcribe-arabic",
+     "https://huggingface.co/CohereLabs/cohere-transcribe-arabic-07-2026"
+    ],
+    "correction": "The HF weights are gated: you must accept conditions to download them."
+   },
+   {
+    "name": "Groq hosted Whisper large-v3 / turbo",
+    "status": "confirmed",
+    "what_was_checked": "Rate-limits table: whisper-large-v3 and -turbo get 20 RPM, 2K RPD, 7.2K audio-seconds/hour and 28.8K audio-seconds/day. STT docs: $0.111/h (v3) and $0.04/h (turbo). 'Max File Size 25 MB (free tier), 100MB (dev tier)', with a url parameter for larger files. 'Minimum Billed Length 10 seconds'. Your-data page: 'By default, Groq does not retain customer data for inference requests', and Zero Data Retention can be turned on in Data Controls.",
+    "urls": [
+     "https://console.groq.com/docs/rate-limits",
+     "https://console.groq.com/docs/speech-to-text",
+     "https://console.groq.com/docs/your-data"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Cloudflare Workers AI Whisper turbo / Nova-3",
+    "status": "confirmed",
+    "what_was_checked": "'10,000 Neurons per day at no charge', then $0.011 per 1,000 Neurons. @cf/openai/whisper-large-v3-turbo is $0.0005/audio-min (46.63 neurons/min). @cf/deepgram/nova-3 is $0.0052/min (472.73 neurons/min).",
+    "urls": [
+     "https://developers.cloudflare.com/workers-ai/platform/pricing/"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "Hamsa and Munsit free allowances",
+    "status": "confirmed",
+    "what_was_checked": "Hamsa pricing: Free $0 with '50 Credits Limit' and 'Speech To Text - Up to 50 min'. Hamsa docs list 'Egyptian, Gulf, Levantine...', 'Code-switching: Handle mixed Arabic-English speech naturally' and speaker diarization. Munsit pricing: '10,000 free credits. No credit card required' and 'speech-to-text - 1,000 credits per minute', which is about 10 min. Munsit docs have an /audio/diarization/transcribe endpoint.",
+    "urls": [
+     "https://tryhamsa.com/pricing/",
+     "https://docs.tryhamsa.com/overview/capabilities/speech-to-text",
+     "https://munsit.com/pricing",
+     "https://docs.munsit.com/"
+    ],
+    "correction": "It is still unverified whether Hamsa's free plan includes API access. Neither vendor publishes accuracy data."
+   },
+   {
+    "name": "pyannote community-1: license, gating, DER, telemetry",
+    "status": "corrected",
+    "what_was_checked": "The HF API shows gated='auto' and license cc-by-4.0. The card's DER table uses 'no forgiveness collar, nor skipping overlapping speech'. CALLHOME part 2: 3.1 28.5, community-1 26.7, precision-2 16.6. The card says 'resampled to 16kHz automatically'. The README config.yaml ships 'metrics_enabled: true' with otlp_endpoint https://otel.pyannote.ai, and PYANNOTE_METRICS_ENABLED=0 disables it. The self-hosted speed on H100 is 31 s per hour. PyPI 4.0.7 requires torch>=2.8, torchaudio, torchcodec, lightning and opentelemetry.",
+    "urls": [
+     "https://huggingface.co/pyannote/speaker-diarization-community-1",
+     "https://raw.githubusercontent.com/pyannote/pyannote-audio/main/README.md",
+     "https://raw.githubusercontent.com/pyannote/pyannote-audio/main/src/pyannote/audio/telemetry/config.yaml",
+     "https://pypi.org/pypi/pyannote.audio/json"
+    ],
+    "correction": "The claim that community-1 'scores lower DER on every dataset' (made in the 3.1 entry) is wrong. On REPERE, 3.1 scores 7.9 and community-1 8.9, and VoxConverse is tied at 11.2."
+   },
+   {
+    "name": "NVIDIA Nemotron-3-Diarization + NeMo-Speech.cpp",
+    "status": "corrected",
+    "what_was_checked": "HF API: ungated, license openmdw-1.1, repo created 2026-09-01 and modified 2026-09-24. Files: q8_0.gguf 107,012,128 B, .nemo 198.7 MB, safetensors 397 MB. The card says 100M params, 'ready for commercial or non-commercial use', 16 kHz input and up to 8 speakers. CALLHOME-Part2 (0.25 s collar): 2-speaker 5.98 at 30.4 s latency and 6.98 at 1.04 s; full set 9.10 with SCA 91.6. Sortformer v2.1 scores 5.68 / 10.32. Training includes Fisher (6,755 h) and NIST SRE 2000 CALLHOME Part 1. RTFx is 1340 / 4385. NeMo-Speech.cpp (Apache-2.0, created 2026-07-15): the CLI docs say 'The file CLI accepts mono or stereo PCM16 and float32 WAV input from 8-96 kHz. It downmixes and resamples'. --offline full attention is limited to about 6.6 min, so long audio uses the default streaming pass. There is no speaker-count flag, only onset/offset/min-duration flags.",
+    "urls": [
+     "https://huggingface.co/nvidia/Nemotron-3-Diarization",
+     "https://huggingface.co/nvidia/Nemotron-3-Diarization/raw/main/README.md",
+     "https://github.com/NVIDIA/NeMo-Speech.cpp",
+     "https://raw.githubusercontent.com/NVIDIA/NeMo-Speech.cpp/main/docs/cli.md",
+     "https://api.github.com/repos/NVIDIA/NeMo-Speech.cpp/releases/tags/v0.1.0"
+    ],
+    "correction": "1) The only versioned NeMo-Speech.cpp release, v0.1.0 (2026-08-19), lists diarization with 'Streaming Sortformer v2' only. Nemotron 3 Diarization (V3) support appears only in main-branch docs, so the prebuilt CPU archive may not run it. The installer falls back to a source build (Git, CMake>=3.26, Ninja, C++17, SentencePiece). This is unverified, so test it. 2) The NeMo-Speech.cpp CLI resamples 8 kHz WAV itself, so manual resampling is not needed there. 3) The exact public release date (claimed 2026-09-23) is unverified; the repo was modified 2026-09-24."
+   },
+   {
+    "name": "sherpa-onnx diarization",
+    "status": "confirmed",
+    "what_was_checked": "The official Python example sets num_clusters=num_speakers. If -1, it uses cluster_threshold (default 0.5; 'A smaller cluster_threshold leads to more clusters'). It resamples with librosa to the model rate and errors on a mismatch. PyPI version is 1.13.8.",
+    "urls": [
+     "https://github.com/k2-fsa/sherpa-onnx/blob/master/python-api-examples/offline-speaker-diarization.py",
+     "https://pypi.org/pypi/sherpa-onnx/json"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "DiariZen and VBx licenses/limits",
+    "status": "confirmed",
+    "what_was_checked": "DiariZen README: weights are CC BY-NC 4.0, 'research and academic purposes only', and the install pins torch==2.1.1. VBx README: Apache-2.0. 'running AHC on long files (more than 30 minutes) can become very slow', with random_<n> initialization offered. CALLHOME: Forgiving 4.42, Fair 14.21, Full 21.77.",
+    "urls": [
+     "https://raw.githubusercontent.com/BUTSpeechFIT/DiariZen/main/README.md",
+     "https://raw.githubusercontent.com/BUTSpeechFIT/VBx/master/README.md"
+    ],
+    "correction": ""
+   },
+   {
+    "name": "pyannoteAI hosted trial and prices",
+    "status": "corrected",
+    "what_was_checked": "Pricing page: '1-month free trial', 'No credit card required', and 'Start free for 30 days... Up to 170 hours of audio processed'. The FAQ says '150 hours of identification and 10 voiceprints for one month'. Prices: 0.112€/h (Precision-3), 0.035€/h (Community-1), 0.168€/h (STT orchestration). Paid Developer plan is €19/month. The Precision-3 blog gives 14.35 vs 16.02 average DER over 15 datasets.",
+    "urls": [
+     "https://www.pyannote.ai/pricing",
+     "https://www.pyannote.ai/blog/precision-3"
+    ],
+    "correction": "The trial is now stated as 'up to 170 hours' on the pricing card, while the FAQ still says 150 hours. Both come from the same page, so the exact figure is unclear. The Precision-3 release date (2026-09-24) was not confirmed."
+   },
+   {
+    "name": "Soniqo Arabic diarization numbers",
+    "status": "confirmed",
+    "what_was_checked": "Arabic, 12 files: Nemotron 3 16.54% (MLX) / 18.16% (CoreML), Sortformer source 22.32%. Earlier table: pyannote Community-1 15.57%, Sortformer offline 17.92%, Speech Cloud API 21.02%. The set is described only as 'Broadcast, telephone and meeting audio'.",
+    "urls": [
+     "https://soniqo.audio/benchmarks/diarization"
+    ],
+    "correction": ""
+   }
+  ],
+  "missing": [
+   "ElevenLabs zero-retention (enable_logging=false) is enterprise-only, so a Free account cannot use it. The Free plan also requires attribution, and free-tier abuse detection can disable Free on shared IPs or VPNs (https://elevenlabs.io/docs/api-reference/speech-to-text/convert, https://elevenlabs.io/docs/overview/administration/billing.md).",
+   "ElevenLabs caps credits usable at once at twice the monthly quota. Combined with the 330 credits/min STT rate, one 80-min job may exceed what Free allows. Official pages disagree (4h30 on the API page vs 10k credits on the creative page), so test a short file before relying on Free for a full call.",
+   "AssemblyAI's own launch blog has a cpWER table where ElevenLabs Scribe v2 is best on both CallHome telephony sets (14.82 / 16.18). The next best are Soniox 16.11 / 17.45 and AssemblyAI 17.18 / 17.78. This is competitor-published, English-only evidence that Scribe's speaker attribution is strong on phone audio (https://www.assemblyai.com/blog/universal-3-5-pro-async).",
+   "Speechmatics Melia 1 is only Standard-level accuracy and has no custom dictionary. For an A/B against ElevenLabs, the stronger config is model='enhanced' with language='ar_en' ($0.40/h). Speechmatics batch has no num_speakers option (only speaker_sensitivity and prefer_current_speaker). Its output carries a per-word 'language' field, which helps with code-switched text.",
+   "Gemini 3.5 Transcribe is a public preview. The docs say word-level timestamps 'may degrade overall transcription accuracy', and the 30-min cap applies whenever diarization or timestamps are on. An 80-min call therefore needs 3 chunks, with speakers re-linked across chunks.",
+   "The Gemini EEA/UK/Swiss claim is inverted. Free use is allowed there, and paid-tier data terms apply to it. This does not matter for a user in Egypt or Saudi Arabia, where free-tier data is used for training and human review.",
+   "Deepgram pre-recorded diarization is included at no extra cost. Only streaming diarization costs $0.0020/min.",
+   "NeMo-Speech.cpp v0.1.0 (the only prebuilt release) documents only Sortformer v2 diarization. Running Nemotron-3-Diarization may need a source build. Its CLI does accept and resample 8 kHz WAV.",
+   "pyannote telemetry defaults to ON (metrics_enabled: true, sent to otel.pyannote.ai). Set PYANNOTE_METRICS_ENABLED=0 before first use.",
+   "The Perle Egyptian Ar–En audio set (300 MP3 utterances) is public, MIT-licensed and ungated on HF. The user can download it as a second local test set without uploading anything (https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch).",
+   "Perle gave ElevenLabs no language hint. Adding language_code='ar' or keyterms is untested and could change script behaviour for English terms, so the user should A/B it.",
+   "Cohere Transcribe Arabic also has local weights (2B params, Apache-2.0, gated on HF). At about 4 GB in BF16 (my estimate), downloading it is painful at 1.5 MB/s. No official GGUF or quantised build was found (unverified).",
+   "OpenAI gpt-4o-transcribe-diarize has an official 2,000 max-output-token limit and a 16k context window, so long calls must be chunked regardless of the community-reported 1400 s cap."
+  ]
+ }
+}

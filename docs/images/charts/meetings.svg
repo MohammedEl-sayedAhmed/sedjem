@@ -1,0 +1,128 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="472" viewBox="0 0 800 472" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Real meetings: difference from ElevenLabs and English kept</title>
+<rect x="0.5" y="0.5" width="799" height="471" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Real meetings: difference from ElevenLabs and English kept</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">Each excerpt, then all six pooled. The reference is ElevenLabs' transcript.</text>
+<rect x="24" y="72" width="12" height="12" rx="3" fill="#0e7c7b"/>
+<text x="42" y="82" font-size="12" fill="#4b5563">Cohere Transcribe Arabic</text>
+<rect x="209.76" y="72" width="12" height="12" rx="3" fill="#2563eb"/>
+<text x="227.76" y="82" font-size="12" fill="#4b5563">whisper-medium</text>
+<text x="112" y="112" font-size="13" fill="#1f2937" font-weight="600">Words that differ from ElevenLabs, %</text>
+<text x="112" y="127" font-size="11" fill="#6b7280">lower is closer</text>
+<text x="540" y="112" font-size="13" fill="#1f2937" font-weight="600">English kept, %</text>
+<text x="540" y="127" font-size="11" fill="#6b7280">higher is better</text>
+<text x="96" y="156" font-size="13" fill="#1f2937" text-anchor="end">m1</text>
+<text x="96" y="170" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m1/people">2</tspan> people</text>
+<text x="96" y="196" font-size="13" fill="#1f2937" text-anchor="end">m2</text>
+<text x="96" y="210" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m2/people">3</tspan> people</text>
+<text x="96" y="236" font-size="13" fill="#1f2937" text-anchor="end">m3</text>
+<text x="96" y="250" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m3/people">3</tspan> people</text>
+<text x="96" y="276" font-size="13" fill="#1f2937" text-anchor="end">m4</text>
+<text x="96" y="290" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m4/people">3</tspan> people</text>
+<text x="96" y="316" font-size="13" fill="#1f2937" text-anchor="end">m5</text>
+<text x="96" y="330" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m5/people">2</tspan> people</text>
+<text x="96" y="356" font-size="13" fill="#1f2937" text-anchor="end">m6</text>
+<text x="96" y="370" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/meetings/m6/people">5</tspan> people</text>
+<line x1="24" y1="384" x2="776" y2="384" stroke="#e5e7eb"/>
+<text x="96" y="408" font-size="13" fill="#1f2937" text-anchor="end">Pooled</text>
+<text x="96" y="422" font-size="11" fill="#6b7280" text-anchor="end">all six</text>
+<g data-axis="x" data-scale="0 70 112 462">
+<line x1="112" y1="138" x2="112" y2="378" stroke="#9ca3af" data-tick="0"/>
+<line x1="112" y1="390" x2="112" y2="430" stroke="#9ca3af" data-tick="0"/>
+<text x="112" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="162" y1="138" x2="162" y2="378" stroke="#e5e7eb" data-tick="10"/>
+<line x1="162" y1="390" x2="162" y2="430" stroke="#e5e7eb" data-tick="10"/>
+<text x="162" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="212" y1="138" x2="212" y2="378" stroke="#e5e7eb" data-tick="20"/>
+<line x1="212" y1="390" x2="212" y2="430" stroke="#e5e7eb" data-tick="20"/>
+<text x="212" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="262" y1="138" x2="262" y2="378" stroke="#e5e7eb" data-tick="30"/>
+<line x1="262" y1="390" x2="262" y2="430" stroke="#e5e7eb" data-tick="30"/>
+<text x="262" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<line x1="312" y1="138" x2="312" y2="378" stroke="#e5e7eb" data-tick="40"/>
+<line x1="312" y1="390" x2="312" y2="430" stroke="#e5e7eb" data-tick="40"/>
+<text x="312" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="40">40</text>
+<line x1="362" y1="138" x2="362" y2="378" stroke="#e5e7eb" data-tick="50"/>
+<line x1="362" y1="390" x2="362" y2="430" stroke="#e5e7eb" data-tick="50"/>
+<text x="362" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="50">50</text>
+<line x1="412" y1="138" x2="412" y2="378" stroke="#e5e7eb" data-tick="60"/>
+<line x1="412" y1="390" x2="412" y2="430" stroke="#e5e7eb" data-tick="60"/>
+<text x="412" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="60">60</text>
+<line x1="462" y1="138" x2="462" y2="378" stroke="#e5e7eb" data-tick="70"/>
+<line x1="462" y1="390" x2="462" y2="430" stroke="#e5e7eb" data-tick="70"/>
+<text x="462" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="70">70</text>
+<path d="M112,145 L322,145 Q326,145 326,149 L326,153 Q326,157 322,157 L112,157 Z" fill="#0e7c7b" data-ref="data/meetings/m1/cohere_wer"/>
+<text x="332" y="154.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/cohere_wer">42.8</tspan>%</text>
+<path d="M112,159 L371,159 Q375,159 375,163 L375,167 Q375,171 371,171 L112,171 Z" fill="#2563eb" data-ref="data/meetings/m1/whisper_wer"/>
+<text x="381" y="168.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/whisper_wer">52.6</tspan>%</text>
+<path d="M112,185 L338,185 Q342,185 342,189 L342,193 Q342,197 338,197 L112,197 Z" fill="#0e7c7b" data-ref="data/meetings/m2/cohere_wer"/>
+<text x="348" y="194.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/cohere_wer">46.0</tspan>%</text>
+<path d="M112,199 L369.5,199 Q373.5,199 373.5,203 L373.5,207 Q373.5,211 369.5,211 L112,211 Z" fill="#2563eb" data-ref="data/meetings/m2/whisper_wer"/>
+<text x="379.5" y="208.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/whisper_wer">52.3</tspan>%</text>
+<path d="M112,225 L278,225 Q282,225 282,229 L282,233 Q282,237 278,237 L112,237 Z" fill="#0e7c7b" data-ref="data/meetings/m3/cohere_wer"/>
+<text x="288" y="234.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/cohere_wer">34.0</tspan>%</text>
+<path d="M112,239 L280,239 Q284,239 284,243 L284,247 Q284,251 280,251 L112,251 Z" fill="#2563eb" data-ref="data/meetings/m3/whisper_wer"/>
+<text x="290" y="248.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/whisper_wer">34.4</tspan>%</text>
+<path d="M112,265 L351.5,265 Q355.5,265 355.5,269 L355.5,273 Q355.5,277 351.5,277 L112,277 Z" fill="#0e7c7b" data-ref="data/meetings/m4/cohere_wer"/>
+<text x="361.5" y="274.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/cohere_wer">48.7</tspan>%</text>
+<path d="M112,279 L353,279 Q357,279 357,283 L357,287 Q357,291 353,291 L112,291 Z" fill="#2563eb" data-ref="data/meetings/m4/whisper_wer"/>
+<text x="363" y="288.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/whisper_wer">49.0</tspan>%</text>
+<path d="M112,305 L357,305 Q361,305 361,309 L361,313 Q361,317 357,317 L112,317 Z" fill="#0e7c7b" data-ref="data/meetings/m5/cohere_wer"/>
+<text x="367" y="314.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/cohere_wer">49.8</tspan>%</text>
+<path d="M112,319 L354.5,319 Q358.5,319 358.5,323 L358.5,327 Q358.5,331 354.5,331 L112,331 Z" fill="#2563eb" data-ref="data/meetings/m5/whisper_wer"/>
+<text x="364.5" y="328.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/whisper_wer">49.3</tspan>%</text>
+<path d="M112,345 L324.5,345 Q328.5,345 328.5,349 L328.5,353 Q328.5,357 324.5,357 L112,357 Z" fill="#0e7c7b" data-ref="data/meetings/m6/cohere_wer"/>
+<text x="334.5" y="354.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/cohere_wer">43.3</tspan>%</text>
+<path d="M112,359 L418,359 Q422,359 422,363 L422,367 Q422,371 418,371 L112,371 Z" fill="#2563eb" data-ref="data/meetings/m6/whisper_wer"/>
+<text x="428" y="368.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/whisper_wer">62.0</tspan>%</text>
+<path d="M112,397 L327,397 Q331,397 331,401 L331,405 Q331,409 327,409 L112,409 Z" fill="#0e7c7b" data-ref="data/meetings/pooled/cohere_wer"/>
+<text x="337" y="406.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/pooled/cohere_wer">43.8</tspan>%</text>
+<path d="M112,411 L352,411 Q356,411 356,415 L356,419 Q356,423 352,423 L112,423 Z" fill="#2563eb" data-ref="data/meetings/pooled/whisper_wer"/>
+<text x="362" y="420.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/pooled/whisper_wer">48.8</tspan>%</text>
+</g>
+<g data-axis="x" data-scale="0 100 540 740">
+<line x1="540" y1="138" x2="540" y2="378" stroke="#9ca3af" data-tick="0"/>
+<line x1="540" y1="390" x2="540" y2="430" stroke="#9ca3af" data-tick="0"/>
+<text x="540" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="590" y1="138" x2="590" y2="378" stroke="#e5e7eb" data-tick="25"/>
+<line x1="590" y1="390" x2="590" y2="430" stroke="#e5e7eb" data-tick="25"/>
+<text x="590" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<line x1="640" y1="138" x2="640" y2="378" stroke="#e5e7eb" data-tick="50"/>
+<line x1="640" y1="390" x2="640" y2="430" stroke="#e5e7eb" data-tick="50"/>
+<text x="640" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="50">50</text>
+<line x1="690" y1="138" x2="690" y2="378" stroke="#e5e7eb" data-tick="75"/>
+<line x1="690" y1="390" x2="690" y2="430" stroke="#e5e7eb" data-tick="75"/>
+<text x="690" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="75">75</text>
+<line x1="740" y1="138" x2="740" y2="378" stroke="#e5e7eb" data-tick="100"/>
+<line x1="740" y1="390" x2="740" y2="430" stroke="#e5e7eb" data-tick="100"/>
+<text x="740" y="446" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="100">100</text>
+<path d="M540,145 L656,145 Q660,145 660,149 L660,153 Q660,157 656,157 L540,157 Z" fill="#0e7c7b" data-ref="data/meetings/m1/cohere_en_kept"/>
+<text x="666" y="154.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/cohere_en_kept">60</tspan>%</text>
+<path d="M540,159 L650,159 Q654,159 654,163 L654,167 Q654,171 650,171 L540,171 Z" fill="#2563eb" data-ref="data/meetings/m1/whisper_en_kept"/>
+<text x="660" y="168.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m1/whisper_en_kept">57</tspan>%</text>
+<path d="M540,185 L620,185 Q624,185 624,189 L624,193 Q624,197 620,197 L540,197 Z" fill="#0e7c7b" data-ref="data/meetings/m2/cohere_en_kept"/>
+<text x="630" y="194.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/cohere_en_kept">42</tspan>%</text>
+<path d="M540,199 L622,199 Q626,199 626,203 L626,207 Q626,211 622,211 L540,211 Z" fill="#2563eb" data-ref="data/meetings/m2/whisper_en_kept"/>
+<text x="632" y="208.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m2/whisper_en_kept">43</tspan>%</text>
+<path d="M540,225 L662,225 Q666,225 666,229 L666,233 Q666,237 662,237 L540,237 Z" fill="#0e7c7b" data-ref="data/meetings/m3/cohere_en_kept"/>
+<text x="672" y="234.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/cohere_en_kept">63</tspan>%</text>
+<path d="M540,239 L686,239 Q690,239 690,243 L690,247 Q690,251 686,251 L540,251 Z" fill="#2563eb" data-ref="data/meetings/m3/whisper_en_kept"/>
+<text x="696" y="248.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m3/whisper_en_kept">75</tspan>%</text>
+<path d="M540,265 L626,265 Q630,265 630,269 L630,273 Q630,277 626,277 L540,277 Z" fill="#0e7c7b" data-ref="data/meetings/m4/cohere_en_kept"/>
+<text x="636" y="274.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/cohere_en_kept">45</tspan>%</text>
+<path d="M540,279 L648,279 Q652,279 652,283 L652,287 Q652,291 648,291 L540,291 Z" fill="#2563eb" data-ref="data/meetings/m4/whisper_en_kept"/>
+<text x="658" y="288.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m4/whisper_en_kept">56</tspan>%</text>
+<path d="M540,305 L578,305 Q582,305 582,309 L582,313 Q582,317 578,317 L540,317 Z" fill="#0e7c7b" data-ref="data/meetings/m5/cohere_en_kept"/>
+<text x="588" y="314.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/cohere_en_kept">21</tspan>%</text>
+<path d="M540,319 L644,319 Q648,319 648,323 L648,327 Q648,331 644,331 L540,331 Z" fill="#2563eb" data-ref="data/meetings/m5/whisper_en_kept"/>
+<text x="654" y="328.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m5/whisper_en_kept">54</tspan>%</text>
+<path d="M540,345 L543,345 Q546,345 546,348 L546,354 Q546,357 543,357 L540,357 Z" fill="#0e7c7b" data-ref="data/meetings/m6/cohere_en_kept"/>
+<text x="552" y="354.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/cohere_en_kept">3</tspan>%</text>
+<path d="M540,359 L606,359 Q610,359 610,363 L610,367 Q610,371 606,371 L540,371 Z" fill="#2563eb" data-ref="data/meetings/m6/whisper_en_kept"/>
+<text x="616" y="368.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/m6/whisper_en_kept">35</tspan>%</text>
+<path d="M540,397 L628,397 Q632,397 632,401 L632,405 Q632,409 628,409 L540,409 Z" fill="#0e7c7b" data-ref="data/meetings/pooled/cohere_en_kept"/>
+<text x="638" y="406.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/pooled/cohere_en_kept">46</tspan>%</text>
+<path d="M540,411 L650,411 Q654,411 654,415 L654,419 Q654,423 650,423 L540,423 Z" fill="#2563eb" data-ref="data/meetings/pooled/whisper_en_kept"/>
+<text x="660" y="420.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/meetings/pooled/whisper_en_kept">57</tspan>%</text>
+</g>
+</svg>

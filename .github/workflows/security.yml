@@ -1,0 +1,63 @@
+# The dependencies' known vulnerabilities (docs/14-pipeline.md): pip-audit on the locks, every package the
+# workflows install, for every push to main and pull request and once a week, since a vulnerability can be
+# published for a version already in use; and for a pull request, GitHub's dependency review of what it adds or
+# changes, the workflows' actions included. Dependabot (.github/dependabot.yml) proposes the updates.
+name: Security
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "43 4 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+# A new push to a pull request cancels the run it replaces; every commit on main gets its own.
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  pip-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.12"
+
+      # pip-audit looks up every package of each lock in .github/locks/, the dependencies' dependencies too, in the
+      # Python Packaging Advisory Database and OSV. It is given each lock's pins without their markers, which would
+      # leave out the packages that only Windows installs on this Linux runner. It comes from the tools' lock, at
+      # the version in .github/locks/tools.in.
+      - name: pip-audit
+        run: |
+          python -m pip install --require-hashes -r .github/locks/tools.txt
+          status=0
+          for lock in .github/locks/*.txt; do
+            echo "::group::$lock"
+            python .github/scripts/locks.py pins "$lock" > "$RUNNER_TEMP/pins.txt"
+            pip-audit --progress-spinner off --desc on --disable-pip --no-deps -r "$RUNNER_TEMP/pins.txt" || status=1
+            echo "::endgroup::"
+          done
+          exit "$status"
+
+  dependency-review:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      # fails on a dependency the pull request adds with a known vulnerability of high severity or more
+      - uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
+        with:
+          fail-on-severity: high

@@ -1,0 +1,73 @@
+# Private: the recordings and everything transcribed from them
+audio-test/
+data/
+app_data/
+# the transcripts of YouTube videos and courses, written by the app (app/courses.py)
+courses/
+
+# results/ holds only public test-set outputs; everything else there (results/poc/, results/meetings/,
+# runs on private sets) stays local
+results/*
+!results/perle.*
+!results/arzen.*
+!results/mixat.*
+!results/summary.json
+!results/ami-diarization.json
+!results/arzen-diarization.json
+
+# Private: never commit the meetings dataset or anything derived from it (the dataset's own
+# name pattern is kept in .git/info/exclude, which is not shared)
+*.named.txt
+*.elevenlabs.txt
+*.speakers.*
+*.words.json
+*.srt
+*.vtt
+
+# Private or bulky audio/video anywhere in the tree (any letter case)
+*.[Ww][Aa][Vv]
+*.[Mm][Pp]3
+*.[Mm]4[AaBb]
+*.[Mm][Pp]4
+*.[Mm][Kk][VvAa]
+*.[Ww][Ee][Bb][Mm]
+*.[Ff][Ll][Aa][Cc]
+*.[Oo][Gg][Gg]
+*.[Oo][Pp][Uu][Ss]
+*.[Aa][Aa][Cc]
+*.[Aa][Mm][Rr]
+*.3[Gg][Pp]
+*.[Ww][Mm][Aa]
+*.[Aa][Ii][Ff]
+*.[Aa][Ii][Ff][Ff]
+*.[Mm][Oo][Vv]
+*.[Aa][Vv][Ii]
+*.[Cc][Aa][Ff]
+# except the product video, made from docs/video/, in its two soundtrack versions
+!docs/video/sedjem-tech.mp4
+!docs/video/sedjem-bright.mp4
+
+# the video's tooling (npm install in docs/video/) and its render leftovers
+docs/video/node_modules
+docs/video/renders/
+docs/video/.hyperframes/
+# the README screenshots at twice the size, before docs/images/make/shrink.py
+docs/images/make/out/
+# the website, as site/build.py writes it (GitHub Pages builds its own copy)
+_site/
+
+# Large or machine-specific (see docs/08-disk-and-cleanup.md to recreate)
+models/
+tools/*
+!tools/usage_totals.py
+.venv/
+.venv-bench/
+__pycache__/
+.playwright-mcp/
+build/
+dist/
+# the desktop build's stamp (version, commit, channel), written by desktop/build.py for the build only
+app/_build.json
+*.part
+*.part[0-9]
+*.joining

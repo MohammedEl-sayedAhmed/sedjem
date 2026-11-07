@@ -1,0 +1,10 @@
+{
+ "engine": "whisper",
+ "model": "whisper-large-v3",
+ "language": "ar",
+ "prompt": "يعني احنا كنا بنتكلم عن ال project بتاعنا و ال deadline و ال meeting اللي جاي مع ال team.",
+ "mode": "pipeline",
+ "threads": 10,
+ "label": "Arabic forced + hint",
+ "code": "734300e-dirty"
+}

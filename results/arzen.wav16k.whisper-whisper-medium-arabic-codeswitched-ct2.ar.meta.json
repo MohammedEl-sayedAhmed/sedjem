@@ -1,0 +1,9 @@
+{
+ "engine": "whisper",
+ "model": "whisper-whisper-medium-arabic-codeswitched-ct2",
+ "language": "ar",
+ "prompt": null,
+ "mode": "pipeline",
+ "threads": 10,
+ "code": "734300e-dirty"
+}

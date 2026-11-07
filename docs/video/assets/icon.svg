@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="sedjem-colour" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14a3a1"/>
+      <stop offset="1" stop-color="#0b5f5e"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="18" fill="url(#sedjem-colour)"/>
+  <rect x=".75" y=".75" width="62.5" height="62.5" rx="17.25" fill="none" stroke="#ffffff" stroke-opacity=".16" stroke-width="1.5"/>
+  <path d="M22 14 C38 10 50 20 48 34 C47 43 40 46 37 50 C35 53 31 54 29 51 C27 48 30 45 30 41 C30 37 24 35 22 30 C19 24 18 16 22 14Z" fill="#ffffff"/>
+  <path d="M29 22 C35 21 40 26 38 32" fill="none" stroke="#0b5f5e" stroke-width="3.2" stroke-linecap="round"/>
+</svg>

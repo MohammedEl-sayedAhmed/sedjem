@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="380" viewBox="0 0 800 380" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Speaker labels: five voiceprint models</title>
+<rect x="0.5" y="0.5" width="799" height="379" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Speaker labels: five voiceprint models</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">The same words from the six meeting excerpts, labelled with each model.</text>
+<rect x="24" y="72" width="12" height="12" rx="3" fill="#4b5563"/>
+<text x="42" y="82" font-size="12" fill="#4b5563">True number of speakers given</text>
+<rect x="243.12" y="72" width="12" height="12" rx="3" fill="#aab2bd"/>
+<text x="261.12" y="82" font-size="12" fill="#4b5563">Number estimated from the voices</text>
+<text x="232" y="112" font-size="13" fill="#1f2937" font-weight="600">Words given to the wrong speaker, %</text>
+<text x="232" y="127" font-size="11" fill="#6b7280">lower is better</text>
+<text x="704" y="112" font-size="13" fill="#1f2937" font-weight="600" text-anchor="middle">Speaker count</text>
+<text x="704" y="127" font-size="11" fill="#6b7280" text-anchor="middle">estimated right</text>
+<text x="220" y="156" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-small (default)</text>
+<text x="220" y="170" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/voiceprints/TitaNet-small (default)/size_mb">40</tspan> MB</text>
+<text x="220" y="196" font-size="13" fill="#1f2937" text-anchor="end">3D-Speaker CAM++</text>
+<text x="220" y="210" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/size_mb">28</tspan> MB</text>
+<text x="220" y="236" font-size="13" fill="#1f2937" text-anchor="end">TitaNet-large</text>
+<text x="220" y="250" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/voiceprints/TitaNet-large/size_mb">101</tspan> MB</text>
+<text x="220" y="276" font-size="13" fill="#1f2937" text-anchor="end">WeSpeaker ResNet34</text>
+<text x="220" y="290" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/size_mb">26</tspan> MB</text>
+<text x="220" y="316" font-size="13" fill="#1f2937" text-anchor="end">WeSpeaker ResNet152</text>
+<text x="220" y="330" font-size="11" fill="#6b7280" text-anchor="end"><tspan data-ref="data/voiceprints/WeSpeaker ResNet152/size_mb">79</tspan> MB</text>
+<g data-axis="x" data-scale="0 40 232 592">
+<line x1="232" y1="138" x2="232" y2="338" stroke="#9ca3af" data-tick="0"/>
+<text x="232" y="354" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="322" y1="138" x2="322" y2="338" stroke="#e5e7eb" data-tick="10"/>
+<text x="322" y="354" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="412" y1="138" x2="412" y2="338" stroke="#e5e7eb" data-tick="20"/>
+<text x="412" y="354" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="502" y1="138" x2="502" y2="338" stroke="#e5e7eb" data-tick="30"/>
+<text x="502" y="354" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<line x1="592" y1="138" x2="592" y2="338" stroke="#e5e7eb" data-tick="40"/>
+<text x="592" y="354" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="40">40</text>
+<path d="M232,145 L333.3,145 Q337.3,145 337.3,149 L337.3,153 Q337.3,157 333.3,157 L232,157 Z" fill="#4b5563" data-ref="data/voiceprints/TitaNet-small (default)/wrong_speaker_true_count"/>
+<text x="343.3" y="154.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/TitaNet-small (default)/wrong_speaker_true_count">11.7</tspan>%</text>
+<path d="M232,159 L319.8,159 Q323.8,159 323.8,163 L323.8,167 Q323.8,171 319.8,171 L232,171 Z" fill="#aab2bd" data-ref="data/voiceprints/TitaNet-small (default)/wrong_speaker_estimated_count"/>
+<text x="329.8" y="168.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/TitaNet-small (default)/wrong_speaker_estimated_count">10.2</tspan>%</text>
+<path d="M232,185 L333.3,185 Q337.3,185 337.3,189 L337.3,193 Q337.3,197 333.3,197 L232,197 Z" fill="#4b5563" data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/wrong_speaker_true_count"/>
+<text x="343.3" y="194.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/wrong_speaker_true_count">11.7</tspan>%</text>
+<path d="M232,199 L326.1,199 Q330.1,199 330.1,203 L330.1,207 Q330.1,211 326.1,211 L232,211 Z" fill="#aab2bd" data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/wrong_speaker_estimated_count"/>
+<text x="336.1" y="208.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/wrong_speaker_estimated_count">10.9</tspan>%</text>
+<path d="M232,225 L337.8,225 Q341.8,225 341.8,229 L341.8,233 Q341.8,237 337.8,237 L232,237 Z" fill="#4b5563" data-ref="data/voiceprints/TitaNet-large/wrong_speaker_true_count"/>
+<text x="347.8" y="234.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/TitaNet-large/wrong_speaker_true_count">12.2</tspan>%</text>
+<path d="M232,239 L318,239 Q322,239 322,243 L322,247 Q322,251 318,251 L232,251 Z" fill="#aab2bd" data-ref="data/voiceprints/TitaNet-large/wrong_speaker_estimated_count"/>
+<text x="328" y="248.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/TitaNet-large/wrong_speaker_estimated_count">10.0</tspan>%</text>
+<path d="M232,265 L459.3,265 Q463.3,265 463.3,269 L463.3,273 Q463.3,277 459.3,277 L232,277 Z" fill="#4b5563" data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/wrong_speaker_true_count"/>
+<text x="469.3" y="274.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/wrong_speaker_true_count">25.7</tspan>%</text>
+<path d="M232,279 L434.1,279 Q438.1,279 438.1,283 L438.1,287 Q438.1,291 434.1,291 L232,291 Z" fill="#aab2bd" data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/wrong_speaker_estimated_count"/>
+<text x="444.1" y="288.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/wrong_speaker_estimated_count">22.9</tspan>%</text>
+<path d="M232,305 L560.1,305 Q564.1,305 564.1,309 L564.1,313 Q564.1,317 560.1,317 L232,317 Z" fill="#4b5563" data-ref="data/voiceprints/WeSpeaker ResNet152/wrong_speaker_true_count"/>
+<text x="570.1" y="314.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/WeSpeaker ResNet152/wrong_speaker_true_count">36.9</tspan>%</text>
+<path d="M232,319 L497.1,319 Q501.1,319 501.1,323 L501.1,327 Q501.1,331 497.1,331 L232,331 Z" fill="#aab2bd" data-ref="data/voiceprints/WeSpeaker ResNet152/wrong_speaker_estimated_count"/>
+<text x="507.1" y="328.96" font-size="11" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="data/voiceprints/WeSpeaker ResNet152/wrong_speaker_estimated_count">29.9</tspan>%</text>
+</g>
+<text x="704" y="162.5" font-size="12" fill="#1f2937" text-anchor="middle"><tspan data-ref="data/voiceprints/TitaNet-small (default)/count_right">5</tspan> of <tspan data-ref="data/voiceprints/TitaNet-small (default)/excerpts">6</tspan></text>
+<text x="704" y="202.5" font-size="12" fill="#1f2937" text-anchor="middle"><tspan data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/count_right">4</tspan> of <tspan data-ref="data/voiceprints/3D-Speaker CAM++ (Chinese and English)/excerpts">6</tspan></text>
+<text x="704" y="242.5" font-size="12" fill="#1f2937" text-anchor="middle"><tspan data-ref="data/voiceprints/TitaNet-large/count_right">5</tspan> of <tspan data-ref="data/voiceprints/TitaNet-large/excerpts">6</tspan></text>
+<text x="704" y="282.5" font-size="12" fill="#1f2937" text-anchor="middle"><tspan data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/count_right">2</tspan> of <tspan data-ref="data/voiceprints/WeSpeaker ResNet34 (the first default)/excerpts">6</tspan></text>
+<text x="704" y="322.5" font-size="12" fill="#1f2937" text-anchor="middle"><tspan data-ref="data/voiceprints/WeSpeaker ResNet152/count_right">3</tspan> of <tspan data-ref="data/voiceprints/WeSpeaker ResNet152/excerpts">6</tspan></text>
+</svg>

@@ -1,0 +1,95 @@
+# Recommended models for Egyptian Arabic–English meetings and calls, listed in Settings → Add models →
+# Recommended.
+#
+# builtin = the id of a model in app/config.toml. The other entries are added with the Hugging Face importer
+# (app/hub.py) from the pinned revision, so they download the same checked files for everyone: kind and
+# architecture are what the importer finds there, and the sizes are of the download. gpu is "any" (through
+# Vulkan: Intel, AMD and NVIDIA graphics) or "nvidia" (CUDA only). Measured figures come from
+# docs/03-results.md (the 40 Egyptian clips of the Perle benchmark); everything else says it is untested.
+# Checked with the importer on 25 September 2026.
+
+[[models]]
+builtin = "cohere"
+name = "Cohere Transcribe Arabic"
+good_for = "Arabic-heavy meetings: the fewest errors on Arabic words, and the fastest in the project's tests."
+evidence = "In the project's tests on the Perle clips: 13.4% WER, 77% of English terms kept in English, and 0.36× real time on the test laptop's processor (Core i5-1245U) or 0.15× on its Intel Iris Xe graphics."
+gpu = "any"
+licence = "Apache-2.0"
+
+[[models]]
+builtin = "whisper-medium"
+name = "whisper-medium code-switching"
+good_for = "Meetings full of English terms: it keeps the most of them in English."
+evidence = "In the project's tests on the Perle clips: 18.5% WER and 90% of English terms kept in English."
+gpu = "nvidia"
+licence = "MIT"
+
+[[models]]
+builtin = "large-v3"
+name = "Whisper large-v3 with the style hint"
+good_for = "Stock Whisper, kept in Egyptian dialect by a one-sentence hint. Slow on a laptop processor."
+evidence = "In the project's tests on the Perle clips: 20.8% WER and 88% of English terms kept with the hint, 39.7% WER without it."
+gpu = "nvidia"
+licence = "MIT"
+
+[[models]]
+repo = "handy-computer/cohere-transcribe-arabic-07-2026-gguf"
+revision = "5e6b33c211458ac69347d297abb6d47a250c328f"
+kind = "gguf"
+architecture = "cohere_asr"
+files = [{ file = "cohere-transcribe-arabic-07-2026-Q8_0.gguf", size = 2410655136 },
+         { file = "cohere-transcribe-arabic-07-2026-Q6_K.gguf", size = 1972524448 },
+         { file = "cohere-transcribe-arabic-07-2026-Q5_K_M.gguf", size = 1770270112 }]
+name = "Cohere Transcribe Arabic, higher precision"
+good_for = "The same Cohere model, less compressed. Suits a computer with a graphics card."
+evidence = "Not tested by the project. The model card's own FLEURS Arabic figures barely change with precision: 11.2% WER for Q4_K_M (the built-in file), 11.0% for Q5_K_M and 11.1% for Q6_K and Q8_0."
+gpu = "any"
+licence = "Apache-2.0"
+
+[[models]]
+repo = "IbrahimAmin/code-switched-egyptian-arabic-whisper-small"
+revision = "9e5bb219bc873b87e03fa156a17000a42a0ea3f9"
+kind = "transformers"
+architecture = "whisper"
+size = 968904103
+name = "Egyptian code-switching whisper-small"
+good_for = "A small Whisper fine-tuned on Egyptian Arabic with English terms."
+evidence = "Not tested by the project, and no independent WER is published for it. It is converted on this computer after the download, which needs Sedjem run from source with transformers and torch."
+gpu = "nvidia"
+licence = "Apache-2.0"
+
+[[models]]
+repo = "handy-computer/whisper-large-v3-turbo-gguf"
+revision = "ceea6c8a94a21ab85be244d311e874a39344dbf5"
+kind = "gguf"
+architecture = "whisper"
+files = [{ file = "whisper-large-v3-turbo-Q8_0.gguf", size = 886381760 }]
+name = "Whisper large-v3-turbo for any graphics card"
+good_for = "Whisper through transcribe.cpp, which can use Intel, AMD and NVIDIA graphics cards (faster-whisper can use only NVIDIA)."
+evidence = "Not tested by the project, and it gets no Egyptian style hint (that was measured on large-v3 only; your own terms are still used). Without the hint, stock large-v3 scored 39.7% WER in the project's tests."
+gpu = "any"
+licence = "Apache-2.0"
+
+[[models]]
+repo = "handy-computer/whisper-large-v3-gguf"
+revision = "b33a05f1459f33b0c876f014a57d51618b77d754"
+kind = "gguf"
+architecture = "whisper"
+files = [{ file = "whisper-large-v3-Q8_0.gguf", size = 1668741440 }]
+name = "Whisper large-v3 for any graphics card"
+good_for = "Whisper large-v3 through transcribe.cpp, on Intel, AMD or NVIDIA graphics cards."
+evidence = "Not tested by the project, but it gets the same Egyptian style hint, which took large-v3 from 39.7% to 20.8% WER in the project's tests."
+gpu = "any"
+licence = "Apache-2.0"
+
+[[models]]
+repo = "mobiuslabsgmbh/faster-whisper-large-v3-turbo"
+revision = "0a363e9161cbc7ed1431c9597a8ceaf0c4f78fcf"
+kind = "ct2"
+architecture = "whisper"
+size = 1621665983
+name = "Whisper large-v3-turbo"
+good_for = "Whisper large-v3 with 4 decoder layers instead of 32, so faster than large-v3. The copy faster-whisper itself uses."
+evidence = "Not tested by the project, and the project's research found no Egyptian Arabic figure for it. It gets no Egyptian style hint; without one, stock large-v3 scored 39.7% WER in the project's tests."
+gpu = "nvidia"
+licence = "MIT"

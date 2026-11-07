@@ -1,0 +1,7 @@
+# Extra packages for the desktop app and its build, on top of requirements.txt.
+# Windows: pywebview uses Edge WebView2 (built into Windows 10 and 11); pythonnet comes with it.
+# Linux: the native window also needs GTK WebKit (apt install gir1.2-webkit2-4.1 python3-gi, with a venv
+#   made with --system-site-packages) or Qt (pip install "pywebview[qt]"); without them the app opens
+#   in Chrome/Edge app mode or a browser tab instead.
+pywebview==6.2.1
+pyinstaller==6.22.3

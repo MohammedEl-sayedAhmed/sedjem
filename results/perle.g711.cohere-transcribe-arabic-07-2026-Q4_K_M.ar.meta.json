@@ -1,0 +1,9 @@
+{
+ "engine": "cohere",
+ "model": "cohere-transcribe-arabic-07-2026-Q4_K_M",
+ "language": "ar",
+ "prompt": null,
+ "mode": "pipeline",
+ "threads": 10,
+ "code": "734300e-dirty"
+}

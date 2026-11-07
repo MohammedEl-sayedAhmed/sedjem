@@ -1,0 +1,650 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=1920, height=1080">
+  <title>Sedjem</title>
+  <style>
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 400; src: url(fonts/ibm-plex-sans-latin-400-normal.woff2) format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 500; src: url(fonts/ibm-plex-sans-latin-500-normal.woff2) format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 600; src: url(fonts/ibm-plex-sans-latin-600-normal.woff2) format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans"; font-weight: 700; src: url(fonts/ibm-plex-sans-latin-700-normal.woff2) format("woff2"); }
+    @font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 400; src: url(fonts/ibm-plex-sans-arabic-arabic-400-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
+    @font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 500; src: url(fonts/ibm-plex-sans-arabic-arabic-500-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
+    @font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 600; src: url(fonts/ibm-plex-sans-arabic-arabic-600-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
+    @font-face { font-family: "IBM Plex Sans Arabic"; font-weight: 700; src: url(fonts/ibm-plex-sans-arabic-arabic-700-normal.woff2) format("woff2"); unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+200C-200E, U+FB50-FDFF, U+FE70-FEFC; }
+    @font-face { font-family: "IBM Plex Mono"; font-weight: 400; src: url(fonts/ibm-plex-mono-latin-400-normal.woff2) format("woff2"); }
+    @font-face { font-family: "IBM Plex Mono"; font-weight: 500; src: url(fonts/ibm-plex-mono-latin-500-normal.woff2) format("woff2"); }
+    @font-face { font-family: "Patrick Hand"; font-weight: 400; src: url(fonts/patrick-hand-latin-400-normal.woff2) format("woff2"); }
+  </style>
+  <link rel="stylesheet" href="style.css">
+  <script src="node_modules/gsap/dist/gsap.min.js"></script>
+  <script src="assets/brands.js"></script>
+</head>
+<body>
+<div id="root" data-composition-id="sedjem" data-start="0" data-duration="60" data-width="1920" data-height="1080">
+
+  <div id="bgLayer" class="bg clip" data-start="0" data-duration="60" data-track-index="0">
+    <div class="bg-dots" id="dots"></div>
+    <div class="glow a" id="glowA"></div>
+    <div class="glow b" id="glowB"></div>
+    <div class="glow c" id="glowC"></div>
+  </div>
+
+  <!-- 0 s: the hook -->
+  <section id="hook" class="clip" data-start="0" data-duration="6" data-track-index="1">
+    <div class="hook-a">
+      <div class="hand" id="hookHand">Meetings don't speak <span id="hookOne">one language.</span>
+        <svg class="squig" id="squigSvg" width="10" height="10"><path id="squig" fill="none" stroke="#0e7c7b" stroke-width="7" stroke-linecap="round"/></svg>
+      </div>
+    </div>
+    <div class="hook-b">
+      <div class="typer" id="typer" dir="rtl" lang="ar"></div>
+    </div>
+    <div class="lang-tags" id="langTags">
+      <span class="pill accent">Egyptian Arabic</span>
+      <span class="pill cloud">English</span>
+    </div>
+  </section>
+
+  <!-- 6 s: the logo, then the corner mark, then the end card -->
+  <div id="brandClip" class="clip" data-start="5.8" data-duration="54.2" data-track-index="9" style="pointer-events:none">
+    <div id="brand">
+      <svg viewBox="0 0 5680 1313.5" class="b-logo" id="bLogo">
+        <g id="bIcon"><svg x="0" y="46.5" width="1267" height="1267" viewBox="0 0 64 64"><defs>
+          <linearGradient id="v-icon-sedjem-colour" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#14a3a1"/>
+            <stop offset="1" stop-color="#0b5f5e"/>
+          </linearGradient>
+        </defs>
+        <rect width="64" height="64" rx="18" fill="url(#v-icon-sedjem-colour)"/>
+        <rect x=".75" y=".75" width="62.5" height="62.5" rx="17.25" fill="none" stroke="#ffffff" stroke-opacity=".16" stroke-width="1.5"/>
+        <path d="M22 14 C38 10 50 20 48 34 C47 43 40 46 37 50 C35 53 31 54 29 51 C27 48 30 45 30 41 C30 37 24 35 22 30 C19 24 18 16 22 14Z" fill="#ffffff"/>
+        <path id="bInner" d="M29 22 C35 21 40 26 38 32" fill="none" stroke="#0b5f5e" stroke-width="3.2" stroke-linecap="round"/></svg></g>
+        <g class="ch"><path transform="translate(1600 1040) scale(1 -1)" d="M277 -10Q209 -10 158.0 11.5Q107 33 78.5 71.0Q50 109 50 160H200Q200 136 221.5 121.5Q243 107 277 107H321Q362 107 383.5 122.0Q405 137 405 164Q405 189 386.0 202.5Q367 216 327 221L263 229Q160 242 113.0 279.0Q66 316 66 392Q66 472 121.0 516.0Q176 560 282 560H320Q421 560 481.0 516.0Q541 472 541 398H391Q391 418 371.5 430.5Q352 443 320 443H282Q245 443 228.0 430.5Q211 418 211 393Q211 370 226.5 358.0Q242 346 276 341L345 332Q449 319 499.5 280.0Q550 241 550 164Q550 80 492.0 35.0Q434 -10 321 -10Z" fill="#111111"/></g>
+        <g class="ch"><path transform="translate(2180 1040) scale(1 -1)" d="M301 -10Q228 -10 173.5 17.5Q119 45 89.5 94.5Q60 144 60 210V340Q60 406 89.5 455.5Q119 505 173.5 532.5Q228 560 301 560Q374 560 427.5 532.5Q481 505 510.5 455.5Q540 406 540 340V240H203V210Q203 158 228.0 131.5Q253 105 303 105Q338 105 359.5 117.0Q381 129 388 150H535Q517 78 453.5 34.0Q390 -10 301 -10ZM397 317V342Q397 393 373.5 420.0Q350 447 301 447Q252 447 227.5 419.0Q203 391 203 340V325L407 327Z" fill="#111111"/></g>
+        <g class="ch"><path transform="translate(2760 1040) scale(1 -1)" d="M243 -10Q160 -10 110.0 48.0Q60 106 60 205V345Q60 443 110.0 501.5Q160 560 243 560Q311 560 350.0 520.5Q389 481 389 410L354 445H389L384 580V730H534V0H389V105H354L389 140Q389 69 350.0 29.5Q311 -10 243 -10ZM297 120Q338 120 361.0 143.5Q384 167 384 210V340Q384 383 361.0 406.5Q338 430 297 430Q255 430 232.5 406.5Q210 383 210 340V210Q210 167 232.5 143.5Q255 120 297 120Z" fill="#111111"/></g>
+        <g class="ch"><path transform="translate(3340 1040) scale(1 -1)" d="M80 -180V-40H240Q281 -40 303.0 -17.5Q325 5 325 45V410H110V550H475V40Q475 -62 415.0 -121.0Q355 -180 251 -180Z" fill="#111111"/></g>
+        <g class="ch"><path transform="translate(3920 1040) scale(1 -1)" d="M301 -10Q228 -10 173.5 17.5Q119 45 89.5 94.5Q60 144 60 210V340Q60 406 89.5 455.5Q119 505 173.5 532.5Q228 560 301 560Q374 560 427.5 532.5Q481 505 510.5 455.5Q540 406 540 340V240H203V210Q203 158 228.0 131.5Q253 105 303 105Q338 105 359.5 117.0Q381 129 388 150H535Q517 78 453.5 34.0Q390 -10 301 -10ZM397 317V342Q397 393 373.5 420.0Q350 447 301 447Q252 447 227.5 419.0Q203 391 203 340V325L407 327Z" fill="#111111"/></g>
+        <g class="ch"><path transform="translate(4500 1040) scale(1 -1)" d="M42 0V550H160V470H184L165 456Q165 503 192.0 531.5Q219 560 259 560Q302 560 326.0 523.0Q350 486 350 425L332 470H360L351 456Q351 503 377.0 531.5Q403 560 447 560Q497 560 528.0 522.5Q559 485 559 420V0H430V410Q430 433 420.0 445.5Q410 458 391 458Q372 458 362.0 445.5Q352 433 352 410V0H249V410Q249 433 239.0 445.5Q229 458 210 458Q191 458 181.0 445.5Q171 433 171 410V0Z" fill="#111111"/></g>
+        <g id="bCur"><path transform="translate(5080 1040) scale(1 -1)" d="M60 -165V-25H540V-165Z" fill="#14a3a1"/></g>
+        <g id="bEar"><g transform="translate(3569.7 0.0) scale(10.6667) translate(-18 -10)"><mask id="v-ear-cut" maskUnits="userSpaceOnUse" x="18" y="10" width="31" height="45"><path d="M22 14 C38 10 50 20 48 34 C47 43 40 46 37 50 C35 53 31 54 29 51 C27 48 30 45 30 41 C30 37 24 35 22 30 C19 24 18 16 22 14Z" fill="#fff"/><path d="M29 22 C35 21 40 26 38 32" fill="none" stroke="#000" stroke-width="4.2" stroke-linecap="round"/></mask><rect x="18" y="10" width="31" height="45" fill="#14a3a1" mask="url(#v-ear-cut)"/></g></g>
+      </svg>
+    </div>
+  </div>
+  <section id="logoTag" class="clip" data-start="6" data-duration="4.2" data-track-index="2">
+    <div style="position:absolute;left:0;right:0;top:640px;text-align:center" class="sub" id="logoSub">Transcripts of Arabic–English meetings, made on your own computer.</div>
+  </section>
+
+  <!-- 10 s to 34 s: the three steps -->
+  <section id="steps" class="clip" data-start="9.6" data-duration="24.6" data-track-index="3">
+    <div class="steps">
+      <div class="stp" style="--c:#0e7c7b"><div class="trk"><i id="f1"></i></div><div class="lb" id="lb1"><svg class="tk" id="tk1" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span>1 Add</span></div></div>
+      <div class="stp" style="--c:#2563eb"><div class="trk"><i id="f2"></i></div><div class="lb" id="lb2"><svg class="tk" id="tk2" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span>2 Read</span></div></div>
+      <div class="stp" style="--c:#7c3aed"><div class="trk"><i id="f3"></i></div><div class="lb" id="lb3"><svg class="tk" id="tk3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg><span>3 Fix</span></div></div>
+    </div>
+  </section>
+
+  <!-- 10 s: step 1, add -->
+  <section id="s1" class="clip" data-start="9.6" data-duration="8.5" data-track-index="4">
+    <div class="copy">
+      <div class="kicker" style="color:var(--accent)" id="s1k">Step 1</div>
+      <div class="h"><span class="ln"><span>Drop a</span></span><span class="ln"><span>recording.</span></span></div>
+      <div class="sub">Any audio or video file.</div>
+    </div>
+    <div class="right">
+      <div class="panel" id="p1">
+        <div class="row"><h3 class="grow">New transcription</h3>
+          <span class="pill accent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v10H4zM2 19h20"/></svg>Runs locally</span></div>
+        <div class="dz" id="dz">
+          <div class="dz-over" id="dzOver"></div>
+          <div class="dz-hint" id="dzHint">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4m-5 5 5-5 5 5M4 20h16"/></svg>
+            <div class="big">Drop a recording here</div>
+            <div class="small">mp3, m4a, wav, mp4, mkv and more</div>
+          </div>
+          <div class="file" id="file">
+            <div class="ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 10v4M9 7v10M13 9v6M17 6v12M21 10v4"/></svg></div>
+            <div class="grow"><div class="name">planning.m4a</div><div class="meta">M4A · AAC · 38:20 · 36.8 MB</div></div>
+            <div class="check" id="fileCheck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div>
+          </div>
+        </div>
+        <div class="prog" id="prog">
+          <div class="row" style="align-items:baseline"><span class="stage">Transcribing</span><span class="part">part <b id="partN">1</b> of 40</span><span class="times" id="left">about 6 min left</span></div>
+          <div class="bar"><i id="pbar"></i></div>
+        </div>
+        <svg class="cursor" id="cur1" viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#18202b" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- 18 s: step 2, read -->
+  <section id="s2" class="clip" data-start="17.6" data-duration="8.5" data-track-index="5">
+    <div class="copy">
+      <div class="kicker" style="color:var(--s1)">Step 2</div>
+      <div class="h"><span class="ln"><span>Every voice,</span></span><span class="ln"><span>its own name.</span></span></div>
+      <div class="sub">Told apart by voice.</div>
+    </div>
+    <div class="right">
+      <div class="panel" id="p2" style="padding-bottom:30px">
+        <div class="tr-head"><h3>Sprint planning</h3><span class="pill mono accent">v0</span><span class="pill">3 speakers</span></div>
+        <div class="spk-row">
+          <div class="spk" style="--c:var(--s1)"><i></i>Mona <span>41%</span></div>
+          <div class="spk" style="--c:var(--s2)"><i></i>Karim <span>33%</span></div>
+          <div class="spk" style="--c:var(--s3)"><i></i>Omar <span>26%</span></div>
+        </div>
+        <div class="lines" id="lines"></div>
+        <div class="player">
+          <div class="play"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg></div>
+          <span class="t" id="ptime">0:00</span>
+          <div class="track"><i id="ptrack" style="transform:scaleX(.02)"></i></div>
+          <span class="t">38:20</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 26 s: step 3, fix -->
+  <section id="s3" class="clip" data-start="25.6" data-duration="8.5" data-track-index="6">
+    <div class="copy">
+      <div class="kicker" style="color:var(--s3)">Step 3</div>
+      <div class="h"><span class="ln"><span>Fix a line.</span></span><span class="ln"><span>Keep every</span></span><span class="ln"><span>version.</span></span></div>
+      <div class="sub">Nothing is lost.</div>
+    </div>
+    <div class="right">
+      <div style="position:relative;width:100%;height:100%">
+        <div class="panel" id="p3" style="position:absolute;left:0;right:0;top:50%">
+          <div class="tr-head"><h3>Sprint planning</h3><span class="pill">Editing</span></div>
+          <div class="lines" style="margin-top:18px">
+            <div class="line" style="--c:var(--s1)"><span class="ts">0:53</span><div class="body"><div class="who">Mona</div><div class="text" dir="rtl">طيب نيجي لل estimation. ال dashboard كام story point؟</div></div></div>
+            <div class="line" style="--c:var(--s3)"><span class="ts">0:58</span><div class="body"><div class="who">Omar</div><div class="text edit-text" dir="rtl" id="editLine"></div></div></div>
+            <div class="line" style="--c:var(--s2)"><span class="ts">1:02</span><div class="body"><div class="who">Karim</div><div class="text" dir="rtl">Eight is fair، بس لو ال API مش جاهزة هنتأخر</div></div></div>
+          </div>
+          <div class="row" style="margin-top:20px;justify-content:flex-end;gap:14px"><span class="btn">Cancel</span><span class="btn primary" id="reviewBtn">Review changes</span></div>
+        </div>
+        <div class="dlg" id="dlg">
+          <div class="dlg-head"><h3 class="grow">Review your changes</h3></div>
+          <div class="dlg-body">
+            <div class="lead">Compared with version 0, the original</div>
+            <div class="stat">1 line changed</div>
+            <div class="drow del"><span class="ts">0:58</span><span class="sign">−</span><div><div class="who">Omar</div><div class="text" dir="rtl">أنا شايف إنه <mark>ايت،</mark> فيه API جديدة كمان</div></div></div>
+            <div class="drow ins"><span class="ts">0:58</span><span class="sign">+</span><div><div class="who">Omar</div><div class="text" dir="rtl">أنا شايف إنه <mark>eight story points،</mark> فيه API جديدة كمان</div></div></div>
+            <div class="dlg-foot"><div class="msg">Estimates as said in the meeting</div><span class="btn">Back</span><span class="btn primary" id="saveBtn">Save version</span></div>
+          </div>
+        </div>
+        <div class="hist" id="hist">
+          <div class="hist-title">History</div>
+          <div class="ver current" id="v1">
+            <div class="ver-head"><span class="ver-n">v1</span><span class="pill">Edit</span><span class="pill ok">Current</span><span class="ver-time">Today 10:41 AM</span></div>
+            <div class="ver-msg">Estimates as said in the meeting</div>
+            <div class="ver-sum">1 line changed</div>
+          </div>
+          <div class="ver" id="v0">
+            <div class="ver-head"><span class="ver-n">v0</span><span class="pill accent">Original</span><span class="ver-time">Today 10:02 AM</span></div>
+            <div class="ver-sum">412 lines from Cohere Transcribe Arabic</div>
+          </div>
+        </div>
+        <svg class="cursor" id="cur3" viewBox="0 0 24 24"><path d="M5 3l14 8-6.2 1.6L9.6 19z" fill="#18202b" stroke="#fff" stroke-width="1.6" stroke-linejoin="round"/></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- 34 s: compare -->
+  <section id="cmpS" class="clip" data-start="33.6" data-duration="10.5" data-track-index="7">
+    <div class="top-copy">
+      <div class="kicker" style="color:var(--accent)">Compare</div>
+      <div class="h"><span class="ln"><span>Two models. One best transcript.</span></span></div>
+      <div class="sub">Differences marked. Keep the better line.</div>
+    </div>
+    <div class="cmp" id="cmp">
+      <div class="cmp-grid" id="cmpGrid">
+        <div class="hd" style="border-bottom:1.5px solid var(--border)"></div>
+        <div class="hd" id="hdL">
+          <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v10H4zM2 19h20"/></svg><span id="hdLt">Cohere Transcribe Arabic</span></div>
+          <div class="s" id="hdLs"><span class="pill accent tag">Cohere · best Arabic</span></div>
+        </div>
+        <div class="hd" id="hdR">
+          <div class="t"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16v10H4zM2 19h20"/></svg>whisper-medium code-switching</div>
+          <div class="s" id="hdRs"><span class="pill cloud tag">whisper-medium · best English terms</span></div>
+        </div>
+      </div>
+      <div id="mergedHead" style="position:absolute;left:120px;top:0;width:710px;padding:24px 28px;background:var(--surface);opacity:0">
+        <div class="row" style="gap:12px"><span style="font-size:26px;font-weight:600">Best of both</span><span class="pill mono ok">v2</span></div>
+        <div style="font-size:20px;color:var(--muted);margin-top:4px">Cohere, with whisper-medium in 2 places</div>
+      </div>
+    </div>
+    <div class="merged-note" id="mergedNote"><span class="pill ok" style="height:52px;font-size:24px;padding:0 24px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>Saved as a new version</span></div>
+  </section>
+
+  <!-- 44 s: local or hosted -->
+  <section id="choice" class="clip" data-start="43.6" data-duration="5.5" data-track-index="8">
+    <div class="copy">
+      <div class="kicker" style="color:var(--cloud)">Your choice</div>
+      <div class="h"><span class="ln"><span>Local, or</span></span><span class="ln"><span>the service</span></span><span class="ln"><span>you trust.</span></span></div>
+      <div class="sub">Your recording is uploaded only after you say so.</div>
+    </div>
+    <div class="right" style="flex-direction:column">
+      <div class="tiles" id="tiles"></div>
+      <div class="consent" id="consent">
+        <div class="cbox"><div class="on" id="cboxOn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></div></div>
+        <div><div class="a">Upload this recording to ElevenLabs</div><div class="b">Asked every time.</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 49 s: any graphics card, or none (51 s) -->
+  <section id="gpuS" class="clip" data-start="48.6" data-duration="5.5" data-track-index="10">
+    <div class="center-copy" id="gpuCopy">
+      <div class="kicker" style="color:var(--accent);margin-bottom:22px">Speed</div>
+      <div class="h" id="gpuH"><span class="ln"><span>Runs on any graphics card,</span></span><span class="ln" style="color:var(--accent)"><span>or on none at all.</span></span></div>
+    </div>
+    <div class="gpu-row" id="gpuRow"></div>
+    <div class="gpu cpu" id="cpu">
+      <div class="logo" id="cpuLogo" style="--brand:#0e7c7b"><svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="6" width="12" height="12" rx="2"/><rect x="9.5" y="9.5" width="5" height="5" rx="1"/><path d="M9.5 2.5V6M14.5 2.5V6M9.5 18v3.5M14.5 18v3.5M2.5 9.5H6M2.5 14.5H6M18 9.5h3.5M18 14.5h3.5"/></svg></div>
+      <div class="nm">Processor</div>
+      <div class="api">Cohere · 0.36× real time on a laptop processor</div>
+    </div>
+  </section>
+
+  <!-- 54 s: end card -->
+  <section id="endS" class="clip" data-start="53.6" data-duration="6.4" data-track-index="11">
+    <div class="end-copy">
+      <div class="tag" id="endTag">Transcripts of Arabic–English meetings, made on your own computer.</div>
+      <div class="foss" id="endFoss"><span>Free and open source</span><i></i><span>AGPL-3.0</span></div>
+      <div class="url" id="endUrl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 7 4 12l5 5M15 7l5 5-5 5"/></svg>github.com/MohammedEl-sayedAhmed/sedjem<div class="shine" id="shine"></div></div>
+    </div>
+  </section>
+
+</div>
+<script>
+/* Sedjem product video: one paused GSAP timeline, 60 s, seeked frame by frame by HyperFrames.
+   The music runs at 120 BPM, so scenes start on even seconds (bar lines) and smaller accents land on
+   half seconds (beats). Headlines stay still for at least 3 s once they land, and no more than one new
+   piece of text appears in any half second. Everything visible is a pure function of the time. */
+"use strict";
+(function () {
+  const $ = (s, el = document) => el.querySelector(s);
+  const $$ = (s, el = document) => Array.from(el.querySelectorAll(s));
+  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+
+  // The app's rule for a line's direction (app/static/app.js mixDir): mostly Arabic words means rtl.
+  const AR = /[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]/;
+  const LA = /[A-Za-zÀ-ɏ]/;
+  function mixDir(text) {
+    let ar = 0, la = 0;
+    for (const w of text.split(/\s+/)) { if (AR.test(w)) ar++; else if (LA.test(w)) la++; }
+    return ar && ar >= 0.3 * (ar + la) ? "rtl" : "ltr";
+  }
+  // A seeded generator, so the tiles fly in from the same places on every render.
+  let seed = 7;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+
+  const CHECK = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg>';
+  const SPK = { Mona: "var(--s1)", Karim: "var(--s2)", Omar: "var(--s3)" };
+
+  // ---------- step 2: a Cohere transcript, written word by word ----------
+  const LINES = [
+    ["0:00", "Mona", "صباح الخير، نبدأ ال sprint planning"],
+    ["0:04", "Karim", "ال login bug لسه موجود في ال release"],
+    ["0:09", "Mona", "The login bug is on the board, صح؟"],
+    ["0:14", "Omar", "أنا شفت ال logs، ال token بيخلص بدري"],
+  ];
+  $("#lines").innerHTML = LINES.map(([ts, who, text]) => {
+    const words = text.split(" ").map((w) => `<span class="w">${esc(w)}</span>`).join(" ");
+    return `<div class="line l2" style="--c:${SPK[who]}"><div class="cur"></div><span class="ts">${ts}</span>` +
+      `<div class="body"><div class="who">${who}</div><div class="text" dir="${mixDir(text)}">${words}</div></div></div>`;
+  }).join("");
+
+  // ---------- compare: two runs of the same recording, row by row ----------
+  // As measured (docs/03-results.md): Cohere gets the Arabic words right but sometimes writes an English
+  // term in Arabic letters; whisper-medium keeps English terms in English but sometimes turns Egyptian
+  // into formal Arabic. The best of both keeps whisper-medium's row for a term, Cohere's for the Arabic.
+  const ROWS = [
+    { ts: "0:19", who: "Omar", keep: 1,
+      l: 'ال token بيخلص، <mark>فاليوزر</mark> بيطلع برا', r: 'ال token بيخلص، <mark>فال user</mark> بيطلع برا' },
+    { ts: "0:26", who: "Mona", keep: 0,
+      l: '<mark>عايزة</mark> نخلص ال dashboard <mark>النهارده</mark>', r: '<mark>أريد</mark> نخلص ال dashboard <mark>اليوم</mark>' },
+    { ts: "0:44", who: "Karim", keep: 1,
+      l: 'هبعتلكم ال <mark>لينك</mark> بعد ال meeting', r: 'هبعتلكم ال <mark>link</mark> بعد ال meeting' },
+  ];
+  const cell = (row, side) => `<div class="cell c${side}" style="--c:${SPK[row.who]}"><div class="kept-bg"></div>` +
+    `<div class="top"><span class="who">${row.who}</span><span class="kbtn">Keep<span class="on">${CHECK}Kept</span></span></div>` +
+    `<div class="text" dir="rtl">${side ? row.r : row.l}</div></div>`;
+  $("#cmpGrid").insertAdjacentHTML("beforeend", ROWS.map((row, i) =>
+    `<div class="gut r${i}">${row.ts}</div>${cell(row, 0).replace('class="cell', `class="cell r${i}`)}${cell(row, 1).replace('class="cell', `class="cell r${i}`)}`).join(""));
+
+  // ---------- choice: the services and models, as the app shows them (brands.js, or a letter tile) ----------
+  // On the computer: Cohere Transcribe (built in) and models added from Hugging Face, such as NVIDIA's and
+  // Qwen's (app/hub.py). Hosted: the nine services, in the README's order.
+  const LOCAL = [["cohere"], ["huggingface"], ["nvidia"], ["qwen"]];
+  const HOSTED = [["elevenlabs"], ["speechmatics"], ["googlegemini"], ["deepgram"], ["assemblyai"],
+    ["azure"], ["openai"], ["groq"], ["mistralai"]];
+  function logoHTML(slug, name, extra = "") {
+    if (!slug) return `<div class="logo letter"${extra}>${esc(name[0])}<div class="ring"></div></div>`;
+    // the brand's own logo file (brands.js LOGOS), on a white tile as in the app: "fill" is an app icon
+    // with its own margin (ElevenLabs, Speechmatics), which fills the tile; "wide" is a wordmark (Intel,
+    // AMD), drawn at 80% of the tile
+    const own = LOGOS[slug];
+    const fill = own && own.fill ? " fill" : own && own.wide ? " wide" : "";
+    if (own) return `<div class="logo img${fill}"${extra}><img src="assets/logos/${own.file}" alt=""><div class="ring"></div></div>`;
+    const b = BRANDS[slug];
+    const faintLight = contrast(b.hex, "ffffff") < 3, faintDark = contrast(b.hex, "161a20") < 3;
+    const plain = faintLight && faintDark ? " plain" : faintLight ? " dark" : "";
+    return `<div class="logo${plain}" style="--brand:#${b.hex}"${extra}><svg viewBox="0 0 24 24"><path d="${b.path}"/></svg><div class="ring"></div></div>`;
+  }
+  const tiles = (list) => list.map(([slug, name]) =>
+    `<div class="tile">${logoHTML(slug, name)}<div class="nm">${esc(name || brandTitle(slug))}</div></div>`).join("");
+  $("#tiles").innerHTML = `<div class="tgrp local"><div class="tlabel">On your computer</div><div class="trow">${tiles(LOCAL)}</div></div>` +
+    `<div class="tgrp hosted"><div class="tlabel">Hosted, with your own key</div><div class="trow">${tiles(HOSTED)}</div></div>`;
+  $("#gpuRow").innerHTML = [["intel", "Vulkan"], ["amd", "Vulkan"], ["nvidia", "Vulkan and CUDA"]].map(([slug, api]) =>
+    `<div class="gpu">${logoHTML(slug)}<div class="nm">${BRANDS[slug].title}</div><div class="api">${api}</div></div>`).join("");
+
+  // the wordmark's letters, for a staggered entrance
+
+  // ---------- text that changes with time (typing, counters) ----------
+  const HOOK = [["تمام، نبدأ ال ", false], ["sprint planning", true], [" دلوقتي", false]];
+  const HOOK_LEN = HOOK.reduce((n, [s]) => n + s.length, 0);
+  function typed(segs, n) {
+    let out = "", left = n;
+    for (const [s, en] of segs) {
+      if (left <= 0) break;
+      const part = esc(s.slice(0, left));
+      out += en ? `<span class="en">${part}</span>` : part;
+      left -= s.length;
+    }
+    return out;
+  }
+  const blink = (t) => (Math.floor(t * 2.5) % 2 === 0 ? 1 : 0);
+  const typer = $("#typer"), partN = $("#partN"), left = $("#left"), editLine = $("#editLine"), ptime = $("#ptime");
+  const EDIT_A = "أنا شايف إنه ", EDIT_B = " فيه API جديدة كمان", OLD = "ايت،", NEW = "eight story points،";
+  const last = {};
+  function set(el, key, html) { if (last[key] !== html) { el.innerHTML = html; last[key] = html; } }
+  const T_TYPE = [2.0, 3.8];        // the hook's Arabic line types itself
+  const T_PARTS = [14.0, 17.0];     // step 1: part 1 to 12 of 40
+  const T_PLAY = 23.5;              // step 2: playback starts
+  const T_SEL = 27.0, T_EDIT = [27.5, 28.7], T_CARET_OFF = 29.3;  // step 3: select, retype
+
+  function render(t) {
+    const n = Math.round(clamp((t - T_TYPE[0]) / (T_TYPE[1] - T_TYPE[0])) * HOOK_LEN);
+    const caretOn = t >= T_TYPE[0] - 0.3 && (n < HOOK_LEN || blink(t));
+    set(typer, "typer", typed(HOOK, n) + `<span class="caret" style="opacity:${caretOn ? 1 : 0}"></span>`);
+    const p = clamp((t - T_PARTS[0]) / (T_PARTS[1] - T_PARTS[0]));
+    set(partN, "part", String(1 + Math.round(p * 11)));
+    set(left, "left", `about ${Math.max(4, 6 - Math.round(p * 2))} min left`);
+    const sec = t < T_PLAY ? 0 : Math.min(16, Math.floor((t - T_PLAY) * 7));
+    set(ptime, "ptime", `0:${String(sec).padStart(2, "0")}`);
+    let mid;
+    if (t < T_SEL) mid = esc(OLD);
+    else if (t < T_EDIT[0]) mid = `<span class="sel">${esc(OLD)}</span>`;
+    else {
+      const k = Math.round(clamp((t - T_EDIT[0]) / (T_EDIT[1] - T_EDIT[0])) * NEW.length);
+      const car = t < T_CARET_OFF && (k < NEW.length || blink(t)) ? '<span class="caret"></span>' : "";
+      mid = `<span class="typed">${esc(NEW.slice(0, k))}</span>${car}`;
+    }
+    set(editLine, "edit", esc(EDIT_A) + mid + esc(EDIT_B));
+  }
+
+  // ---------- the timeline ----------
+  function build() {
+    // 2D transforms only: a 3D transform puts an element on its own layer, and Chrome keeps that layer's
+    // text rasterised at the scale it had while moving, which differs between render workers and made a
+    // settled card shimmer from frame to frame
+    gsap.config({ force3D: false });
+    const tl = gsap.timeline({ paused: true });
+    const E = "expo.out", IN = "power2.in", IO = "power3.inOut";
+
+    // headline blocks: the kicker and headline come in on a bar line, the subline half a beat later
+    const copyIn = (root, t) => {
+      tl.fromTo($$(".kicker", root), { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, t - 0.05);
+      tl.fromTo($$(".h .ln > span", root), { yPercent: 112 }, { yPercent: 0, duration: 0.85, ease: E, stagger: 0.08 }, t);
+      tl.fromTo($$(".sub", root), { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.7, ease: E }, t + 0.5);
+    };
+    const copyOut = (root, t) => {
+      tl.to([...$$(".kicker", root), ...$$(".h .ln > span", root), ...$$(".sub", root)],
+        { opacity: 0, y: -34, duration: 0.34, ease: IN, stagger: 0.025 }, t);
+    };
+    // a half-second digital stutter, for the music's bit-crushed glitches (25.5 s and 33.5 s):
+    // hard steps sideways, a red/cyan split and a slight skew, frame-exact, then back to rest
+    const SPLIT = (a) => `${a}px 0 rgba(255,40,90,.55), ${-a}px 0 rgba(0,190,255,.55)`;
+    const glitch = (targets, t0) => {
+      const steps = [[16, 6, 3], [-11, 0, -2], [7, 4, 0], [-15, 7, 4], [0, 0, 0], [10, 5, -3], [-6, 3, 0], [4, 0, 2], [0, 0, 0]];
+      steps.forEach(([x, split, skew], k) => tl.set(targets, {
+        x, skewX: skew, textShadow: split ? SPLIT(split) : "0 0 0 rgba(0,0,0,0)",
+      }, t0 + k * 0.0625));
+    };
+    const pop = (el, t, from = 0.6) =>
+      tl.fromTo(el, { scale: from, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.55, ease: "back.out(2.2)" }, t);
+
+    // background drift, over the whole 60 s
+    tl.fromTo("#dots", { x: 0, y: 0 }, { x: -80, y: -80, duration: 60, ease: "none" }, 0);
+    tl.fromTo("#glowA", { x: 0, y: 0 }, { x: 300, y: 180, duration: 60, ease: "sine.inOut" }, 0);
+    tl.fromTo("#glowB", { x: 0, y: 0 }, { x: -360, y: -200, duration: 60, ease: "sine.inOut" }, 0);
+
+    // ---- 0 s: hook ----
+    const hand = $("#hookHand"), one = $("#hookOne");
+    const x0 = one.offsetLeft, w = one.offsetWidth, yb = one.offsetTop + one.offsetHeight * 0.95;
+    const svg = $("#squigSvg");
+    svg.setAttribute("width", hand.offsetWidth); svg.setAttribute("height", hand.offsetHeight + 40);
+    let d = `M${x0} ${yb}`;
+    const waves = 5;
+    for (let i = 0; i < waves; i++) d += ` q${w / waves / 2} ${i % 2 ? 9 : -9} ${w / waves} 0`;
+    $("#squig").setAttribute("d", d);
+    const len = $("#squig").getTotalLength();
+    tl.fromTo(hand, { clipPath: "inset(-30px 100% -60px -30px)" }, { clipPath: "inset(-30px 0% -60px -30px)", duration: 1.6, ease: "power1.inOut" }, 0.2);
+    tl.fromTo(hand, { y: 16 }, { y: 0, duration: 1.8, ease: "power2.out" }, 0.1);
+    tl.fromTo("#squig", { strokeDasharray: len, strokeDashoffset: len }, { strokeDashoffset: 0, duration: 0.5, ease: "power2.out" }, 1.8);
+    // the typed line keeps a fixed right edge, as a right-to-left line does while it is typed
+    typer.innerHTML = typed(HOOK, HOOK_LEN);
+    typer.style.width = `${typer.offsetWidth + 12}px`;
+    tl.fromTo(".typer .en", { backgroundSize: "0% 38%" }, { backgroundSize: "100% 38%", duration: 0.45, ease: "power2.out" }, 4.0);
+    $$("#langTags .pill").forEach((el, i) => pop(el, 4.0 + i * 0.5, 0.7));
+    tl.to([".hook-a", ".hook-b", "#langTags"], { opacity: 0, y: -40, duration: 0.3, ease: IN, stagger: 0.04 }, 5.62);
+
+    // ---- 6 s: the logo lands on the music's drop ----
+    const brand = $("#brand");
+    const W = brand.offsetWidth, H = brand.offsetHeight;
+    const S = 54 / 170;
+    const BIG = { x: (1920 - W) / 2, y: 470 - H / 2, scale: 1 };
+    const SMALL = { x: 60, y: 72 - (H * S) / 2, scale: S };
+    const END = { x: (1920 - W) / 2, y: 420 - H / 2, scale: 1 };
+    gsap.set(brand, BIG);
+    // The lockup is docs/brand/sedjem-logo-colour.svg. The ear pops in and its inner curve is drawn, the
+    // letters rise, the ear drops in as the dot of the j and the cursor blinks while the logo holds.
+    // Origins are set once, before any tween, so every tween ends on the file's exact geometry.
+    gsap.set(["#bIcon", "#bEar"], { transformOrigin: "50% 50%" });
+    gsap.set("#bInner", { strokeDasharray: 20, strokeDashoffset: 20 });
+    const blink = (from, to) => { for (let t = from, on = false; t < to; t += 0.53, on = !on) tl.set("#bCur", { opacity: on ? 1 : 0 }, t); };
+    tl.fromTo("#bIcon", { scale: 0.3, rotation: -14, opacity: 0 }, { scale: 1, rotation: 0, opacity: 1, duration: 0.75, ease: "back.out(1.7)" }, 5.82);
+    tl.to("#bInner", { strokeDashoffset: 0, duration: 0.5, ease: "power2.out" }, 6.1);
+    tl.fromTo("#bLogo .ch", { y: 700, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: E, stagger: 0.045 }, 6.05);
+    tl.fromTo("#bEar", { y: -700, scale: 0.4, opacity: 0 }, { y: 0, scale: 1, opacity: 1, duration: 0.6, ease: "back.out(2.2)" }, 6.55);
+    tl.fromTo("#bCur", { opacity: 0 }, { opacity: 1, duration: 0.01 }, 6.9);
+    blink(7.43, 9.3);
+    tl.set("#bCur", { opacity: 1 }, 9.35);
+    tl.fromTo("#logoSub", { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, ease: E }, 7.0);
+    tl.to("#logoSub", { y: -14, opacity: 0, duration: 0.3, ease: IN }, 9.45);
+    tl.fromTo(brand, BIG, { ...SMALL, duration: 0.6, ease: IO }, 9.4);
+
+    // ---- 10 s to 34 s: the steps bar ----
+    tl.fromTo(".stp", { y: -26, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: E, stagger: 0.08 }, 9.75);
+    [["#f1", 10, 18], ["#f2", 18, 26], ["#f3", 26, 34]].forEach(([f, a, b], i) => {
+      tl.fromTo(f, { scaleX: 0 }, { scaleX: 1, duration: b - a, ease: "none" }, a);
+      tl.fromTo(`#lb${i + 1}`, { color: "#6f7a88" }, { color: "#18202b", duration: 0.3 }, a);
+      tl.fromTo(`#tk${i + 1}`, { width: 0, opacity: 0, scale: 0.4 }, { width: 22, opacity: 1, scale: 1, duration: 0.4, ease: "back.out(2.5)" }, b - 0.02);
+    });
+    tl.to(".stp", { y: -24, opacity: 0, duration: 0.35, ease: IN, stagger: 0.04 }, 33.9);
+
+    // ---- 10 s: step 1, a recording dropped in ----
+    const s1 = $("#s1");
+    copyIn(s1, 9.95);
+    tl.fromTo("#p1", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, ease: E }, 9.95);
+    const file = $("#file");
+    const dz = $("#dz");
+    const fx = file.offsetLeft + file.offsetWidth * 0.62, fy = dz.offsetTop + file.offsetTop + 20;
+    // the file is dragged in from below right, over the panel's edge, and let go on the bar at 13 s
+    const FX = 520, FY = 420;
+    tl.set(file, { x: FX, y: FY, rotation: -8, scale: 1.06, opacity: 0 }, 0);
+    tl.set("#cur1", { x: fx + FX, y: fy + FY, opacity: 0 }, 0);
+    tl.fromTo(file, { x: FX, y: FY, rotation: -8, scale: 1.06, boxShadow: "0 40px 80px rgba(15,23,42,.28)" },
+      { x: 0, y: 0, rotation: 2, duration: 1.5, ease: IO }, 11.5);
+    tl.fromTo(file, { opacity: 0 }, { opacity: 1, duration: 0.3 }, 11.5);
+    tl.to(file, { rotation: 0, scale: 1, boxShadow: "0 1px 2px rgba(15,23,42,.06)", duration: 0.5, ease: "back.out(2)" }, 13.0);
+    // once it has landed the card has no transform at all, so it is drawn the same way in every frame
+    tl.set(file, { clearProps: "transform" }, 13.55);
+    tl.fromTo("#cur1", { x: fx + FX, y: fy + FY, opacity: 0 }, { x: fx, y: fy, duration: 1.5, ease: IO }, 11.5);
+    tl.fromTo("#cur1", { opacity: 0 }, { opacity: 1, duration: 0.25 }, 11.5);
+    tl.to("#cur1", { x: fx + 150, y: fy + 170, opacity: 0, duration: 0.7, ease: "power2.inOut" }, 13.25);
+    tl.fromTo("#dzOver", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 12.4);
+    tl.to("#dzOver", { opacity: 0, duration: 0.5 }, 13.0);
+    tl.to("#dzHint", { opacity: 0, scale: 0.94, duration: 0.35 }, 12.5);
+    pop("#fileCheck", 13.5, 0.2);
+    tl.fromTo("#prog", { y: 30, opacity: 0 }, { y: 0, opacity: 1, duration: 0.6, ease: E }, 13.95);
+    tl.fromTo("#pbar", { scaleX: 0 }, { scaleX: 12 / 40, duration: T_PARTS[1] - T_PARTS[0], ease: "power1.inOut" }, T_PARTS[0]);
+    copyOut(s1, 17.58);
+    tl.to("#p1", { y: -40, opacity: 0, duration: 0.36, ease: IN }, 17.6);
+
+    // ---- 18 s: step 2, every voice its own name ----
+    const s2 = $("#s2");
+    copyIn(s2, 17.95);
+    tl.fromTo("#p2", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, ease: E }, 17.95);
+    tl.fromTo("#p2 .spk", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.5, ease: E, stagger: 0.12 }, 19.0);
+    $$("#lines .line").forEach((ln, i) => {
+      const t = 19.5 + i;
+      tl.fromTo(ln, { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, t);
+      const ws = $$(".w", ln);
+      tl.fromTo(ws, { opacity: 0 }, { opacity: 1, duration: 0.2, stagger: 0.7 / ws.length, ease: "none" }, t + 0.1);
+    });
+    const curs = $$("#lines .cur");
+    [0, 1, 2].forEach((i) => {
+      tl.fromTo(curs[i], { opacity: 0 }, { opacity: 1, duration: 0.2 }, T_PLAY + i * 0.5);
+      tl.to(curs[i], { opacity: 0, duration: 0.2 }, T_PLAY + i * 0.5 + 0.5);
+    });
+    tl.fromTo(curs[3], { opacity: 0 }, { opacity: 1, duration: 0.2 }, T_PLAY + 1.5);
+    glitch(["#s2 .copy", "#p2"], 25.5);
+    copyOut(s2, 25.64);
+    tl.to("#p2", { y: -40, opacity: 0, duration: 0.3, ease: IN }, 25.66);
+
+    // ---- 26 s: step 3, fix a line and keep the version ----
+    const s3 = $("#s3");
+    copyIn(s3, 25.95);
+    gsap.set(["#p3", "#dlg", "#hist"], { yPercent: -50 });
+    const stage3 = $("#p3").parentElement;
+    const rb = $("#reviewBtn"), sb = $("#saveBtn");
+    const at = (el) => { // a point on an element, in the stage's coordinates, at rest
+      const a = el.getBoundingClientRect(), s = stage3.getBoundingClientRect();
+      return { x: a.left - s.left + a.width * 0.8, y: a.top - s.top + a.height * 0.72 };
+    };
+    // measured before the entrance tweens move anything: the stage is still at rest here
+    gsap.set("#p3", { y: 0, opacity: 1 });
+    const rbP = at(rb);
+    gsap.set("#dlg", { opacity: 1, scale: 1, y: 0 });
+    const sbP = at(sb);
+    tl.fromTo("#p3", { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, ease: E }, 25.95);
+    tl.fromTo("#cur3", { x: rbP.x + 260, y: rbP.y + 240, opacity: 0 }, { x: rbP.x, y: rbP.y, opacity: 1, duration: 0.9, ease: IO }, 28.6);
+    tl.to(rb, { scale: 0.93, duration: 0.12, yoyo: true, repeat: 1 }, 29.5);
+    tl.fromTo("#dlg", { opacity: 0, scale: 0.93, y: 40 }, { opacity: 1, scale: 1, y: 0, duration: 0.6, ease: E }, 29.7);
+    tl.to("#p3", { opacity: 0.25, scale: 0.97, duration: 0.5, ease: "power2.out" }, 29.7);
+    tl.to("#cur3", { x: sbP.x, y: sbP.y, duration: 1.0, ease: IO }, 30.6);
+    tl.to(sb, { scale: 0.93, backgroundColor: "#0a6362", duration: 0.12, yoyo: true, repeat: 1 }, 31.5);
+    tl.to("#dlg", { opacity: 0, scale: 0.95, y: -20, duration: 0.35, ease: IN }, 31.75);
+    tl.to("#p3", { opacity: 0, duration: 0.3, ease: IN }, 31.75);
+    tl.to("#cur3", { opacity: 0, x: sbP.x + 60, y: sbP.y + 80, duration: 0.4 }, 31.8);
+    const v1h = $("#v1").offsetHeight + 18;
+    tl.fromTo("#hist", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 32.0);
+    tl.fromTo("#v0", { y: -v1h }, { y: 0, duration: 0.6, ease: IO }, 32.45);
+    tl.fromTo("#v1", { opacity: 0, scale: 0.94, y: -24 }, { opacity: 1, scale: 1, y: 0, duration: 0.7, ease: E }, 32.5);
+    glitch(["#s3 .copy", "#hist"], 33.5);
+    copyOut(s3, 33.64);
+    tl.to("#hist", { y: -40, opacity: 0, duration: 0.3, ease: IN }, 33.66);
+
+    // ---- 34 s: two models, one best transcript (10 s, so the differing words can be read) ----
+    const cs = $("#cmpS");
+    copyIn(cs, 33.95);
+    const cmp = $("#cmp");
+    $("#mergedNote").style.top = `${cmp.offsetTop + cmp.offsetHeight + 34}px`;
+    tl.fromTo(cmp, { y: 80, opacity: 0 }, { y: 0, opacity: 1, duration: 0.9, ease: E }, 34.5);
+    tl.fromTo("#hdLs .tag", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.5, ease: E }, 35.0);
+    tl.fromTo("#hdRs .tag", { opacity: 0, x: -12 }, { opacity: 1, x: 0, duration: 0.5, ease: E }, 35.5);
+    ROWS.forEach((row, i) => tl.fromTo($$(`.r${i}`, cmp), { opacity: 0, y: 16 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 36.0 + i * 0.5));
+    const marks = $$("mark", cmp);
+    tl.to(marks, { backgroundColor: "rgba(255,226,138,1)", boxShadow: "0 0 0 5px rgba(255,205,70,.45)", duration: 0.35, ease: "power2.out", stagger: 0.05 }, 37.5);
+    tl.to(marks, { boxShadow: "0 0 0 0px rgba(255,205,70,0)", duration: 0.7, ease: "power2.out", stagger: 0.05 }, 37.95);
+    ROWS.forEach((row, i) => {
+      const t = 39.0 + i * 0.5;
+      const kept = $(`.cell.r${i}.c${row.keep}`, cmp), other = $(`.cell.r${i}.c${1 - row.keep}`, cmp);
+      tl.fromTo($(".kept-bg", kept), { opacity: 0 }, { opacity: 1, duration: 0.3 }, t);
+      tl.fromTo($(".kbtn .on", kept), { opacity: 0 }, { opacity: 1, duration: 0.15 }, t);
+      tl.fromTo($(".kbtn", kept), { scale: 1 }, { scale: 1.14, duration: 0.12, yoyo: true, repeat: 1, ease: "power2.out" }, t);
+      tl.to(other, { opacity: 0.45, duration: 0.3 }, t);
+    });
+    // merge: the kept cells come together in one column, which then closes up
+    const drop = ROWS.map((row, i) => $(`.cell.r${i}.c${1 - row.keep}`, cmp));
+    tl.to(drop, { opacity: 0, duration: 0.35, ease: IN }, 41.0);
+    tl.to(["#hdR", "#hdL > *"], { opacity: 0, duration: 0.3 }, 41.0);
+    ROWS.forEach((row, i) => { if (row.keep === 1) tl.to($(`.cell.r${i}.c1`, cmp), { x: -710, duration: 0.7, ease: IO }, 41.1); });
+    tl.fromTo("#mergedHead", { opacity: 0 }, { opacity: 1, duration: 0.3 }, 41.35);
+    tl.fromTo(cmp, { width: 1540 }, { width: 830, x: 355, duration: 0.65, ease: IO }, 41.5);
+    tl.to($$(".kept-bg", cmp), { opacity: 0, duration: 0.4 }, 41.9);
+    tl.fromTo("#mergedNote", { opacity: 0, y: 20, scale: 0.9 }, { opacity: 1, y: 0, scale: 1, duration: 0.55, ease: "back.out(2)" }, 42.0);
+    copyOut(cs, 43.58);
+    tl.to([cmp, "#mergedNote"], { y: -40, opacity: 0, duration: 0.36, ease: IN }, 43.6);
+
+    // ---- 44 s: local, or the service you trust ----
+    const ch = $("#choice");
+    copyIn(ch, 43.95);
+    const flyIn = (tile, t) => {
+      const dx = (rnd() - 0.5) * 900, dy = 260 + rnd() * 300;
+      tl.fromTo($(".logo", tile), { x: dx, y: dy, rotation: (rnd() - 0.5) * 70, scale: 0.4, opacity: 0 },
+        { x: 0, y: 0, rotation: 0, scale: 1, opacity: 1, duration: 1.0, ease: E }, t);
+    };
+    tl.fromTo("#tiles .local .tlabel", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 44.5);
+    $$("#tiles .local .tile").forEach((tile, i) => flyIn(tile, 44.5 + i * 0.08));
+    tl.fromTo("#tiles .hosted .tlabel", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 45.0);
+    $$("#tiles .hosted .tile").forEach((tile, i) => flyIn(tile, 45.0 + i * 0.06));
+    tl.fromTo("#tiles .nm", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.5, ease: E }, 45.5);
+    tl.fromTo("#consent", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 46.0);
+    pop("#cboxOn", 47.0, 0.5);
+    tl.fromTo("#tiles .hosted .tile:first-child .ring", { opacity: 0, scale: 1.2 }, { opacity: 1, scale: 1, duration: 0.45, ease: "back.out(2)" }, 47.0);
+    copyOut(ch, 48.58);
+    tl.to(["#tiles", "#consent"], { y: -40, opacity: 0, duration: 0.36, ease: IN, stagger: 0.04 }, 48.6);
+
+    // ---- 49 s: any graphics card; 51 s: or none at all, held to 53.6 s (the music builds from 48 s) ----
+    const gl = $$("#gpuH .ln > span");
+    tl.fromTo("#gpuCopy .kicker", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: 0.6, ease: E }, 48.95);
+    tl.fromTo(gl[0], { yPercent: 112 }, { yPercent: 0, duration: 0.85, ease: E }, 49.0);
+    $$("#gpuRow .gpu").forEach((g, i) => {
+      tl.fromTo(g, { opacity: 0, y: 70, scale: 0.6 }, { opacity: 1, y: 0, scale: 1, duration: 0.6, ease: "back.out(1.8)" }, 49.5 + i * 0.5);
+    });
+    tl.to("#gpuRow", { x: -300, opacity: 0.4, duration: 0.7, ease: IO }, 50.9);
+    tl.fromTo(gl[1], { yPercent: 112 }, { yPercent: 0, duration: 0.85, ease: E }, 51.0);
+    tl.fromTo("#cpu", { opacity: 0, scale: 0.5, y: 40 }, { opacity: 1, scale: 1, y: 0, duration: 0.7, ease: "back.out(1.6)" }, 51.1);
+    [52.0, 52.5, 53.0].forEach((t, i) => tl.to("#cpuLogo", { scale: 1.04 + i * 0.02, duration: 0.12, yoyo: true, repeat: 1, ease: "power2.out" }, t));
+    tl.to(["#gpuCopy .kicker", ...gl], { opacity: 0, y: -34, duration: 0.34, ease: IN, stagger: 0.03 }, 53.58);
+    tl.to(["#gpuRow", "#cpu"], { opacity: 0, y: 40, duration: 0.34, ease: IN }, 53.58);
+
+    // ---- 54 s: the end card, on the impact, holding to 60 s ----
+    tl.fromTo(brand, SMALL, { ...END, duration: 0.6, ease: IO, immediateRender: false }, 53.4);
+    tl.fromTo("#glowC", { opacity: 0, scale: 0.7 }, { opacity: 1, scale: 1, duration: 1.6, ease: "power2.out" }, 53.8);
+    tl.to("#bEar", { scale: 1.3, duration: 0.18, yoyo: true, repeat: 1, ease: "power2.out" }, 54.0);
+    blink(54.53, 60);
+    tl.fromTo("#endTag", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.7, ease: E }, 54.5);
+    tl.fromTo("#endFoss", { opacity: 0, y: 20 }, { opacity: 1, y: 0, duration: 0.7, ease: E }, 55.0);
+    tl.fromTo("#endUrl", { opacity: 0, scale: 0.85, y: 20 }, { opacity: 1, scale: 1, y: 0, duration: 0.7, ease: "back.out(1.7)" }, 55.5);
+    tl.fromTo("#shine", { x: -200 }, { x: 900, duration: 1.0, ease: "power2.inOut" }, 57.0);
+
+    tl.eventCallback("onUpdate", () => render(tl.time()));
+    render(0);
+    window.__timelines["sedjem"] = tl;
+    if (window.__hfForceTimelineRebind) window.__hfForceTimelineRebind();
+  }
+
+  const faces = ['400 28px "IBM Plex Sans"', '600 28px "IBM Plex Sans"', '700 28px "IBM Plex Sans"', '500 28px "IBM Plex Sans"',
+    '400 28px "IBM Plex Sans Arabic"', '500 28px "IBM Plex Sans Arabic"', '600 28px "IBM Plex Sans Arabic"',
+    '400 28px "IBM Plex Mono"', '500 28px "IBM Plex Mono"', '400 28px "Patrick Hand"'];
+  Promise.all(faces.map((f) => document.fonts.load(f, f.includes("Arabic") ? "عربي" : "Aa"))).then(() => document.fonts.ready).then(build)
+    .catch((e) => console.error("sedjem video: could not build the timeline", e && e.stack ? e.stack : e));
+})();
+</script>
+</body>
+</html>

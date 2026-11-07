@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="370" viewBox="0 0 800 370" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Phone audio: word error rate on the Perle clips</title>
+<rect x="0.5" y="0.5" width="799" height="369" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Phone audio: word error rate on the Perle clips</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">The same clips at 16 kHz, resampled through 8 kHz, and through a G.711 telephone channel.</text>
+<text x="330" y="86" font-size="13" fill="#1f2937" font-weight="600">Word error rate, %</text>
+<text x="330" y="101" font-size="11" fill="#6b7280">lower is better</text>
+<text x="196" y="152.5" font-size="13" fill="#1f2937" text-anchor="end">Cohere Transcribe Arabic</text>
+<text x="196" y="224.5" font-size="13" fill="#1f2937" text-anchor="end">whisper-medium (default)</text>
+<text x="196" y="296.5" font-size="13" fill="#1f2937" text-anchor="end">Whisper large-v3 + hint</text>
+<g data-axis="x" data-scale="0 25 330 700">
+<line x1="330" y1="112" x2="330" y2="328" stroke="#9ca3af" data-tick="0"/>
+<text x="330" y="344" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="404" y1="112" x2="404" y2="328" stroke="#e5e7eb" data-tick="5"/>
+<text x="404" y="344" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="5">5</text>
+<line x1="478" y1="112" x2="478" y2="328" stroke="#e5e7eb" data-tick="10"/>
+<text x="478" y="344" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="552" y1="112" x2="552" y2="328" stroke="#e5e7eb" data-tick="15"/>
+<text x="552" y="344" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="15">15</text>
+<line x1="626" y1="112" x2="626" y2="328" stroke="#e5e7eb" data-tick="20"/>
+<text x="626" y="344" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="700" y1="112" x2="700" y2="328" stroke="#e5e7eb" data-tick="25"/>
+<text x="700" y="344" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<path d="M330,122 L524.7,122 Q528.7,122 528.7,126 L528.7,132 Q528.7,136 524.7,136 L330,136 Z" fill="#0e7c7b" data-ref="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer"/>
+<text x="322" y="133" font-size="11" fill="#4b5563" text-anchor="end">16 kHz</text>
+<text x="534.7" y="133.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer" data-doc="docs/03-results.md#Phone audio|Cohere Transcribe Arabic|16 kHz">13.4</tspan>%</text>
+<path d="M330,141 L542.98,141 Q546.98,141 546.98,145 L546.98,151 Q546.98,155 542.98,155 L330,155 Z" fill="#0e7c7b" data-ref="summary/perle/phone/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer"/>
+<text x="322" y="152" font-size="11" fill="#4b5563" text-anchor="end">Through 8 kHz</text>
+<text x="552.98" y="152.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/phone/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer" data-doc="docs/03-results.md#Phone audio|Cohere Transcribe Arabic|Through 8 kHz">14.7</tspan>%</text>
+<path d="M330,160 L552.11,160 Q556.11,160 556.11,164 L556.11,170 Q556.11,174 552.11,174 L330,174 Z" fill="#0e7c7b" data-ref="summary/perle/g711/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer"/>
+<text x="322" y="171" font-size="11" fill="#4b5563" text-anchor="end">G.711 telephone</text>
+<text x="562.11" y="171.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/g711/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer" data-doc="docs/03-results.md#Phone audio|Cohere Transcribe Arabic|G.711 telephone">15.3</tspan>%</text>
+<path d="M330,194 L600.07,194 Q604.07,194 604.07,198 L604.07,204 Q604.07,208 600.07,208 L330,208 Z" fill="#2563eb" data-ref="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer"/>
+<text x="322" y="205" font-size="11" fill="#4b5563" text-anchor="end">16 kHz</text>
+<text x="610.07" y="205.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer" data-doc="docs/03-results.md#Phone audio|whisper-medium code-switching|16 kHz">18.5</tspan>%</text>
+<path d="M330,213 L584.09,213 Q588.09,213 588.09,217 L588.09,223 Q588.09,227 584.09,227 L330,227 Z" fill="#2563eb" data-ref="summary/perle/phone/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer"/>
+<text x="322" y="224" font-size="11" fill="#4b5563" text-anchor="end">Through 8 kHz</text>
+<text x="594.09" y="224.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/phone/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer" data-doc="docs/03-results.md#Phone audio|whisper-medium code-switching|Through 8 kHz">17.4</tspan>%</text>
+<path d="M330,232 L595.51,232 Q599.51,232 599.51,236 L599.51,242 Q599.51,246 595.51,246 L330,246 Z" fill="#2563eb" data-ref="summary/perle/g711/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer"/>
+<text x="322" y="243" font-size="11" fill="#4b5563" text-anchor="end">G.711 telephone</text>
+<text x="605.51" y="243.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/g711/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer" data-doc="docs/03-results.md#Phone audio|whisper-medium code-switching|G.711 telephone">18.2</tspan>%</text>
+<path d="M330,266 L634.33,266 Q638.33,266 638.33,270 L638.33,276 Q638.33,280 634.33,280 L330,280 Z" fill="#8a94a3" data-ref="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/wer"/>
+<text x="322" y="277" font-size="11" fill="#4b5563" text-anchor="end">16 kHz</text>
+<text x="644.33" y="277.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/wer" data-doc="docs/03-results.md#Phone audio|Whisper large-v3 + hint|16 kHz">20.8</tspan>%</text>
+<path d="M330,285 L645.75,285 Q649.75,285 649.75,289 L649.75,295 Q649.75,299 645.75,299 L330,299 Z" fill="#8a94a3" data-ref="summary/perle/phone/whisper-large-v3/ar-p3c2e92/wer"/>
+<text x="322" y="296" font-size="11" fill="#4b5563" text-anchor="end">Through 8 kHz</text>
+<text x="655.75" y="296.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/phone/whisper-large-v3/ar-p3c2e92/wer" data-doc="docs/03-results.md#Phone audio|Whisper large-v3 + hint|Through 8 kHz">21.6</tspan>%</text>
+<path d="M330,304 L652.6,304 Q656.6,304 656.6,308 L656.6,314 Q656.6,318 652.6,318 L330,318 Z" fill="#8a94a3" data-ref="summary/perle/g711/whisper-large-v3/ar-p3c2e92/wer"/>
+<text x="322" y="315" font-size="11" fill="#4b5563" text-anchor="end">G.711 telephone</text>
+<text x="662.6" y="315.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/g711/whisper-large-v3/ar-p3c2e92/wer" data-doc="docs/03-results.md#Phone audio|Whisper large-v3 + hint|G.711 telephone">22.1</tspan>%</text>
+</g>
+</svg>

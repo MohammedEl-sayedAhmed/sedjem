@@ -1,0 +1,15 @@
+{
+  "name": "sedjem-video",
+  "private": true,
+  "description": "The silent 40-second Sedjem product video, as a HyperFrames composition",
+  "license": "AGPL-3.0-only",
+  "scripts": {
+    "preview": "hyperframes preview",
+    "check": "hyperframes check",
+    "render": "hyperframes render --fps 30 --quality delivery --workers 1 --no-browser-gpu --output renders/sedjem-raw.mp4"
+  },
+  "devDependencies": {
+    "gsap": "3.14.2",
+    "hyperframes": "0.8.78"
+  }
+}

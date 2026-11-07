@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="244" viewBox="0 0 800 244" role="img" font-family='-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
+<title>Perle at 16 kHz: word error rate and English kept</title>
+<rect x="0.5" y="0.5" width="799" height="243" rx="12" fill="#ffffff" stroke="#e5e7eb"/>
+<text x="24" y="36" font-size="16" fill="#1f2937" font-weight="600">Perle at 16 kHz: word error rate and English kept</text>
+<text x="24" y="56" font-size="12" fill="#4b5563">Whiskers show the 95% confidence interval over the clips.</text>
+<text x="206" y="86" font-size="13" fill="#1f2937" font-weight="600">Word error rate, %</text>
+<text x="206" y="101" font-size="11" fill="#6b7280">lower is better</text>
+<text x="590" y="86" font-size="13" fill="#1f2937" font-weight="600">English kept, %</text>
+<text x="590" y="101" font-size="11" fill="#6b7280">higher is better</text>
+<text x="196" y="131.5" font-size="13" fill="#1f2937" text-anchor="end">Cohere Transcribe Arabic</text>
+<text x="196" y="161.5" font-size="13" fill="#1f2937" text-anchor="end">whisper-medium (default)</text>
+<text x="196" y="191.5" font-size="13" fill="#1f2937" text-anchor="end">Whisper large-v3 + hint</text>
+<g data-axis="x" data-scale="0 30 206 506">
+<line x1="206" y1="112" x2="206" y2="202" stroke="#9ca3af" data-tick="0"/>
+<text x="206" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="256" y1="112" x2="256" y2="202" stroke="#e5e7eb" data-tick="5"/>
+<text x="256" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="5">5</text>
+<line x1="306" y1="112" x2="306" y2="202" stroke="#e5e7eb" data-tick="10"/>
+<text x="306" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="10">10</text>
+<line x1="356" y1="112" x2="356" y2="202" stroke="#e5e7eb" data-tick="15"/>
+<text x="356" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="15">15</text>
+<line x1="406" y1="112" x2="406" y2="202" stroke="#e5e7eb" data-tick="20"/>
+<text x="406" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="20">20</text>
+<line x1="456" y1="112" x2="456" y2="202" stroke="#e5e7eb" data-tick="25"/>
+<text x="456" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<line x1="506" y1="112" x2="506" y2="202" stroke="#e5e7eb" data-tick="30"/>
+<text x="506" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="30">30</text>
+<path d="M206,119 L336.26,119 Q340.26,119 340.26,123 L340.26,131 Q340.26,135 336.26,135 L206,135 Z" fill="#0e7c7b" data-ref="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer"/>
+<line x1="299.47" y1="127" x2="387.39" y2="127" stroke="#374151" stroke-width="1.5" data-lo="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer_ci/0" data-hi="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer_ci/1" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|Cohere Transcribe Arabic (Q4, transcribe.cpp)|WER (95% CI)"/>
+<line x1="299.47" y1="122" x2="299.47" y2="132" stroke="#374151" stroke-width="1.5"/>
+<line x1="387.39" y1="122" x2="387.39" y2="132" stroke="#374151" stroke-width="1.5"/>
+<text x="393.39" y="131.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/wer" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|Cohere Transcribe Arabic (Q4, transcribe.cpp)|WER (95% CI)">13.4</tspan>%</text>
+<path d="M206,149 L387.19,149 Q391.19,149 391.19,153 L391.19,161 Q391.19,165 387.19,165 L206,165 Z" fill="#2563eb" data-ref="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer"/>
+<line x1="357.56" y1="157" x2="424.61" y2="157" stroke="#374151" stroke-width="1.5" data-lo="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer_ci/0" data-hi="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer_ci/1" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|whisper-medium code-switching fine-tune (default)|WER (95% CI)"/>
+<line x1="357.56" y1="152" x2="357.56" y2="162" stroke="#374151" stroke-width="1.5"/>
+<line x1="424.61" y1="152" x2="424.61" y2="162" stroke="#374151" stroke-width="1.5"/>
+<text x="430.61" y="161.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/wer" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|whisper-medium code-switching fine-tune (default)|WER (95% CI)">18.5</tspan>%</text>
+<path d="M206,179 L410.33,179 Q414.33,179 414.33,183 L414.33,191 Q414.33,195 410.33,195 L206,195 Z" fill="#8a94a3" data-ref="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/wer"/>
+<line x1="369.77" y1="187" x2="460.53" y2="187" stroke="#374151" stroke-width="1.5" data-lo="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/wer_ci/0" data-hi="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/wer_ci/1" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|Whisper large-v3 + style hint|WER (95% CI)"/>
+<line x1="369.77" y1="182" x2="369.77" y2="192" stroke="#374151" stroke-width="1.5"/>
+<line x1="460.53" y1="182" x2="460.53" y2="192" stroke="#374151" stroke-width="1.5"/>
+<text x="466.53" y="191.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/wer" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|Whisper large-v3 + style hint|WER (95% CI)">20.8</tspan>%</text>
+</g>
+<g data-axis="x" data-scale="0 100 590 750">
+<line x1="590" y1="112" x2="590" y2="202" stroke="#9ca3af" data-tick="0"/>
+<text x="590" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="0">0</text>
+<line x1="630" y1="112" x2="630" y2="202" stroke="#e5e7eb" data-tick="25"/>
+<text x="630" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="25">25</text>
+<line x1="670" y1="112" x2="670" y2="202" stroke="#e5e7eb" data-tick="50"/>
+<text x="670" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="50">50</text>
+<line x1="710" y1="112" x2="710" y2="202" stroke="#e5e7eb" data-tick="75"/>
+<text x="710" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="75">75</text>
+<line x1="750" y1="112" x2="750" y2="202" stroke="#e5e7eb" data-tick="100"/>
+<text x="750" y="218" font-size="11" fill="#6b7280" text-anchor="middle" data-tick="100">100</text>
+<path d="M590,119 L709.35,119 Q713.35,119 713.35,123 L713.35,131 Q713.35,135 709.35,135 L590,135 Z" fill="#0e7c7b" data-ref="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/en_kept"/>
+<text x="719.35" y="131.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/cohere-transcribe-arabic-07-2026-Q4_K_M/ar/en_kept" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|Cohere Transcribe Arabic (Q4, transcribe.cpp)|English kept">77</tspan>%</text>
+<path d="M590,149 L729.91,149 Q733.91,149 733.91,153 L733.91,161 Q733.91,165 729.91,165 L590,165 Z" fill="#2563eb" data-ref="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/en_kept"/>
+<text x="739.91" y="161.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/whisper-whisper-medium-arabic-codeswitched-ct2/ar/en_kept" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|whisper-medium code-switching fine-tune (default)|English kept">90</tspan>%</text>
+<path d="M590,179 L727.23,179 Q731.23,179 731.23,183 L731.23,191 Q731.23,195 727.23,195 L590,195 Z" fill="#8a94a3" data-ref="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/en_kept"/>
+<text x="737.23" y="191.32" font-size="12" fill="#1f2937" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke"><tspan data-ref="summary/perle/wav16k/whisper-large-v3/ar-p3c2e92/en_kept" data-doc="docs/03-results.md#Public benchmark: Perle at 16 kHz|Whisper large-v3 + style hint|English kept">88</tspan>%</text>
+</g>
+</svg>

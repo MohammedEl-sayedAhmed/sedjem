@@ -1,0 +1,10 @@
+{
+ "engine": "cohere",
+ "model": "cohere-transcribe-arabic-07-2026-Q4_K_M",
+ "language": "ar",
+ "prompt": null,
+ "mode": "pipeline",
+ "threads": 10,
+ "device": "vulkan: Intel(R) Iris(R) Xe Graphics (ADL GT2)",
+ "code": "6596a37"
+}

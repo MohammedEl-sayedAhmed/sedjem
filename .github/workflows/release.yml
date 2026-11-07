@@ -1,0 +1,96 @@
+# A release, run by hand with its version (Actions → Release → Run workflow, or
+# `gh workflow run release.yml -f version=0.3.2`), from main's newest commit or from the commit given
+# (docs/14-pipeline.md). Running it is the decision to release:
+#   check    the version is X.Y.Z, matches app/__init__.py and is newer than every release; the commit is on main
+#            and its Tests run passed on Windows and Linux (.github/scripts/release.py check). The run's summary
+#            shows the release notes as they will be published.
+#   tag      the commit is tagged vX.Y.Z. A tag made with this workflow's token starts no other workflow, so:
+#   build    the Desktop build workflow (desktop.yml) is called with the version and the commit. It tests and
+#            builds both systems, installs the Windows build over itself and over the newest release as Update now
+#            does, and publishes: the notes in .github/release-notes/vX.Y.Z.md, or a draft from the commits since
+#            the previous release when there is no such file. Its publishing job uses the "release" environment,
+#            which can ask for an approval first, and is followed by winget.
+# Run again after a failed build, a release goes on from the tag it made.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "The version to release, X.Y.Z, as in app/__init__.py"
+        type: string
+        required: true
+      commit:
+        description: "The full sha of the commit to release (empty: the newest commit of the branch above)"
+        type: string
+        required: false
+        default: ""
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read  # the Tests workflow's runs
+    outputs:
+      commit: ${{ steps.check.outputs.commit }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.commit || github.sha }}
+          fetch-depth: 0  # the tags and the commits since the previous release, for the notes
+          persist-credentials: false
+
+      - name: The version and the commit
+        id: check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: python3 .github/scripts/release.py check "$VERSION" --commit "$(git rev-parse HEAD)"
+
+      - name: The release notes
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          {
+            echo "### The notes of v$VERSION"
+            echo
+            python3 .github/scripts/release.py notes "$VERSION" --dry-run
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  tag:
+    needs: check
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: write  # the tag
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.check.outputs.commit }}
+          persist-credentials: false
+
+      - name: Tag the commit
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+          COMMIT: ${{ needs.check.outputs.commit }}
+        run: python3 .github/scripts/release.py tag "$VERSION" --commit "$COMMIT"
+
+  build:
+    needs: [check, tag]
+    permissions:
+      contents: write  # for its release job, which publishes; its other jobs only read
+    uses: ./.github/workflows/desktop.yml
+    with:
+      version: ${{ inputs.version }}
+      commit: ${{ needs.check.outputs.commit }}
+    secrets:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}

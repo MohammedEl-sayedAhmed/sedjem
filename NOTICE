@@ -1,0 +1,20 @@
+Sedjem
+Copyright (C) 2026 Mohammed El-sayed Ahmed
+https://github.com/MohammedEl-sayedAhmed/sedjem
+
+Sedjem is free software: you can redistribute it and/or modify it under the terms of the GNU Affero
+General Public License, version 3 only (AGPL-3.0-only), as published by the Free Software Foundation.
+The full text is in the LICENSE file. It comes with no warranty.
+
+Additional term under section 7(b) of the AGPL: any copy or modified version must keep the author
+attribution "Sedjem by Mohammed El-sayed Ahmed", with a link to
+https://github.com/MohammedEl-sayedAhmed/sedjem, in the app's About section and in its README
+or equivalent documentation.
+
+Commercial licences, for use without the AGPL's conditions (for example in a closed-source product
+or a hosted service whose changes you don't want to publish), are available from the author:
+https://github.com/MohammedEl-sayedAhmed
+
+Versions of this project published up to 25 September 2026 were released under the MIT licence.
+
+The models Sedjem downloads and the libraries it bundles keep their own licences (see README.md).
