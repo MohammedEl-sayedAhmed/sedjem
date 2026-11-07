@@ -2,6 +2,14 @@
 # request and once a week, as the questions they ask grow (docs/14-pipeline.md). What they find goes to the
 # repository's Security tab and, for a pull request, into its checks. This is CodeQL's advanced setup: the default
 # setup in the repository's settings must stay off, or GitHub refuses these results.
+#
+# The ratchet: a pull request fails only on a finding that main doesn't already have. The job `codeql-ratchet`
+# compares the findings of the three analyses with the fingerprints in baseline.json on the `security-baseline`
+# branch, and the job `update-baseline` writes that file after each push to main and each weekly run
+# (.github/scripts/codeql_ratchet.py explains the fingerprints). Both go through the API, with no checkout of the
+# branch, as stats.yml does; codeql-baseline-guard.yml puts back what anyone else pushes there. While the branch
+# doesn't exist, the ratchet passes with a notice, until the repository variable CODEQL_RATCHET_ARMED is true; then
+# a missing branch fails, as a branch without its file always does. AgDR-0015 has the reasons.
 name: CodeQL
 
 on:
@@ -45,3 +53,79 @@ jobs:
       - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
         with:
           category: "/language:${{ matrix.language }}"
+          output: codeql-results
+
+      # the findings, for the ratchet and the baseline: they live for a day, only to reach the jobs below
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: codeql-sarif-${{ matrix.language }}
+          path: codeql-results
+          retention-days: 1
+          if-no-files-found: error
+
+  # The check that main requires. It runs also when an analysis failed, since a job that is skipped counts as
+  # passed, and then says so: a pull request is never let through for want of a scan.
+  codeql-ratchet:
+    name: codeql-ratchet
+    needs: analyze
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: The analyses finished
+        env:
+          ANALYZE_RESULT: ${{ needs.analyze.result }}
+        run: |
+          if [ "$ANALYZE_RESULT" != "success" ]; then
+            echo "::error::The CodeQL analyses did not all finish (analyze: $ANALYZE_RESULT), so there is nothing to compare."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: codeql-sarif-*
+          path: codeql-sarif
+
+      # the baseline is read through the API; without the branch yet, this passes with a notice until
+      # CODEQL_RATCHET_ARMED is true, and fails after
+      - name: Compare with the baseline
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          RATCHET_ARMED: ${{ vars.CODEQL_RATCHET_ARMED }}
+        run: python3 .github/scripts/codeql_ratchet.py check --sarif codeql-sarif --repo "$GITHUB_REPOSITORY"
+
+  # After a push to main and the weekly run, the baseline becomes main's findings. It is written through the API
+  # with the job's own token (no stored token, no git push), and one write at a time. A write from an older commit
+  # never replaces the baseline of a newer one.
+  update-baseline:
+    name: update-baseline
+    needs: analyze
+    if: ${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    concurrency:
+      group: security-baseline
+      cancel-in-progress: false
+    permissions:
+      contents: write  # the security-baseline branch, through the API
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: codeql-sarif-*
+          path: codeql-sarif
+
+      - name: Write the baseline
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          COMMIT: ${{ github.sha }}
+        run: python3 .github/scripts/codeql_ratchet.py update --sarif codeql-sarif --repo "$GITHUB_REPOSITORY" --commit "$COMMIT"

@@ -43,7 +43,7 @@ they cite; each timestamp is that of the commit that carried the decision out, i
 from [PR #39](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/39), running jobs on another computer. Records
 12 to 14 were written with the change they record, which pins everything the pipeline installs by hash
 ([ADR 14](../adr/0014-everything-the-builds-install-is-pinned-by-hash.md)), each stamped with the time it was
-decided.
+decided. Records 15 and 16 were written with the CodeQL ratchet and the Scorecard workflow they record.
 
 ## Index
 
@@ -63,3 +63,5 @@ decided.
 | AgDR-0012 | [Locks made by uv's universal resolution, checked for each system](AgDR-0012-locks-from-uv-universal-checked-per-system.md) | executed | One lock for each use, made on any computer, resolved again for Linux and Windows to add what the universal resolution missed, such as sherpa-onnx-core; proxy-tools built with a locked setuptools. |
 | AgDR-0013 | [The locks kept current by a quick check and one command, not by Dependabot](AgDR-0013-locks-kept-current-by-a-check-not-dependabot.md) | executed | Dependabot makes hashed locks only from .in files, so it stays on the requirement files, and the quick checks fail with the command until the locks are made again. |
 | AgDR-0014 | [Setups from source and Update now keep the requirement files](AgDR-0014-source-setups-keep-the-requirement-files.md) | executed | Copies that run from source and older versions that update stay as they are; the locks cover what is built and checked. |
+| AgDR-0015 | [A CodeQL ratchet on a baseline branch that the workflow writes through the API](AgDR-0015-codeql-ratchet-on-a-baseline-branch.md) | executed | A pull request fails only on CodeQL findings that main lacks, compared with fingerprints on the `security-baseline` branch; it passes while the branch does not exist, so main's 23 open alerts do not block everything. |
+| AgDR-0016 | [A weekly OpenSSF Scorecard run that reports to the Security tab](AgDR-0016-weekly-openssf-scorecard.md) | executed | An independent score of the pipeline's supply-chain practices, weekly and when the branch protection changes, published to scorecard.dev with the findings in the Security tab. |

@@ -14,7 +14,10 @@ the rules for public text, and the choices still open.
 | Desktop build (`desktop.yml`) | pull requests that change how the app is built or started, by hand, and when Release or Nightly preview calls it | the tests again, both builds with their self-tests, the installer and its update tests; publishes only when called or for a pushed tag |
 | Release (`release.yml`) | by hand, with the version | checks the version and the commit, tags it, and has the Desktop build publish it |
 | Nightly preview (`preview.yml`) | once a day | a pre-release of main's newest tested commit ([updates](12-updates.md#nightly-preview-builds)) |
-| CodeQL (`codeql.yml`) | every push to main and pull request, and on Mondays | CodeQL's security queries on the Python, the JavaScript and the workflows |
+| CodeQL (`codeql.yml`) | every push to main and pull request, and on Mondays | CodeQL's security queries on the Python, the JavaScript and the workflows; a pull request fails only on findings that main doesn't have (`codeql-ratchet`), and main's findings are written to the `security-baseline` branch ([the ratchet](#the-codeql-ratchet)) |
+| CodeQL baseline guard (`codeql-baseline-guard.yml`) | every push to the `security-baseline` branch | puts back what anyone but the CodeQL workflow pushed there, and opens an issue |
+| Scorecard (`scorecard.yml`) | on Mondays, every push to main, and when the branch protection rules change | the OpenSSF Scorecard of the repository's own supply-chain practices, with its findings in the Security tab |
+| Footprints (`footprints.yml`) | every pull request, also when its title or description is edited | fails on AI-tool attribution in the commits, the title or the description ([ADR 15](adr/0015-no-ai-tool-attribution-in-the-history.md)) |
 | Security (`security.yml`) | every push to main and pull request, and on Mondays | pip-audit on the locks, every package the workflows install, and the dependency review of a pull request |
 | Dependabot (`.github/dependabot.yml`) | on Mondays | pull requests that update the pip requirements and the actions |
 | Pages (`pages.yml`) | pushes to main that change the website or the benchmark results it shows, after each day's stats, after a release, by hand | the website ([site/build.py](../site/build.py)), built from main; it never follows a run for a fork's pull request |
@@ -45,12 +48,15 @@ The browser tests drive the runner's own Chrome, so there is no Playwright brows
 
 ## Before main
 
-main is protected: it can't be force-pushed or deleted, and a pull request can merge only when the checks
-`checks`, `test (ubuntu-24.04)`, `test (windows-latest)` and `windows-source` have passed. `checks` must be
-among them: when it fails, the jobs that need it are skipped, and GitHub counts a skipped check as passed.
-Administrators aren't bound by the protection, so the maintainer may push a small fix straight to main; larger
-changes, and every change made by an agent, go through a pull request, and the Tests workflow runs on main
-again after the merge.
+main is protected ([ADR 16](adr/0016-branch-protection-with-seven-checks-and-a-linear-history.md)): it can't be
+force-pushed or deleted, and a pull request can merge only when the checks `checks`, `test (ubuntu-24.04)`,
+`test (windows-latest)`, `windows-source`, `dependency-review`, `codeql-ratchet` and `footprints` have passed and
+its branch is up to date with main. `checks` must be among them: when it fails, the jobs that need it are
+skipped, and GitHub counts a skipped check as passed. The same is why `codeql-ratchet` runs also when a CodeQL
+analysis failed, and then fails. A pull request is merged by squashing, so that history stays linear, and its
+branch is deleted after the merge. Administrators aren't bound by the protection, so the maintainer may push a
+small fix straight to main; larger changes, and every change made by an agent, go through a pull request, and the
+Tests workflow runs on main again after the merge.
 
 Commit titles start with the area they change, such as "Updates: ..." or "Website: ...". The release notes are
 drafted from them.
@@ -116,10 +122,11 @@ The Release workflow ([`.github/scripts/release.py`](../.github/scripts/release.
   link to the privacy policy. Without a notes file, the draft is published as it is. The release then goes to
   winget.
 
-Running the workflow is the approval. Publishing uses the GitHub environment `release`, which GitHub creates on
-its first use without rules. To have a release wait for a click before it is published, add a required reviewer
-in *Settings → Environments → release*; the run then waits at the Desktop build's release job, the notes can be
-read in the summary meanwhile, and *Review deployments* lets it go on. A tag pushed by hand
+Publishing a stable release uses the GitHub environment `release`, which has the maintainer as its required
+reviewer ([ADR 16](adr/0016-branch-protection-with-seven-checks-and-a-linear-history.md)). Running the workflow
+starts the release, and the run waits at the Desktop build's release job until the maintainer approves it; the notes
+can be read in the summary meanwhile, and *Review deployments* lets it go on. A nightly preview doesn't use the
+environment, so it needs no approval. A tag pushed by hand
 (`git push origin v0.3.2`) still publishes through the Desktop build, with the same approval, but without the
 Release workflow's checks.
 
@@ -152,7 +159,16 @@ pull request to microsoft/winget-pkgs if it is still open; once it is merged, th
 - The dependency review fails a pull request that adds a dependency with a known vulnerability of high severity
   or more.
 - CodeQL's security queries run on the Python, the JavaScript and the workflows, with the results in the
-  repository's Security tab. This is CodeQL's advanced setup, so its default setup in the settings stays off.
+  repository's Security tab. This is CodeQL's advanced setup, so its default setup in the settings stays off. A
+  pull request fails the check `codeql-ratchet` only on findings that main doesn't have ([the
+  ratchet](#the-codeql-ratchet)).
+- The OpenSSF Scorecard runs every week and when the branch protection rules change, and shows what it finds in
+  the Security tab. It scores the repository's own practices, such as pinned actions, token permissions, branch
+  protection and dependency updates, and publishes the result to scorecard.dev
+  ([AgDR-0016](agdr/AgDR-0016-weekly-openssf-scorecard.md)).
+- The check `footprints` fails a pull request whose commits, title or description carry AI-tool attribution. Using
+  AI tools is fine; attributing them in the history is not. [`.github/scripts/check_footprints.py`](../.github/scripts/check_footprints.py)
+  holds the patterns, and only it and its test may name them.
 - Nothing the workflows install or run can change without a commit that changes it
   ([ADR 14](adr/0014-everything-the-builds-install-is-pinned-by-hash.md)). Every action is pinned to a commit,
   with its version in a comment, and Dependabot updates both. Every Python package comes from a lock with the
@@ -161,14 +177,48 @@ pull request to microsoft/winget-pkgs if it is still open; once it is merged, th
   release's installer, which the update test installs, against that release's `SHA256SUMS.txt` as *Update now*
   does. The scripts the nightly preview and the stats fetch are this repository's own, at the run's commit.
   [`tests/test_pipeline.py`](../tests/test_pipeline.py) checks each of these, and that no other installer runs.
-- Each workflow starts with no permissions or read-only ones, and each job gets only what it needs. Checkouts
-  don't keep the token.
+- Each workflow starts with no permissions, and each job gets only what it needs: the write permissions are in the
+  jobs that use them, and [`tests/test_pipeline.py`](../tests/test_pipeline.py) lists every one. Checkouts don't
+  keep the token.
 - Pull requests from forks run with `pull_request`, which gives them a read-only token and no secrets. No
   workflow uses `pull_request_target`. The two secrets are used in one place each: `WINGET_TOKEN` in the winget
   job of a release, and `STATS_TOKEN` in the stats workflow.
 - GitHub's own secret scanning and push protection, free for public repositories, look for leaked keys. A
   separate scanner such as gitleaks would add generic patterns, which here would mostly find the tests' stand-in
   keys and the public key of the usage counts, so there is none.
+
+### The CodeQL ratchet
+
+CodeQL finds 23 things in the code as it is, so requiring it as it is would block every pull request
+([AgDR-0015](agdr/AgDR-0015-codeql-ratchet-on-a-baseline-branch.md)). The ratchet lets a pull request through
+unless it adds a finding:
+
+- Each analysis writes its findings (SARIF) and hands them on as an artifact kept for a day. A finding's
+  fingerprint is its rule and the hash CodeQL puts on it, which comes from the code around it, so it survives lines
+  added above it. Two findings with the same fingerprint count twice.
+- On a pull request, the job `codeql-ratchet` compares the fingerprints with `baseline.json` on the
+  `security-baseline` branch ([`.github/scripts/codeql_ratchet.py`](../.github/scripts/codeql_ratchet.py)). A
+  finding that the branch has fewer times than the scan is new: the job names it in the checks and fails. It runs
+  also when an analysis failed, and then fails, since a skipped job counts as passed.
+- After each push to main, each Monday and each run by hand on main, the job `update-baseline` writes the findings
+  of that commit as the new baseline. A write from an older commit never replaces the baseline of a newer one. The
+  job writes the branch through the API with its own token, never with git, as `stats.yml` does for its branch.
+  A fixed finding leaves the baseline at the next write, so main can only get cleaner.
+- `codeql-baseline-guard.yml` runs on every push to the branch. The CodeQL workflow's own token starts no
+  workflow, so each run is someone else's push: it adds a commit that restores the files, and opens or updates an
+  issue. GitHub reads a push's workflows from the pushed commit, so each baseline commit is built on main's files
+  plus `baseline.json`; a push that removes the guard file from the branch is not guarded. GitHub starts no push
+  workflow for a branch deletion: a deleted baseline is written again by the next push to main, the weekly run or
+  a run by hand on main, and until then the ratchet fails every pull request. The real control is a repository
+  ruleset on `security-baseline` that restricts updates and deletions, with GitHub Actions as its bypass actor,
+  applied in the settings.
+- While the `security-baseline` branch doesn't exist, which is true until the first push to main after this
+  was added, `codeql-ratchet` passes with a notice and compares nothing. Once that first baseline is written, the
+  maintainer sets the repository variable `CODEQL_RATCHET_ARMED` to `true`, and a missing branch fails the check
+  from then on. A branch without `baseline.json` always fails it, since only the CodeQL workflow writes the branch.
+
+The findings stay in the Security tab: the ratchet decides only whether a pull request passes. To see main's, read
+`baseline.json` on the branch or filter the alerts by `branch:main`.
 
 ### Locks
 
@@ -252,7 +302,8 @@ These were decided for now, and can change:
 - Pull requests: required for agents and larger changes; the maintainer may push small fixes to main.
 - The linter: ruff with the error rules only, the existing code fixed in one go. More rules can follow the same
   way, one set at a time.
-- Approval: running the Release workflow is the approval, and the `release` environment has no reviewer yet.
+- Approval: the maintainer approves each stable release in the `release` environment. The review is by one
+  person, who may also approve their own run; a second reviewer would need a second maintainer.
 - Signing: none for now, as above.
 - Provenance: the release files have no build provenance yet. GitHub's attest-build-provenance action would let
   anyone check that a download came from the Desktop build workflow (`gh attestation verify`); it can only be

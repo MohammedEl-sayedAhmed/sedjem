@@ -40,9 +40,11 @@ The app listens on http://127.0.0.1:8765. [The app](docs/09-app.md) lists its op
 
 ## Test and check
 
-CI requires four checks before a pull request can merge: `checks`, the tests on Ubuntu and Windows, and
-`windows-source`, the setup from source on Windows. Run these with the virtual environment active
-(`. .venv/bin/activate`); the `checks` job also runs actionlint on the workflows.
+CI requires seven checks before a pull request can merge, with the branch up to date with main: `checks`, the tests
+on Ubuntu and Windows, `windows-source`, the setup from source on Windows, `dependency-review`, `codeql-ratchet`
+(no CodeQL finding that main doesn't have) and `footprints` (no AI-tool attribution, see Rules). Run the first four
+with the virtual environment active (`. .venv/bin/activate`); the `checks` job also runs actionlint on the
+workflows. A pull request is merged by squashing, and its branch is deleted after.
 
 ```sh
 python -m unittest discover -s tests -v                              # every test; hosted services are local stand-ins
@@ -77,6 +79,11 @@ The browser tests (`tests/test_ui*.py`) skip without Playwright or a browser, un
 - Every change an agent makes goes through a pull request. Commit titles start with the area they change, such as
   "Docs: ...", "Pipeline: ..." or "Website: ...", because the release notes are drafted from them.
 - Tests come with the change, and the checks above pass.
+- No AI-tool attribution in the history: no co-author trailer for an assistant, no "Generated with" note, no robot
+  emoji, in a commit message, in the lines a commit adds, or in a pull request's title or description. Using an AI
+  tool is fine; attributing it is not. The `footprints` check fails a pull request that has one
+  ([ADR 15](docs/adr/0015-no-ai-tool-attribution-in-the-history.md)). Only `.github/scripts/check_footprints.py` and
+  its test may name the patterns.
 - A changed requirement file comes with its locks: run `python .github/scripts/locks.py` and commit `.github/locks/`.
   Dependabot can't make the locks, so they are pushed by hand on its pull requests.
 - Docs say what changed, in plain prose: no bold, no em dashes (en dashes are fine), British spelling, and lines

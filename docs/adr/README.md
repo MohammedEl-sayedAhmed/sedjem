@@ -30,8 +30,10 @@ requests they cite; each is dated by the commit that brought its decision in.
 | 0010 | [Anonymous usage counts through Aptabase](0010-anonymous-usage-counts-through-aptabase.md) | Accepted | A few counts a month, on by default with a switch, never any content or identifier, with public monthly totals. |
 | 0011 | [Windows: no free code signing, and winget instead](0011-windows-no-free-signing-ship-through-winget.md) | Accepted | The commercial licences rule out SignPath; the installer stays unsigned and Sedjem is published on winget. |
 | 0012 | [A static, bilingual website on GitHub Pages](0012-website-static-bilingual-on-github-pages.md) | Accepted | One page in English and Egyptian Arabic, built with the standard library, with anonymous page counts and no cookies. |
-| 0013 | [Branch protection on main for a single maintainer](0013-branch-protection-for-a-single-maintainer.md) | Accepted | The tests on Linux and Windows are required, force pushes and deletion are blocked, and no review is required. |
+| 0013 | [Branch protection on main for a single maintainer](0013-branch-protection-for-a-single-maintainer.md) | Superseded by [0016](0016-branch-protection-with-seven-checks-and-a-linear-history.md) | The tests on Linux and Windows are required, force pushes and deletion are blocked, and no review is required. |
 | 0014 | [Everything the builds install is pinned by hash](0014-everything-the-builds-install-is-pinned-by-hash.md) | Accepted | Every Python package from a lock with its SHA-256, dependencies' dependencies included; pip never upgraded; every program a run downloads checked first, as clipman pins its actions. |
+| 0015 | [No AI-tool attribution in the history](0015-no-ai-tool-attribution-in-the-history.md) | Accepted | Commits, titles and descriptions carry no co-author trailer, "Generated with" note or robot emoji for an AI tool; the check `footprints` fails a pull request that has one. |
+| 0016 | [Branch protection with seven checks and a linear history](0016-branch-protection-with-seven-checks-and-a-linear-history.md) | Accepted | Seven required checks and an up-to-date branch, squash merges only, merged branches deleted, and the maintainer's approval for a stable release; replaces ADR 13. |
 
 ## Adding a record
 

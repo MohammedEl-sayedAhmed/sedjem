@@ -1,0 +1,42 @@
+# Keeps AI-tool attribution out of the history (AGENTS.md, ADR 15): fails a pull request when one of its commits
+# (message, trailers or added lines), its title or its description carries the attribution that AI tools add,
+# such as a co-author trailer for an assistant, a "Generated with" note or the robot emoji. The description of a
+# pull request opened by a bot is skipped. .github/scripts/check_footprints.py holds the patterns and the few
+# files that may name them. Using AI tools is fine; attributing them is not.
+#
+# It runs on pull_request, which gives a fork's run a read-only token and no secrets. The
+# title and the description reach the script through environment variables, never through ${{ }} in a script.
+name: Footprints
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions: {}
+
+# A new push, or an edit of the title, cancels the run it replaces.
+concurrency:
+  group: footprints-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  footprints:
+    name: footprints
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0  # the base and every commit of the pull request
+          persist-credentials: false
+
+      - name: Scan the commits, the title and the description
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        run: python3 .github/scripts/check_footprints.py "$BASE_SHA" "$HEAD_SHA"
