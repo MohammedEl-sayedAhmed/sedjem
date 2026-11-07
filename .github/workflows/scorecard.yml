@@ -1,0 +1,49 @@
+# The OpenSSF Scorecard, a weekly check of the repository's own supply-chain practices: pinned actions, token
+# permissions, branch protection, dependency updates, security policy, signed releases and more
+# (docs/14-pipeline.md). It runs every Monday, after each push to main, and when the branch protection rules
+# change. Its findings go to the repository's Security tab, and the result is published to the OpenSSF's
+# public dashboard (https://scorecard.dev), which the project's badge can read. Scorecard's own rules for a
+# workflow that publishes apply: read-only or empty permissions at the top, the permissions a job needs inside
+# it, and only a few kinds of step. AgDR-0016 has the reasons.
+name: Scorecard
+
+on:
+  branch_protection_rule:
+  schedule:
+    - cron: "37 4 * * 1"
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  analysis:
+    name: analysis
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read  # Scorecard reads the workflows' runs
+      security-events: write  # the findings, for the Security tab
+      id-token: write  # publishing the result to scorecard.dev
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@fa7117db83c52d787ae5a89f350999701505d78e # v2.5.0
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: scorecard-sarif
+          path: results.sarif
+          retention-days: 5
+
+      - uses: github/codeql-action/upload-sarif@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
+        with:
+          sarif_file: results.sarif
+          category: scorecard

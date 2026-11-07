@@ -1,5 +1,5 @@
 ---
-status: Accepted
+status: Superseded by 0016
 date: 2026-10-30
 deciders: MohammedEl-sayedAhmed
 ---

@@ -39,11 +39,16 @@ WRITERS = {
     ("desktop.yml", "release"): {"contents"},
     ("preview.yml", "build"): {"contents"}, ("preview.yml", "prune"): {"contents"},
     ("release.yml", "tag"): {"contents"}, ("release.yml", "build"): {"contents"},
-    ("codeql.yml", "analyze"): {"security-events"},
-    ("stats.yml", None): {"contents"},
-    ("pages.yml", None): {"pages", "id-token"}, ("pages.yml", "on-main"): {"actions"},
+    ("codeql.yml", "analyze"): {"security-events"}, ("codeql.yml", "update-baseline"): {"contents"},
+    ("codeql-baseline-guard.yml", "guard"): {"contents", "issues"},
+    ("scorecard.yml", "analysis"): {"security-events", "id-token"},
+    ("stats.yml", "stats"): {"contents"},
+    ("pages.yml", "deploy"): {"pages", "id-token"}, ("pages.yml", "on-main"): {"actions"},
 }
-REQUIRED_CHECKS = {"checks", "test (ubuntu-24.04)", "test (windows-latest)", "windows-source"}
+# The checks that main requires (ADR 16): the Tests workflow's four, the dependency review, the CodeQL ratchet and
+# Footprints. A check is named by its job's name, or by the job's id without one.
+REQUIRED_CHECKS = {"checks", "test (ubuntu-24.04)", "test (windows-latest)", "windows-source", "dependency-review",
+                   "codeql-ratchet", "footprints"}
 LOCKS = ".github/locks"
 # Packages that come only as source code, so that installing them builds them: pip with --no-build-isolation after
 # setuptools.txt, uv with the hashes of the build's setuptools, never a build backend fetched unchecked
@@ -112,8 +117,9 @@ class Workflows(unittest.TestCase):
         cls.flows = {name: load(name) for name in cls.names}
 
     def test_the_workflows(self):
-        self.assertEqual(self.names, ["codeql.yml", "desktop.yml", "pages.yml", "preview.yml", "release.yml",
-                                      "security.yml", "stats.yml", "tests.yml"])
+        self.assertEqual(self.names, ["codeql-baseline-guard.yml", "codeql.yml", "desktop.yml", "footprints.yml",
+                                      "pages.yml", "preview.yml", "release.yml", "scorecard.yml", "security.yml",
+                                      "stats.yml", "tests.yml"])
 
     def test_every_action_is_pinned_to_a_commit_with_its_version_beside_it(self):
         pins = {}
@@ -134,6 +140,7 @@ class Workflows(unittest.TestCase):
             self.assertEqual(len(found), 1, f"{repo} at one version everywhere: {found}")
         self.assertIn("actions/checkout", pins)
         self.assertIn("github/codeql-action", pins)
+        self.assertIn("ossf/scorecard-action", pins)
 
     def test_permissions_are_the_fewest_each_job_needs(self):
         writes = {}
@@ -188,8 +195,11 @@ class Workflows(unittest.TestCase):
                 self.assertIn("github.event.pull_request.number ||", concurrency["group"])
         # on main every commit keeps its run: the nightly and the Release workflow look for the commit's own
         self.assertEqual(self.flows["tests.yml"]["concurrency"]["group"], "tests-${{ github.event.pull_request.number || github.sha }}")
-        for name in ("release.yml", "preview.yml", "pages.yml", "stats.yml"):
+        for name in ("release.yml", "preview.yml", "pages.yml", "stats.yml", "codeql-baseline-guard.yml"):
             self.assertIs(self.flows[name]["concurrency"]["cancel-in-progress"], False, name)
+        # the check on the title and the description starts again when either is edited
+        self.assertEqual(self.flows["footprints.yml"]["concurrency"],
+                         {"group": "footprints-${{ github.event.pull_request.number }}", "cancel-in-progress": True})
 
     def test_every_install_is_from_a_lock_with_hashes(self):
         """pip and uv install only from the locks, every file checked against its hashes; nothing is upgraded
@@ -276,10 +286,23 @@ class Tests(unittest.TestCase):
 
     def test_the_check_names_main_requires(self):
         names = {"checks", "windows-source"} | {f"test ({os})" for os in self.jobs["test"]["strategy"]["matrix"]["os"]}
-        self.assertEqual(names, REQUIRED_CHECKS)
+        self.assertEqual(names, REQUIRED_CHECKS & names, "the Tests workflow's four")
+        self.assertEqual(len(names), 4)
         self.assertEqual(set(self.jobs["test"]["strategy"]["matrix"]), {"os"}, "another key would change the names")
+        # the others come from their own workflows, under the names that the settings list
+        others = {"security.yml": "dependency-review", "codeql.yml": "codeql-ratchet", "footprints.yml": "footprints"}
+        for name, job_id in others.items():
+            job = load(name)["jobs"][job_id]
+            self.assertEqual(job.get("name", job_id), job_id, name)
+            self.assertNotIn("strategy", job, "a matrix would change the name")
+        self.assertEqual(names | set(others.values()), REQUIRED_CHECKS)
         doc = " ".join((ROOT / "docs" / "14-pipeline.md").read_text(encoding="utf-8").split())
-        self.assertIn("`checks`, `test (ubuntu-24.04)`, `test (windows-latest)` and `windows-source`", doc)
+        self.assertIn("`checks`, `test (ubuntu-24.04)`, `test (windows-latest)`, `windows-source`, `dependency-review`, "
+                      "`codeql-ratchet` and `footprints`", doc)
+        agents = " ".join((ROOT / "AGENTS.md").read_text(encoding="utf-8").split())
+        self.assertIn("seven checks", agents)
+        for check in sorted(REQUIRED_CHECKS - names - {"dependency-review"}):
+            self.assertIn(f"`{check}`", agents)
 
     def test_the_slower_jobs_wait_for_the_quick_checks(self):
         self.assertNotIn("needs", self.jobs["checks"])
@@ -442,6 +465,95 @@ class Security(unittest.TestCase):
         self.assertEqual(job["permissions"], {"contents": "read", "security-events": "write"})
         init, analyze = (s["uses"] for s in job["steps"] if "codeql-action" in s.get("uses", ""))
         self.assertEqual(init.split("@")[1], analyze.split("@")[1], "init and analyze at the same version")
+
+    def test_the_ratchet_fails_a_pull_request_only_on_findings_main_lacks(self):
+        jobs = load("codeql.yml")["jobs"]
+        self.assertEqual(set(jobs), {"analyze", "codeql-ratchet", "update-baseline"})
+        # every analysis hands its findings on, as a file kept for a day
+        analyze = steps(jobs["analyze"])
+        self.assertEqual(analyze["github/codeql-action/analyze"]["with"]["output"], "codeql-results")
+        upload = analyze["actions/upload-artifact"]["with"]
+        self.assertEqual((upload["name"], upload["path"], upload["retention-days"], upload["if-no-files-found"]),
+                         ("codeql-sarif-${{ matrix.language }}", "codeql-results", 1, "error"))
+        # the gate: the check's name, only for a pull request, and run when an analysis failed, since a skipped job
+        # counts as passed; it then fails
+        gate = jobs["codeql-ratchet"]
+        self.assertEqual(gate["name"], "codeql-ratchet")
+        self.assertEqual(gate["needs"], "analyze")
+        self.assertEqual(gate["if"], "${{ always() && github.event_name == 'pull_request' }}")
+        self.assertEqual(gate["permissions"], {"contents": "read"})
+        first = gate["steps"][0]
+        self.assertEqual(first["env"], {"ANALYZE_RESULT": "${{ needs.analyze.result }}"})
+        self.assertIn('[ "$ANALYZE_RESULT" != "success" ]', first["run"])
+        self.assertIn("exit 1", first["run"])
+        check = steps(gate)["Compare with the baseline"]
+        self.assertIn('codeql_ratchet.py check --sarif codeql-sarif --repo "$GITHUB_REPOSITORY"', check["run"])
+        # the baseline is written only after main, through the API with the job's own token
+        update = jobs["update-baseline"]
+        self.assertEqual(update["needs"], "analyze")
+        self.assertEqual(update["if"], "${{ github.event_name != 'pull_request' && github.ref == 'refs/heads/main' }}")
+        self.assertEqual(update["permissions"], {"contents": "write"})
+        self.assertEqual(update["concurrency"], {"group": "security-baseline", "cancel-in-progress": False})
+        write = steps(update)["Write the baseline"]
+        self.assertEqual(write["env"], {"GITHUB_TOKEN": "${{ github.token }}", "COMMIT": "${{ github.sha }}"})
+        self.assertIn('codeql_ratchet.py update --sarif codeql-sarif --repo "$GITHUB_REPOSITORY" --commit "$COMMIT"',
+                      write["run"])
+        for job in (gate, update):
+            self.assertEqual(steps(job)["actions/download-artifact"]["with"],
+                             {"pattern": "codeql-sarif-*", "path": "codeql-sarif"})
+            self.assertNotIn("git push", str(job), "no stored token, no git push")
+        self.assertFalse((ROOT / ".github" / "security-baseline.json").exists(), "the baseline is a branch, not a file")
+
+    def test_the_baseline_guard_undoes_pushes_by_anyone_else(self):
+        data = load("codeql-baseline-guard.yml")
+        self.assertEqual(triggers(data), {"push": {"branches": ["security-baseline"]}})
+        job = data["jobs"]["guard"]
+        self.assertEqual(job["if"], "${{ github.actor != 'github-actions[bot]' }}")
+        self.assertEqual(job["permissions"], {"contents": "write", "issues": "write"})
+        self.assertFalse([s for s in job["steps"] if "uses" in s], "the API only: no checkout of the branch")
+        restore, issue = steps(job)["Put the baseline back"], steps(job)["Open or update the issue"]
+        self.assertEqual(set(restore["env"]), {"GH_TOKEN", "BEFORE", "AFTER"})
+        self.assertIn('-f "parents[]=$AFTER"', restore["run"], "a commit on top of the push, with the old files")
+        self.assertNotIn("DELETED", restore["run"], "GitHub starts no push workflow for a deletion")
+        self.assertEqual(issue["if"], "${{ always() }}", "an issue also when putting it back failed")
+        self.assertIn('"$number"', issue["run"], "the open issue is added to")
+
+    def test_scorecard_weekly_with_the_fewest_permissions(self):
+        data = load("scorecard.yml")
+        self.assertEqual(set(triggers(data)), {"branch_protection_rule", "schedule", "push"})
+        self.assertEqual(triggers(data)["push"], {"branches": ["main"]})
+        self.assertEqual(data["permissions"], {}, "the publishing action wants none, or read-only, at the top")
+        job = data["jobs"]["analysis"]
+        self.assertEqual(job["permissions"], {"contents": "read", "actions": "read", "security-events": "write",
+                                              "id-token": "write"})
+        self.assertEqual(steps(job)["ossf/scorecard-action"]["with"],
+                         {"results_file": "results.sarif", "results_format": "sarif", "publish_results": True})
+        self.assertEqual(steps(job)["github/codeql-action/upload-sarif"]["with"]["sarif_file"], "results.sarif")
+        self.assertEqual(set(job), {"name", "runs-on", "timeout-minutes", "permissions", "steps"},
+                         "Scorecard refuses a publishing job with other settings, such as a container or services")
+
+    def test_footprints_on_every_pull_request_with_the_text_through_env(self):
+        data = load("footprints.yml")
+        self.assertEqual(triggers(data), {"pull_request": {"types": ["opened", "synchronize", "reopened", "edited"]}})
+        job = data["jobs"]["footprints"]
+        self.assertEqual(job["permissions"], {"contents": "read"})
+        self.assertEqual(steps(job)["actions/checkout"]["with"], {"fetch-depth": 0, "persist-credentials": False})
+        scan = steps(job)["Scan the commits, the title and the description"]
+        self.assertEqual(scan["env"], {"BASE_SHA": "${{ github.event.pull_request.base.sha }}",
+                                       "HEAD_SHA": "${{ github.event.pull_request.head.sha }}",
+                                       "PR_TITLE": "${{ github.event.pull_request.title }}",
+                                       "PR_BODY": "${{ github.event.pull_request.body }}",
+                                       "PR_AUTHOR_TYPE": "${{ github.event.pull_request.user.type }}"})
+        self.assertEqual(scan["run"], 'python3 .github/scripts/check_footprints.py "$BASE_SHA" "$HEAD_SHA"')
+
+    def test_stats_and_pages_grant_their_writes_to_the_jobs_that_need_them(self):
+        stats, pages = load("stats.yml"), load("pages.yml")
+        self.assertEqual(stats["permissions"], {})
+        self.assertEqual(stats["jobs"]["stats"]["permissions"], {"contents": "write"})
+        self.assertEqual(pages["permissions"], {})
+        self.assertEqual(pages["jobs"]["build"]["permissions"], {"contents": "read"})
+        self.assertEqual(pages["jobs"]["deploy"]["permissions"], {"pages": "write", "id-token": "write"})
+        self.assertEqual(pages["jobs"]["on-main"]["permissions"], {"actions": "write"})
 
     def test_pip_audit_and_the_dependency_review(self):
         data = load("security.yml")

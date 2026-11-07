@@ -15,8 +15,7 @@ on:
     - cron: "17 3 * * *"
   workflow_dispatch:
 
-permissions:
-  contents: write
+permissions: {}
 
 concurrency:
   group: repository-stats
@@ -26,6 +25,8 @@ jobs:
   stats:
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      contents: write  # the stats branch, through the API
     steps:
       - name: Update the stats branch
         env:
