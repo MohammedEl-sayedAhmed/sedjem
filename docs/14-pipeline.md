@@ -207,12 +207,12 @@ unless it adds a finding:
 - `codeql-baseline-guard.yml` runs on every push to the branch. The CodeQL workflow's own token starts no
   workflow, so each run is someone else's push: it adds a commit that restores the files, and opens or updates an
   issue. GitHub reads a push's workflows from the pushed commit, so each baseline commit is built on main's files
-  plus `baseline.json`; a push that removes the guard file from the branch is not guarded. GitHub starts no push
-  workflow for a branch deletion: a deleted baseline is written again by the next push to main, the weekly run or
-  a run by hand on main, and until then the ratchet fails every pull request. No ruleset protects
-  `security-baseline`: GitHub accepts GitHub Actions as a bypass actor only in a repository that an organisation
-  owns, so a ruleset here would also block the CodeQL workflow's own writes. The guard and the armed check are the
-  controls; a ruleset becomes possible if the repository moves to an organisation.
+  plus `baseline.json`; a push that removes the guard file from the branch is not guarded. A ruleset on
+  `security-baseline`, with no bypass actor, blocks deleting the branch and pushing to it with force; the CodeQL
+  workflow and the guard only add commits on top, so it never blocks them. A ruleset that would also stop other
+  pushes needs GitHub Actions as a bypass actor, which GitHub accepts only in a repository that an organisation
+  owns, so the guard is what puts such pushes back. If the branch went missing all the same, the next push to main,
+  the weekly run or a run by hand on main writes it again, and until then the ratchet fails every pull request.
 - While the `security-baseline` branch doesn't exist, which is true until the first push to main after this
   was added, `codeql-ratchet` passes with a notice and compares nothing. Once that first baseline is written, the
   maintainer sets the repository variable `CODEQL_RATCHET_ARMED` to `true`, and a missing branch fails the check
