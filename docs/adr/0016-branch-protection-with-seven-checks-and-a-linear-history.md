@@ -51,8 +51,10 @@ them:
 The order of the change matters. The new workflows come to main first, and the settings follow. A required check that
 no workflow produces yet would block every pull request, and `codeql-ratchet` does nothing useful until the first
 push to main has written the `security-baseline` branch. Until then it passes with a notice. Once the branch
-exists, the repository variable `CODEQL_RATCHET_ARMED` is set to `true`, so that a missing branch fails the check,
-and a ruleset on `security-baseline` restricts updates and deletions to GitHub Actions.
+exists, the repository variable `CODEQL_RATCHET_ARMED` is set to `true`, so that a missing branch fails the check.
+No ruleset protects `security-baseline`: GitHub accepts GitHub Actions as a bypass actor only in a repository that
+an organisation owns, so a ruleset here would also block the CodeQL workflow's own writes. The guard workflow and
+the armed check protect the branch instead.
 
 ## Consequences
 

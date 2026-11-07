@@ -75,9 +75,11 @@ needs no stored credential, as with `stats`, and puts the logic where unit tests
   main has written the branch.
 - Someone with write access can still delete the branch. The next push to main, the weekly run or a run by hand on
   main writes it again, and until then, with `CODEQL_RATCHET_ARMED` set, every pull request fails the check, so a
-  deletion cannot let a finding through. The real control is a repository ruleset on `security-baseline`
-  that restricts updates and deletions, with GitHub Actions as the bypass actor. It is a setting for the maintainer,
-  and not applied by this change.
+  deletion cannot let a finding through. A repository ruleset on `security-baseline` that lets only the CodeQL
+  workflow write the branch is not possible here: GitHub accepts GitHub Actions as a bypass actor only in a
+  repository that an organisation owns, and without that bypass the ruleset would block the workflow's own writes.
+  The guard workflow and the armed check are the controls. A ruleset becomes possible if the repository moves to an
+  organisation.
 - A pull request can change the script or the workflow that judges it. The check stops a slip, not a person who
   rewrites it.
 - If CodeQL changes its fingerprint, the baseline no longer matches. The next write on main repairs it, and until
