@@ -27,7 +27,9 @@ import functools
 import importlib.util
 import json
 import re
+import socket
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -74,6 +76,18 @@ class Quiet(SimpleHTTPRequestHandler):
         pass
 
 
+class SiteServer(ThreadingHTTPServer):
+    """A built site on a free port. A page opens several connections at once. With the default listen queue of 5,
+    Windows refuses the ones that don't fit while the server is busy (Linux makes them wait), so a stylesheet or a
+    script goes missing and some other test fails each run. The app's server has the same queue (app/server.py)."""
+    request_queue_size = 64
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], ConnectionError):  # the browser dropped a connection: no traceback in the log
+            return
+        super().handle_error(request, client_address)
+
+
 class SiteInBrowserTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -89,7 +103,7 @@ class SiteInBrowserTest(unittest.TestCase):
         cls.counting = build.build(tmp / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
         # and without numbers: no stats, and no totals yet
         cls.plain = build.build(tmp / "plain", usage=tmp / "no-usage.json")
-        cls.servers = [ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
+        cls.servers = [SiteServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
                        for out in (cls.out, cls.counting, cls.plain)]
         for server in cls.servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -791,6 +805,27 @@ class SiteInBrowserTest(unittest.TestCase):
         self.assertEqual(page.evaluate("""async () => [document.cookie, localStorage.length, sessionStorage.length,
             (await indexedDB.databases()).length, (await caches.keys()).length]"""), ["", 0, 0, 0, 0])
         self.assertEqual(page.errors, [])
+
+
+class Backlog(unittest.TestCase):
+    """A page opens several connections at once while the site's server may still be busy: none is refused, as with
+    the app's server (tests/test_app.py, Backlog). No browser needed."""
+
+    def test_a_burst_of_connections_waits_instead_of_being_refused(self):
+        server = SiteServer(("127.0.0.1", 0), Quiet)  # listening, but not accepting yet
+        socks = []
+        try:
+            for _ in range(30):
+                socks.append(socket.create_connection(("127.0.0.1", server.server_address[1]), timeout=5))
+            self.assertEqual(len(socks), 30)
+        finally:
+            for s in socks:
+                s.close()
+            server.server_close()
+
+    def test_the_site_server_keeps_the_app_servers_queue(self):
+        from app.server import Server
+        self.assertEqual(SiteServer.request_queue_size, Server.request_queue_size)
 
 
 if __name__ == "__main__":
