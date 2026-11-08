@@ -1,7 +1,8 @@
 """Tests for the repository statistics (.github/scripts/repo_stats.py): the daily history grows past
 GitHub's 14 days, a day reported again replaces the old numbers, snapshots keep one set of rows a day,
 the checksum list isn't counted as a download, the badges and summary show the totals, and a run without
-access to the traffic keeps the old traffic files and says so. The star history is rebuilt from the
+access to the traffic keeps the old traffic files, says so, saves the rest and then fails, while a run with
+it passes. The star history is rebuilt from the
 stargazers and forks, which are read a hundred to a request. The charts are valid SVG whose marks sit where
 their numbers say (the running total of app downloads, the releases, the stars and forks, the clones and
 views per day), light and dark differ only in their colours, and a sparse or empty history still draws.
@@ -143,16 +144,18 @@ class Fetch(unittest.TestCase):
         self.assertEqual(calls[2], ("stats-token", f"/repos/{REPO}/traffic/clones"), "the stats token is tried first")
         self.assertIn(("actions-token", f"/repos/{REPO}/traffic/clones"), calls)
 
-    def test_no_traffic_access_at_all_warns_and_records_the_rest(self):
+    def test_no_traffic_access_at_all_records_the_rest(self):
         def call(token, path, method="GET", body=None, raw=False, accept=None):
             if "/traffic/" in path:
                 raise stats.GitHubError(403, "no")
             return [] if "/releases" in path else {"stargazers_count": 0}
 
-        with mock.patch.object(stats, "call", call), mock.patch("builtins.print") as out:
+        with mock.patch.object(stats, "call", call), mock.patch("builtins.print"):
             got = stats.fetch(REPO, "actions-token", None)
         self.assertIsNone(got["clones"])
-        self.assertIn("STATS_TOKEN", out.call_args[0][0])
+        self.assertIsNone(got["views"])
+        self.assertIsNone(got["referrers"])
+        self.assertEqual(got["releases"], [])
 
     def test_stars_and_forks_are_read_with_their_days_a_hundred_to_a_request(self):
         calls = []
@@ -416,6 +419,41 @@ class StepSummary(unittest.TestCase):
             for path in stats.CHARTS.values():
                 self.assertIn(f'="https://raw.githubusercontent.com/{REPO}/{stats.BRANCH}/{path}"', text)
             self.assertNotIn('="charts/', text, "the job summary has no branch to resolve a relative path against")
+
+
+class Run(unittest.TestCase):
+    def run_main(self, got):
+        """main() committing to a stats branch that exists, with fetch() returning `got`: (the SystemExit, or None,
+        the commit mock, the printed lines)."""
+        with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "t"}), \
+                mock.patch.object(stats, "read_branch", return_value=("abc1234", {})), \
+                mock.patch.object(stats, "fetch", return_value=got), \
+                mock.patch.object(stats, "commit", return_value="def5678") as commit, \
+                mock.patch("builtins.print") as out:
+            os.environ.pop("GITHUB_STEP_SUMMARY", None)  # CI's own job summary is left alone
+            try:
+                stats.main(["--repo", REPO])
+                exit_ = None
+            except SystemExit as e:
+                exit_ = e
+        return exit_, commit, [" ".join(map(str, c.args)) for c in out.call_args_list]
+
+    def test_without_the_traffic_the_rest_is_saved_and_then_the_run_fails(self):
+        exit_, commit, printed = self.run_main(fetched(traffic=False, stargazers=[], forks=[]))
+        commit.assert_called_once()
+        self.assertIn("downloads.csv", commit.call_args[0][4], "the downloads are saved before the run fails")
+        self.assertIsNotNone(exit_)
+        self.assertEqual(exit_.code, 1)
+        (error,) = [line for line in printed if line.startswith("::error::")]
+        for words in ("STATS_TOKEN", "Administration: Read-only", "14 days"):
+            self.assertIn(words, error)
+        self.assertNotIn("\n", error, "one annotation")
+
+    def test_with_the_traffic_the_run_passes(self):
+        exit_, commit, printed = self.run_main(fetched(clones=[day("2026-10-01", 3, 2)], stargazers=[], forks=[]))
+        commit.assert_called_once()
+        self.assertIsNone(exit_)
+        self.assertFalse([line for line in printed if line.startswith("::")], printed)
 
 
 class Wiring(unittest.TestCase):

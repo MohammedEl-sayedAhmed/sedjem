@@ -21,6 +21,8 @@ Tokens, from the environment:
   STATS_TOKEN   reads clones, views and referrers, which need Administration read access: a fine-grained
                 token for this repository. If it is missing, GITHUB_TOKEN is tried; when neither can read
                 them, the traffic files are left as they were and the summary says when they were last read.
+                The run then fails, once the rest is saved: GitHub keeps clones and views for 14 days only,
+                so a day that isn't read by then is lost, and a green run would hide that until too late.
 
 To look at the result without changing the branch, write the files into a folder instead:
     GITHUB_TOKEN=$(gh auth token) python3 .github/scripts/repo_stats.py --repo OWNER/NAME --out stats-preview
@@ -655,9 +657,6 @@ def fetch(repo, token, traffic_token):
             if e.status not in (401, 403):
                 raise
             got["clones"] = got["views"] = got["referrers"] = None
-    if got["clones"] is None:
-        print("::warning::Clones and views could not be read: set the STATS_TOKEN secret "
-              "(a fine-grained token for this repository with Administration read access).")
     return got
 
 
@@ -704,7 +703,8 @@ def main(argv=None):
         sys.exit("needs --repo (or GITHUB_REPOSITORY) and GITHUB_TOKEN")
     today = datetime.now(timezone.utc).date().isoformat()
     head, old = read_branch(args.repo, token, args.branch)
-    new = update(old, fetch(args.repo, token, os.environ.get("STATS_TOKEN")), args.repo, today)
+    got = fetch(args.repo, token, os.environ.get("STATS_TOKEN"))
+    new = update(old, got, args.repo, today)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         # the job's summary has no branch to resolve the charts' paths against
         raw = f"https://raw.githubusercontent.com/{args.repo}/{args.branch}/"
@@ -722,6 +722,12 @@ def main(argv=None):
         print(f"{args.branch}: {sha[:7]}, {len(changed)} files updated")
     else:
         print("nothing changed")
+    if got["clones"] is None:
+        # after the rest is saved, and as a failed run, so that GitHub's email for it comes within the 14 days
+        print("::error::Clones, views and referrers could not be read, so this run saved the rest and fails. GitHub "
+              "keeps them for 14 days only. Set the STATS_TOKEN secret to a fine-grained token for this repository "
+              "with Administration: Read-only permission.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

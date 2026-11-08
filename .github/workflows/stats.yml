@@ -7,7 +7,9 @@
 # It fetches the script and writes the branch through the API instead.
 #
 # Clones and views need the STATS_TOKEN secret: a fine-grained token for this repository with
-# "Administration: Read-only" permission. Without it only downloads, stars and forks are recorded.
+# "Administration: Read-only" permission. Without it, or once it has expired, a run records the downloads, stars
+# and forks and then fails, so that GitHub's email for a failed run comes while the last 14 days of clones and
+# views can still be read. Pages rebuilds only after a successful run, so the website's numbers wait for it too.
 name: Repository stats
 
 on:
