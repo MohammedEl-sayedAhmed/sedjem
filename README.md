@@ -49,9 +49,9 @@ recording on your machine unless you choose a hosted service.
   <br><sub>The line being heard is marked, and each line reads in its own direction.</sub>
 </p>
 
-It goes online only for the model downloads, YouTube for the links you add, the hosted services you choose,
-GitHub to check for updates when allowed, and Aptabase for the usage counts below. The counts are anonymous, and
-the switch in *Settings → About* or `DO_NOT_TRACK=1` turns them off. See [usage counts](docs/13-usage-counts.md)
+Sedjem goes online only for the model downloads, YouTube for the links you add, the hosted services you choose,
+GitHub to check for updates when allowed, and Aptabase for the usage counts below. The counts are anonymous and
+on by default; the switch in *Settings → About* or `DO_NOT_TRACK=1` turns them off. See [usage counts](docs/13-usage-counts.md)
 and the [privacy policy](docs/privacy.md). Downloading from YouTube is for personal use, within YouTube's terms.
 Every setting is in [the app notes](docs/09-app.md), and the assistants in [their own notes](docs/11-assistants.md).
 
@@ -105,9 +105,10 @@ browser window; the details are in [the desktop notes](docs/10-desktop.md), and 
 
 ## Two models, one transcript
 
-Two models get different things wrong. On the same sprint planning, Cohere wrote *eight* and *cache* in Arabic
-letters, and whisper-medium turned Nour's Egyptian into formal Arabic. Sedjem lines the two transcripts up by
-time, marks the words that differ, and keeps the better line from each as a new version.
+Two models get different things wrong. In the made-up meeting these pictures show, Cohere writes *eight* and
+*cache* in Arabic letters and whisper-medium turns Nour's Egyptian into formal Arabic: the kinds of mistake each
+made in the project's tests. Sedjem lines the two transcripts up by time and marks the words that differ, and you
+keep the better line from each as a new version.
 
 <p align="center">
   <a href="site/captures/compare-wide-light.png#gh-light-mode-only"><img src="site/captures/compare-wide-light.png" width="656" alt="Comparing two models on Omar's line at 0:58: Cohere Transcribe Arabic wrote eight in Arabic letters, whisper-medium code-switching kept it in English, and the whisper-medium row is kept"></a>
@@ -124,7 +125,8 @@ Every edit is shown as a diff before it is saved, the way `git diff` shows one, 
 On 40 Egyptian Arabic–English clips from the public [Perle](https://huggingface.co/datasets/Perle-ai/ASR_Code_Switch)
 benchmark, Cohere makes the fewest errors and whisper-medium keeps the most English terms in English. On the
 project's test laptop (an Intel Core i5-1245U, no NVIDIA GPU), an hour of audio takes about 16 minutes with
-Cohere, 32 with whisper-medium and 2 hours with Whisper large-v3.
+Cohere, 32 with whisper-medium and 2 hours with Whisper large-v3 (the first two timed on the recorded meetings with
+speaker labels on, the third on the Perle clips).
 
 <details>
 <summary>The numbers</summary>
@@ -215,7 +217,8 @@ are the ones to start with:
 - [Speaker labels](docs/04-speaker-labels.md): how voices are told apart, and which speaker model to use
 - [Recommendation](docs/07-recommendation.md): what to use for which job
 - [The app](docs/09-app.md): using Sedjem, versions, comparing, its settings, API keys, privacy
-- [Privacy policy](docs/privacy.md): everything Sedjem contacts and when, what stays on the computer, and turning the usage counts off
+- [Privacy policy](docs/privacy.md): everything Sedjem contacts and when, what stays on the computer, and turning
+  the usage counts off
 
 ## Activity
 
