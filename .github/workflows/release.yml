@@ -88,6 +88,7 @@ jobs:
     needs: [check, tag]
     permissions:
       contents: write  # for its release job, which publishes; its other jobs only read
+      discussions: write  # for the same job, which opens the release's post in Announcements
     uses: ./.github/workflows/desktop.yml
     with:
       version: ${{ inputs.version }}

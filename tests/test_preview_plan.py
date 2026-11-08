@@ -371,8 +371,10 @@ class Wiring(unittest.TestCase):
         self.assertEqual(jobs["build"]["with"], {"version": "${{ needs.plan.outputs.version }}",
                                                  "commit": "${{ needs.plan.outputs.commit }}"})
         self.assertIn("needs.plan.outputs.build == 'true'", jobs["build"]["if"])
-        for name in ("build", "prune"):
-            self.assertEqual(jobs[name]["permissions"], {"contents": "write"}, name)
+        # the build grants what the Desktop build's release job asks for, Announcements included, though a preview
+        # opens no post there
+        self.assertEqual(jobs["build"]["permissions"], {"contents": "write", "discussions": "write"})
+        self.assertEqual(jobs["prune"]["permissions"], {"contents": "write"})
         self.assertIn("prune", next(iter(steps(jobs["prune"]).values()))["run"])
 
     def test_the_desktop_build_publishes_previews_as_pre_releases(self):
