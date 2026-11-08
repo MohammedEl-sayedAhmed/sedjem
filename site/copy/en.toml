@@ -251,7 +251,7 @@ sha256 = "SHA256"
 start = "First start"
 start_text = 'In Settings → Models, download <span translate="no">whisper-medium</span> (778&nbsp;MB) or <span translate="no">Cohere Transcribe Arabic</span> (1.6&nbsp;GB). The speaker model, <span translate="no">TitaNet-small</span> (40&nbsp;MB), comes with the first one. A graphics card is optional.'
 follow = "New versions"
-follow_text = 'Each new version is announced in the project’s <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/discussions">Discussions</a>, where questions and ideas are welcome too. For an email with each one, choose Watch → Custom → Releases on GitHub.'
+follow_text = 'Each stable version is announced in the project’s <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/discussions">Discussions</a>, where questions and ideas are welcome too. On GitHub, Watch → Custom → Releases sends an email for each release, the nightly previews included.'
 
 [footer]
 ear = '<span translate="no">Sedjem</span> is the ancient Egyptian word for “to&nbsp;hear”, written with the sign of an ear.'

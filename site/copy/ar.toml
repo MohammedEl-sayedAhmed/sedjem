@@ -244,7 +244,7 @@ sha256 = "SHA256"  # new
 start = "أول تشغيل"  # new
 start_text = "أول ما تفتحه، نزّل موديل من Settings → Models: يا إما whisper-medium (778&nbsp;MB)، يا إما Cohere Transcribe Arabic (1.6&nbsp;GB). موديل المتكلمين TitaNet-small (40&nbsp;MB) بينزل مع أول واحد. كارت الشاشة مش شرط."
 follow = "الإصدارات الجديدة"  # new
-follow_text = 'كل إصدار جديد بيتعلن في <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/discussions">Discussions</a> بتاعة المشروع، وتقدر تسأل أو تقترح فكرة هناك كمان. ولو عايز إيميل مع كل إصدار، اختار Watch → Custom → Releases على GitHub.'  # new
+follow_text = 'كل إصدار stable بيتعلن في الـ <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/discussions">Discussions</a> بتاعة المشروع، وتقدر تسأل أو تقترح فكرة هناك كمان. ولو اخترت Watch → Custom → Releases على GitHub، هيوصلك إيميل مع كل إصدار، ومعاها الـ previews اللي بتنزل كل ليلة.'  # new
 
 [footer]
 ear = "Sedjem كلمة مصرية قديمة معناها «يسمع»، وبتتكتب بعلامة الودن."

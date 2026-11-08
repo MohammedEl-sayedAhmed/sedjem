@@ -123,8 +123,8 @@ The Release workflow ([`.github/scripts/release.py`](../.github/scripts/release.
   starts no other workflow. That builds and tests both systems, installs the Windows build over itself and over
   the newest release, both the way *Update now* does, and publishes the release with its files, its notes and a
   link to the privacy policy. Without a notes file, the draft is published as it is. Publishing also opens the
-  release's post in the Discussions' Announcements, where users follow new versions (a preview opens none). The
-  release then goes to winget.
+  release's post in the Discussions' Announcements, where users follow new versions (a preview opens none), so
+  that category must keep its name. The release then goes to winget.
 
 Publishing a stable release uses the GitHub environment `release`, which has the maintainer as its required
 reviewer ([ADR 16](adr/0016-branch-protection-with-seven-checks-and-a-linear-history.md)). Running the workflow
@@ -143,8 +143,9 @@ another commit, delete the tag first, with `git push origin --delete v0.3.2`.
 Once published, the release is what every copy of Sedjem is offered when it checks for updates. Publish a fixed
 0.3.3 as soon as possible rather than replacing 0.3.2, since copies that installed 0.3.2 wouldn't be offered a new
 build with the same number. Meanwhile, `gh release delete v0.3.2 --cleanup-tag` takes it back, and the release
-before it becomes the newest again; a copy that already has 0.3.2 keeps it until the next version. Close the
-pull request to microsoft/winget-pkgs if it is still open; once it is merged, the next version's replaces it.
+before it becomes the newest again; a copy that already has 0.3.2 keeps it until the next version. Its post in
+Announcements stays, so delete it or say there that the release was taken back. Close the pull request to
+microsoft/winget-pkgs if it is still open; once it is merged, the next version's replaces it.
 
 ## Security
 
@@ -182,8 +183,10 @@ pull request to microsoft/winget-pkgs if it is still open; once it is merged, th
   does. The scripts the nightly preview and the stats fetch are this repository's own, at the run's commit.
   [`tests/test_pipeline.py`](../tests/test_pipeline.py) checks each of these, and that no other installer runs.
 - Each workflow starts with no permissions, and each job gets only what it needs: the write permissions are in the
-  jobs that use them, and [`tests/test_pipeline.py`](../tests/test_pipeline.py) lists every one. Checkouts don't
-  keep the token.
+  jobs that use them, and [`tests/test_pipeline.py`](../tests/test_pipeline.py) lists every one. The one exception
+  is the nightly preview's build, which grants `discussions: write` that it never uses: a called workflow gets no
+  more than its caller grants, and the Desktop build's release job asks for it for a stable release's post.
+  Checkouts don't keep the token.
 - Pull requests from forks run with `pull_request`, which gives them a read-only token and no secrets. No
   workflow uses `pull_request_target`. The two secrets are used in one place each: `WINGET_TOKEN` in the winget
   job of a release, and `STATS_TOKEN` in the stats workflow.

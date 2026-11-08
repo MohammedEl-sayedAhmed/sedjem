@@ -2209,8 +2209,8 @@ function aboutPanel() {
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/discussions" target="_blank" rel="noopener noreferrer">${ICON.external} Discussions</a>
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">${ICON.external} Licence</a>
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md" target="_blank" rel="noopener noreferrer">${ICON.external} Privacy policy</a></span>
-          <span class="follow">Each new version is announced in the Discussions, where questions and ideas are welcome too.
-            For an email with each one, choose Watch → Custom → Releases on GitHub.</span>
+          <span class="follow">Each stable version is announced in the Discussions, where questions and ideas are welcome too.
+            Watch → Custom → Releases on GitHub sends an email for each release, the nightly previews included.</span>
         </div>
       </div>
       <div class="set-list">
