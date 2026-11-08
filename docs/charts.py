@@ -27,7 +27,7 @@ OUT = ROOT / "docs" / "images" / "charts"
 # Where the docs publish the public numbers: "file#heading", the section that holds the table
 RESULTS, README, SPEAKERS = "docs/03-results.md", "README.md", "docs/04-speaker-labels.md"
 PERLE_TABLE, PHONE_TABLE = f"{RESULTS}#Public benchmark: Perle at 16 kHz", f"{RESULTS}#Phone audio"
-MODELS_TABLE = f"{README}#Models"
+MODELS_TABLE = f"{README}#Measured on Egyptian speech"
 SPEAKER_TABLES = {"arzen": f"{SPEAKERS}#ArzEn: interviews in Egyptian Arabic and English",
                   "ami": f"{SPEAKERS}#AMI: English meetings with much overlap"}
 
