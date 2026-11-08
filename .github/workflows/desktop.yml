@@ -508,6 +508,7 @@ jobs:
     environment: ${{ needs.version.outputs.channel == 'stable' && 'release' || '' }}
     permissions:
       contents: write
+      discussions: write  # a stable release opens its post in Announcements; a preview opens none
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -550,9 +551,10 @@ jobs:
             python3 ../.github/scripts/release.py notes "$VERSION" --commit "$COMMIT"
             notes="../.github/release-notes/$tag.md"
             { cat "$notes"; printf '\n---\n\n%s\n' "$privacy"; } > ../release-notes.md
-            # the tag must be there already (release.yml makes it, or it was pushed), never made here from main
+            # the tag must be there already (release.yml makes it, or it was pushed), never made here from main;
+            # the release's post in the Discussions' Announcements, where users follow new versions
             gh release create "$tag" ./* --repo "$GITHUB_REPOSITORY" --title "Sedjem $VERSION" --verify-tag \
-              --notes-file ../release-notes.md
+              --notes-file ../release-notes.md --discussion-category Announcements
           fi
 
   winget:

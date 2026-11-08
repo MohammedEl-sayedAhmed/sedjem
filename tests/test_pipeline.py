@@ -36,9 +36,10 @@ spec.loader.exec_module(locks)
 UNPINNED = set()  # every workflow's actions are pinned
 # What may write, and where: everything else reads at most
 WRITERS = {
-    ("desktop.yml", "release"): {"contents"},
-    ("preview.yml", "build"): {"contents"}, ("preview.yml", "prune"): {"contents"},
-    ("release.yml", "tag"): {"contents"}, ("release.yml", "build"): {"contents"},
+    # discussions: a stable release opens its post in Announcements, and the callers grant what the job asks for
+    ("desktop.yml", "release"): {"contents", "discussions"},
+    ("preview.yml", "build"): {"contents", "discussions"}, ("preview.yml", "prune"): {"contents"},
+    ("release.yml", "tag"): {"contents"}, ("release.yml", "build"): {"contents", "discussions"},
     ("codeql.yml", "analyze"): {"security-events"}, ("codeql.yml", "update-baseline"): {"contents"},
     ("codeql-baseline-guard.yml", "guard"): {"contents", "issues"},
     ("scorecard.yml", "analysis"): {"security-events", "id-token"},
@@ -401,6 +402,9 @@ class DesktopBuild(unittest.TestCase):
         self.assertIn('python3 ../.github/scripts/release.py notes "$VERSION" --commit "$COMMIT"', stable)
         self.assertIn("--verify-tag", stable)
         self.assertNotIn("--generate-notes", stable)
+        # a stable release opens its post in Announcements, where users follow new versions; a preview opens none
+        self.assertIn("--discussion-category Announcements", stable)
+        self.assertNotIn("--discussion-category", run[:run.index("\nelse\n")])
 
     def test_the_tests_before_the_build_write_a_summary(self):
         by_name = steps(self.jobs["build"])

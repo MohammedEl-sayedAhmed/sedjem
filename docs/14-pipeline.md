@@ -119,8 +119,9 @@ The Release workflow ([`.github/scripts/release.py`](../.github/scripts/release.
 - calls the Desktop build workflow with the version and the commit, since a tag made with a workflow's token
   starts no other workflow. That builds and tests both systems, installs the Windows build over itself and over
   the newest release, both the way *Update now* does, and publishes the release with its files, its notes and a
-  link to the privacy policy. Without a notes file, the draft is published as it is. The release then goes to
-  winget.
+  link to the privacy policy. Without a notes file, the draft is published as it is. Publishing also opens the
+  release's post in the Discussions' Announcements, where users follow new versions (a preview opens none). The
+  release then goes to winget.
 
 Publishing a stable release uses the GitHub environment `release`, which has the maintainer as its required
 reviewer ([ADR 16](adr/0016-branch-protection-with-seven-checks-and-a-linear-history.md)). Running the workflow
