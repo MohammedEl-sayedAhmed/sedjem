@@ -504,7 +504,12 @@ class SiteInBrowserTest(unittest.TestCase):
                  {"page": "ar", "device": "desktop", "theme": "system", "referrer": "linkedin.com",
                   "source": "linkedin"}),
                 ("/?src=myspace", 390, None, None, None,
-                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "none"})):
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "none"}),
+                # the first of the two on the list, so a stray src doesn't hide utm_source; twitter is x
+                ("/?src=newsletter-42&utm_source=linkedin", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "linkedin"}),
+                ("/?utm_source=Twitter", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "x"})):
             with self.subTest(path, width=width, platform=platform):
                 page = self.open(path, width, base=self.counting_base, stored=stored, platform=platform,
                                  locale="ar-EG", referer=referer)

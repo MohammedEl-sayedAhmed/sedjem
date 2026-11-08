@@ -93,8 +93,8 @@ What is counted:
   (`light`, `dark`, or `system` when the page follows the system's), the site whose link led there, as its host
   name alone, such as `github.com`, or `none`, and the tag of a shared link: a link to the website in a post can end
   in `?src=linkedin` (or `utm_source=linkedin`), since many apps don't say which site a visit came from. The tag is
-  sent only when it is one of `linkedin`, `x`, `facebook`, `reddit`, `youtube`, `telegram`, `whatsapp` or `email`,
-  and as `none` otherwise
+  sent as `source`, only when it is one of `linkedin`, `x` (`twitter` counts as `x`), `facebook`, `reddit`,
+  `youtube`, `telegram`, `whatsapp` or `email`, and as `none` otherwise
 - `download`, when a download button or link is clicked: `windows`, `linux` or `source`, where it was, at the top of
   the page (`hero`) or in the *Get Sedjem* section (`get`), and which page
 
@@ -109,8 +109,9 @@ browser's `User-Agent`; by its terms it uses them only in memory, to find the co
 pseudonymous hash that changes every day, and doesn't store them.
 
 The website never sets a cookie and keeps nothing in the browser for the counts (only the theme picked with its
-button is kept there). It never sends the full address of the page that linked to it, anything typed or read on the
-page, scrolling or time spent on it, or anything that would tie one visit to another.
+button is kept there). It never sends the full address of the page that linked to it, nor the page's own address
+(of that, only a tag from the list above), anything typed or read on the page, scrolling or time spent on it, or
+anything that would tie one visit to another.
 
 Nothing is counted when the browser has Do Not Track or Global Privacy Control turned on, or when a blocker stops
 requests to Aptabase. A copy of the pages anywhere but the published address, a local preview or a page opened from

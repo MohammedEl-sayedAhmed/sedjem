@@ -66,15 +66,21 @@
     return !host || host === location.hostname.replace(/^www\./, "") ? "none" : host.slice(0, 60);
   }
 
-  // the tag of a shared link, such as ?src=linkedin or utm_source=linkedin, when it is on the list; "none" otherwise.
-  // Many apps send no referrer, so a post's link carries its tag instead.
+  // the tag of a shared link, such as ?src=linkedin or utm_source=linkedin: the first of the two that is on the list,
+  // with twitter, the name many sharing tools still write, as x; "none" when neither is. Many apps send no referrer,
+  // so a post's link carries its tag instead.
   function source() {
-    var tag = "";
+    var tags = [];
     try {
       var query = new URLSearchParams(location.search);
-      tag = (query.get("src") || query.get("utm_source") || "").toLowerCase();
+      tags = [query.get("src"), query.get("utm_source")];
     } catch (e) { /* none */ }
-    return EVENTS.page_view.source.indexOf(tag) >= 0 ? tag : "none";
+    for (var i = 0; i < tags.length; i++) {
+      var tag = String(tags[i] || "").toLowerCase();
+      if (tag === "twitter") tag = "x";
+      if (tag !== "none" && EVENTS.page_view.source.indexOf(tag) >= 0) return tag;
+    }
+    return "none";
   }
 
   // whether an event is one of the two, with exactly its props and each value from its list

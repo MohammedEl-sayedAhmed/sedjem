@@ -197,8 +197,11 @@ The website counts its own page views and download clicks, in an Aptabase app of
 The same monthly step takes that app's export too (`--website`) and adds the website's totals to `docs/usage.json`
 under `website`: the page views, the visitors (each of Aptabase's daily hashes once a day, added up), the countries,
 the pages by language, the phones, tablets and desktops, the sites that linked to it (`none` for no link), the tags
-of the shared links it was opened from, such as `?src=linkedin` (`none` for no tag, and for the page views from
-before the pages sent one), and the download clicks by platform. The website shows the newest month of both,
+of the shared links it was opened from, and the download clicks by platform. A tag is the `source` of a page view:
+`linkedin`, `x`, `facebook`, `reddit`, `youtube`, `telegram`, `whatsapp` or `email`, from a link that ends in
+`?src=linkedin` or `utm_source=linkedin`, say ([privacy](privacy.md#the-website)). The totals hold them under
+`sources`: `none` for the page views with no tag, a tag not on the list, or from before the pages sent one, and
+`tags` for the others. The website shows the newest month of both,
 beside GitHub's downloads, stars and page views, in its section of numbers; before the first month, it says when
 the first totals come.
 
