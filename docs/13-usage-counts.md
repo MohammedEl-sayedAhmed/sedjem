@@ -196,14 +196,16 @@ below.
 The website counts its own page views and download clicks, in an Aptabase app of its own ([privacy](privacy.md#the-website)).
 The same monthly step takes that app's export too (`--website`) and adds the website's totals to `docs/usage.json`
 under `website`: the page views, the visitors (each of Aptabase's daily hashes once a day, added up), the countries,
-the pages by language, the phones, tablets and desktops, the sites that linked to it (`none` for no link) and the
-download clicks by platform. The website shows the newest month of both, beside GitHub's downloads, stars and page
-views, in its section of numbers; before the first month, it says when the first totals come.
+the pages by language, the phones, tablets and desktops, the sites that linked to it (`none` for no link), the tags
+of the shared links it was opened from, such as `?src=linkedin` (`none` for no tag, and for the page views from
+before the pages sent one), and the download clicks by platform. The website shows the newest month of both,
+beside GitHub's downloads, stars and page views, in its section of numbers; before the first month, it says when
+the first totals come.
 
 Only totals are published. A country is listed only when at least three installs were active there that month, and
 so is a region, a system, a version of a system or of Sedjem, and a locale; the others are added up as `other`, so
-that no one install can be picked out. On the website's side a country or a linking site is listed only when at
-least three visitors came from it that month, and at most ten sites are. Since anyone can send events with the app
+that no one install can be picked out. On the website's side a country, a linking site or a tag is listed only when
+at least three visitors came with it that month, and at most ten sites are. Since anyone can send events with the app
 key, which is public, a weekly summary with numbers Sedjem never sends is left out, and a value Sedjem never sends
 counts as `unknown` (as does a value missing from an event of an older version); a website event that its pages
 never send is left out. The exports themselves, which have every event with its daily user hash and session number,
