@@ -504,10 +504,11 @@ class Wiring(unittest.TestCase):
 
     def test_the_readme_badges_read_the_files_the_script_writes(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        for name in ("downloads", "clones"):
-            path = f"badges/{name}.json"
-            self.assertIn(path, stats.FILES)
-            self.assertIn(f"%2F{stats.BRANCH}%2F{path.replace('/', '%2F')}", readme, f"the {name} badge")
+        path = "badges/downloads.json"
+        self.assertIn(path, stats.FILES)
+        self.assertIn(f"%2F{stats.BRANCH}%2F{path.replace('/', '%2F')}", readme, "the downloads badge")
+        # clones, which build machines make most of, have no badge in the README
+        self.assertNotIn("badges%2Fclones.json", readme)
         self.assertIn(f"/tree/{stats.BRANCH}#readme", readme, "the badges link to the summary")
 
     def test_the_readme_charts_are_files_the_script_writes(self):
