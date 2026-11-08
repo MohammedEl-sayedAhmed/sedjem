@@ -27,7 +27,9 @@ import functools
 import importlib.util
 import json
 import re
+import socket
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -75,11 +77,15 @@ class Quiet(SimpleHTTPRequestHandler):
 
 
 class SiteServer(ThreadingHTTPServer):
-    """The built site, served as GitHub Pages serves it. A page opens several connections at once. With the default
-    listen queue of 5, Windows refuses the ones that don't fit while the server is busy (Linux makes them wait), so a
-    stylesheet or a script goes missing and some other test fails each run. The app's server has the same queue."""
-    daemon_threads = True
+    """A built site on a free port. A page opens several connections at once. With the default listen queue of 5,
+    Windows refuses the ones that don't fit while the server is busy (Linux makes them wait), so a stylesheet or a
+    script goes missing and some other test fails each run. The app's server has the same queue (app/server.py)."""
     request_queue_size = 64
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], ConnectionError):  # the browser dropped a connection: no traceback in the log
+            return
+        super().handle_error(request, client_address)
 
 
 class SiteInBrowserTest(unittest.TestCase):
@@ -801,13 +807,25 @@ class SiteInBrowserTest(unittest.TestCase):
         self.assertEqual(page.errors, [])
 
 
-class ServerQueue(unittest.TestCase):
-    def test_the_site_server_queues_a_pages_burst_of_connections_as_the_app_does(self):
-        """Windows refuses the connections beyond the listen queue, so the site's server keeps the app's longer one
-        (no browser needed)."""
+class Backlog(unittest.TestCase):
+    """A page opens several connections at once while the site's server may still be busy: none is refused, as with
+    the app's server (tests/test_app.py, Backlog). No browser needed."""
+
+    def test_a_burst_of_connections_waits_instead_of_being_refused(self):
+        server = SiteServer(("127.0.0.1", 0), Quiet)  # listening, but not accepting yet
+        socks = []
+        try:
+            for _ in range(30):
+                socks.append(socket.create_connection(("127.0.0.1", server.server_address[1]), timeout=5))
+            self.assertEqual(len(socks), 30)
+        finally:
+            for s in socks:
+                s.close()
+            server.server_close()
+
+    def test_the_site_server_keeps_the_app_servers_queue(self):
         from app.server import Server
         self.assertEqual(SiteServer.request_queue_size, Server.request_queue_size)
-        self.assertGreaterEqual(SiteServer.request_queue_size, 64)
 
 
 if __name__ == "__main__":
