@@ -74,6 +74,14 @@ class Quiet(SimpleHTTPRequestHandler):
         pass
 
 
+class SiteServer(ThreadingHTTPServer):
+    """The built site, served as GitHub Pages serves it. A page opens several connections at once. With the default
+    listen queue of 5, Windows refuses the ones that don't fit while the server is busy (Linux makes them wait), so a
+    stylesheet or a script goes missing and some other test fails each run. The app's server has the same queue."""
+    daemon_threads = True
+    request_queue_size = 64
+
+
 class SiteInBrowserTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -89,7 +97,7 @@ class SiteInBrowserTest(unittest.TestCase):
         cls.counting = build.build(tmp / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
         # and without numbers: no stats, and no totals yet
         cls.plain = build.build(tmp / "plain", usage=tmp / "no-usage.json")
-        cls.servers = [ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
+        cls.servers = [SiteServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
                        for out in (cls.out, cls.counting, cls.plain)]
         for server in cls.servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -791,6 +799,15 @@ class SiteInBrowserTest(unittest.TestCase):
         self.assertEqual(page.evaluate("""async () => [document.cookie, localStorage.length, sessionStorage.length,
             (await indexedDB.databases()).length, (await caches.keys()).length]"""), ["", 0, 0, 0, 0])
         self.assertEqual(page.errors, [])
+
+
+class ServerQueue(unittest.TestCase):
+    def test_the_site_server_queues_a_pages_burst_of_connections_as_the_app_does(self):
+        """Windows refuses the connections beyond the listen queue, so the site's server keeps the app's longer one
+        (no browser needed)."""
+        from app.server import Server
+        self.assertEqual(SiteServer.request_queue_size, Server.request_queue_size)
+        self.assertGreaterEqual(SiteServer.request_queue_size, 64)
 
 
 if __name__ == "__main__":
