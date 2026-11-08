@@ -967,6 +967,19 @@ class SiteTest(unittest.TestCase):
                 self.assertEqual([a.attrs["href"] for a in last.find(lambda n: n.tag == "a")], [privacy])
             self.assertNotRegex((self.out / HOMES[lang]).read_text(encoding="utf-8").lower(), r"code.?signing")
 
+    def test_the_discussions_are_linked_from_the_get_section_and_the_footer(self):
+        """Each page says where new versions are announced, the Discussions, in the Get section, with GitHub's Watch for
+        an email, and links them from the footer too."""
+        discussions = "https://github.com/MohammedEl-sayedAhmed/sedjem/discussions"
+        for lang, home in self.homes.items():
+            with self.subTest(lang):
+                (footer,) = home.find(lambda n: n.tag == "footer")
+                self.assertEqual(len(footer.find(lambda n: n.tag == "a" and n.attrs.get("href") == discussions)), 1)
+                (get,) = home.find(lambda n: n.tag == "section" and n.attrs.get("id") == "download")
+                (follow,) = [w for w in get.find(lambda n: "way" in n.classes())
+                             if w.find(lambda n: n.tag == "a" and n.attrs.get("href") == discussions)]
+                self.assertIn("Watch → Custom → Releases", follow.text())
+
     def test_the_version_is_the_latest_releases_or_the_apps(self):
         """The downloads' small print names the latest release's version, or the app's without the release's details."""
         source = (ROOT / "app" / "__init__.py").read_text(encoding="utf-8")

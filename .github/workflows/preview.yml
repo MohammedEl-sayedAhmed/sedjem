@@ -50,6 +50,7 @@ jobs:
     if: needs.plan.outputs.build == 'true'
     permissions:
       contents: write  # for its release job, which publishes the pre-release; its other jobs only read
+      discussions: write  # asked for by that job, and a called workflow gets no more than this; a preview opens no post
     uses: ./.github/workflows/desktop.yml
     with:
       version: ${{ needs.plan.outputs.version }}

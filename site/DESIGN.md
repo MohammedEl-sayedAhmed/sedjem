@@ -349,9 +349,9 @@ everything is one column, the claim first, then the proof, then its caption.
             Get Sedjem                   From source
             Free and open source ...     [ git clone ... ]   (scrolls sideways if it must)
             Windows ... (Download)       First start
-            Linux ... (Download)
+            Linux ... (Download)         New versions [the Discussions, and GitHub's Watch]
             -------------------------------------------------------------------------------- rule
-            Sedjem is the ancient ...    Documentation  Releases  Name and logo  Licence  Privacy
+            Sedjem is the ancient ...    Documentation  Releases  Discussions  Name and logo  Licence  Privacy
 ```
 
 At 1440 by 900 the first screen holds the headline, the lead, the download, the ear, and most of the transcript.
