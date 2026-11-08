@@ -22,10 +22,11 @@ Tokens, from the environment:
                 token for this repository. If it is missing, GITHUB_TOKEN is tried; when neither can read
                 them, the traffic files are left as they were and the summary says when they were last read.
                 The run then fails, once the rest is saved: GitHub keeps clones and views for 14 days only,
-                so a day that isn't read by then is lost, and a green run would hide that until too late.
+                so a day that isn't read by then is lost, and a green run would hide that until it is too late.
 
 To look at the result without changing the branch, write the files into a folder instead:
     GITHUB_TOKEN=$(gh auth token) python3 .github/scripts/repo_stats.py --repo OWNER/NAME --out stats-preview
+A preview whose token can't read the traffic says so and still ends normally.
 """
 import argparse
 import csv
@@ -717,16 +718,20 @@ def main(argv=None):
             with open(os.path.join(args.out, p), "w", encoding="utf-8") as f:
                 f.write(t)
         print(f"wrote {len(new)} files to {args.out} ({len(changed)} differ from the {args.branch} branch)")
-    elif changed:
+        if got["clones"] is None:
+            print("Clones, views and referrers could not be read with this token, so the traffic files are the "
+                  f"{args.branch} branch's.")
+        return
+    if changed:
         sha = commit(args.repo, token, args.branch, head, changed, f"Stats for {today}")
         print(f"{args.branch}: {sha[:7]}, {len(changed)} files updated")
     else:
         print("nothing changed")
     if got["clones"] is None:
-        # after the rest is saved, and as a failed run, so that GitHub's email for it comes within the 14 days
-        print("::error::Clones, views and referrers could not be read, so this run saved the rest and fails. GitHub "
-              "keeps them for 14 days only. Set the STATS_TOKEN secret to a fine-grained token for this repository "
-              "with Administration: Read-only permission.")
+        # after the rest is recorded, and as a failed run, so that GitHub's email for it comes within the 14 days
+        print("::error::Clones, views and referrers could not be read, so the rest is recorded and this run fails. "
+              "GitHub keeps them for 14 days only. Set the STATS_TOKEN secret to a fine-grained token for this "
+              "repository with Administration: Read-only permission.")
         sys.exit(1)
 
 

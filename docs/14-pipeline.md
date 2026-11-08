@@ -78,6 +78,9 @@ each job wrote there:
   console and its network requests.
 - The Desktop build prints the self-tests' reports at the end of each build job, and keeps the Windows installer
   for 7 days, also when a later check of it failed, so that it can be tried by hand.
+- Repository stats fails on purpose when it can't read the clones, views and referrers, after it has recorded the
+  downloads, stars and forks. GitHub keeps the traffic for 14 days only, so set the `STATS_TOKEN` secret again
+  within that time: a fine-grained token for this repository with "Administration: Read-only" permission.
 
 No test is retried automatically, since a retry would hide a test that fails now and then. When a failed job
 passes after *Re-run failed jobs*, that test goes into an issue as a flaky test, with a link to the failed run.
