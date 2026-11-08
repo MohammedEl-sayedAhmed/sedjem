@@ -484,16 +484,32 @@ class SiteInBrowserTest(unittest.TestCase):
 
     def test_each_page_opened_sends_one_page_view(self):
         """One page_view each time a page is opened, to Aptabase's EU address with the key, from a fixed list of values
-        but the referrer, which is the linking site's host without www.; with the browser's language, the system in
-        one word, the version the page offers and a session number of the moment, new for each page opened."""
+        but the referrer, which is the linking site's host without www.; the tag of a shared link (src or utm_source)
+        only when it is on the list; with the browser's language, the system in one word, the version the page offers
+        and a session number of the moment, new for each page opened."""
         version = build.version()
         for path, width, stored, platform, referer, expected in (
-                ("/", 390, None, "Windows", None, {"page": "en", "device": "phone", "theme": "system", "referrer": "none"}),
+                ("/", 390, None, "Windows", None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "none"}),
                 ("/ar/", 768, "dark", "macOS", "https://www.github.com/MohammedEl-sayedAhmed/sedjem",
-                 {"page": "ar", "device": "tablet", "theme": "dark", "referrer": "github.com"}),
+                 {"page": "ar", "device": "tablet", "theme": "dark", "referrer": "github.com", "source": "none"}),
                 ("/", 1440, "light", "Linux x86_64", "https://news.ycombinator.com/item?id=1",
-                 {"page": "en", "device": "desktop", "theme": "light", "referrer": "news.ycombinator.com"}),
-                ("/", 1099, None, None, None, {"page": "en", "device": "tablet", "theme": "system", "referrer": "none"})):
+                 {"page": "en", "device": "desktop", "theme": "light", "referrer": "news.ycombinator.com",
+                  "source": "none"}),
+                ("/", 1099, None, None, None,
+                 {"page": "en", "device": "tablet", "theme": "system", "referrer": "none", "source": "none"}),
+                ("/?src=linkedin", 390, None, "Android", None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "linkedin"}),
+                ("/ar/?utm_source=LinkedIn&utm_medium=social", 1440, None, None, "https://www.linkedin.com/",
+                 {"page": "ar", "device": "desktop", "theme": "system", "referrer": "linkedin.com",
+                  "source": "linkedin"}),
+                ("/?src=myspace", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "none"}),
+                # the first of the two on the list, so a stray src doesn't hide utm_source; twitter is x
+                ("/?src=newsletter-42&utm_source=linkedin", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "linkedin"}),
+                ("/?utm_source=Twitter", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "x"})):
             with self.subTest(path, width=width, platform=platform):
                 page = self.open(path, width, base=self.counting_base, stored=stored, platform=platform,
                                  locale="ar-EG", referer=referer)
@@ -536,7 +552,8 @@ class SiteInBrowserTest(unittest.TestCase):
                    lambda route: route.continue_(url=route.request.url.replace("/sedjem/", "/", 1)))
         page.goto(self.counting_base + "/404.html", wait_until="load")
         view, missing = self.counts(page, 2)
-        self.assertEqual(missing["props"], {"page": "404", "device": "tablet", "theme": "dark", "referrer": "none"})
+        self.assertEqual(missing["props"], {"page": "404", "device": "tablet", "theme": "dark", "referrer": "none",
+                                            "source": "none"})
         self.assertNotEqual(missing["sessionId"], view["sessionId"])
         self.assertEqual(page.errors, [])
 

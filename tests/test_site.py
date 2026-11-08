@@ -95,7 +95,9 @@ VERSION_IN = {"en": "Version {}.", "ar": "الإصدار {}."}
 # The anonymous counts (site/counts.js; docs/privacy.md, "The website"): each event with its props and their values
 # (None for the referrer, a host name), the system props, and the one address they go to
 COUNTED = {"page_view": {"page": ["en", "ar", "404"], "device": ["phone", "tablet", "desktop"],
-                         "theme": ["light", "dark", "system"], "referrer": None},
+                         "theme": ["light", "dark", "system"], "referrer": None,
+                         "source": ["none", "linkedin", "x", "facebook", "reddit", "youtube", "telegram", "whatsapp",
+                                    "email"]},
            "download": {"platform": ["windows", "linux", "source"], "place": ["hero", "get"], "page": ["en", "ar", "404"]}}
 SYSTEM_PROPS = ["locale", "appVersion", "isDebug", "sdkVersion", "osName"]
 ENDPOINT = "https://eu.aptabase.com/api/v0/event"

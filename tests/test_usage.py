@@ -1177,26 +1177,34 @@ def export(rows, header=HEADER, quotes=False):
 def website():
     """An export of the Sedjem website app with November 2026's page views, 16 of them by 8 visitors (a visitor is a
     day's hash): Egypt 6 by 4 (E1 on two days), Saudi Arabia 4 by 2, Germany 5 by 1 and one with no country; linked
-    from linkedin.com by 3 visitors, github.com by 2 and an intranet by 1. Five download clicks, and five events the
-    pages never send; and a page view in October and one in December."""
-    def visit(user, day, page, device, referrer, country, times=1):
-        return [{**row("page_view", country, "", "", f"2026-11-{day} 10:00:00", {"page": page, "device": device, "theme":
-                                                                                 "system", "referrer": referrer},
+    from linkedin.com by 3 visitors, github.com by 2 and an intranet by 1; tagged linkedin by the 3 from linkedin.com,
+    reddit by the 2 from github.com (4 views) and email by the one from the intranet, with Germany's 5 tagged none and
+    the others from before the pages sent a tag. Five download clicks, and six events the pages never send; and a page
+    view in October and one in December."""
+    def visit(user, day, page, device, referrer, country, times=1, source=None):
+        props = {"page": page, "device": device, "theme": "system", "referrer": referrer,
+                 **({"source": source} if source else {})}
+        return [{**row("page_view", country, "", "", f"2026-11-{day} 10:00:00", props,
                        os_name="Android", os_version="", version="0.3.1"), "user_id": user}] * times
     def click(platform, place="get", page="en"):
         return {**row("download", "EG", "", "", "2026-11-05 10:01:00", {"platform": platform, "place": place, "page": page}),
                 "user_id": "E1"}
-    rows = (visit("E1", "05", "en", "phone", "none", "EG", 2) + visit("E1", "05", "ar", "phone", "linkedin.com", "EG")
-            + visit("E2", "05", "ar", "desktop", "linkedin.com", "EG") + visit("E1", "06", "en", "desktop", "linkedin.com", "EG")
-            + visit("E3", "07", "404", "tablet", "none", "EG") + visit("S1", "08", "en", "desktop", "github.com", "SA", 2)
-            + visit("S2", "08", "ar", "phone", "github.com", "SA", 2) + visit("D1", "09", "en", "desktop", "none", "DE", 5)
-            + visit("X1", "10", "en", "phone", "intranet.example.corp", ""))
+    rows = (visit("E1", "05", "en", "phone", "none", "EG", 2)
+            + visit("E1", "05", "ar", "phone", "linkedin.com", "EG", source="linkedin")
+            + visit("E2", "05", "ar", "desktop", "linkedin.com", "EG", source="linkedin")
+            + visit("E1", "06", "en", "desktop", "linkedin.com", "EG", source="linkedin")
+            + visit("E3", "07", "404", "tablet", "none", "EG")
+            + visit("S1", "08", "en", "desktop", "github.com", "SA", 2, source="reddit")
+            + visit("S2", "08", "ar", "phone", "github.com", "SA", 2, source="reddit")
+            + visit("D1", "09", "en", "desktop", "none", "DE", 5, source="none")
+            + visit("X1", "10", "en", "phone", "intranet.example.corp", "", source="email"))
     rows += [click("windows", "hero"), click("windows"), click("windows", page="ar"), click("linux"), click("source")]
     good = visit("E9", "11", "en", "phone", "none", "EG")[0]
     rows += [{**good, "string_props": json.dumps(props)} for props in (
         {"page": "fr", "device": "phone", "theme": "system", "referrer": "none"},
         {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "title": "Board meeting"},
-        {"page": "en", "device": "phone", "theme": "system", "referrer": "Bad Host!"})]
+        {"page": "en", "device": "phone", "theme": "system", "referrer": "Bad Host!"},
+        {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "myspace"})]
     rows += [click("mac"), {**good, "event_name": "active_month"}]
     rows += [{**good, "timestamp": "2026-10-31 23:00:00"}, {**good, "timestamp": "2026-12-01 08:00:00"}]
     return rows
@@ -1427,8 +1435,11 @@ class Totals(unittest.TestCase):
         self.assertEqual(site["devices"], {"phone": 6, "tablet": 1, "desktop": 9})
         self.assertEqual(site["referrers"], {"none": 8, "sites": {"linkedin.com": 3, "other": 5}},
                          "github.com (4 views by 2 visitors) and the intranet (1) are folded")
+        self.assertEqual(site["sources"], {"none": 8, "tags": {"linkedin": 3, "other": 5}},
+                         "a page view from before the tag counts as none; reddit (4 views by 2 visitors) and email "
+                         "(1 by 1) are folded, since a tag needs 3 visitors, not 3 views")
         self.assertEqual(site["downloads"], {"clicks": 5, "platforms": {"windows": 3, "linux": 1, "source": 1}})
-        self.assertEqual(site["skipped"], 5)
+        self.assertEqual(site["skipped"], 6, "a tag the pages never send is left out with the rest")
         published = json.dumps(site)
         for private in ("E1", "S1", "D1", "intranet.example.corp", "github.com", '"SA"', '"DE"', "9F86D081884C7D65"):
             self.assertNotIn(private, published)
@@ -1450,7 +1461,7 @@ class Totals(unittest.TestCase):
         app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
         with mock.patch("sys.stdout", io.StringIO()) as out:
             totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
-        self.assertIn("The website in November 2026: 16 page views by 8 visitors, 3 countries, 5 download clicks; 5 "
+        self.assertIn("The website in November 2026: 16 page views by 8 visitors, 3 countries, 5 download clicks; 6 "
                       "events left out", out.getvalue())
         data = json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))
         self.assertEqual((list(data["months"]), list(data["website"])), (["2026-11"], ["2026-11"]))

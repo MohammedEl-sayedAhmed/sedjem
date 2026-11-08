@@ -25,10 +25,11 @@ are added up as "other", so that no one install can be picked out.
 
 The website's totals go into docs/usage.json under "website", by month: the page views, and the visitors (one a
 day for each of Aptabase's daily hashes, added up), the countries, the pages by language, the phones, tablets and
-desktops, the sites that linked to it, and the download clicks by platform. A country or a site is listed only when
-at least 3 visitors came from it that month, and at most 10 sites are, so that no one visit can be picked out. An
-event the pages never send (another event, a prop too many or too few, a value not on counts.js's lists) is left
-out.
+desktops, the sites that linked to it, the tags of the shared links it was opened from, and the download clicks by
+platform. A country, a site or a tag is listed only when at least 3 visitors came with it that month, and at most 10
+sites are, so that no one visit can be picked out. An event the pages never send (another event, a prop too many or
+too few, a value not on counts.js's lists) is left out; a page view from before the pages sent a tag counts as one
+with none.
 
 The exports' columns are found by their names, in any order and letter case: timestamp, event_name, os_name,
 os_version, app_version, country_code, and string_props with numeric_props (or one props column); region_name and
@@ -112,7 +113,9 @@ MONTH = re.compile(r"\d{4}-(0[1-9]|1[0-2])")
 # What the website sends (a copy of site/counts.js's EVENTS): each event with its props and their values, None for
 # the referrer, a host name as HOST allows it
 WEBSITE = {"page_view": {"page": ("en", "ar", "404"), "device": ("phone", "tablet", "desktop"),
-                         "theme": ("light", "dark", "system"), "referrer": None},
+                         "theme": ("light", "dark", "system"), "referrer": None,
+                         "source": ("none", "linkedin", "x", "facebook", "reddit", "youtube", "telegram", "whatsapp",
+                                    "email")},
            "download": {"platform": ("windows", "linux", "source"), "place": ("hero", "get"), "page": ("en", "ar", "404")}}
 HOST = re.compile(r"[a-z0-9._:\[\]-]{1,60}")
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
@@ -322,10 +325,13 @@ def totals(rows, month, exported):
 
 
 def website_events(rows):
-    """The website's events that hold exactly what its pages send, and how many others were left out."""
+    """The website's events that hold exactly what its pages send, and how many others were left out. A page view
+    from before the pages sent the tag of a shared link counts as one with none."""
     good, skipped = [], 0
     for r in rows:
         allowed = WEBSITE.get(r["event"])
+        if r["event"] == "page_view" and "source" not in r["props"]:
+            r = {**r, "props": {**r["props"], "source": "none"}}
         props = r["props"]
         if allowed and set(props) == set(allowed) and all(
                 isinstance(props[k], str) and (props[k] in values if values else HOST.fullmatch(props[k]))
@@ -345,6 +351,7 @@ def website_totals(rows, month, exported):
     country = lambda r: r["country"] if re.fullmatch(r"[A-Z]{2}", r["country"]) else "other"  # noqa: E731
     by = lambda rows_, prop, values: {v: sum(1 for r in rows_ if r["props"][prop] == v) for v in values}  # noqa: E731
     linked = [r for r in views if r["props"]["referrer"] != "none"]
+    tagged = [r for r in views if r["props"]["source"] != "none"]
     return {
         "month": month, "exported": exported,
         "page_views": len(views), "visitors": len({r["visitor"] for r in views}),
@@ -353,6 +360,7 @@ def website_totals(rows, month, exported):
         "devices": by(views, "device", WEBSITE["page_view"]["device"]),
         "referrers": {"none": len(views) - len(linked),
                       "sites": fold_visitors(linked, lambda r: r["props"]["referrer"], most=SITES)},
+        "sources": {"none": len(views) - len(tagged), "tags": fold_visitors(tagged, lambda r: r["props"]["source"])},
         "downloads": {"clicks": len(clicks), "platforms": by(clicks, "platform", WEBSITE["download"]["platform"])},
         "skipped": skipped,
     }
