@@ -215,8 +215,11 @@ never send is left out. The exports themselves, which have every event with its 
 are deleted afterwards and never go into the repository. The script's own description has the steps.
 
 <!-- usage-totals:start -->
-No totals yet: the counts start with Sedjem 0.3.0, and the first month's totals will be here once that month has
-been exported.
+| Month | Active installs | New installs | Countries | Transcriptions | Hours | Hosted |
+|---|---|---|---|---|---|---|
+| October 2026 | 4 | 3 | 1 | 5 | 5.0 | 0% |
+
+Each month's other totals (retention, settings, hardware, the models downloaded, weekly use, the runs, speed, failures and features) are in [docs/usage.json](usage.json).
 <!-- usage-totals:end -->
 
 ## Files
