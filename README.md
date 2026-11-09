@@ -9,17 +9,17 @@ Updated on 2026-11-09 by the Repository stats workflow on main (`.github/workflo
 
 | | |
 |---|---|
-| Downloads of the app, all releases | 72 |
+| Downloads of the app, all releases | 74 |
 | Clones since 2026-10-05 | 2,107 (491 unique per day, added up) |
 | Page views since 2026-10-05 | 492 (116 unique per day, added up) |
-| Stars, forks, watchers | 8, 0, 0 |
+| Stars, forks, watchers | 9, 0, 0 |
 
 ## Downloads by release
 
 | Release | File | Downloads |
 |---|---|---|
 | v0.3.3 | Sedjem-0.3.3-linux-x64.tar.gz | 1 |
-| v0.3.3 | Sedjem-0.3.3-setup.exe | 1 |
+| v0.3.3 | Sedjem-0.3.3-setup.exe | 3 |
 | v0.3.3 | SHA256SUMS.txt | 1 |
 | v0.3.3-preview.20261108 | Sedjem-0.3.3-preview.20261108-linux-x64.tar.gz | 1 |
 | v0.3.3-preview.20261108 | Sedjem-0.3.3-preview.20261108-setup.exe | 1 |

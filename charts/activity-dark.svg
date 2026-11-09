@@ -1,20 +1,22 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="800" height="550" viewBox="0 0 800 550" role="img" aria-labelledby="title desc" font-family='system-ui, -apple-system, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif'>
 <title id="title">Sedjem on GitHub: downloads, stars and forks, clones and page views</title>
-<desc id="desc">Four charts on one time axis, from 26 September 2026 to 9 November 2026. Downloads of the app, all releases, as a running total: 72 on 9 November 2026, recorded since 19 October 2026. Releases: v0.1.0 on 26 September 2026, v0.2.0 on 19 October 2026, v0.3.0 on 29 October 2026, v0.3.1 on 29 October 2026, v0.3.2 on 30 October 2026, v0.3.3-preview.20261107 on 7 November 2026, v0.3.3-preview.20261108 on 8 November 2026, v0.3.3 on 9 November 2026. Stars: 8, the first on 28 September 2026. Forks: none yet. Clones per day: 2,107 since 5 October 2026, the most 627 on 30 October 2026. Page views per day: 492 since 5 October 2026, the most 101 on 30 October 2026.</desc>
+<desc id="desc">Four charts on one time axis, from 26 September 2026 to 9 November 2026. Downloads of the app, all releases, as a running total: 74 on 9 November 2026, recorded since 19 October 2026. Releases: v0.1.0 on 26 September 2026, v0.2.0 on 19 October 2026, v0.3.0 on 29 October 2026, v0.3.1 on 29 October 2026, v0.3.2 on 30 October 2026, v0.3.3-preview.20261107 on 7 November 2026, v0.3.3-preview.20261108 on 8 November 2026, v0.3.3 on 9 November 2026. Stars: 9, the first on 28 September 2026. Forks: none yet. Clones per day: 2,107 since 5 October 2026, the most 627 on 30 October 2026. Page views per day: 492 since 5 October 2026, the most 101 on 30 October 2026.</desc>
 <rect x="0.5" y="0.5" width="799" height="549" rx="6" fill="#0d1117" stroke="#3d444d"/>
 <text x="20" y="32" font-size="15" fill="#e6edf3" font-weight="600">Sedjem on GitHub</text>
 <text x="780" y="32" font-size="12" fill="#9198a1" text-anchor="end">26 Sep to 9 Nov 2026</text>
-<g data-panel="downloads" data-x="2026-09-26 2026-11-09 57.29 6.58" data-y="80 234 114">
+<g data-panel="downloads" data-x="2026-09-26 2026-11-09 57.29 6.58" data-y="100 234 114">
 <text x="20" y="66" font-size="13" fill="#e6edf3" font-weight="600">Downloads of the app, all releases</text>
 <text x="20" y="84" font-size="12" fill="#9198a1">Running total of the installer and the Linux archive</text>
-<line x1="54" y1="204" x2="350" y2="204" stroke="#2d333b"/>
-<text x="48" y="208" font-size="11" fill="#9198a1" text-anchor="end">20</text>
-<line x1="54" y1="174" x2="350" y2="174" stroke="#2d333b"/>
-<text x="48" y="178" font-size="11" fill="#9198a1" text-anchor="end">40</text>
-<line x1="54" y1="144" x2="350" y2="144" stroke="#2d333b"/>
-<text x="48" y="148" font-size="11" fill="#9198a1" text-anchor="end">60</text>
+<line x1="54" y1="210" x2="350" y2="210" stroke="#2d333b"/>
+<text x="48" y="214" font-size="11" fill="#9198a1" text-anchor="end">20</text>
+<line x1="54" y1="186" x2="350" y2="186" stroke="#2d333b"/>
+<text x="48" y="190" font-size="11" fill="#9198a1" text-anchor="end">40</text>
+<line x1="54" y1="162" x2="350" y2="162" stroke="#2d333b"/>
+<text x="48" y="166" font-size="11" fill="#9198a1" text-anchor="end">60</text>
+<line x1="54" y1="138" x2="350" y2="138" stroke="#2d333b"/>
+<text x="48" y="142" font-size="11" fill="#9198a1" text-anchor="end">80</text>
 <line x1="54" y1="114" x2="350" y2="114" stroke="#2d333b"/>
-<text x="48" y="118" font-size="11" fill="#9198a1" text-anchor="end">80</text>
+<text x="48" y="118" font-size="11" fill="#9198a1" text-anchor="end">100</text>
 <line x1="54" y1="234" x2="350" y2="234" stroke="#3d444d"/>
 <text x="48" y="238" font-size="11" fill="#9198a1" text-anchor="end">0</text>
 <text x="70.44" y="250" font-size="11" fill="#9198a1" text-anchor="middle">28 Sep</text>
@@ -29,11 +31,11 @@
 <g data-release="v0.3.0" data-date="2026-10-29"><line x1="274.36" y1="114" x2="274.36" y2="234" stroke="#656c76"/></g>
 <g data-release="v0.2.0" data-date="2026-10-19"><line x1="208.58" y1="106" x2="208.58" y2="234" stroke="#656c76"/><text x="193.18" y="102" font-size="11" fill="#9198a1">v0.2.0</text></g>
 <g data-release="v0.1.0" data-date="2026-09-26"><line x1="57.29" y1="106" x2="57.29" y2="234" stroke="#656c76"/><text x="41.89" y="102" font-size="11" fill="#9198a1">v0.1.0</text></g>
-<text x="200.58" y="221.5" font-size="11" fill="#9198a1" text-anchor="end" data-note="downloads">Recorded from 19 Oct</text>
-<path d="M208.58,217.5 L215.16,214.5 L221.73,211.5 L228.31,210 L248.04,210 L254.62,208.5 L261.2,207 L267.78,207 L274.36,196.5 L280.93,174 L287.51,169.5 L294.09,156 L300.67,153 L307.24,147 L313.82,142.5 L320.4,138 L326.98,135 L333.56,136.5 L340.13,133.5 L346.71,126 L346.71,234 L208.58,234 Z" fill="#14a3a1" fill-opacity="0.12"/>
-<path d="M208.58,217.5 L215.16,214.5 L221.73,211.5 L228.31,210 L248.04,210 L254.62,208.5 L261.2,207 L267.78,207 L274.36,196.5 L280.93,174 L287.51,169.5 L294.09,156 L300.67,153 L307.24,147 L313.82,142.5 L320.4,138 L326.98,135 L333.56,136.5 L340.13,133.5 L346.71,126" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="downloads" data-points="2026-10-19:11 2026-10-20:13 2026-10-21:15 2026-10-22:16 2026-10-25:16 2026-10-26:17 2026-10-27:18 2026-10-28:18 2026-10-29:25 2026-10-30:40 2026-10-31:43 2026-11-01:52 2026-11-02:54 2026-11-03:58 2026-11-04:61 2026-11-05:64 2026-11-06:66 2026-11-07:65 2026-11-08:67 2026-11-09:72"/>
-<circle cx="346.71" cy="126" r="4" fill="#14a3a1"/>
-<text x="354.71" y="130" font-size="12" fill="#e6edf3" font-weight="600" data-label="downloads">72</text>
+<text x="200.58" y="224.8" font-size="11" fill="#9198a1" text-anchor="end" data-note="downloads">Recorded from 19 Oct</text>
+<path d="M208.58,220.8 L215.16,218.4 L221.73,216 L228.31,214.8 L248.04,214.8 L254.62,213.6 L261.2,212.4 L267.78,212.4 L274.36,204 L280.93,186 L287.51,182.4 L294.09,171.6 L300.67,169.2 L307.24,164.4 L313.82,160.8 L320.4,157.2 L326.98,154.8 L333.56,156 L340.13,153.6 L346.71,145.2 L346.71,234 L208.58,234 Z" fill="#14a3a1" fill-opacity="0.12"/>
+<path d="M208.58,220.8 L215.16,218.4 L221.73,216 L228.31,214.8 L248.04,214.8 L254.62,213.6 L261.2,212.4 L267.78,212.4 L274.36,204 L280.93,186 L287.51,182.4 L294.09,171.6 L300.67,169.2 L307.24,164.4 L313.82,160.8 L320.4,157.2 L326.98,154.8 L333.56,156 L340.13,153.6 L346.71,145.2" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="downloads" data-points="2026-10-19:11 2026-10-20:13 2026-10-21:15 2026-10-22:16 2026-10-25:16 2026-10-26:17 2026-10-27:18 2026-10-28:18 2026-10-29:25 2026-10-30:40 2026-10-31:43 2026-11-01:52 2026-11-02:54 2026-11-03:58 2026-11-04:61 2026-11-05:64 2026-11-06:66 2026-11-07:65 2026-11-08:67 2026-11-09:74"/>
+<circle cx="346.71" cy="145.2" r="4" fill="#14a3a1"/>
+<text x="354.71" y="149.2" font-size="12" fill="#e6edf3" font-weight="600" data-label="downloads">74</text>
 </g>
 <g data-panel="stars" data-x="2026-09-26 2026-11-09 457.29 6.58" data-y="10 234 114">
 <text x="420" y="66" font-size="13" fill="#e6edf3" font-weight="600">Stars and forks</text>
@@ -55,10 +57,10 @@
 <text x="654.62" y="250" font-size="11" fill="#9198a1" text-anchor="middle">26 Oct</text>
 <text x="746.71" y="250" font-size="11" fill="#9198a1" text-anchor="middle">9 Nov</text>
 <line x1="420" y1="98" x2="434" y2="98" stroke="#14a3a1" stroke-width="2" stroke-linecap="round"/>
-<text x="440" y="102" font-size="12" fill="#9198a1">8 stars</text>
+<text x="440" y="102" font-size="12" fill="#9198a1">9 stars</text>
 <text x="497.84" y="102" font-size="12" fill="#9198a1">No forks yet</text>
-<path d="M470.44,234 L470.44,198 L477.02,198 L477.02,186 L654.62,186 L654.62,186 L661.2,186 L661.2,174 L667.78,174 L667.78,162 L674.36,162 L674.36,138 L746.71,138 L746.71,138" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="stars" data-points="2026-09-28:3 2026-09-29:4 2026-10-26:4 2026-10-27:5 2026-10-28:6 2026-10-29:8 2026-11-09:8"/>
-<circle cx="746.71" cy="138" r="4" fill="#14a3a1"/>
+<path d="M470.44,234 L470.44,198 L477.02,198 L477.02,186 L654.62,186 L654.62,186 L661.2,186 L661.2,174 L667.78,174 L667.78,162 L674.36,162 L674.36,138 L740.13,138 L740.13,138 L746.71,138 L746.71,126" fill="none" stroke="#14a3a1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" data-series="stars" data-points="2026-09-28:3 2026-09-29:4 2026-10-26:4 2026-10-27:5 2026-10-28:6 2026-10-29:8 2026-11-08:8 2026-11-09:9"/>
+<circle cx="746.71" cy="126" r="4" fill="#14a3a1"/>
 </g>
 <g data-panel="clones" data-x="2026-09-26 2026-11-09 57.29 6.58" data-y="800 462 342">
 <text x="20" y="294" font-size="13" fill="#e6edf3" font-weight="600">Clones per day</text>
