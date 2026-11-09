@@ -218,7 +218,8 @@ It totals the month of `--exported` up to that day, in the same way, and writes 
 key, `so_far`, with the `month`, the last day it covers (`through`) and its `app` and `website` parts. The months, the
 README and the table below are not touched. A later `--so-far` run replaces it, and the run for that month once it is
 finished (the monthly step below), or for a later month, removes it. The website shows it beside the newest finished
-month, marked "so far, to 9 November", and draws its breakdowns, its visits and its page views of each day.
+month, marked "so far, to 9 November", and draws its breakdowns and its visits, by country on the map and by day in the
+calendar.
 
 
 

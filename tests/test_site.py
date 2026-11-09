@@ -1848,6 +1848,20 @@ class NumbersTest(unittest.TestCase):
         data["website"]["2026-11"]["countries"]["page_views"] = {"EG": 5}
         sections, _ = self.build("map-one", stats=self.stats, usage=fixture.write_usage(self.dir / "map-one.json", data))
         self.assertFalse(sections["en"].find(lambda n: "map" in n.classes()))
+        # the legend's range is the shaded countries' alone: "other" and a code without an outline (BH) aren't drawn
+        self.assertNotIn("BH", outlines)
+        data = json.loads(json.dumps(fixture.USAGE))
+        data["website"]["2026-11"]["visits"] = {"total": 95, "countries": {"EG": 3, "FR": 2, "BH": 40, "other": 50},
+                                                "days": {"2026-11-01": 95}}
+        sections, _ = self.build("map-range", stats=self.stats, usage=fixture.write_usage(self.dir / "map-range.json", data))
+        self.assertEqual(squash(sections["en"].find(lambda n: "ramp-key" in n.classes())[0].text()), "Visits 2 3")
+        # with visits, the map and its list stay even when the page views' countries fold into one group
+        data["website"]["2026-11"]["countries"]["page_views"] = {"EG": 5}
+        data["website"]["2026-11"]["visits"] = {"total": 4, "countries": {"EG": 3, "FR": 1}, "days": {"2026-11-01": 4}}
+        sections, _ = self.build("map-visits", stats=self.stats, usage=fixture.write_usage(self.dir / "map-visits.json", data))
+        (lit,) = sections["en"].find(lambda n: n.tag == "g" and "lit" in n.classes())
+        self.assertEqual(len([p for p in lit.children if not isinstance(p, str)]), 2)
+        self.assertEqual(self.census(sections["en"])["Where"]["Website visitors by country"], [("Egypt", "75%"), ("France", "25%")])
 
     def test_the_map_stays_within_its_budget_and_needs_its_file(self):
         """The map adds at most about 80 kB to a page; the asset is the one the generator writes (no Antarctica, codes

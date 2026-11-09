@@ -623,13 +623,15 @@ def census(t, w, month_, through):
     """The census of one period: {"month", "through" (the last day of a month so far, else None), "groups": [(group,
     [(breakdown, [(value, count)])])] with the small groups folded into "other", a breakdown left out when it would
     show only one group, and a group left out when it has none, "visits": the website's visits as totals (their number, by country and by day), or None}."""
-    counts = census_counts(t, w)
+    counts, visits = census_counts(t, w), visit_totals(w)
     groups = []
     for group, breakdowns in CENSUS:
-        shown = [(key, rows) for key, *_ in breakdowns if len(rows := folded(counts[key])) >= 2]
+        # the website's countries stay while there are visits: the map and its list count those, not the folded page views
+        shown = [(key, rows) for key, *_ in breakdowns
+                 if len(rows := folded(counts[key])) >= 2 or (key == "wcountries" and visits and visits["countries"])]
         if shown:
             groups.append((group, shown))
-    return {"month": month_, "through": through, "groups": groups, "visits": visit_totals(w)}
+    return {"month": month_, "through": through, "groups": groups, "visits": visits}
 
 
 def app_part(t):
@@ -1029,7 +1031,8 @@ def world_map(shade, total, unit, say, words):
     strong by its count against the largest (the map isn't folded: a country with one visit is shaded). A code the map
     doesn't have is ignored. A shaded country has the data of its tooltip: its name, its count (unit, a copy key such
     as visit_count) and its share of total. The outlines are read from MAP, which docs/images/make/worldmap.py writes;
-    without it there is no map."""
+    without it there is no map. Returns the SVG with the lowest and the highest count it shades, for the legend, which
+    so never names a count that no drawn country has ("other" and the codes without an outline aren't drawn)."""
     try:
         asset = json.loads(MAP.read_text(encoding="utf-8"))
         outlines = {str(k): str(v) for k, v in asset["countries"].items()}
@@ -1038,7 +1041,7 @@ def world_map(shade, total, unit, say, words):
         box = None
     if not box:
         note(f"{MAP} can't be read; the map is left out")
-        return ""
+        return "", 0, 0
     lit = {code: n for code, n in shade.items() if code in outlines and n > 0}
     top = max(lit.values(), default=0)
     land = "".join(f'<path d="{d}"/>' for code, d in outlines.items() if code not in lit)
@@ -1047,7 +1050,7 @@ def world_map(shade, total, unit, say, words):
                    + tip(name_of(code), say(f"{unit}_one" if n == 1 else unit, n=f"{n:,}") + f" · {share_of(n, total or 1)}", True) + "/>"
                    for code, n in sorted(lit.items()))
     return (f'<svg class="map" viewBox="{box}" aria-hidden="true" focusable="false" data-tip-group>'
-            f'<g class="land">{land}</g><g class="lit">{teal}</g></svg>')
+            f'<g class="land">{land}</g><g class="lit">{teal}</g></svg>', min(lit.values(), default=0), top)
 
 
 def ramp_key(label, low, high):
@@ -1089,10 +1092,9 @@ def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
             shade, whole, unit_key, label = visits["countries"], visits["total"], "visit_count", say("legend_visits")
         else:
             shade, whole, unit_key, label = {v: n for v, n in rows if v != "other"}, total, "view_count", say("legend_views")
-        drawn = world_map(shade, whole, unit_key, say, words)
+        drawn, low, high = world_map(shade, whole, unit_key, say, words)
         if drawn:  # the legend over the map, which spans the card, and the list of countries under it
-            lit = [n for c, n in shade.items() if n > 0]
-            picture = f'{ramp_key(label, min(lit, default=0), max(lit, default=0))}<div class="map-row">{drawn}</div>{picture}'
+            picture = f'{ramp_key(label, low, high)}<div class="map-row">{drawn}</div>{picture}'
     else:
         picture = quiet(named, total, lead)
     return (f'<div class="crowd{" crowd-map" if drawn else ""}"><p class="crowd-title">{title}</p>{picture}'
@@ -1102,7 +1104,7 @@ def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
 
 def census_html(c, say, words, lang):
     """The census of the most recent period: its groups (where, computers, how it is used, website visitors), each
-    with its breakdowns, and the website's page views of each day, as a calendar, under the visitors."""
+    with its breakdowns, and the website's visits of each day, as a calendar, under the visitors."""
     chosen = {g: dict(items) for g, items in c["groups"]}
     out = []
     for group, breakdowns in CENSUS:
