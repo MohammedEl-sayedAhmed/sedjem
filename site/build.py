@@ -948,7 +948,8 @@ def calendar_grid(days, month_, say, words, lang):
     """The visits of each day of a month as a calendar: seven columns, Monday to Sunday, one row a week, the month's
     name over it; each day ([(date, visits)], to the period's last day) shows its number small and, when it had visits,
     their count, with a tint of teal by its share of the busiest day (one hue); a day with none is a quiet step of the
-    card, the days before the first are blank and the days after the last covered are empty outlines. Each day has
+    card, the days before the first are blank and the days after the last covered, to the end of its week, are empty
+    outlines; the weeks after it aren't drawn. Each day has
     its tooltip, and the table under it, for screen readers, has the numbers."""
     year, number = int(month_[:4]), int(month_[5:])
     names = words["numbers.months"].split()
@@ -964,6 +965,7 @@ def calendar_grid(days, month_, say, words, lang):
         said = tip(f"{d} {names[number - 1]}", say("visit_count_one" if n == 1 else "visit_count", n=str(n)), n == top and n > 0)
         cells.append(f'<span class="cell{" lit" if n else ""}"' + (f' style="--a: {0.25 + 0.75 * n / top:.2f}"' if n else "")
                      + f'{said}><span class="n">{d}</span>' + (f'<span class="v">{n}</span>' if n else "") + "</span>")
+    cells = cells[:-(-(date(year, number, 1).weekday() + last) // 7) * 7]  # up to the week of the last covered day
     heads = "".join(f"<span>{w}</span>" for w in say("weekdays").split())
     ramp = (f'<span class="key-row calendar-key"><span>{say("legend_fewer")}</span><span class="sw cell-low"></span>'
             f'<span class="sw cell-high"></span><span>{say("legend_more")}</span></span>')
@@ -1064,8 +1066,9 @@ def key_row(items):
 def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
     """One breakdown of the census, in the form that fits it: a quiet list of names and shares (most of them), the
     devices as three glyphs with their shares, local or hosted as one small ring, and the website's countries as a
-    list under the world map, which shades the countries by their visits (all of them, unfolded; without the visits,
-    by the page views of those that pass the fold) under a legend of its ramp; each with a table for screen readers."""
+    list under the world map, which shades the countries by their visits (all of them, unfolded, and the list counts
+    the same visits; without the visits, both use the page views of those that pass the fold) under a legend of its
+    ramp; each with a table for screen readers."""
     total = sum(n for _, n in rows)
     named = [("other" if v == "other" else f"c{i}", label_of(kind, key, v, say, words), n) for i, (v, n) in enumerate(rows)]
     lead = next((k for k, _, _ in named if k != "other"), None)
@@ -1075,6 +1078,12 @@ def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
     elif key == "hosted" and len(rows) == 2:
         picture = ring(named, total, say)
     elif key == "wcountries":
+        if visits:  # the list under the map counts what the map shades: the visits of every country, unfolded
+            rows = sorted(visits["countries"].items(), key=lambda kv: (kv[0] == "other", -kv[1], kv[0]))
+            named = [("other" if v == "other" else f"c{i}", label_of(kind, key, v, say, words), n)
+                     for i, (v, n) in enumerate(rows)]
+            total, unit = visits["total"], "visits"
+            lead = next((k for k, _, _ in named if k != "other"), None)
         picture = quiet(named, total, lead)
         if visits:
             shade, whole, unit_key, label = visits["countries"], visits["total"], "visit_count", say("legend_visits")
@@ -1084,10 +1093,6 @@ def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
         if drawn:  # the legend over the map, which spans the card, and the list of countries under it
             lit = [n for c, n in shade.items() if n > 0]
             picture = f'{ramp_key(label, min(lit, default=0), max(lit, default=0))}<div class="map-row">{drawn}</div>{picture}'
-            if visits:  # the shaded countries' visits, for screen readers
-                spoken = table(say("visits"), [say("visit_country"), say("unit_visits"), say("share")],
-                               [(label_of("country", "wcountries", c, say, words), plain(n, lang), share_of(n, whole or 1))
-                                for c, n in visits["countries"].items()], boxed=True)
     else:
         picture = quiet(named, total, lead)
     return (f'<div class="crowd{" crowd-map" if drawn else ""}"><p class="crowd-title">{title}</p>{picture}'

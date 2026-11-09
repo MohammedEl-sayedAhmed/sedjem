@@ -478,9 +478,10 @@ a visit is the brand's teal in one of five steps, light to strong (opacity 0.22,
 hue), by its visits against the busiest country's; countries are not folded here, so a country with one visit is
 shaded, and the data holds only visits by country and by day, nothing per visit (docs/privacy.md says so). The legend is
 a labelled ramp above the map's right edge: the word "Visits", the lowest count, the five steps drawn as the map draws
-them, the highest count. The list of countries with their shares (page views, folded under 3 as every list is) sits
-under the map in two or three columns. The map is hidden from screen readers (the lists, the table of visits by
-country and the tooltips carry the numbers) and is not mirrored on the Arabic page, since a map has no reading
+them, the highest count. The list of countries with their shares sits under the map in two or three columns and
+counts what the map shades, the visits of every country, unfolded, so the two never disagree (an earlier draft listed
+the page views folded under 3, and Qatar was lit on the map but missing from the list). The map is hidden from screen
+readers (the list's table of visits by country and the tooltips carry the numbers) and is not mirrored on the Arabic page, since a map has no reading
 direction. It is the equirectangular outline of Natural Earth's 1:110m countries (public domain, v5.1.2), drawn by
 docs/images/make/worldmap.py into site/worldmap.json, about 72 kB, which build.py inlines and never fetches.
 "Visits each day" is a calendar heatmap of the period's month that counts the same visits by day: seven columns from

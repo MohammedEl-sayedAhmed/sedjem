@@ -1552,8 +1552,9 @@ class NumbersTest(unittest.TestCase):
             "Installs by country": rows(("Egypt", 640), ("Saudi Arabia", 210), ("Emirates", 120), ("United States", 60),
                               ("Germany", 41), ("Jordan", 30), ("Other", 103)),
             "Regions": rows(("Cairo", 300), ("Giza", 200), ("Other", 704)),
-            "Website visitors by country": rows(("Egypt", 6000), ("United States", 3000), ("Saudi Arabia", 1500),
-                                                ("XX", 345), ("Other", 1500))})
+            # the website's countries count what the map shades: the visits, unfolded
+            "Website visitors by country": rows(("Egypt", 6), ("United States", 3), ("Saudi Arabia", 2), ("France", 1),
+                                                ("XX", 1), ("Other", 1))})
         self.assertEqual(got["Computers"], {
             "System": rows(("Windows", 1000), ("Linux", 150), ("Other", 54)),
             "Graphics card": rows(("Nvidia", 500), ("No graphics card", 400), ("Other", 304)),
@@ -1686,7 +1687,7 @@ class NumbersTest(unittest.TestCase):
                                      "ar": "مين بيشغّل Sedjem: ديسمبر 2026، لحد دلوقتي، لحد 2 ديسمبر"}[lang])
         got = self.census(self.sofar["en"])
         self.assertEqual(got["Where"], {"Installs by country": [("Egypt", "61%"), ("Saudi Arabia", "30%"), ("Other", "9%")],
-                                        "Website visitors by country": [("Egypt", "71%"), ("Other", "29%")]})
+                                        "Website visitors by country": [("Egypt", "67%"), ("Saudi Arabia", "33%")]})
         self.assertEqual(got["Computers"], {"Graphics card": [("Nvidia", "61%"), ("Intel", "39%")]})
         self.assertEqual(got["How it is used"]["Model"], [("Cohere Transcribe Arabic", "83%"), ("whisper-medium code-switching", "17%")])
         self.assertEqual(got["Website visitors"], {"Device": [("Desktop", "48%"), ("Phone", "48%"), ("Tablet", "5%")]})
@@ -1770,7 +1771,7 @@ class NumbersTest(unittest.TestCase):
             self.assertEqual(len(box.find(lambda n: "sw" in n.classes())), 2, "fewer to more")
         (box,) = self.sofar["en"].find(lambda n: "chart-box" in n.classes())
         self.assertEqual(len(box.find(lambda n: "cell" in n.classes() and not {"off", "future"} & set(n.classes()))), 2, "1 and 2 December")
-        self.assertEqual(len(box.find(lambda n: "future" in n.classes())), 29, "the days to come are empty outlines")
+        self.assertEqual(len(box.find(lambda n: "future" in n.classes())), 4, "the rest of that week is empty outlines; later weeks aren't drawn")
         # without visits there is no calendar; a visit total that can't be read is left out with the rest
         data = json.loads(json.dumps(fixture.USAGE))
         del data["website"]["2026-11"]["visits"]
@@ -1819,8 +1820,8 @@ class NumbersTest(unittest.TestCase):
             self.assertEqual([c.classes()[0] for c in crowd.children if not isinstance(c, str) and c.classes()][:4],
                              ["crowd-title", "ramp-key", "map-row", "quiet"], "the legend over the map, the list under it")
             tables = crowd.find(lambda n: n.tag == "table")
-            self.assertEqual(len(tables), 2)
-            rows = [[squash(c.text()) for c in tr.children if not isinstance(c, str)] for tr in tables[1].find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")]
+            self.assertEqual(len(tables), 1, "the list's table counts the visits the map shades")
+            rows = [[squash(c.text()) for c in tr.children if not isinstance(c, str)] for tr in tables[0].find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")]
             self.assertEqual([r[1] for r in rows], ["6", "3", "2", "1", "1", "1"], "every country with a visit, none folded")
             self.assertEqual(rows[0][2], "43%")
         self.assertEqual(str(self.full["en"].find(lambda n: "map" in n.classes())[0]).count("<path"),

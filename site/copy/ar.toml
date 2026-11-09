@@ -199,8 +199,6 @@ daily = "الزيارات كل يوم"  # new
 unit_visits = "الزيارات"  # new
 weekdays = "ن ث ر خ ج س ح"  # new
 ear_each = "كل ودن = {{n}} نسخة"  # new
-visits = "زيارات الموقع حسب الدولة"  # new
-visit_country = "الدولة"  # new
 visit_count = "{{n}} زيارات"  # new
 visit_count_one = "1 زيارة"  # new
 transcriptions_weeks = "نصوص اتعملت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"  # new
