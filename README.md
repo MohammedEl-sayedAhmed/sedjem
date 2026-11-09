@@ -236,8 +236,7 @@ Totals from the app's anonymous usage counts, published once a month
 ([how they are made](docs/13-usage-counts.md#public-totals)):
 
 <!-- usage-totals:start -->
-No totals yet: the counts start with Sedjem 0.3.0, and the first month's totals will be here once that month has
-been exported.
+In October 2026, 4 installs ran Sedjem, in 1 country, and 3 were new. They made 5 transcriptions of 5.0 hours of audio, 0% of them with hosted services. Every month's totals are in [docs/usage.json](docs/usage.json).
 <!-- usage-totals:end -->
 
 ## More
