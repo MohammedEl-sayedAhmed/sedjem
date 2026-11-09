@@ -152,7 +152,7 @@
   "use strict";
   function wire() {
     Array.prototype.forEach.call(document.querySelectorAll(".plot[data-points]"), function (plot) {
-      var card = plot.closest(".card"), rows = card ? card.querySelectorAll("table tbody tr") : [];
+      var card = plot.closest(".chart-box") || plot.closest(".card"), rows = card ? card.querySelectorAll("table tbody tr") : [];
       var points = plot.getAttribute("data-points").split(" ").map(function (p) { return p.split(",").map(Number); });
       if (!points.length || points.length !== rows.length) return;
       var rtl = window.getComputedStyle(plot).direction === "rtl", at = points.length - 1;
@@ -198,7 +198,7 @@
       plot.addEventListener("pointerdown", function (event) { show(nearest(event)); });
       plot.addEventListener("pointerleave", hide);
       // the keyboard's way in, named by its card's title; screen readers have the table under it
-      var title = card.querySelector("h3");
+      var title = card.querySelector("h3, .crowd-title");
       plot.tabIndex = 0;
       plot.setAttribute("role", "img");
       if (title) plot.setAttribute("aria-label", title.textContent);
@@ -212,6 +212,73 @@
         show(at + step);
       });
     });
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
+  else wire();
+})();
+
+/* One tooltip for every other picture of the numbers: the map's countries, the
+   calendar's days, the ears, the lists, the glyphs and the bars. build.py writes what each item says in data attributes
+   (data-tip-a the first line, data-tip-b the second, data-tip-key a small teal key for the accent), the same numbers as
+   the table under the picture; this file only shows them, in the card style of the lines' tooltip. A pointer shows the
+   item under it, a tap shows it and a tap elsewhere closes it, and a picture takes the keyboard's focus (data-tip-group), where the arrow keys move between its
+   items and Escape closes. The box stays inside the window. Nothing is computed or fetched. */
+(function () {
+  "use strict";
+  function wire() {
+    var groups = document.querySelectorAll("[data-tip-group]");
+    if (!groups.length) return;
+    var box = document.createElement("div"), first = document.createElement("strong"), second = document.createElement("span");
+    var current = null;
+    box.className = "tipbox";
+    box.hidden = true;
+    box.setAttribute("aria-hidden", "true");
+    box.appendChild(first);
+    box.appendChild(second);
+    document.body.appendChild(box);
+
+    function hide() { box.hidden = true; current = null; }
+    function show(item) {
+      if (!item) { hide(); return; }
+      current = item;
+      first.textContent = item.getAttribute("data-tip-a") || "";
+      second.textContent = item.getAttribute("data-tip-b") || "";
+      second.hidden = !second.textContent;
+      box.classList.toggle("has-key", item.hasAttribute("data-tip-key"));
+      box.hidden = false;
+      var r = item.getBoundingClientRect(), w = box.offsetWidth, h = box.offsetHeight;
+      var left = Math.max(8, Math.min(window.innerWidth - w - 8, r.left + r.width / 2 - w / 2));
+      var top = r.top - h - 8 < 8 ? Math.min(window.innerHeight - h - 8, r.bottom + 8) : r.top - h - 8;
+      box.style.left = left + "px";
+      box.style.top = top + "px";
+    }
+    function pick(group, event) {
+      var t = event.target.closest ? event.target.closest("[data-tip-a]") : null;
+      return t && group.contains(t) ? t : null;
+    }
+    Array.prototype.forEach.call(groups, function (group) {
+      var items = function () { return group.querySelectorAll("[data-tip-a]"); };
+      var title = group.closest(".crowd, .period, .card"), label = title && title.querySelector(".crowd-title, h4, h3");
+      group.tabIndex = 0;
+      group.removeAttribute("aria-hidden");
+      group.setAttribute("role", "img");
+      if (label) group.setAttribute("aria-label", label.textContent);
+      group.addEventListener("pointermove", function (event) { if (event.pointerType !== "touch") show(pick(group, event)); });
+      group.addEventListener("pointerdown", function (event) { show(pick(group, event)); });
+      group.addEventListener("pointerleave", function (event) { if (event.pointerType !== "touch") hide(); });
+      group.addEventListener("blur", hide);
+      group.addEventListener("keydown", function (event) {
+        var list = Array.prototype.slice.call(items()), i = list.indexOf(current);
+        var rtl = window.getComputedStyle(group).direction === "rtl";
+        var step = { ArrowRight: rtl ? -1 : 1, ArrowDown: 1, ArrowLeft: rtl ? 1 : -1, ArrowUp: -1, Home: -list.length, End: list.length }[event.key];
+        if (event.key === "Escape") { hide(); return; }
+        if (!step || !list.length) return;
+        event.preventDefault();
+        show(list[Math.max(0, Math.min(list.length - 1, (i < 0 ? (step > 0 ? -1 : list.length) : i) + step))]);
+      });
+    });
+    document.addEventListener("pointerdown", function (event) { if (!event.target.closest || !event.target.closest("[data-tip-group]")) hide(); });
+    window.addEventListener("scroll", hide, { passive: true });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", wire);
   else wire();

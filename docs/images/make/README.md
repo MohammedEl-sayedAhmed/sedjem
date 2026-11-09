@@ -15,4 +15,6 @@ The website's pictures of the app come from the same script: its shot named site
 
 og.py makes the website's share pictures, site/images/og-en.png and og-ar.png, which LinkedIn, WhatsApp, X, Slack and others show for a link to each page. Each is 1200 by 630 pixels and is drawn from the site itself: the logo, the hero's headline in the page's language with the line of its title under it, the ear, and three lines of the made-up meeting with the speakers' names in their colours. It refuses to write a picture whose text leaves the middle 1100 by 560, which some apps crop to, or runs past its line.
 
+worldmap.py makes site/worldmap.json, the countries' outlines for the world map in the website's census, from Natural Earth's 1:110m admin 0 countries (public domain). Download the pinned GeoJSON, named in the script's description, outside the repository and run `python docs/images/make/worldmap.py path/to/ne_110m_admin_0_countries.geojson`; it reads the file as data, fetches nothing, and needs only the standard library. The site build reads the JSON it writes.
+
 The other generated pictures have their tools next to them: the charts are made by docs/charts.py, the logo files by docs/brand/build.py and render.py, and the video, its music and the README GIF as described in docs/video/README.md.

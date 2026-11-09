@@ -628,8 +628,9 @@ class SiteInBrowserTest(unittest.TestCase):
     def test_the_grid_fits_from_a_phone_to_a_desktop(self):
         """The grid of numbers from 320 to 1440 px on both pages, with every number and without any, with and without
         scripts: nothing in it reaches past its card or the column, nothing overflows its own box, and the page doesn't
-        scroll sideways, and every number is there without scripts. From 1000 px the figure cards stand three to a row,
-        all of a width, and the counts' month across a row of its own; below, one under the other."""
+        scroll sideways, and every number is there without scripts. From 1000 px the downloads lead across a row, then the
+        latest release's, the systems' and the page views' cards stand three to a row, all of a width, the stars under the
+        page views, and the counts across a row of their own; below, one under the other."""
         boxes = """() => { const sec = document.querySelector('section[aria-labelledby="numbers"]');
             const column = sec.querySelector('.wrap').getBoundingClientRect();
             const out = [];
@@ -670,14 +671,15 @@ class SiteInBrowserTest(unittest.TestCase):
                                     rows.setdefault(top, []).append((key, card_width))
                                 if width >= 1000:
                                     self.assertEqual([[k for k, _ in row] for row in rows.values()],
-                                                     [["numbers-downloads", "numbers-releases", "numbers-platforms"],
-                                                      ["numbers-views", "numbers-stars"], ["numbers-counts"]])
+                                                     [["numbers-downloads"], ["numbers-releases", "numbers-platforms", "numbers-views"],
+                                                      ["numbers-stars"], ["numbers-counts"]])
                                     widths = {k: w for row in rows.values() for k, w in row}
                                     whole = widths.pop("numbers-counts")
-                                    wide = widths.pop("numbers-stars")  # it fills the row before the counts
+                                    lead = widths.pop("numbers-downloads")  # the downloads lead across the whole row
+                                    self.assertAlmostEqual(widths.pop("numbers-stars"), widths["numbers-views"], delta=1, msg="stacked under the page views")
                                     self.assertEqual(len(set(widths.values())), 1, widths)
-                                    self.assertAlmostEqual(wide, 2 * widths["numbers-views"] + 24, delta=2)
-                                    self.assertAlmostEqual(whole, 3 * widths["numbers-views"] + 2 * 24, delta=2)
+                                    self.assertAlmostEqual(lead, 3 * widths["numbers-views"] + 2 * 24, delta=2)
+                                    self.assertAlmostEqual(whole, lead, delta=2)
                                 else:
                                     self.assertEqual(len(rows), 6)
                             self.assertEqual(page.errors, [])
