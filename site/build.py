@@ -21,7 +21,19 @@ page and the docs can't drift; those files are the repository's, and one that ca
 
 "Sedjem in numbers", near the end, is a grid of charts drawn here as SVG: GitHub's downloads, stars and page views
 from the files the Repository stats workflow keeps on the stats branch, read from a folder given with --stats, and
-the newest month of the anonymous counts' totals from docs/usage.json (tools/usage_totals.py). The downloads link the
+the anonymous counts' totals from docs/usage.json (tools/usage_totals.py). The downloads lead, a wide line with each
+stable release tagged by its version in mono; the page views and the stars are smaller. In one bar the part the
+bar is about is the brand's teal and the other parts are greys, so one accent leads. The counts' card, "The anonymous
+counts", shows the newest finished month and, beside it, the month so far when docs/usage.json has one ("so far, to
+9 November"), then a census of the most recent period in four groups, each breakdown in the form that fits its data:
+the installs as a row of the brand's ears, a quiet list of names and shares (largest first, "other" last, a hairline
+under each row) for the countries, regions, systems, graphics cards, memory, versions, models, languages, lengths,
+sites and link tags, the devices as three line glyphs (Lucide, ISC) with their shares, local or hosted as one small
+ring, the website's visits by country on a choropleth world map drawn from site/worldmap.json (made by
+docs/images/make/worldmap.py from Natural Earth's public-domain data; countries are not folded there) and by day in a
+calendar. Stacked bars stay for a whole split in two or three parts (the releases, the systems). One accent leads in
+each picture, the brand's teal, and the rest is grey. A value with fewer than 3 installs, transcriptions or visitors
+is added to "other", a breakdown that would show one group is left out, and so is a group with none. The downloads link the
 latest release's files, with their names, sizes and SHA256, read from a folder given with --release. The build never
 fetches anything: pages.yml downloads the files into the folders with the API before it builds. Without the stats
 folder GitHub's charts are left out, without docs/usage.json the page says when the first totals come, and without
@@ -44,6 +56,7 @@ shows unstyled in a local preview. site/DESIGN.md has the design notes, and test
 """
 import argparse
 import ast
+import calendar
 import csv
 import html
 import json
@@ -90,7 +103,23 @@ METHOD = "https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/13-usag
 VIEWS_DAYS = 30  # the page views of the repository: the days added up, up to the last one recorded
 STABLE = re.compile(r"v?(\d+(?:\.\d+)*)")  # a release's tag; one with more after it (-preview.20261029) is a preview
 ENGINES = ("cohere", "whisper_medium", "whisper_large", "other_local", "hosted")  # the models, as docs/usage.json names them
-TOP = 5  # the countries the counts' card names; the rest are added up as "other"
+LEAST = 3  # the installs, transcriptions or visitors a group needs to be named; the smaller ones are added up as "other"
+MAP = SITE / "worldmap.json"  # the countries' outlines, made by docs/images/make/worldmap.py from Natural Earth
+SMALL = 40  # the height of the page views' and the stars' lines
+LEAD = 170  # the height of the lead chart, the downloads, in pixels
+EARS = 24  # the most ears in the installs' unit chart; past it one ear stands for EACH's first number that fits
+EACH = (1, 2, 5, 10, 20, 25, 50, 100, 200, 250, 500, 1000, 5000, 10000)
+REST = ("other", "previews")  # the parts that add up the rest, in the lightest grey
+# What the census draws, in its order: each group with its breakdowns (the name in docs/usage.json's counts, how a value
+# is named, and what is counted: installs, transcriptions, or the website's page views)
+CENSUS = (("where", (("countries", "country", "installs"), ("regions", "place", "installs"),
+                    ("wcountries", "country", "views"))),
+          ("computers", (("systems", "text", "installs"), ("gpu", "text", "installs"), ("ram", "gb", "installs"),
+                         ("kind", "text", "installs"), ("versions", "text", "installs"))),
+          ("how", (("models", "model", "transcriptions"), ("hosted", "text", "transcriptions"),
+                   ("languages", "text", "transcriptions"), ("lengths", "min", "transcriptions"))),
+          ("visitors", (("devices", "text", "views"), ("wsystems", "text", "views"),
+                        ("referrers", "text", "views"), ("sources", "text", "views"))))
 # The latest release's files, which the download links point at (pages.yml downloads the release's details into a
 # folder given with --release): each system's file by its name, where GitHub serves them, and the form of a SHA256
 LATEST = "https://github.com/MohammedEl-sayedAhmed/sedjem/releases/latest"  # without the details, the release's page
@@ -534,13 +563,105 @@ def count(value):
     return value
 
 
+def tally(source, *path):
+    """The counts at path in source as {name: count}, or {} when they are missing or aren't counts."""
+    for key in path:
+        if not isinstance(source, dict) or key not in source:
+            return {}
+        source = source[key]
+    try:
+        return {str(k): count(v) for k, v in source.items()}
+    except (AttributeError, ValueError):
+        return {}
+
+
+def folded(counts):
+    """Counts as [(name, count)] with the groups under LEAST (and "unknown") added up as "other", the largest first
+    and "other" last."""
+    named = {k: n for k, n in counts.items() if n >= LEAST and k not in ("other", "unknown")}
+    rest = sum(counts.values()) - sum(named.values())
+    return sorted(named.items(), key=lambda kv: (-kv[1], kv[0])) + ([("other", rest)] if rest else [])
+
+
+def linked(w, key, listed):
+    """The website's page views with no link (or no tag), then those by site (or tag): {"none": n, ...}."""
+    none = w.get(key, {}).get("none") if isinstance(w, dict) and isinstance(w.get(key), dict) else None
+    return ({"none": none} if isinstance(none, int) and not isinstance(none, bool) and none >= 0 else {}) \
+        | tally(w, key, listed)
+
+
+def census_counts(t, w):
+    """Every breakdown the census may draw, as {name: {value: count}}, from the app's totals t and the website's w
+    of one period (either may be None). A breakdown the file doesn't have is empty."""
+    models = tally(t, "runs", "models")
+    return {"countries": tally(t, "installs", "countries", "installs"), "regions": tally(t, "installs", "regions"),
+            "systems": tally(t, "installs", "systems"), "gpu": tally(t, "hardware", "gpu"),
+            "ram": tally(t, "hardware", "ram"), "kind": tally(t, "hardware", "kind"),
+            "versions": tally(t, "installs", "versions"), "models": models,
+            "hosted": {"local": sum(n for k, n in models.items() if k != "hosted"), "hosted": models.get("hosted", 0)}
+            if models else {},
+            "languages": tally(t, "runs", "languages"), "lengths": tally(t, "runs", "lengths"),
+            "wcountries": tally(w, "countries", "page_views"), "devices": tally(w, "devices"),
+            "wsystems": tally(w, "systems"), "referrers": linked(w, "referrers", "sites"),
+            "sources": linked(w, "sources", "tags")}
+
+
+def visit_totals(w):
+    """The website's visits as docs/usage.json has them, totals only: {"total", "countries": {code: visits}, "days":
+    [(date, visits)]}, or None when there are none or they can't be read."""
+    try:
+        v = w["visits"]
+        countries = {str(k): count(n) for k, n in v["countries"].items() if re.fullmatch(r"[A-Z]{2}|other", str(k))}
+        days = sorted((date.fromisoformat(d), count(n)) for d, n in v["days"].items())
+        total = count(v["total"])
+    except (AttributeError, KeyError, TypeError, ValueError):
+        return None
+    return {"total": total, "countries": countries, "days": days} if total else None
+
+
+def census(t, w, month_, through):
+    """The census of one period: {"month", "through" (the last day of a month so far, else None), "groups": [(group,
+    [(breakdown, [(value, count)])])] with the small groups folded into "other", a breakdown left out when it would
+    show only one group, and a group left out when it has none, "visits": the website's visits as totals (their number, by country and by day), or None}."""
+    counts, visits = census_counts(t, w), visit_totals(w)
+    groups = []
+    for group, breakdowns in CENSUS:
+        # the website's countries stay while there are visits: the map and its list count those, not the folded page views
+        shown = [(key, rows) for key, *_ in breakdowns
+                 if len(rows := folded(counts[key])) >= 2 or (key == "wcountries" and visits and visits["countries"])]
+        if shown:
+            groups.append((group, shown))
+    return {"month": month_, "through": through, "groups": groups, "visits": visits}
+
+
+def app_part(t):
+    """One period's app totals as the page reads them: the installs, their countries, the transcriptions, the hours
+    of audio and the most used model (None when none was used)."""
+    models = {e: count(t["runs"]["models"].get(e, 0)) for e in ENGINES}
+    hours = t["runs"]["hours"]
+    if isinstance(hours, bool) or not isinstance(hours, (int, float)) or not 0 <= hours < 10 ** 9:
+        raise ValueError(f"{hours!r} isn't a number of hours")
+    weeks = sorted(k for k in (t.get("weekly", {}).get("active_installs") or {}) if re.fullmatch(r"\d{4}-W\d\d", str(k)))
+    return {"month": t["month"], "weeks": len(weeks), "last_week": weeks[-1] if weeks else "",
+            "installs": count(t["installs"]["active"]),
+            "countries": count(t["installs"]["countries"]["count"]),
+            "transcriptions": count(t["runs"]["transcriptions"]), "hours": round(float(hours), 1),
+            "model": max(ENGINES, key=lambda e: (models[e], -ENGINES.index(e))) if any(models.values()) else None}
+
+
+def website_part(w):
+    """One period's website totals as the page reads them: page views, countries and download clicks."""
+    return {"page_views": count(w["page_views"]), "countries": count(w["countries"]["count"]),
+            "clicks": count(w["downloads"]["clicks"])}
+
+
 def monthly(path):
-    """The newest month of the anonymous counts' totals in docs/usage.json (tools/usage_totals.py): {"app": the
-    installs, their countries, the TOP countries with the most installs and the rest added up as "other", the
-    transcriptions, the hours of audio and the most used model (None when none was used), "website": its page views,
-    their countries and the download clicks that month, or None when it has none}. {} while the file isn't there,
-    before the first month is exported; None, with a line in the log, when it can't be read. Website totals that
-    can't be read are left out alone."""
+    """The anonymous counts' totals in docs/usage.json (tools/usage_totals.py): {"app": the newest finished month's
+    installs, countries, transcriptions, hours of audio and most used model, "website": its page views, countries and
+    download clicks (None when it has none), "so_far": the month so far, {"month", "through", "app", "website"}, or
+    None, "census": the breakdowns of the most recent period (the month so far when there is one, else the newest
+    month) as census() has them}. {} while the file isn't there, before the first month is exported; None, with a
+    line in the log, when it can't be read. A part that can't be read is left out alone."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -553,31 +674,41 @@ def monthly(path):
         if not months:
             return {}
         newest = max(months)
-        t = months[newest]
-        models = {e: count(t["runs"]["models"].get(e, 0)) for e in ENGINES}
-        hours = t["runs"]["hours"]
-        if isinstance(hours, bool) or not isinstance(hours, (int, float)) or not 0 <= hours < 10 ** 9:
-            raise ValueError(f"{hours!r} isn't a number of hours")
-        where = {str(k): count(n) for k, n in t["installs"]["countries"]["installs"].items()}
-        named = sorted((k for k in where if re.fullmatch(r"[A-Z]{2}", k)), key=lambda k: (-where[k], k))
-        rest = sum(where.values()) - sum(where[k] for k in named[:TOP])
-        app = {"month": newest, "installs": count(t["installs"]["active"]),
-               "countries": count(t["installs"]["countries"]["count"]),
-               "top": [(k, where[k]) for k in named[:TOP]] + ([("other", rest)] if rest else []),
-               "transcriptions": count(t["runs"]["transcriptions"]), "hours": round(float(hours), 1),
-               "model": max(ENGINES, key=lambda e: (models[e], -ENGINES.index(e))) if any(models.values()) else None}
+        app = app_part(months[newest])
     except (AttributeError, KeyError, TypeError, ValueError) as e:
         note(f"{path} doesn't hold the totals tools/usage_totals.py writes ({e!r}); the counts are left out")
         return None
-    site = None
+    site = raw_site = None
     if newest in (data.get("website") or {}):
         try:
-            w = data["website"][newest]
-            site = {"page_views": count(w["page_views"]), "countries": count(w["countries"]["count"]),
-                    "clicks": count(w["downloads"]["clicks"])}
+            raw_site = data["website"][newest]
+            site = website_part(raw_site)
         except (AttributeError, KeyError, TypeError, ValueError) as e:
+            raw_site = None
             note(f"the website's totals for {newest} in {path} can't be read ({e!r}); they are left out")
-    return {"app": app, "website": site}
+    so_far = picture = None
+    raw = data.get("so_far")
+    if isinstance(raw, dict):
+        try:
+            month_, through = raw["month"], raw["through"]
+            if not re.fullmatch(r"\d{4}-(0[1-9]|1[0-2])", month_) or date.fromisoformat(through).strftime("%Y-%m") != month_:
+                raise ValueError(f"{month_!r} through {through!r}")
+            if month_ > newest:
+                parts_ = {}
+                for part, make in (("app", app_part), ("website", website_part)):
+                    try:
+                        parts_[part] = make(raw[part]) if isinstance(raw.get(part), dict) else None
+                    except (AttributeError, KeyError, TypeError, ValueError) as e:
+                        parts_[part] = None
+                        note(f"the month so far's {part} totals in {path} can't be read ({e!r}); they are left out")
+                if parts_["app"] or parts_["website"]:
+                    so_far = {"month": month_, "through": through, **parts_}
+                    picture = census(raw.get("app") if parts_["app"] else None,
+                                     raw.get("website") if parts_["website"] else None, month_, through)
+        except (KeyError, TypeError, ValueError) as e:
+            note(f"the month so far in {path} can't be read ({e!r}); it is left out")
+    return {"app": app, "website": site, "so_far": so_far,
+            "census": picture or census(months[newest], raw_site, newest, None)}
 
 
 # ---- the section of numbers: a grid of cards, each a figure as a dashboard shows one, drawn here from the numbers ---
@@ -588,14 +719,14 @@ def monthly(path):
 # keep their width; the Arabic page mirrors it with the stylesheet, so time runs from the right as its words do. Each
 # picture has a table of the same numbers for screen readers, which site.js also reads for its tooltip.
 
-def figure(n, lang):
+def figure(n, lang, tenths=False):
     """A number as the page writes it, in a data element that holds its plain value: 1,234 or 7.8, the tenths only
-    when there are some."""
-    if isinstance(n, float) and n.is_integer():
+    when there are some, or always (tenths: hours, 5.0) as docs/usage.json has them."""
+    if isinstance(n, float) and n.is_integer() and not tenths:
         n = int(n)
     group, point = NUMERALS[lang]
     text = f"{n:,}" if isinstance(n, int) else f"{n:,.1f}"
-    return f'<data value="{n}">{"".join(group if c == "," else point if c == "." else c for c in text)}</data>'
+    return f'<data value="{n if isinstance(n, int) else f"{n:.1f}"}">{"".join(group if c == "," else point if c == "." else c for c in text)}</data>'
 
 
 def plain(n, lang):
@@ -652,17 +783,19 @@ def curve(xs, ys, m, first, last):
     return f"M{xs[first]:.1f},{ys[first]:.1f} " + " ".join(pieces)
 
 
-def spark(series, key, floor=None, marks=(), height=56):
-    """A small line under a card's number, across the card: a smooth curve over a wash that fades downwards, the last
-    stretch dashed (the day still being counted) to a dot, and a ring at each day in marks (a release). No axes and no
-    dates: the tooltip and the table under the card give each day and its value. floor is the value at the bottom,
-    0 for counts of a day, the lowest value for a running total, which then fills the height as it grows."""
+def spark(series, key, floor=None, marks=(), height=56, tags=False, top=6, wash=True):
+    """A line under a card's number, across the card: a smooth curve over a wash that fades downwards (wash), the last
+    stretch dashed (the day still being counted) to a dot, and a ring at each day in marks (a release), which tags
+    name with a small mono version above the line (tags; the tags of days close together are staggered). No axes and
+    no dates: the tooltip and the table under the card give each day and its value. floor is the value at the bottom,
+    0 for counts of a day, the lowest value for a running total, which then fills the height as it grows; top is the
+    room above the highest value, in pixels, for the tags."""
     days, values = [d for d, _ in series], [v for _, v in series]
     span = max((days[-1] - days[0]).days, 1)
     lo = min(values) if floor is None else floor
     rise = (max(values) - lo) or 1
     xs = [(d - days[0]).days / span * 1000 if len(days) > 1 else 1000 for d in days]  # the nested SVG is 1000 wide
-    ys = [round(6 + (1 - (v - lo) / rise) * (height - 10), 1) for v in values]
+    ys = [round(top + (1 - (v - lo) / rise) * (height - top - 4), 1) for v in values]
     whole = f"M{xs[0]:.1f},{ys[-1]:.1f}" if len(xs) == 1 else None
     if len(xs) > 1:
         m = tangents(xs, ys)
@@ -672,27 +805,65 @@ def spark(series, key, floor=None, marks=(), height=56):
         whole = curve(xs, ys, m, 0, len(xs) - 1)
     else:
         line, dashed = whole, ""
-    wash = f"{whole} L{xs[-1]:.1f},{height} L{xs[0]:.1f},{height} Z"
+    area = (f'<path class="wash" d="{whole} L{xs[-1]:.1f},{height} L{xs[0]:.1f},{height} Z" style="fill: url(#wash-{key})"/>'
+            if wash else "")
+    gradient = (f'<defs><linearGradient id="wash-{key}" x1="0" y1="0" x2="0" y2="1">'
+                f'<stop offset="0" style="stop-color: var(--series-1); stop-opacity: 0.28"/>'
+                f'<stop offset="1" style="stop-color: var(--series-1); stop-opacity: 0"/></linearGradient></defs>'
+                if wash else "")
+    named = dict(marks)
     rings = "".join(f'<circle class="mark" cx="{pct(xs[i] / 10)}" cy="{ys[i]}" r="3.5"/>'
-                    for i, d in enumerate(days) if d in dict(marks) and i < len(days) - 1)
-    svg = (f'<svg class="chart" height="{height}" aria-hidden="true" focusable="false">'
-           f'<defs><linearGradient id="wash-{key}" x1="0" y1="0" x2="0" y2="1">'
-           f'<stop offset="0" style="stop-color: var(--series-1); stop-opacity: 0.28"/>'
-           f'<stop offset="1" style="stop-color: var(--series-1); stop-opacity: 0"/></linearGradient></defs>'
+                    for i, d in enumerate(days) if d in named and i < len(days) - 1)
+    labels, near, level = "", None, 0
+    for i, d in enumerate(days):
+        if tags and d in named:
+            level = 1 - level if near is not None and (xs[i] - near) / 1000 < 0.09 else 0
+            near = xs[i]
+            edge = " end" if xs[i] > 900 else " start" if xs[i] < 100 else ""  # at an edge the tag stays inside the card
+            labels += (f'<span class="tag{edge}" style="--x: {pct(xs[i] / 10)}; --y: {ys[i] - 10 - 20 * level:g}px; '
+                       f'--stem: {10 + 20 * level}px">{named[d]}</span>')
+    svg = (f'<svg class="chart" height="{height}" aria-hidden="true" focusable="false">{gradient}'
            f'<svg width="100%" height="{height}" viewBox="0 0 1000 {height}" preserveAspectRatio="none">'
-           f'<path class="wash" d="{wash}" style="fill: url(#wash-{key})"/><path class="line" d="{line}"/>{dashed}</svg>'
+           f'{area}<path class="line" d="{line}"/>{dashed}</svg>'
            f'{rings}<circle class="dot" cx="{pct(xs[-1] / 10)}" cy="{ys[-1]}" r="4"/></svg>')
     return (f'<div class="plot spark" style="--h: {height}px" data-points="{places([(x / 10, y) for x, y in zip(xs, ys)])}">'
-            f"{svg}</div>")
+            f"{svg}{labels}</div>")
 
 
-def parts(rows, total):
-    """One whole as a thin bar of parts 2 px apart, each part's class from its key, with a legend of names and shares
-    under it."""
-    blocks = "".join(f'<span class="part part-{k}" style="--v: {n}"></span>' for k, _, n in rows)
-    legend = "".join(f'<li><span class="key part-{k}"></span>{name} <span class="share">{round(n / total * 100)}%</span></li>'
-                     for k, name, n in rows)
-    return (f'<div class="parts"><div class="split" aria-hidden="true">{blocks}</div>'
+def roles(rows, lead=None):
+    """The colour role of each part of a bar: the part the picture is about (lead, a key; else the first) in the
+    brand's teal, the part that adds up the rest in the lightest grey, and the others in steps of grey."""
+    lead = rows[0][0] if lead is None and rows else lead
+    steps = iter(range(1, 99))
+    return [("is-lead" if k == lead else "is-rest" if k in REST else f"is-g{min(next(steps), 3)}") for k, *_ in rows]
+
+
+def share_of(n, total):
+    """A part's share of its whole in per cent, "<1%" for a part under half of one."""
+    return f"{round(n / total * 100)}%" if n / total >= 0.005 else "<1%"
+
+
+def bare(text):
+    """Words as plain text, for an attribute: without their tags and entities."""
+    return html.unescape(re.sub(r"<[^>]+>", "", text))
+
+
+def tip(first, second="", accent=False):
+    """The data attributes site.js's tooltip shows for an item of a picture: its first line, its second and, for the
+    accent, a small teal key. They say what the table under the picture says."""
+    return (f' data-tip-a="{html.escape(bare(first))}"' + (f' data-tip-b="{html.escape(bare(second))}"' if second else "")
+            + (" data-tip-key" if accent else ""))
+
+
+def parts(rows, total, lead=None):
+    """One whole as a thin bar of parts 2 px apart, each part's class from its key and its role (the one in teal, the
+    others in grey), with a legend of names and shares under it."""
+    given = roles(rows, lead)
+    blocks = "".join(f'<span class="part part-{k} {role}" style="--v: {n}"{tip(name, f"{plain(n, chr(101) + chr(110))} · {share_of(n, total)}", role == "is-lead")}></span>'
+                     for (k, name, n), role in zip(rows, given))
+    legend = "".join(f'<li><span class="key part-{k} {role}"></span>{name} <span class="share">{share_of(n, total)}</span></li>'
+                     for (k, name, n), role in zip(rows, given))
+    return (f'<div class="parts"><div class="split" aria-hidden="true" data-tip-group>{blocks}</div>'
             f'<ul class="legend" aria-hidden="true">{legend}</ul></div>')
 
 
@@ -707,19 +878,101 @@ def table(caption, heads, rows, boxed=False):
     return f'<div class="sr-only"><table>{whole}</div>' if boxed else f'<table class="sr-only">{whole}'
 
 
-def stat(n, label, lang, size=""):
+def stat(n, label, lang, size="", tenths=False):
     """A number, large, over its label (the anonymous counts' card)."""
-    return f'<p class="stat{size}">{figure(n, lang)}<span>{label}</span></p>'
+    return f'<p class="stat{size}">{figure(n, lang, tenths)}<span>{label}</span></p>'
 
 
-def ranked(rows, lang, other_key):
-    """A short list of bars on one baseline, each with its name and its value at its end; the part that adds up the
-    rest (other_key) in grey, last."""
-    top = max((n for *_, n in rows), default=0) or 1
-    items = "".join(f'<li class="{"rank-rest" if key == other_key else "rank-part"}"><span class="rank-name">{name}</span>'
-                    f'<span class="rank-bar" style="--v: {n / top * 100:.1f}"></span>'
-                    f'<span class="rank-value">{plain(n, lang)}</span></li>' for key, name, n in rows)
-    return f'<ol class="rank" aria-hidden="true">{items}</ol>'
+def quiet(rows, total, lead=None, hairline=True):
+    """A quiet list: each row its name and its share in Plex Mono, the largest first and "other" last (as rows come),
+    and under it a hairline as long as its share, teal for the row the list is about, grey for the others."""
+    given = roles(rows, lead)
+    items = "".join(
+        f'<li class="quiet-row {role}"{tip(name, f"{n:,} · {share_of(n, total)}", role == "is-lead")}><span class="quiet-name">{name}</span>'
+        f'<span class="quiet-share">{share_of(n, total)}</span>'
+        + (f'<span class="quiet-line" style="--v: {n / total * 100:.1f}"></span>' if hairline else "") + "</li>"
+        for (_, name, n), role in zip(rows, given))
+    return f'<ol class="quiet" aria-hidden="true" data-tip-group>{items}</ol>'
+
+
+def ring(rows, total, say):
+    """One share as a small ring (a whole split in two, such as local or hosted): the first part's arc in teal on a
+    track of grey, its name and share beside it, and the other's."""
+    share = rows[0][2] / total
+    length = 2 * math.pi * 14
+    svg = (f'<svg class="ring" viewBox="0 0 36 36" aria-hidden="true" focusable="false"><circle class="ring-track" cx="18" cy="18" r="14"/>'
+           f'<circle class="ring-arc" cx="18" cy="18" r="14" stroke-dasharray="{share * length:.1f} {length:.1f}"/></svg>')
+    return f'<div class="ring-row">{svg}{quiet(rows, total, hairline=False)}</div>'
+
+
+# The three glyphs of the devices, Lucide's smartphone, tablet and monitor (ISC licence, in NOTICE): 24 px, one stroke
+LUCIDE = {
+    "phone": '<rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/>',
+    "tablet": '<rect width="16" height="20" x="4" y="2" rx="2" ry="2"/><line x1="12" x2="12.01" y1="18" y2="18"/>',
+    "desktop": '<rect width="20" height="14" x="2" y="3" rx="2"/><line x1="8" x2="16" y1="21" y2="21"/>'
+               '<line x1="12" x2="12" y1="17" y2="21"/>'}
+
+
+def glyphs(rows, total):
+    """The devices as line glyphs in the text colour, each with its share large under it and its name under that; the
+    largest has a teal hairline under it, the one accent. A value with no glyph (other) is its name and share only."""
+    given = roles(rows, rows[0][0] if rows else None)
+    items = "".join(
+        f'<li class="glyph {role}"{tip(name, f"{n:,} · {share_of(n, total)}", role == "is-lead")}>'
+        + (f'<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">{LUCIDE[key]}</svg>' if key in LUCIDE else
+           '<span class="glyph-none"></span>')
+        + f'<span class="glyph-share">{share_of(n, total)}</span><span class="glyph-name">{name}</span></li>'
+        for (key, name, n), role in zip(rows, given))
+    return f'<ul class="glyphs" aria-hidden="true" data-tip-group>{items}</ul>'
+
+
+def ear_paths():
+    """The two paths of the brand icon's ear, as ear() draws it."""
+    return re.findall(r'<path d="([^"]+)"', ICON.read_text(encoding="utf-8"))[:2]
+
+
+def ears(n, say, period=""):
+    """A unit chart of the installs: one small ear of the brand's icon for each install, and past EARS installs one ear
+    for each N of them, said under the ears. Nothing for no installs."""
+    if not n:
+        return ""
+    each = next((e for e in EACH if -(-n // e) <= EARS), EACH[-1])
+    count = n if each == 1 else max(round(n / each), 1)
+    outline, curve = ear_paths()
+    one = (f'<svg class="unit" viewBox="17 10.5 33.6 45" aria-hidden="true" focusable="false">'
+           f'<path d="{outline}"/><path class="unit-in" d="{curve}"/></svg>')
+    note_ = f'<span class="ears-each">{say("ear_each", n=plain(each, "en"))}</span>' if each > 1 else ""
+    return (f'<div class="ears" aria-hidden="true" data-tip-group><span class="ears-row"{tip(f"{n:,} " + say("installs_one" if n == 1 else "installs"), period, True)}>'
+            f'{one * count}</span>{note_}</div>')
+
+
+def calendar_grid(days, month_, say, words, lang):
+    """The visits of each day of a month as a calendar: seven columns, Monday to Sunday, one row a week, the month's
+    name over it; each day ([(date, visits)], to the period's last day) shows its number small and, when it had visits,
+    their count, with a tint of teal by its share of the busiest day (one hue); a day with none is a quiet step of the
+    card, the days before the first are blank and the days after the last covered, to the end of its week, are empty
+    outlines; the weeks after it aren't drawn. Each day has
+    its tooltip, and the table under it, for screen readers, has the numbers."""
+    year, number = int(month_[:4]), int(month_[5:])
+    names = words["numbers.months"].split()
+    per = {d.day: n for d, n in days if (d.year, d.month) == (year, number)}
+    last = max(per, default=0)
+    top = max(per.values(), default=0) or 1
+    cells = ['<span class="cell off"></span>'] * date(year, number, 1).weekday()
+    for d in range(1, calendar.monthrange(year, number)[1] + 1):
+        if d > last:  # a day still to come is an empty outline
+            cells.append('<span class="cell future"></span>')
+            continue
+        n = per.get(d, 0)
+        said = tip(f"{d} {names[number - 1]}", say("visit_count_one" if n == 1 else "visit_count", n=str(n)), n == top and n > 0)
+        cells.append(f'<span class="cell{" lit" if n else ""}"' + (f' style="--a: {0.25 + 0.75 * n / top:.2f}"' if n else "")
+                     + f'{said}><span class="n">{d}</span>' + (f'<span class="v">{n}</span>' if n else "") + "</span>")
+    cells = cells[:-(-(date(year, number, 1).weekday() + last) // 7) * 7]  # up to the week of the last covered day
+    heads = "".join(f"<span>{w}</span>" for w in say("weekdays").split())
+    ramp = (f'<span class="key-row calendar-key"><span>{say("legend_fewer")}</span><span class="sw cell-low"></span>'
+            f'<span class="sw cell-high"></span><span>{say("legend_more")}</span></span>')
+    return (f'<div class="calendar" aria-hidden="true" data-tip-group><p class="calendar-month">{month(month_, words)}</p>'
+            f'<div class="weekdays">{heads}</div><div class="days">{"".join(cells)}</div>{ramp}</div>')
 
 
 def card(key, title, body, span):
@@ -735,6 +988,169 @@ def figure_card(key, number, title, line, picture, span=1, section="numbers"):
             f'        <div class="kpi"><p class="kpi-figure">{number}</p>'
             f'<div class="kpi-text"><h3>{title}</h3><p>{line}</p></div></div>\n'
             f"        {picture}\n      </div>")
+
+
+def counted(n, key, say, lang, size="", tenths=False):
+    """A number over its label, in the singular when it is one (hours: 1.0 too)."""
+    return stat(n, say(f"{key}_one" if n == 1 else key), lang, size, tenths)
+
+
+def label_of(kind, key, value, say, words):
+    """The name of a value of a breakdown, in the page's language: a country by the copy's names, a range with its
+    unit, a value the copy names (a kind of install, a model), else the value as it is sent, as a Latin name."""
+    latin = lambda text: f"{IN_LATIN}{html.escape(text)}</span>"  # noqa: E731
+    if value == "other":
+        return say("other")
+    if kind == "country":
+        return words.get(f"countries.{value}") or latin(value)
+    if kind == "place":
+        return latin(value.split(": ", 1)[-1])
+    if kind == "model":
+        return words[f"numbers.model_{value}"]
+    unit = {"gb": "gb", "min": "min"}.get(kind)
+    if unit:
+        m = re.fullmatch(r"(under|over) (\d+)", value) or re.fullmatch(r"(\d+)-(\d+)", value)
+        if m:
+            number = say(m[1], v=m[2]) if m[1] in ("under", "over") else f"<bdi dir=\"ltr\">{m[1]}–{m[2]}</bdi>"
+            return say(unit, v=number)
+    named = words.get(f"numbers.v_{key}_{value.replace('-', '_')}")
+    return named or latin(value)
+
+
+STEPS = 5  # the steps of the map's ramp of teal, light to strong
+
+
+def step_of(n, top):
+    """The step, 1 to STEPS, of a count on the ramp: its share of the largest count, rounded up."""
+    return min(STEPS, max(1, -(-n * STEPS // top))) if top else 1
+
+
+def world_map(shade, total, unit, say, words):
+    """The world as an SVG, a choropleth: the land in a quiet step of the card's own greys with hairline borders, no sea
+    and no Antarctica, and each country in shade ({code: count}) in the brand's teal, one of STEPS steps from light to
+    strong by its count against the largest (the map isn't folded: a country with one visit is shaded). A code the map
+    doesn't have is ignored. A shaded country has the data of its tooltip: its name, its count (unit, a copy key such
+    as visit_count) and its share of total. The outlines are read from MAP, which docs/images/make/worldmap.py writes;
+    without it there is no map. Returns the SVG with the lowest and the highest count it shades, for the legend, which
+    so never names a count that no drawn country has ("other" and the codes without an outline aren't drawn)."""
+    try:
+        asset = json.loads(MAP.read_text(encoding="utf-8"))
+        outlines = {str(k): str(v) for k, v in asset["countries"].items()}
+        box = re.fullmatch(r"0 0 \d+ \d+", asset["viewBox"]) and asset["viewBox"]
+    except (OSError, ValueError, KeyError, AttributeError, TypeError):
+        box = None
+    if not box:
+        note(f"{MAP} can't be read; the map is left out")
+        return "", 0, 0
+    lit = {code: n for code, n in shade.items() if code in outlines and n > 0}
+    top = max(lit.values(), default=0)
+    land = "".join(f'<path d="{d}"/>' for code, d in outlines.items() if code not in lit)
+    name_of = lambda code: bare(words.get(f"countries.{code}") or code)  # noqa: E731
+    teal = "".join(f'<path class="s{step_of(n, top)}" d="{outlines[code]}"'
+                   + tip(name_of(code), say(f"{unit}_one" if n == 1 else unit, n=f"{n:,}") + f" · {share_of(n, total or 1)}", True) + "/>"
+                   for code, n in sorted(lit.items()))
+    return (f'<svg class="map" viewBox="{box}" aria-hidden="true" focusable="false" data-tip-group>'
+            f'<g class="land">{land}</g><g class="lit">{teal}</g></svg>', min(lit.values(), default=0), top)
+
+
+def ramp_key(label, low, high):
+    """The map's legend: a word, the lowest count, the ramp of its steps drawn as they are on the map, the highest."""
+    steps = "".join(f'<i class="s{i}"></i>' for i in range(1, STEPS + 1))
+    return (f'<div class="ramp-key" aria-hidden="true"><span>{label}</span> <span class="mono">{plain(low, "en")}</span> '
+            f'<span class="steps">{steps}</span> <span class="mono">{plain(high, "en")}</span></div>')
+
+
+def key_row(items):
+    """A row of legend items, each a swatch drawn like the thing it explains and a few words: [(swatch class, words)]."""
+    return ('<ul class="key-row" aria-hidden="true">'
+            + "".join(f'<li><span class="sw {swatch}"></span>{text}</li>' for swatch, text in items) + "</ul>")
+
+
+def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
+    """One breakdown of the census, in the form that fits it: a quiet list of names and shares (most of them), the
+    devices as three glyphs with their shares, local or hosted as one small ring, and the website's countries as a
+    list under the world map, which shades the countries by their visits (all of them, unfolded, and the list counts
+    the same visits; without the visits, both use the page views of those that pass the fold) under a legend of its
+    ramp; each with a table for screen readers."""
+    total = sum(n for _, n in rows)
+    named = [("other" if v == "other" else f"c{i}", label_of(kind, key, v, say, words), n) for i, (v, n) in enumerate(rows)]
+    lead = next((k for k, _, _ in named if k != "other"), None)
+    drawn = spoken = ""
+    if key == "devices":
+        picture = glyphs([(v if v in LUCIDE else "other", name, n) for (v, _), (_, name, n) in zip(rows, named)], total)
+    elif key == "hosted" and len(rows) == 2:
+        picture = ring(named, total, say)
+    elif key == "wcountries":
+        if visits:  # the list under the map counts what the map shades: the visits of every country, unfolded
+            rows = sorted(visits["countries"].items(), key=lambda kv: (kv[0] == "other", -kv[1], kv[0]))
+            named = [("other" if v == "other" else f"c{i}", label_of(kind, key, v, say, words), n)
+                     for i, (v, n) in enumerate(rows)]
+            total, unit = visits["total"], "visits"
+            lead = next((k for k, _, _ in named if k != "other"), None)
+        picture = quiet(named, total, lead)
+        if visits:
+            shade, whole, unit_key, label = visits["countries"], visits["total"], "visit_count", say("legend_visits")
+        else:
+            shade, whole, unit_key, label = {v: n for v, n in rows if v != "other"}, total, "view_count", say("legend_views")
+        drawn, low, high = world_map(shade, whole, unit_key, say, words)
+        if drawn:  # the legend over the map, which spans the card, and the list of countries under it
+            picture = f'{ramp_key(label, low, high)}<div class="map-row">{drawn}</div>{picture}'
+    else:
+        picture = quiet(named, total, lead)
+    return (f'<div class="crowd{" crowd-map" if drawn else ""}"><p class="crowd-title">{title}</p>{picture}'
+            + table(title, [say("value"), say(f"unit_{unit}"), say("share")],
+                    [(name, plain(n, lang), share_of(n, total)) for _, name, n in named], boxed=True) + spoken + "</div>")
+
+
+def census_html(c, say, words, lang):
+    """The census of the most recent period: its groups (where, computers, how it is used, website visitors), each
+    with its breakdowns, and the website's visits of each day, as a calendar, under the visitors."""
+    chosen = {g: dict(items) for g, items in c["groups"]}
+    out = []
+    for group, breakdowns in CENSUS:
+        inner = "".join(crowd(key, say(f"t_{key}"), chosen[group][key], kind, unit, say, words, lang, c["visits"])
+                        for key, kind, unit in breakdowns if key in chosen.get(group, {}))
+        if group == "visitors" and c["visits"] and c["visits"]["days"]:
+            days = c["visits"]["days"]
+            inner += (f'<div class="crowd chart-box"><p class="crowd-title">{say("daily")}</p>'
+                      f'{calendar_grid(days, c["month"], say, words, lang)}'
+                      + table(say("daily"), [say("day"), say("unit_visits")], [(day(d, words), plain(n, lang)) for d, n in days], boxed=True)
+                      + "</div>")
+        if inner:
+            out.append(f'<div class="group group-{group}"><h4>{say(f"g_{group}")}</h4>{inner}</div>')
+    return "".join(out)
+
+
+def week_of(week, words):
+    """An ISO week ("2026-W45") in plain words: the day it begins on, as "2 November"."""
+    year, number = (int(x) for x in re.fullmatch(r"(\d{4})-W(\d\d)", week).groups())
+    return day(date.fromisocalendar(year, number, 1), words, year=False)
+
+
+def period_html(app, site, title, say, lang, so_far=False, words=None):
+    """One period's numbers: its title, the installs and their countries large with the installs as a row of ears, the
+    transcriptions and hours smaller, the most used model, and the website's page views, countries and download
+    clicks in one line."""
+    stats = ""
+    if app:
+        stats = (counted(app["installs"], "installs", say, lang) + counted(app["countries"], "countries", say, lang)
+                 + ears(app["installs"], say, title))
+        if not so_far:
+            stats += (counted(app["transcriptions"], "transcriptions", say, lang, " stat-small")
+                      + counted(app["hours"], "hours", say, lang, " stat-small", True))
+        elif app["weeks"]:  # the runs of a month so far are those of the weeks reported, which come after a week ends
+            stats += (stat(app["transcriptions"], say("transcriptions_weeks"), lang, " stat-small")
+                      + stat(app["hours"], say("hours_weeks"), lang, " stat-small", True)
+                      + f'<p class="model">{say("weeks_last", week=week_of(app["last_week"], words))}</p>')
+        if app["model"] and (not so_far or app["weeks"]):
+            stats += f'<p class="model">{say("model")} <span>{say("model_" + app["model"])}</span></p>'
+    web = ""
+    if site:
+        web = (f'<div class="website"><h4>{say("website")}</h4>'
+               + counted(site["page_views"], "page_views", say, lang, " stat-small")
+               + counted(site["countries"], "countries", say, lang, " stat-small")
+               + counted(site["clicks"], "clicks", say, lang, " stat-small") + "</div>")
+    return f'<div class="period"><h4>{title}</h4><div class="stats">{stats}</div>{web}</div>'
 
 
 def numbers(words, lang, gh, totals):
@@ -759,8 +1175,8 @@ def numbers(words, lang, gh, totals):
         rows = [(day(d, words) + (f" ({say('release_out', release=marks[d])})" if d in marks else ""), plain(n, lang))
                 for d, n in series]
         cards.append(figure_card("downloads", figure(total, lang), say("downloads"), line,
-                                 spark(series, "downloads", marks=gh["marks"])
-                                 + table(say("downloads_title"), [say("day"), say("downloads_title")], rows)))
+                                 spark(series, "downloads", marks=gh["marks"], height=LEAD, tags=True, top=46)
+                                 + table(say("downloads_title"), [say("day"), say("downloads_title")], rows), span=3))
         if gh["releases"]:
             latest, n = gh["releases"][0]
             out = next((d for d, r in gh["marks"] if r == latest), None)
@@ -770,7 +1186,7 @@ def numbers(words, lang, gh, totals):
             whole = sum(m for *_, m in bar)
             cards.append(figure_card("releases", figure(n, lang), say("latest_title", release=latest),
                                      say("latest_out", day=day(out, words, year=False)) if out else say("latest_only"),
-                                     parts(bar, whole)
+                                     parts(bar, whole, "latest")
                                      + table(say("releases_title"), [say("release"), say("downloads_title")],
                                              [(v, plain(m, lang)) for v, m in gh["releases"]]
                                              + ([(say("previews"), plain(gh["previews"], lang))] if gh["previews"] else []))))
@@ -783,52 +1199,48 @@ def numbers(words, lang, gh, totals):
                     for i, (p, m) in enumerate(shares) if i != big]
             cards.append(figure_card("platforms", f'<data value="{share}">{share}%</data>',
                                      say("platform_share", platform=say(shares[big][0])), " ".join(rest),
-                                     parts([(p, say(p), m) for p, m in shares], whole)
+                                     parts([(p, say(p), m) for p, m in shares], whole, shares[big][0])
                                      + table(say("platforms_title"), [say("platform"), say("downloads_title"), say("share")],
                                              [(say(p), plain(m, lang), f"{round(m / whole * 100)}%") for p, m in shares])))
+    small = []  # the page views and the stars, smaller and simpler than the lead: a plain line, stacked in one column
     if gh and gh.get("views"):
         views, first, last = gh["views"], gh["views"][0][0], gh["views"][-1][0]
         seen = sum(n for _, n in views)
         title = say("views_30") if gh["views_whole"] else say("views_since", first=day(first, words, year=False))
-        cards.append(figure_card("views", figure(seen, lang), title,
+        small.append(figure_card("views", figure(seen, lang), title,
                                  say("views_average", n=plain(round(seen / len(views), 1), lang)),
-                                 spark(views, "views", floor=0)
+                                 spark(views, "views", floor=0, height=SMALL, wash=False)
                                  + table(say("views_title"), [say("day"), say("page_views")],
                                          [(day(d, words), plain(n, lang)) for d, n in views])))
     if gh and gh.get("stars"):
         stars = gh["stars"]
         grew = stars[-1][1] - stars[0][1]
         since = day(stars[0][0], words, year=False)
-        cards.append(figure_card("stars", figure(stars[-1][1], lang), say("stars"),
+        small.append(figure_card("stars", figure(stars[-1][1], lang), say("stars"),
                                  say("more_since", n=plain(grew, lang), day=since) if grew else say("since_day", day=since),
-                                 spark(stars, "stars")
+                                 spark(stars, "stars", height=SMALL, wash=False)
                                  + table(say("stars_title"), [say("day"), say("stars_title")],
                                          [(day(d, words), plain(n, lang)) for d, n in stars])))
+    if small:
+        cards.append('      <div class="stack">\n' + "\n".join(small) + "\n      </div>")
     if gh:
         caption.append(say("caption_github", day=day(gh["day"], words), charts=CHARTS))
     if totals == {}:
         cards.append(card("counts", say("counts"), f'<p class="soon">{say("not_yet")}</p>', 1))
     elif totals:
-        if len(cards) % 3:  # the counts take a row of their own, so the last card before them fills its row
-            cards[-1] = cards[-1].replace("span-1", f"span-{4 - len(cards) % 3}", 1)
-        app, site = totals["app"], totals["website"]
-        place = lambda k: (words.get(f"countries.{k}") or f'{IN_LATIN}{html.escape(k)}</span>')  # noqa: E731
-        rows = [(k, say("other_countries") if k == "other" else place(k), n) for k, n in app["top"]]
-        stats = (stat(app["installs"], say("installs"), lang) + stat(app["countries"], say("countries"), lang)
-                 + stat(app["transcriptions"], say("transcriptions"), lang, " stat-small")
-                 + stat(app["hours"], say("hours"), lang, " stat-small"))
-        model = f'<p class="model">{say("model")} <span>{say("model_" + app["model"])}</span></p>' if app["model"] else ""
-        web = ""
-        if site:
-            web = (f'<div class="website"><h4>{say("website")}</h4>'
-                   + stat(site["page_views"], say("page_views"), lang, " stat-small")
-                   + stat(site["countries"], say("countries"), lang, " stat-small")
-                   + stat(site["clicks"], say("clicks"), lang, " stat-small") + "</div>")
-        body = (f'<div class="counts"><div class="stats">{stats}{model}</div>'
-                + (f'<div class="where"><h4>{say("top")}</h4>{ranked(rows, lang, "other")}'
-                   + table(say("top"), [say("country"), say("installs")], [(name, plain(n, lang)) for _, name, n in rows])
-                   + "</div>" if rows else "") + f"</div>{web}")
-        cards.append(card("counts", say("app", month=month(app["month"], words)), body, 3))
+        app, site, sofar, picture = totals["app"], totals["website"], totals["so_far"], totals["census"]
+        periods = period_html(app, site, month(app["month"], words), say, lang)
+        if sofar:
+            periods += period_html(sofar["app"], sofar["website"], say("so_far", month=month(sofar["month"], words),
+                                   day=day(date.fromisoformat(sofar["through"]), words, year=False)), say, lang, True, words)
+        named = (say("so_far", month=month(picture["month"], words), day=day(date.fromisoformat(picture["through"]), words,
+                                                                         year=False))
+                 if picture["through"] else month(picture["month"], words))
+        groups = census_html(picture, say, words, lang)
+        body = (f'<div class="periods">{periods}</div>'
+                + (f'<div class="census"><h4 class="census-title">{say("census", period=named)}</h4>'
+                   f'<div class="groups">{groups}</div></div>' if groups else ""))
+        cards.append(card("counts", say("counts"), body, 3))
     if totals is not None:
         caption.append(say("caption_counts", method=METHOD))
     if not cards:

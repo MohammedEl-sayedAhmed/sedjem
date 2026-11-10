@@ -117,9 +117,23 @@ Nothing is counted when the browser has Do Not Track or Global Privacy Control t
 requests to Aptabase. A copy of the pages anywhere but the published address, a local preview or a page opened from
 the disk sends nothing either.
 
-Their totals are published once a month, as the app's are ([usage counts](13-usage-counts.md#public-totals)): a
-country, a site that linked to the website or a tag is named only when at least three visitors came with it that
-month.
+Their totals are published as the app's are ([usage counts](13-usage-counts.md#public-totals)): once a month, and
+while a month runs, the month so far about once a week, each newer copy replacing the last. A country, a system, a
+site that linked to the website or a tag is named only when at least three visitors came with it that month. One part has no such rule: the visits, which the website draws as a world map and a calendar. A visit is
+one session of page views and download clicks, and the totals hold only how many visits there were, how many came from
+each country and how many on each day. The countries of the visits are not folded, so a country with one or two visits
+shows on the map. Nothing is kept for a single visit: no hour, system or device of one, no region, no language, no tag
+of a link, no IP address, no session number and no hash of a user. The desktop app's totals stay totals, with the
+three-install rule.
+
+The website shows these numbers in its section "Sedjem in numbers": the newest finished month and, beside it, the
+month so far, then for the most recent period the breakdowns of the desktop app's totals (countries, regions, the
+computers' system, graphics card and memory, how Sedjem was installed, its version, the model, language and length of
+recordings) and of the website's (the visitors' countries, their devices and systems, the sites and tags of links they
+came from, the visits by country on the map and by day in the calendar). Every breakdown but the visits folds a value
+into "other" when it has fewer than three of what it counts: installs for the app's, transcriptions for the runs,
+visitors for the website's countries, systems, sites and tags, and page views for the devices, which the totals count
+by page view.
 
 ## Another computer of yours
 

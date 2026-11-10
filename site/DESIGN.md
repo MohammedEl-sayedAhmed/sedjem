@@ -45,8 +45,8 @@ colors:
   brand-teal-deep: "#0b5f5e"
   brand-teal-on-dark: "#2dd4bf"
   wordmark: "#111111"
-  numbers-teal-light: "#6dbeba"
-  numbers-teal-dark: "#2f7f7c"
+  numbers-grey-light: "#8a95a3"
+  numbers-grey-dark: "#6f7a88"
 typography:
   display:
     fontFamily: "IBM Plex Sans, Plex Sans Fallback, system-ui, -apple-system, Segoe UI, Roboto, Noto Sans, sans-serif"
@@ -429,47 +429,91 @@ says where the numbers come from, GitHub's as of their day, with links to the st
 totals are made.
 
 A figure card is its number, large (40 px, semibold, tabular figures), beside its title and one line about it, then
-a small picture across the card under them, kept to the card's foot. The card is the card surface with a hairline
-edge and, in the dark theme, the lit top edge. Five cards hold GitHub's numbers:
+a picture across the card under them, kept to the card's foot. The card is the card surface with a hairline edge
+and, in the dark theme, the lit top edge. One chart leads and the rest are smaller:
 
-- the downloads in all, with how many came in the last seven days (or since the first day, while the history is
-  shorter than a week), over a small line of the running total;
+- the downloads in all lead, across the whole row: the number at 56 px from 1000 px, with how many came in the last
+  seven days (or since the first day, while the history is shorter than a week), over the running total drawn 170 px
+  high, the widest and tallest picture in the section. Each stable release is marked on the line by a ring and a
+  small tag in Plex Mono above it, `0.3.1`, the way the transcript sets a timecode; the tags of releases close
+  together are staggered, with a hairline down to the ring. The line keeps no axis and no dates;
 - the latest release's downloads, with the day it came out, over a thin bar of it, the older releases and the
   previews, with a legend of names and shares;
 - the larger system's share, with the other's, over a thin bar of the two and its legend;
-- the repository's page views of the last 30 days recorded, with their daily average, over a small line of each day;
-- the stars, with how many came since the first day recorded, over a small line of them.
+- the repository's page views of the last 30 days recorded, with their daily average, and the stars, with how many
+  came since the first day recorded, stacked in one column beside the two bars, each a plain 40 px line with no wash.
 
-The small line has no axes and no dates: a smooth curve (a monotone cubic, which never overshoots a value, so a
-running total never seems to dip) over a wash of the same teal that fades downwards, its last stretch dashed, as that
-day is still being counted, to a dot, and a ring on a day a release came out. A running total fills the picture from
-its lowest value to its highest; the page views start from nothing. The bar of parts is 8 px, its parts 2 px apart.
+The line is a smooth curve (a monotone cubic, which never overshoots a value, so a running total never seems to dip)
+over a wash of the same teal that fades downwards (the lead only), its last stretch dashed, as that day is still
+being counted, to a dot, and a ring on a day a release came out. A running total fills the picture from its lowest
+value to its highest; the page views start from nothing. The bar of parts is 8 px, its parts 2 px apart, and is kept for a whole
+split in two or three parts.
 
-The sixth card is the anonymous counts' newest month, across a row of its own, so the card before it, the stars,
-fills the second row two columns wide: the installs and their countries
-large, the transcriptions and hours smaller, the most used model, the five countries with the most installs as ranked
-bars and the rest as other, and the website's page views, countries and download clicks. Before the first month is
-exported it is one more card in the row, calm and hatched, with one line saying when the first totals come; no number
-stands in for one. The grid has three columns from 1000 px, one below; a card whose file can't be read is left out
-and the rest keep their order.
+The sixth card is "The anonymous counts", across a row of its own. At its head the newest finished month and, beside
+it, the month so far when docs/usage.json has one, marked "so far, to 9 November": the installs and their countries
+large, the installs also as a row of the brand's ear, one for each install (past 24, one stands for N, said under
+the row), the transcriptions and hours smaller (hours always with one decimal, as the file has them), the most used
+model, and the website's page views, countries and download clicks in one line; a count of one takes the singular
+("1 country"). The runs of a month so far are those of the weeks reported, so they are labelled as that and name the
+week they run up to in plain words ("the week of 2 November"), and are left out when no week has reported. Under them
+the census of the most recent period, headed "Who runs Sedjem: November 2026, so far, to 9 November", the month so far
+when there is one, else the newest month. A value with fewer than 3 installs, transcriptions or visitors is added to
+"other"; a breakdown that would show one group is left out, and so is a group with none, so a small month shows
+little, which is honest. Each breakdown takes the form that fits its data and has a table of its counts for screen
+readers:
 
-The colours are the brand's teal, #14a3a1 (the ear's), for a series and for the part a card is about; a lighter teal,
-#6dbeba, for a whole's second part (Linux, the older releases) on the light card, and a darker one, #2f7f7c, on the
-dark card; and a grey of the palette for the part that adds up the rest (previews, other countries). The dataviz
-validator, validate_palette.js, was run on them against the card in both themes. The teal alone passes every check.
-As two categories the pair fails in both themes: the second teal is too close to the first in chroma and, for full
-colour vision, in hue. Read as two steps of one hue, which is how the cards use them, both pairs pass every check of
-an ordinal ramp; the first light teal tried, #8fd3cf, failed its contrast on white (1.7:1 against a floor of 2:1). So the parts never rely on colour alone: the legend names each with its share, and each card's
-table gives every number. Text never wears these colours.
+- stacked bars only where a whole is split in two or three parts (the releases, the systems of the downloads);
+- a quiet list for most: the name, its share in Plex Mono, the largest first and "other" last, with a hairline under
+  each row as long as its share (teal for the largest, grey for the rest): the countries, regions, systems, graphics
+  cards, memory, versions, models, languages, lengths of a recording, the sites they came from and the tags of links;
+- the devices as three line glyphs (Lucide's smartphone, tablet and monitor, ISC licence, one size and stroke, in the
+  text colour, never teal) with the share large under each and a teal hairline under the largest;
+- local or hosted as one small ring, with its two parts named beside it;
+- the installs as the row of ears, and the website's visits as a choropleth world map and a calendar.
+
+The Where group's moment is a world map of the website's visits, a choropleth across the whole card at its own aspect
+ratio (no Antarctic band, at most 460 px tall). The land is a quiet step of the palette's own line grey (light grey on
+the light card, graphite on the dark) with hairline country borders in the card's colour and no sea. Each country with
+a visit is the brand's teal in one of five steps, light to strong (opacity 0.22, 0.42, 0.62, 0.82 and 1 of the one
+hue), by its visits against the busiest country's; countries are not folded here, so a country with one visit is
+shaded, and the data holds only visits by country and by day, nothing per visit (docs/privacy.md says so). The legend is
+a labelled ramp above the map's right edge: the word "Visits", the lowest count, the five steps drawn as the map draws
+them, the highest count. The list of countries with their shares sits under the map in two or three columns and
+counts what the map shades, the visits of every country, unfolded, so the two never disagree (an earlier draft listed
+the page views folded under 3, and Qatar was lit on the map but missing from the list). The map is hidden from screen
+readers (the list's table of visits by country and the tooltips carry the numbers) and is not mirrored on the Arabic page, since a map has no reading
+direction. It is the equirectangular outline of Natural Earth's 1:110m countries (public domain, v5.1.2), drawn by
+docs/images/make/worldmap.py into site/worldmap.json, about 72 kB, which build.py inlines and never fetches.
+"Visits each day" is a calendar heatmap of the period's month that counts the same visits by day: seven columns from
+Monday to Sunday, cells fluid up to 48 px, the day of the month small in the top-left corner (muted mono) and the
+visit count centred and larger only on days with visits, tinted teal by its share of the busiest day; a past day with
+none is a quiet step of the card, a day still to come an empty outline. Its legend is two swatches, "Fewer" to "More".
+
+One tooltip serves every picture: the card surface, a hairline, mono figures, no colour but a small teal key when the
+item is the accent, in the page's direction. build.py writes what it says in data attributes (the same numbers as the
+tables), site.js shows it for a pointer, a tap (tap elsewhere to close) and the keyboard (each picture is focusable,
+the arrow keys move between its items, Escape closes), and keeps it inside the window; it computes and fetches nothing.
+The lines keep their own tooltip, which names the release at a release's tag.
+
+The colours are one accent and a grey. The brand's teal, #14a3a1 (the ear's), is the line and the one part a bar is
+about: the part the card is about (the latest release, the larger system) or, in the census, the largest share of a list. Every
+other part is a step of the palette's grey, #8a95a3 on the light card and #6f7a88 on the dark, then lighter mixes
+of it with the card for the third and fourth part, the lightest for the part that adds up the rest (previews, other).
+This replaces the lighter and darker teals that two-part bars wore before: a bar that was teal in two steps gave the
+eye two accents to weigh, and with a census of a dozen bars on the page the bars that lead must read at once. One
+accent leads; the legend and the tables still carry every number, so no part relies on colour alone, and the grey
+steps are told apart by their order and the 2 px gaps. The dataviz validator, validate_palette.js, was run on the teal
+and the grey against the card in both themes. Text never wears these colours.
 
 The pictures are SVG drawn by build.py, placed across in per cent and down in pixels, so the words around them stay
 at the page's own sizes at any width; the line and its wash stretch across in a nested SVG with strokes that keep
-their width, and each wash has a gradient of its own. The Arabic page mirrors the line, so time runs from the right
-as its words do. Every number is in the HTML at build time, with thousands separators and in Western digits on both
-pages, as the Arabic copy writes every number, each in a data element, each date in a time element, and each picture
-has a table of its numbers for screen readers; the downloads' table marks the day each release came out. site.js
-adds a tooltip: a pointer or a tap over a line shows the nearest day's value and date, read from that table, with a
-hairline at the day, and the arrow keys move it once the line has the focus.
+their width, and each wash has a gradient of its own. The Arabic page mirrors the line and the daily bars, so time
+runs from the right as its words do. Every number is in the HTML at build time, with thousands separators and in
+Western digits on both pages, as the Arabic copy writes every number, each in a data element, each date in a time
+element, and each picture has a table of its numbers for screen readers; the downloads' table marks the day each
+release came out. site.js adds a tooltip: a pointer or a tap over a line or the daily bars shows the nearest day's
+value and date, read from that table, with a hairline at the day, and the arrow keys move it once the chart has the
+focus.
 
 build.py reads the numbers from files (the stats branch's, which pages.yml downloads through the API, and
 docs/usage.json) and fetches nothing; Pages rebuilds after each day's stats. A file it can't read leaves its cards

@@ -18,3 +18,9 @@ https://github.com/MohammedEl-sayedAhmed
 Versions of this project published up to 25 September 2026 were released under the MIT licence.
 
 The models Sedjem downloads and the libraries it bundles keep their own licences (see README.md).
+
+The world map on the website is drawn from Natural Earth's 1:110m admin 0 countries (public domain,
+https://www.naturalearthdata.com/), version 5.1.2, by docs/images/make/worldmap.py.
+
+The three device glyphs (smartphone, tablet and monitor) on the website are from Lucide (ISC licence,
+https://lucide.dev/), copied as inline SVG.

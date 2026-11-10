@@ -90,12 +90,15 @@
      4.5:1 a name of this size needs, so Karim takes the app's darker orange (its --s7), 5.0:1 */
   --s1: #2563eb; --s2: #b45309; --s3: #7c3aed; --s4: #0f766e;
   --ear: #14a3a1;              /* the logo's ear, drawn as a line */
-  /* the numbers' charts: the brand's teal for a series, a light teal for the second part of a whole (Linux, the older
-     releases), told apart by lightness and the 2 px gap between parts, with the legend naming each; and a grey for
-     the part that adds up the rest (previews, other countries) */
+  /* the numbers' charts: the brand's teal for a series and for the one part a bar is about, and steps of the grey for
+     the other parts (the palette's own greys), the lightest for the part that adds up the rest (previews, other); the legend names each part
+     with its share, so no colour is told apart alone */
   --series-1: #14a3a1;
-  --series-2: #6dbeba;
   --series-rest: #8a95a3;
+  --tone-1: var(--series-rest);
+  --tone-2: var(--line-strong);
+  --tone-3: var(--line-strong);
+  --tone-rest: var(--line);
   --view-light: block;         /* of a view drawn for each theme, the one on show */
   --view-dark: none;
 
@@ -201,8 +204,7 @@ html:lang(ar) {
     --s1: #6ea0ff; --s2: #ff8f5c; --s3: #b794ff; --s4: #3fcfbf;
     --ear: #0e7c7b;            /* quieter on the dark page, so the headline leads */
     --series-rest: #6f7a88;
-    --series-2: #2f7f7c;
-    --view-light: none;
+      --view-light: none;
     --view-dark: block;
   }
 }
@@ -228,7 +230,6 @@ html:lang(ar) {
   --s1: #6ea0ff; --s2: #ff8f5c; --s3: #b794ff; --s4: #3fcfbf;
   --ear: #0e7c7b;            /* quieter on the dark page, so the headline leads */
   --series-rest: #6f7a88;
-  --series-2: #2f7f7c;
   --view-light: none;
   --view-dark: block;
 }
@@ -513,6 +514,7 @@ mark {
   .bento { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--gap); }
   .bento .span-2 { grid-column: span 2; }
   .bento .span-3 { grid-column: 1 / -1; }
+  .numbers .figure-card.span-3 .kpi-figure data { font-size: 56px; }
 }
 /* a card: the card's surface with a hairline edge and, in the dark theme, a lit top edge; in the counts' card its
    title small and muted, then each number, large, over its label */
@@ -570,19 +572,6 @@ html[dir="rtl"] .tip { translate: 50% -8px; }
   width: 1px; height: var(--h); background: var(--line-strong); pointer-events: none;
 }
 
-/* ranked bars: each part's name, its bar from one baseline with its end rounded, and its value at the end; the part
-   that adds up the rest in grey, last */
-.rank { display: grid; gap: 10px; margin: auto 0 0; padding: 0; list-style: none; font-size: var(--fs-small); }
-.rank li { display: grid; grid-template-columns: minmax(4.5em, max-content) minmax(0, 1fr) auto; align-items: center; gap: 12px; }
-.rank-bar { position: relative; height: 10px; }
-.rank-bar::before {
-  content: ""; position: absolute; inset-block: 0; inset-inline-start: 0; width: calc(var(--v) * 1%); min-width: 2px;
-  border-start-end-radius: 4px; border-end-end-radius: 4px; background: var(--series-1);
-}
-.rank-rest .rank-bar::before { background: var(--series-rest); }
-.rank-value { font-weight: 500; font-variant-numeric: tabular-nums; }
-.rank-name { overflow-wrap: anywhere; }
-
 /* bars to compare (the benchmarks): one grid for the whole chart, so every bar starts on the same zero line; each bar's
    name, its bar and its value at the end, Sedjem's own in the brand's teal and the others in grey; a heading over a
    group; and which way is better under them. A share of the words or the minutes for an hour has a track for the
@@ -617,24 +606,135 @@ html[dir="rtl"] .tip { translate: 50% -8px; }
 .parts { display: grid; gap: 12px; margin-top: auto; padding-top: 20px; }
 .split { display: flex; gap: 2px; height: 8px; }
 .part { flex: var(--v) 1 0; min-width: 4px; border-radius: 4px; }
-.part-windows, .part-latest { background: var(--series-1); }
-.part-linux, .part-older { background: var(--series-2); }
-.part-other, .part-previews { background: var(--series-rest); }
+.part, .key { background: var(--tone-1); }
+.part.is-lead, .key.is-lead { background: var(--series-1); }
+.part.is-g2, .key.is-g2 { background: var(--tone-2); }
+.part.is-g3, .key.is-g3 { background: var(--tone-3); }
+.part.is-rest, .key.is-rest { background: var(--tone-rest); }
 .legend { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--fs-small); }
 .legend li { display: flex; align-items: center; gap: 8px; }
 .key { width: 10px; height: 10px; border-radius: 2px; }
-.legend .share { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; }
+.legend .share { color: var(--text); font: 500 var(--fs-small)/1.4 var(--mono); font-variant-numeric: tabular-nums; }
 
-/* the anonymous counts: the numbers beside the countries, the website's under them; before the first month, a calm
-   hatched card with the line that says when they come */
-.counts { display: grid; gap: 24px; }
+/* the lead chart's version tags: a small mono tag above the release's ring on the line, a hairline down to it; the tags
+   of releases close together are staggered by build.py. The page views and the stars are stacked in one column. */
+.tag {
+  position: absolute; inset-inline-start: var(--x); top: calc(20px + var(--y)); translate: -50% -100%;
+  color: var(--muted); font: 500 var(--fs-tick)/1 var(--mono); white-space: nowrap; pointer-events: none;
+}
+.tag::after { content: ""; position: absolute; top: 100%; inset-inline-start: 50%; width: 1px; height: var(--stem); background: var(--line-strong); }
+html[dir="rtl"] .tag { translate: 50% -100%; }
+.tag.end { translate: -100% -100%; }
+html[dir="rtl"] .tag.end { translate: 100% -100%; }
+.tag.start { translate: 0 -100%; }
+html[dir="rtl"] .tag.start { translate: 0 -100%; }
+.tag.end::after { inset-inline-start: auto; inset-inline-end: 0; }
+.tag.start::after { inset-inline-start: 0; }
+.stack { display: grid; gap: 16px; align-content: stretch; min-width: 0; }
+.stack .card { padding-block: 16px; }
+.stack .plot { padding-top: 12px; }
+.stack .kpi-figure data { font-size: var(--fs-figure); }
+
+/* the anonymous counts: the newest month and the month so far side by side, each with its numbers and the website's in
+   one line; under them the census, thin bars in four groups; before the first month, a calm hatched card with the
+   line that says when they come */
+.periods { display: grid; gap: 24px; }
+.period { display: grid; gap: 16px; align-content: start; min-width: 0; }
+.period h4, .census-title { margin: 0; color: var(--text); font-weight: 600; }
 .stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; align-content: start; }
 .model { grid-column: 1 / -1; color: var(--muted); font-size: var(--fs-small); }
 .model span { color: var(--text); }
-.website { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 24px; padding-top: 16px; border-top: 1px solid var(--line); }
-.website h4 { grid-column: 1 / -1; margin: 0; }
+.website { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 20px; }
+.website h4 { flex-basis: 100%; margin: 0; color: var(--muted); font-weight: 500; }
+.website .stat { flex-direction: row; align-items: baseline; gap: 6px; }
+.census { display: grid; gap: 20px; padding-top: 24px; border-top: 1px solid var(--line); }
+.groups { display: grid; gap: 32px; }
+.group { display: grid; gap: 20px; align-content: start; min-width: 0; }
+.group h4 { margin: 0; }
+.crowd { min-width: 0; }
+.crowd-title { margin: 0; font-size: var(--fs-small); line-height: var(--lh-small); font-weight: 500; }
+.crowd .quiet, .crowd .glyphs, .crowd .ring-row, .crowd .calendar { margin-top: 0; padding-top: 8px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+/* the census's forms, each quiet and each with one teal accent: a list of names and shares in mono with a hairline under
+   each row as long as its share, the devices as line glyphs in the text colour, one small ring, a row of the brand's
+   ears, and a calendar of the month's page views */
+.quiet { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; font-size: var(--fs-small); line-height: var(--lh-small); }
+.quiet-row { break-inside: avoid; position: relative; display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 6px 0 8px; }
+.quiet-name { min-width: 0; overflow-wrap: anywhere; }
+.quiet-share { color: var(--text); font: 500 var(--fs-small)/1.4 var(--mono); font-variant-numeric: tabular-nums; }
+.quiet-row::before, .quiet-line { content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 1px; background: var(--line); }
+.quiet-line { inset-inline-end: auto; width: calc(var(--v) * 1%); min-width: 2px; background: var(--tone-1); }
+.quiet-row.is-lead .quiet-line { background: var(--series-1); height: 2px; }
+.quiet-row.is-rest .quiet-line { background: var(--tone-rest); }
+.glyphs { display: flex; flex-wrap: wrap; gap: 8px 32px; margin: 0; padding: 0; list-style: none; }
+.glyph { position: relative; display: grid; justify-items: start; gap: 2px; padding-bottom: 8px; min-width: 4.5em; }
+.glyph svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.glyph-none { height: 28px; }
+.glyph-share { font: 600 var(--fs-lede)/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+.glyph-name { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.glyph::after { content: ""; position: absolute; inset-inline: 0; bottom: 0; height: 1px; background: var(--line); }
+.glyph.is-lead::after { height: 2px; background: var(--series-1); }
+.ring-row { display: flex; align-items: center; gap: 20px; }
+.ring-row .quiet { flex: 1; min-width: 0; }
+.ring { flex: none; width: 56px; height: 56px; transform: rotate(-90deg); }
+.ring circle { fill: none; stroke-width: 4; }
+.ring-track { stroke: var(--line-strong); }
+.ring-arc { stroke: var(--series-1); stroke-linecap: butt; }
+html[dir="rtl"] .ring { transform: rotate(-90deg) scaleY(-1); }
+.ears { grid-column: 1 / -1; display: grid; gap: 4px; }
+.ears-row { display: flex; flex-wrap: wrap; gap: 4px; }
+.ears .unit { width: 14px; height: 19px; fill: var(--series-1); stroke: none; }
+.ears .unit-in { fill: none; stroke: var(--card); stroke-width: 3.2; stroke-linecap: round; }
+.ears-each { color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.calendar { display: grid; gap: 6px; width: 100%; max-width: 360px; }
+.weekdays, .days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.weekdays span { color: var(--muted); font-size: var(--fs-tick); line-height: 1.3; text-align: center; overflow: hidden; }
+.cell { position: relative; display: block; aspect-ratio: 1; max-height: 48px; border-radius: 4px; background: var(--line); }
+.cell.lit::before { content: ""; position: absolute; inset: 0; border-radius: 4px; background: var(--series-1); opacity: var(--a); }
+.cell.off { background: none; }
+.cell.future { background: none; box-shadow: inset 0 0 0 1px var(--line); }
+.cell .n { position: absolute; z-index: 1; inset-block-start: 3px; inset-inline-start: 4px; color: var(--muted); font: 400 var(--fs-tick)/1 var(--mono); }
+.cell .v { position: absolute; z-index: 1; inset: 0; display: grid; place-items: center; padding-top: 6px; color: var(--text); font: 600 var(--fs-small)/1 var(--mono); font-variant-numeric: tabular-nums; }
+.calendar-key { justify-self: end; }
+.calendar-month { margin: 0; color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+
+/* legends: a swatch drawn like the thing it explains and a few words, in one row above the map (right-aligned from
+   700 px, wrapping on a phone); the calendar's is two swatches, fewer to more */
+.key-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.key-row li, .calendar-key { display: inline-flex; align-items: center; gap: 6px; }
+.sw { display: inline-block; flex: none; }
+.ramp-key { display: flex; align-items: center; gap: 8px; padding-top: 8px; color: var(--muted); font-size: var(--fs-small); line-height: var(--lh-small); }
+.ramp-key .mono { color: var(--text); }
+.steps { display: inline-flex; gap: 2px; }
+.steps i { display: block; width: 22px; height: 10px; border-radius: 2px; background: var(--series-1); opacity: var(--o); }
+.sw.cell-low, .sw.cell-high { width: 12px; height: 12px; border-radius: 2px; }
+.sw.cell-low { background: var(--series-1); opacity: 0.35; }
+.sw.cell-high { background: var(--series-1); }
 @media (min-width: 700px) {
-  .counts { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .crowd-map > .ramp-key { justify-content: flex-end; }
+}
+
+/* the world map: the land in a quiet step of the card's greys with hairline borders, no sea; the countries with
+   visitors in the brand's teal, their opacity set by build.py from their share. It is not mirrored on the Arabic page.
+   The list of countries with their shares sits beside it from 700 px, under it on a phone. */
+.map-row { padding-top: 8px; }
+.map { display: block; width: 100%; height: auto; max-height: 460px; }
+.map path { fill: var(--line); stroke: var(--card); stroke-width: 0.5; stroke-linejoin: round; vector-effect: non-scaling-stroke; fill-rule: evenodd; }
+.map .lit path { fill: var(--series-1); }
+.map .lit .s1, .steps .s1 { --o: 0.22; }
+.map .lit .s2, .steps .s2 { --o: 0.42; }
+.map .lit .s3, .steps .s3 { --o: 0.62; }
+.map .lit .s4, .steps .s4 { --o: 0.82; }
+.map .lit .s5, .steps .s5 { --o: 1; }
+.map .lit path { fill-opacity: var(--o); }
+@media (min-width: 1000px) {
+  .crowd-map .quiet { column-count: 3; }
+}
+@media (min-width: 700px) {
+  .periods { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 32px; }
+  .group { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px 48px; }
+  .group > h4, .group > .crowd-map { grid-column: 1 / -1; }
+  .crowd-map .quiet { column-count: 2; column-gap: 48px; }
 }
 #numbers-counts:has(.soon) {
   justify-content: center;
@@ -691,8 +791,25 @@ html[dir="rtl"] .tip { translate: 50% -8px; }
 /* ---------- forced colours: borders the theme drew with shadows ---------- */
 @media (forced-colors: active) {
   .frame, .btn, .srt, .code-box, .menu-panel, .spec, .card { border: 1px solid CanvasText; }
-  .rank-bar::before, .part, .bar-fill { background: CanvasText; }
+  .part, .key, .bar-fill, .quiet-line, .ears .unit, .calendar .cell.lit { background: CanvasText; }
+  .ears .unit { fill: CanvasText; }
+  .ring-arc { stroke: CanvasText; }
+  .map path { fill: Canvas; stroke: CanvasText; }
+  .map .lit path { fill: Highlight; }
   .chart .line { stroke: CanvasText; }
   .chart .dot { fill: CanvasText; }
   .chart .mark { stroke: CanvasText; }
 }
+
+/* the one tooltip of the other pictures, in the card style of the lines' tooltip: the first line, a second in muted, a
+   small teal key when the item is the accent; text follows the page's direction */
+.tipbox {
+  position: fixed; z-index: 5; display: flex; flex-direction: column; gap: 1px; max-width: min(18em, calc(100vw - 16px)); padding: 6px 10px;
+  border-radius: 4px; background: var(--card); color: var(--muted); font-size: var(--fs-tick); line-height: 1.4;
+  box-shadow: inset 0 0 0 1px var(--line-strong), 0 8px 24px rgba(15, 18, 22, 0.16); pointer-events: none;
+}
+.tipbox[hidden] { display: none; }
+.tipbox strong { color: var(--text); font-size: var(--fs-small); font-weight: 600; font-variant-numeric: tabular-nums; }
+.tipbox span { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.tipbox.has-key strong::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-inline-end: 6px; border-radius: 2px; background: var(--series-1); }
+[data-tip-group]:focus-visible { outline: 2px solid var(--mark); outline-offset: 3px; border-radius: 4px; }

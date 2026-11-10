@@ -196,23 +196,44 @@ below.
 The website counts its own page views and download clicks, in an Aptabase app of its own ([privacy](privacy.md#the-website)).
 The same monthly step takes that app's export too (`--website`) and adds the website's totals to `docs/usage.json`
 under `website`: the page views, the visitors (each of Aptabase's daily hashes once a day, added up), the countries,
-the pages by language, the phones, tablets and desktops, the sites that linked to it (`none` for no link), the tags
+the pages by language, the visitors' systems, the phones, tablets and desktops, the sites that linked to it (`none` for no link), the tags
 of the shared links it was opened from, and the download clicks by platform. A tag is the `source` of a page view:
 `linkedin`, `x`, `facebook`, `reddit`, `youtube`, `telegram`, `whatsapp` or `email`, from a link that ends in
 `?src=linkedin` or `utm_source=linkedin`, say ([privacy](privacy.md#the-website)). The totals hold them under
 `sources`: `none` for the page views with no tag, a tag not on the list, or from before the pages sent one, and
 `tags` for the others. The website shows the newest month of both,
 beside GitHub's downloads, stars and page views, in its section of numbers; before the first month, it says when
-the first totals come.
+the first totals come. The website's part also totals its visits (`visits`): how many there were, how many came from each country and how
+many on each day of the month. Aptabase's session ids and daily hashes are used in memory to group the events and are
+never written. The website draws the visits as a world map and a calendar.
+
+The month under way is not a finished month, and the table below lists finished months only. To show it on the website
+all the same, export the same files during the month (a weekly export is enough) and run the script with `--so-far`:
+
+```sh
+python tools/usage_totals.py aptabase/last-month.csv aptabase/this-month.csv --website aptabase/website-this-month.csv --so-far --exported 2026-11-09
+```
+
+It totals the month of `--exported` up to that day, in the same way, and writes it into `docs/usage.json` under its own
+key, `so_far`, with the `month`, the last day it covers (`through`) and its `app` and `website` parts. The months, the
+README and the table below are not touched. A later `--so-far` run replaces it, and the run for that month once it is
+finished (the monthly step below), or for a later month, removes it. The website shows it beside the newest finished
+month, marked "so far, to 9 November", and draws its breakdowns and its visits, by country on the map and by day in the
+calendar.
+
+
 
 Only totals are published. A country is listed only when at least three installs were active there that month, and
 so is a region, a system, a version of a system or of Sedjem, and a locale; the others are added up as `other`, so
-that no one install can be picked out. On the website's side a country, a linking site or a tag is listed only when
-at least three visitors came with it that month, and at most ten sites are. Since anyone can send events with the app
+that no one install can be picked out. On the website's side a country, a system, a linking site or a tag is listed
+only when at least three visitors came with it that month, and at most ten sites are. The exception is the website's
+visits (`visits`, above), whose countries are not folded, so that a country with one or two visits shows on the
+map; they are totals, with nothing kept for one visit (no hour, system, device, region, language, IP address, session
+number or hash of a user). The desktop app has no such part. Since anyone can send events with the app
 key, which is public, a weekly summary with numbers Sedjem never sends is left out, and a value Sedjem never sends
 counts as `unknown` (as does a value missing from an event of an older version); a website event that its pages
 never send is left out. The exports themselves, which have every event with its daily user hash and session number,
-are deleted afterwards and never go into the repository. The script's own description has the steps.
+are kept in `aptabase/`, which git ignores, and never go into the repository. The script's own description has the steps.
 
 <!-- usage-totals:start -->
 | Month | Active installs | New installs | Countries | Transcriptions | Hours | Hosted |

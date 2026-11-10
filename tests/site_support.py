@@ -39,14 +39,37 @@ WEBSITE = {"page_views": 12345, "countries": 31, "clicks": 678}
 WHERE = {"EG": 640, "SA": 210, "AE": 120, "US": 60, "DE": 41, "JO": 30, "other": 103}
 
 
-def totals(month, installs, countries, transcriptions, hours, models, where=None):
-    """An app month as tools/usage_totals.py writes it, with the parts the page reads filled in."""
-    return {"month": month, "exported": "2026-12-03",
+def totals(month, installs, countries, transcriptions, hours, models, where=None, more=None):
+    """An app month as tools/usage_totals.py writes it, with the parts the page reads filled in; more is merged into
+    its installs, hardware and runs ({"installs": {...}, "hardware": {...}, "runs": {...}})."""
+    more = more or {}
+    return {"month": month, "exported": "2026-12-03", "weekly": {"active_installs": {}},
             "installs": {"active": installs, "new": 40,
-                         "countries": {"count": countries, "installs": where or {"EG": 5, "other": installs - 5}}},
-            "runs": {"transcriptions": transcriptions, "hours": hours, "models": models, "hosted_share": 0.1},
+                         "countries": {"count": countries, "installs": where or {"EG": 5, "other": installs - 5}},
+                         **more.get("installs", {})},
+            "hardware": more.get("hardware", {}), **({"weekly": more["weekly"]} if "weekly" in more else {}),
+            "runs": {"transcriptions": transcriptions, "hours": hours, "models": models, "hosted_share": 0.1,
+                     **more.get("runs", {})},
             "skipped": 0}
 
+
+# The newest month's other breakdowns, folded as the totals file has them where it folds them (the systems, the versions
+# and the regions), unfolded where it doesn't (the hardware, languages and lengths): the page folds those under 3
+MORE = {"installs": {"systems": {"Windows": 1000, "Linux": 150, "other": 54},
+                     "versions": {"0.10.0": 900, "0.9.2": 250, "other": 54},
+                     "regions": {"EG: Cairo": 300, "EG: Giza": 200, "other": 704}},
+        "hardware": {"gpu": {"none": 400, "nvidia": 500, "intel": 2, "amd": 1, "unknown": 301},
+                     "ram": {"under 8": 100, "8-16": 700, "16-32": 400, "over 32": 4},
+                     "kind": {"installer": 1000, "source": 204}},
+        "runs": {"languages": {"ar": 4000, "en": 1000, "auto": 2},
+                 "lengths": {"under 5": 900, "5-30": 2000, "30-60": 2, "over 60": 0}}}
+
+
+# The website's November: its visits as totals, by country (unfolded) and by day, adding up to the same 14
+VISITS = {"total": 14, "countries": {"EG": 6, "US": 3, "SA": 2, "FR": 1, "other": 1, "XX": 1},
+          "days": {f"2026-11-{d:02d}": n for d, n in zip(range(1, 31), [0, 1, 0, 0, 2, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 0, 0, 1, 2, 2])}}
+WEBSITE_MORE = {"visits": VISITS, "systems": {"Windows": 6000, "Android": 4000, "iOS": 1000, "other": 1345},
+                "sources": {"none": 10000, "tags": {"linkedin": 2000, "other": 345}}}
 
 USAGE = {
     "about": "Made up for the website's tests",
@@ -54,18 +77,31 @@ USAGE = {
         "2026-10": totals("2026-10", 7, 2, 19, 4.0, {"cohere": 19, "whisper_medium": 0, "whisper_large": 0,
                                                        "other_local": 0, "hosted": 0}),
         "2026-11": totals("2026-11", 1204, 23, 5310, 2750.5, {"cohere": 1800, "whisper_medium": 2900, "whisper_large": 110,
-                                                               "other_local": 0, "hosted": 500}, WHERE),
+                                                               "other_local": 0, "hosted": 500}, WHERE, MORE),
     },
     "website": {
         "2026-10": {"month": "2026-10", "page_views": 99, "countries": {"count": 1, "page_views": {"other": 99}},
                     "downloads": {"clicks": 3, "platforms": {"windows": 3, "linux": 0, "source": 0}}},
         "2026-11": {"month": "2026-11", "exported": "2026-12-03", "page_views": 12345, "visitors": 7000,
-                    "countries": {"count": 31, "page_views": {"EG": 9000, "other": 3345}},
+                    "countries": {"count": 31, "page_views": {"EG": 6000, "US": 3000, "SA": 1500, "XX": 345, "other": 1500}},
                     "pages": {"en": 6000, "ar": 6300, "404": 45}, "devices": {"phone": 7000, "tablet": 345, "desktop": 5000},
                     "referrers": {"none": 8000, "sites": {"linkedin.com": 3000, "other": 1345}},
-                    "downloads": {"clicks": 678, "platforms": {"windows": 600, "linux": 60, "source": 18}}, "skipped": 0},
+                    "downloads": {"clicks": 678, "platforms": {"windows": 600, "linux": 60, "source": 18}}, "skipped": 0,
+                    **WEBSITE_MORE},
     },
 }
+
+# The month so far: December, to the 2nd, beside November, with its own app and website parts
+SO_FAR = {"month": "2026-12", "through": "2026-12-02",
+          "app": totals("2026-12", 33, 3, 120, 61.0, {"cohere": 100, "whisper_medium": 20, "whisper_large": 0,
+                                                       "other_local": 0, "hosted": 0}, {"EG": 20, "SA": 10, "other": 3},
+                        {"hardware": {"gpu": {"nvidia": 20, "intel": 13}}, "weekly": {"active_installs": {"2026-W49": 30}}}),
+          "website": {"month": "2026-12", "exported": "2026-12-02", "page_views": 210, "visitors": 150,
+                      "countries": {"count": 4, "page_views": {"EG": 150, "other": 60}},
+                      "devices": {"phone": 100, "tablet": 10, "desktop": 100},
+                      "downloads": {"clicks": 9, "platforms": {"windows": 9, "linux": 0, "source": 0}},
+                      "visits": {"total": 3, "countries": {"EG": 2, "SA": 1}, "days": {"2026-12-01": 1, "2026-12-02": 2}}}}
+USAGE_SO_FAR = {**USAGE, "so_far": SO_FAR}
 
 
 # The latest release, as gh api repos/OWNER/NAME/releases/latest gives it (the parts the page reads), with the sums
