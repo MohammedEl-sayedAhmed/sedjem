@@ -459,9 +459,9 @@ weeks that had ended by its last day, so they are labelled as the weeks reported
 plain words ("the week of 2 November"), and are left out when no week of the month has ended. Under them, when the
 month so far has visits, its map and calendar, headed "Website visits: November 2026, so far, to 9 November". Then
 the census of the newest finished month, headed "Who runs Sedjem: October 2026"; it draws its own map and calendar
-only when there is no month so far, or the month so far has no visits. A finished month with headline numbers only
-(`headline_only`, tools/usage_totals.py) has no most used model and no breakdown, so its census holds the website's
-visits at most. A value with fewer than 3 installs,
+only when there is no month so far, or the month so far has no visits. A part of a finished month with headline
+numbers only (`headline_only`, tools/usage_totals.py) adds no breakdown to the census, and an app part like that has
+no most used model; with both parts cut, the census holds the website's visits at most. A value with fewer than 3 installs,
 transcriptions or visitors is added to
 "other"; a breakdown that would show one group is left out, and so is a group with none, so a small month shows
 little, which is honest. Each breakdown takes the form that fits its data and has a table of its counts for screen

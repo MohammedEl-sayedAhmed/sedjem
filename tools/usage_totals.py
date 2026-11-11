@@ -82,7 +82,9 @@ ROOT = Path(__file__).resolve().parent.parent
 OUT = Path("docs/usage.json")
 PAGES = {"readme": Path("README.md"), "docs": Path("docs/13-usage-counts.md")}
 START, END = "<!-- usage-totals:start -->", "<!-- usage-totals:end -->"
-LEAST = 3  # installs a country (or a region, a version, a locale) needs that month to be listed by name
+# Installs a country (or a region, a version, a locale) needs that month to be listed by name; also the installs (or
+# visitors) a finished month needs after its full copy in git history (FULL_COPIES) to keep its breakdowns
+LEAST = 3
 SITES = 10  # the most sites that linked to the website listed by name
 
 # The columns, by the names an export may give them (compared in lower case, with - and spaces as _)
@@ -626,10 +628,11 @@ def main(argv=None):
     for part, x, unit in (("app", t, "install"), ("website", site, "visitor")):
         more = after_copy(part, x) if x and not args.so_far else None
         if more is not None and more < LEAST:
-            through = FULL_COPIES[month]["through"]
-            print(f"{month_name(month)}, the {part}: headline numbers only. Git history "
-                  f"holds a copy of the month to {int(through[8:])} {MONTHS[int(through[5:7]) - 1]} with every breakdown, "
-                  f"and {plural(max(more, 0), unit)} came after it, fewer than {LEAST}.")
+            copy, through = FULL_COPIES[month][part], FULL_COPIES[month]["through"]
+            why = (f"{plural(more, unit)} came after it, fewer than {LEAST}" if more >= 0 else
+                   f"the exports have fewer {unit}s than it ({copy + more} against {copy}): check that they are complete")
+            print(f"{month_name(month)}, the {part}: headline numbers only. Git history holds a copy of the month to "
+                  f"{int(through[8:])} {MONTHS[int(through[5:7]) - 1]} with every breakdown, and {why}.")
     print(f"Wrote {OUT.as_posix()}" + (", README.md and docs/13-usage-counts.md" if t and not args.so_far else "") + ". Keep the exports in aptabase/ (git ignores it); they never go into the repository.")
 
 

@@ -1781,6 +1781,31 @@ class Totals(unittest.TestCase):
         self.assertIn("| November 2026 | 11 | 5 | 4 | 17 | 7.8 | 24% |", docs)
         self.assertNotIn("headline numbers only", docs[docs.index(totals.START):docs.index(totals.END)])
 
+        # with that copy again (2 of each after it): a --so-far run of its month is not checked against it, as the
+        # month so far holds headline numbers only anyway
+        copy = {"2026-11": {"through": "2026-11-09", "app": 9, "website": 6}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--so-far", "--exported", "2026-11-20", "--root", str(root)])
+        self.assertNotIn("headline numbers only", out.getvalue())
+        self.assertEqual(read()["so_far"], totals.so_far_part(read()["so_far"]))
+        self.assertNotIn("headline_only", json.dumps(read()["so_far"]))
+        # a run of the website alone checks the website's part alone
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main(["--website", site, "--exported", "2026-12-03", "--root", str(root)])
+        self.assertIn("November 2026, the website: headline numbers only.", out.getvalue())
+        self.assertNotIn("the app:", out.getvalue())
+        data = read()
+        self.assertEqual((data["months"]["2026-11"], data["website"]["2026-11"]),
+                         (full[0], {**totals.headline("website", full[1]), "headline_only": True}))
+        # exports with fewer installs than the copy are cut, and the line says to check them
+        copy = {"2026-11": {"through": "2026-11-09", "app": 15, "website": 6}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--exported", "2026-12-03", "--root", str(root)])
+        self.assertIn("November 2026, the app: headline numbers only. Git history holds a copy of the month to 9 "
+                      "November with every breakdown, and the exports have fewer installs than it (11 against 15): "
+                      "check that they are complete.", out.getvalue())
+        self.assertTrue(read()["months"]["2026-11"]["headline_only"])
+
     def test_the_exports_are_kept_where_git_ignores_them(self):
         """The Aptabase exports hold daily hashes and session ids: they are kept in aptabase/, which git ignores, and
         the script and the docs say so, not that they are deleted."""

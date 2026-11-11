@@ -49,10 +49,13 @@ that no one install can be picked out.
   three installs, or in headline numbers only.
 - The check counts the installs that came after the copy as one group. It does not check each value. The difference of
   a breakdown can still show that one or two of those installs have a value: a graphics card, or a country, region,
-  system or version that the finished month names. It cannot show which values belong to the same install, and it
-  names no value that the finished month adds to "other". One month's hardware counts are not folded either.
+  system or version that the finished month names. It also ties that value to any value they all share, such as their
+  country, and to a value that goes with it, as CUDA goes with an NVIDIA card. So the difference can show much of one
+  install's values. The totals of one month with three installs can show as much, since the hardware counts are not
+  folded. The difference names no value that the finished month adds to "other".
 - The website shows the month so far's headline numbers and visits, and the census of the newest finished month. A
-  finished month with headline numbers only has no breakdown, so its census holds the website's visits at most.
+  part with headline numbers only adds no breakdown to the census. When both parts of a finished month have headline
+  numbers only, its census holds the website's visits at most.
 - November 2026 may have no breakdowns. Then the table in the usage counts page says "not published" for its share
   of hosted runs.
 - A copy of a month so far with every breakdown must not go into the repository again. If one does, it has to be added

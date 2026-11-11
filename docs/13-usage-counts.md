@@ -235,8 +235,10 @@ finished month's run checks how many active installs came after that copy, which
 keeps every breakdown. With fewer, `docs/usage.json` holds November's headline numbers only, marked `headline_only`,
 and the table below says "not published" for its hosted share. The website's part has the same check with its
 visitors, 31 in that copy. The check counts the installs after the copy as one group, not each value. The difference
-can still show that one or two of them have a value the finished month names, but not which values belong to the same
-install. `FULL_COPIES` in `tools/usage_totals.py` lists the copy, and
+can still show that one or two of them have a value the finished month names, such as a graphics card. It also ties
+that value to any value they all share, such as their country, and to a value that goes with it, as CUDA goes with an
+NVIDIA card. So it can show much of one install's values, as the totals of one month with three installs can, since
+the hardware counts are not folded. It names no value that the finished month adds to `other`. `FULL_COPIES` in `tools/usage_totals.py` lists the copy, and
 [ADR 17](adr/0017-the-month-so-far-weekly-with-headline-numbers-only.md) records the decision.
 
 
