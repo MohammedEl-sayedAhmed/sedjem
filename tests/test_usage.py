@@ -1498,7 +1498,7 @@ class Totals(unittest.TestCase):
         read = build.monthly(root / "docs" / "usage.json")
         self.assertEqual(read["app"], {"month": "2026-11", "weeks": 3, "last_week": "2026-W47", "installs": 11, "countries": 4,
                                        "transcriptions": 17, "hours": 7.8, "model": "cohere"})
-        self.assertEqual(read["website"], {"page_views": 16, "countries": 3, "clicks": 5})
+        self.assertEqual(read["website"], {"page_views": 16, "visitors": 8, "countries": 3, "clicks": 5})
         self.assertIsNone(read["so_far"])
         self.assertEqual((read["census"]["month"], read["census"]["through"], read["census"]["visits"]["total"]), ("2026-11", None, 1),
                          "the export's rows share one session, so one visit")
@@ -1602,6 +1602,16 @@ class Totals(unittest.TestCase):
         self.assertEqual((sf["month"], sf["through"], sorted(sf)), ("2026-12", "2026-12-04", ["app", "month", "through", "website"]))
         self.assertEqual((sf["app"]["month"], sf["app"]["exported"]), ("2026-12", "2026-12-04"))
         self.assertEqual((sf["website"]["month"], sf["website"]["page_views"]), ("2026-12", 1))
+        # headline numbers only: every key it may hold, and no other
+        app_, web = sf["app"], sf["website"]
+        self.assertEqual(sorted(app_), ["exported", "installs", "month", "runs"])
+        self.assertEqual((sorted(app_["installs"]), sorted(app_["installs"]["countries"]), sorted(app_["runs"])),
+                         (["active", "countries", "new"], ["count"], ["hours", "transcriptions"]))
+        self.assertEqual(sorted(web), ["countries", "downloads", "exported", "month", "page_views", "visitors", "visits"])
+        self.assertEqual((sorted(web["countries"]), sorted(web["downloads"]), sorted(web["visits"])),
+                         (["count"], ["clicks"], ["countries", "days", "total"]))
+        self.assertTrue(all(re.fullmatch(r"[A-Z]{2}|other", k) for k in web["visits"]["countries"]))
+        self.assertTrue(all(re.fullmatch(r"2026-12-\d\d", k) for k in web["visits"]["days"]))
         self.assertEqual([(root / p).read_text(encoding="utf-8") for p in ("README.md", "docs/13-usage-counts.md")], pages,
                          "README.md and the docs list finished months only")
         # a later run replaces it
@@ -1636,9 +1646,61 @@ class Totals(unittest.TestCase):
                 run(*app, *args)
             self.assertIn(words, str(e.exception.code))
 
+    def test_two_copies_of_the_month_so_far_differ_in_headline_numbers_only(self):
+        """Each weekly copy of the month so far stays in git history. Two copies of December, with one more install in the
+        second (from France, on Linux, with an AMD card, 0.3.3, and a week of whisper-large runs in English), differ
+        only in the headline numbers: the full totals would show that install's values, the copies don't."""
+        week = lambda **n: row("week_summary", sent="2026-12-07 10:00:00", props=summary("2026-W49", **n))  # noqa: E731
+        base = ([month(age="0", m="2026-12", sent="2026-12-02 09:00:00", has_cohere=1) for _ in range(3)]
+                + [row("install", "EG", sent="2026-12-02 09:00:00") for _ in range(3)]
+                + [week(transcriptions=4, minutes=60, cohere=4, lang_ar=4, days_used=2, starts=3) for _ in range(3)])
+        one = [month("FR", "Normandy", "fr-fr", age="0", m="2026-12", sent="2026-12-03 09:00:00", gpu="amd", ram="over 32",
+                     os_name="Linux", os_version="Fedora 41", version="0.3.3", has_cohere=0),
+               row("install", "FR", sent="2026-12-03 09:00:00"),
+               week(transcriptions=5, minutes=120, whisper_large=5, lang_en=5, days_used=1, starts=1)]
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        copies, full = [], []
+        for name, rows in (("before", base), ("after", base + one)):
+            path = self.write(export(rows), f"{name}.csv")
+            with mock.patch("sys.stdout", io.StringIO()):
+                totals.main([str(path), "--so-far", "--exported", "2026-12-09", "--root", str(root)])
+            copies.append(json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))["so_far"])
+            full.append(totals.totals(totals.read(path), "2026-12", "2026-12-09"))
+
+        def leaves(d, path=()):
+            for k, v in d.items():
+                yield from leaves(v, (*path, k)) if isinstance(v, dict) else [((*path, k), v)]
+
+        def changed(a, b):
+            a, b = dict(leaves(a)), dict(leaves(b))
+            return {p for p in a.keys() | b.keys() if a.get(p) != b.get(p)}
+
+        self.assertEqual(changed(*copies), {("app", "installs", "active"), ("app", "installs", "new"),
+                                            ("app", "installs", "countries", "count"), ("app", "runs", "transcriptions"),
+                                            ("app", "runs", "hours")})
+        self.assertEqual([(c["app"]["installs"]["active"], c["app"]["installs"]["countries"]["count"], c["app"]["runs"]["hours"])
+                          for c in copies], [(3, 1, 3.0), (4, 2, 5.0)])
+        # what the copies leave out: the full totals' difference would name the install's values
+        leaked = changed(*full)
+        for place in (("hardware", "gpu", "amd"), ("hardware", "ram", "over 32"), ("runs", "models", "whisper_large"),
+                      ("runs", "languages", "en"), ("weekly", "active_installs", "2026-W49")):
+            self.assertIn(place, leaked)
+        # a kept month so far written before this rule is cut to its headline numbers when the file is written again
+        old = {"month": "2026-12", "through": "2026-12-09", "app": full[1]}
+        (root / "docs" / "usage.json").write_text(json.dumps({"months": {}, "so_far": old}), encoding="utf-8")
+        totals.write(root)
+        self.assertEqual(json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))["so_far"], copies[1])
+
+    def test_the_repositorys_month_so_far_holds_headline_numbers_only(self):
+        """docs/usage.json as committed: its month so far, when it has one, holds headline numbers only."""
+        data = json.loads((ROOT / "docs" / "usage.json").read_text(encoding="utf-8"))
+        if "so_far" in data:
+            self.assertEqual(data["so_far"], totals.so_far_part(data["so_far"]))
+
     def test_the_site_reads_the_month_so_far_the_script_writes(self):
-        """What --so-far writes is what the page's section reads: the month so far beside the newest month, the census of
-        the month so far, its visits and its page views of each day."""
+        """What --so-far writes is what the page's section reads: the month so far's headline numbers beside the newest
+        month, its visits (by country and by day) under them, and the census of the newest finished month."""
         spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
         build = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(build)
@@ -1653,8 +1715,13 @@ class Totals(unittest.TestCase):
         read = build.monthly(root / "docs" / "usage.json")
         self.assertEqual((read["app"]["month"], read["so_far"]["month"], read["so_far"]["through"]), ("2026-11", "2026-12", "2026-12-04"))
         self.assertEqual((read["so_far"]["website"]["page_views"], read["census"]["month"], read["census"]["through"]),
-                         (1, "2026-12", "2026-12-04"))
-        self.assertEqual(read["census"]["visits"]["total"], 1)
+                         (1, "2026-11", None))
+        self.assertEqual(read["so_far"]["app"], {"month": "2026-12", "weeks": 0, "last_week": "", "installs": 0, "countries": 0,
+                                                 "transcriptions": 7, "hours": 0.0, "model": None},
+                         "December's export has a week of December and no active install; no week has ended by the 4th")
+        self.assertEqual((read["visits"]["month"], read["visits"]["through"], read["visits"]["visits"]["total"]), ("2026-12", "2026-12-04", 1))
+        self.assertIsNone(read["census"]["visits"], "the map and the calendar are the month so far's")
+        self.assertEqual(dict(read["census"]["groups"])["where"][0], ("countries", [("EG", 4), ("SA", 3), ("other", 4)]))
 
     def test_the_exports_are_kept_where_git_ignores_them(self):
         """The Aptabase exports hold daily hashes and session ids: they are kept in aptabase/, which git ignores, and

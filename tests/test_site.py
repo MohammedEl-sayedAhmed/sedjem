@@ -644,7 +644,7 @@ class SiteTest(unittest.TestCase):
         numbers |= {f"numbers.g_{group}" for group, _ in build.CENSUS}
         numbers |= {f"numbers.t_{key}" for _, bs in build.CENSUS for key, *_ in bs}
         numbers |= {f"numbers.unit_{unit}" for _, bs in build.CENSUS for *_, unit in bs}
-        numbers |= {f"numbers.{key}{end}" for key in ("installs", "countries", "transcriptions", "hours", "page_views", "clicks") for end in ("", "_one")}
+        numbers |= {f"numbers.{key}{end}" for key in ("installs", "countries", "transcriptions", "hours", "page_views", "visitors", "clicks") for end in ("", "_one")}
         numbers |= {f"numbers.v_{key}_{v}" for key, values in {
             "kind": ("installer", "linux_build", "source"), "gpu": ("none", "intel", "amd", "nvidia"),
             "hosted": ("local", "hosted"), "languages": ("ar", "en", "auto"), "devices": ("phone", "tablet", "desktop"),
@@ -1261,7 +1261,7 @@ class NumbersTest(unittest.TestCase):
         self.assertEqual(c["stats"], [(str(u["installs"]["active"]), "installs ran Sedjem"),
                                       (str(u["installs"]["countries"]["count"]), "countries"),
                                       (str(u["runs"]["transcriptions"]), "transcriptions"), (str(u["runs"]["hours"]), "hours of audio"),
-                                      (str(w["page_views"]), "page views"), (str(w["countries"]["count"]), "countries"),
+                                      (str(w["page_views"]), "page views"), (str(w["visitors"]), "visitors"), (str(w["countries"]["count"]), "countries"),
                                       (str(w["downloads"]["clicks"]), "download clicks")])
         (model,) = self.full["en"].find(lambda n: "model" in n.classes())
         self.assertEqual(squash(model.text()), "Most used model: whisper-medium code-switching")
@@ -1481,7 +1481,7 @@ class NumbersTest(unittest.TestCase):
         written alike: Western digits and the same separators, as the Arabic copy writes every number."""
         values = {lang: [(d.attrs["value"], d.text()) for d in section.find(lambda n: n.tag == "data")]
                   for lang, section in self.full.items()}
-        self.assertEqual(len(values["en"]), 5 + 7)  # the figure of each of GitHub's cards, and seven of the counts'
+        self.assertEqual(len(values["en"]), 5 + 8)  # the figure of each of GitHub's cards, and eight of the counts'
         self.assertEqual(values["en"], values["ar"])
         points = {lang: [plot.attrs["data-points"] for plot in section.find(lambda n: "plot" in n.classes())]
                   for lang, section in self.full.items()}
@@ -1522,9 +1522,10 @@ class NumbersTest(unittest.TestCase):
     @staticmethod
     def census(section):
         """The census of a section's counts card: {group: {breakdown title: [(name, share)]}}, as drawn (the rows of a
-        quiet list, the glyphs of the devices, the two parts of a ring), and the groups' order."""
+        quiet list, the glyphs of the devices, the two parts of a ring), and the groups' order; the month so far's visits
+        are not part of it."""
         out = {}
-        for group in section.find(lambda n: "group" in n.classes()):
+        for group in section.find(lambda n: "group" in n.classes() and not n.inside(lambda m: "census-visits" in m.classes())):
             title = squash(group.find(lambda n: n.tag == "h4")[0].text())
             out[title] = {}
             for crowd in group.find(lambda n: n.tag == "div" and n.classes()[:1] == ["crowd"]):
@@ -1669,8 +1670,9 @@ class NumbersTest(unittest.TestCase):
 
     def test_the_month_so_far_stands_beside_the_newest_month(self):
         """With a month so far in docs/usage.json the counts card shows two periods side by side, the finished month and
-        the month so far, marked "so far, to 2 December"; the census is the month so far's, with the period named, and
-        its numbers follow the same folding rule. A month so far that is no newer than the newest month is not shown,
+        the month so far, marked "so far, to 2 December", with its headline numbers alone (its runs once a week of it
+        has ended); under them the month so far's website visits, its map and its calendar; and the census is the newest
+        finished month's, with no map of its own. A month so far that is no newer than the newest month is not shown,
         and one that can't be read is left out with a line in the log."""
         for lang, section in self.sofar.items():
             (card,) = section.find(lambda n: n.attrs.get("id") == "numbers-counts")
@@ -1678,20 +1680,41 @@ class NumbersTest(unittest.TestCase):
             self.assertEqual([squash(p.find(lambda n: n.tag == "h4")[0].text()) for p in periods],
                              {"en": ["November 2026", "December 2026, so far, to 2 December"],
                               "ar": ["نوفمبر 2026", "ديسمبر 2026، لحد دلوقتي، لحد 2 ديسمبر"]}[lang])
-            self.assertEqual([(t.attrs["datetime"]) for t in periods[1].find(lambda n: n.tag == "time")], ["2026-12", "2026-12-02", "2026-11-30"], "the month, its last day and the week of the runs")
+            self.assertEqual([(t.attrs["datetime"]) for t in periods[1].find(lambda n: n.tag == "time")], ["2026-12", "2026-12-02"],
+                             "the month and its last day; no week of December has ended, so no runs")
             figures = [[d.attrs["value"] for d in p.find(lambda n: n.tag == "data")] for p in periods]
-            self.assertEqual(figures, [["1204", "23", "5310", "2750.5", "12345", "31", "678"],
-                                       ["33", "3", "120", "61.0", "210", "4", "9"]])
-            title = squash(card.find(lambda n: "census-title" in n.classes())[0].text())
-            self.assertEqual(title, {"en": "Who runs Sedjem: December 2026, so far, to 2 December",
-                                     "ar": "مين بيشغّل Sedjem: ديسمبر 2026، لحد دلوقتي، لحد 2 ديسمبر"}[lang])
-        got = self.census(self.sofar["en"])
-        self.assertEqual(got["Where"], {"Installs by country": [("Egypt", "61%"), ("Saudi Arabia", "30%"), ("Other", "9%")],
-                                        "Website visitors by country": [("Egypt", "67%"), ("Saudi Arabia", "33%")]})
-        self.assertEqual(got["Computers"], {"Graphics card": [("Nvidia", "61%"), ("Intel", "39%")]})
-        self.assertEqual(got["How it is used"]["Model"], [("Cohere Transcribe Arabic", "83%"), ("whisper-medium code-switching", "17%")])
-        self.assertEqual(got["Website visitors"], {"Device": [("Desktop", "48%"), ("Phone", "48%"), ("Tablet", "5%")]})
+            self.assertEqual(figures, [["1204", "23", "5310", "2750.5", "12345", "7000", "31", "678"], ["33", "3", "210", "150", "4", "9"]])
+            self.assertFalse(periods[1].find(lambda n: "model" in n.classes()), "a month so far has no breakdown of the models")
+            titles = [squash(t.text()) for t in card.find(lambda n: "census-title" in n.classes())]
+            self.assertEqual(titles, {"en": ["Website visits: December 2026, so far, to 2 December", "Who runs Sedjem: November 2026"],
+                                      "ar": ["زيارات الموقع: ديسمبر 2026، لحد دلوقتي، لحد 2 ديسمبر", "مين بيشغّل Sedjem: نوفمبر 2026"]}[lang])
+            (seen,) = card.find(lambda n: "census-visits" in n.classes())
+            self.assertEqual(len(seen.find(lambda n: n.tag == "svg" and "map" in n.classes())), 1, "the month so far's map")
+            self.assertEqual(len(seen.find(lambda n: "chart-box" in n.classes())), 1, "and its calendar")
+            self.assertEqual(len(card.find(lambda n: n.tag == "svg" and "map" in n.classes())), 1, "one map on the card")
+        got, alone = self.census(self.sofar["en"]), self.census(self.full["en"])
+        # the census is November's, as without a month so far, but for the visits: the map, the list of the countries'
+        # visits under it and the calendar are the month so far's, so its countries are the page views that pass the fold
+        self.assertEqual(got["Where"].pop("Website visitors by country")[:2], [("Egypt", "49%"), ("United States", "24%")])
+        self.assertEqual(alone["Where"].pop("Website visitors by country")[:2], [("Egypt", "43%"), ("United States", "21%")])
+        self.assertEqual(got, alone)
+        (census,) = self.sofar["en"].find(lambda n: "census" in n.classes() and "census-visits" not in n.classes())
+        self.assertFalse(census.find(lambda n: "map" in n.classes() or "chart-box" in n.classes()),
+                         "its map and calendar are the month so far's")
         self.assertEqual(list(self.cards(self.sofar["en"])), ["downloads", "releases", "platforms", "views", "stars", "counts"])
+        # once a week of the month has ended, its runs come too: those of the weeks that ended by its last day
+        data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
+        data["so_far"]["through"] = "2026-12-08"
+        sections, _ = self.build("so-far-week", stats=self.stats, usage=fixture.write_usage(self.dir / "so-far-week.json", data))
+        period = sections["en"].find(lambda n: "period" in n.classes())[1]
+        self.assertEqual([t.attrs["datetime"] for t in period.find(lambda n: n.tag == "time")], ["2026-12", "2026-12-08", "2026-11-30"],
+                         "the month, its last day and the week of the runs")
+        self.assertEqual([d.attrs["value"] for d in period.find(lambda n: n.tag == "data")], ["33", "3", "120", "61.0", "210", "150", "4", "9"])
+        self.assertEqual(build.weeks_ended("2026-12", date(2026, 12, 7)), ["2026-W49"], "the week ended on Sunday the 6th")
+        self.assertEqual(build.weeks_ended("2026-12", date(2026, 12, 6)), [], "not before it ends")
+        self.assertEqual(build.weeks_ended("2026-11", date(2026, 11, 30)), ["2026-W45", "2026-W46", "2026-W47", "2026-W48"],
+                         "W44 is October's: its Thursday is 29 October")
+        self.assertEqual(build.weeks_ended("2026-10", date(2026, 11, 3)), ["2026-W40", "2026-W41", "2026-W42", "2026-W43", "2026-W44"])
         # the month so far shows the newest month's census only when there is none
         self.assertIn("December 2026", squash(visible_text(self.sofar["en"])))
         self.assertNotIn("so far", squash(visible_text(self.full["en"])))
@@ -1718,27 +1741,28 @@ class NumbersTest(unittest.TestCase):
         del data["so_far"]["app"]
         sections, _ = self.build("so-far-website", stats=self.stats, usage=fixture.write_usage(self.dir / "so-far-website.json", data))
         periods = sections["en"].find(lambda n: "period" in n.classes())
-        self.assertEqual([len(p.find(lambda n: "stat" in n.classes())) for p in periods], [7, 3])
+        self.assertEqual([len(p.find(lambda n: "stat" in n.classes())) for p in periods], [8, 4])
 
     def test_a_count_of_one_takes_the_singular(self):
         """"1 country", "1 install", "1 transcription", "1 hour of audio", "1 page view" and "1 download click", in both
         languages; the hours always with one decimal, as the file has them."""
         data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
         sf = data["so_far"]
+        sf["through"] = "2026-12-08"  # a week of it has ended, so its runs are shown
         sf["app"]["installs"]["active"] = 1
         sf["app"]["installs"]["countries"]["count"] = 1
         sf["app"]["runs"].update({"transcriptions": 1, "hours": 1.0})
-        sf["website"].update({"page_views": 1, "countries": {"count": 1, "page_views": {"other": 1}}, "downloads": {"clicks": 1, "platforms": {}}})
+        sf["website"].update({"page_views": 1, "visitors": 1, "countries": {"count": 1}, "downloads": {"clicks": 1}})
         sections, _ = self.build("singular", stats=self.stats, usage=fixture.write_usage(self.dir / "singular.json", data))
         stats = lambda lang: self.cards(sections[lang])["counts"]["stats"]  # noqa: E731
-        self.assertEqual(stats("en")[7:], [("1", "install ran Sedjem"), ("1", "country"), ("1", "transcriptions in the weeks reported so far"),
+        self.assertEqual(stats("en")[8:], [("1", "install ran Sedjem"), ("1", "country"), ("1", "transcriptions in the weeks reported so far"),
                                            ("1.0", "hours of audio in the weeks reported so far"),
-                                           ("1", "page view"), ("1", "country"), ("1", "download click")])
-        self.assertEqual(stats("ar")[7:], [("1", "نسخة من Sedjem اشتغلت"), ("1", "دولة"), ("1", "نصوص اتعملت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
+                                           ("1", "page view"), ("1", "visitor"), ("1", "country"), ("1", "download click")])
+        self.assertEqual(stats("ar")[8:], [("1", "نسخة من Sedjem اشتغلت"), ("1", "دولة"), ("1", "نصوص اتعملت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
                                            ("1.0", "ساعات صوت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
-                                           ("1", "مشاهدة صفحة"), ("1", "دولة"), ("1", "ضغطة على التحميل")])
-        self.assertEqual([label for _, label in stats("en")[:7]], ["installs ran Sedjem", "countries", "transcriptions", "hours of audio",
-                                                                   "page views", "countries", "download clicks"])
+                                           ("1", "مشاهدة صفحة"), ("1", "زائر"), ("1", "دولة"), ("1", "ضغطة على التحميل")])
+        self.assertEqual([label for _, label in stats("en")[:8]], ["installs ran Sedjem", "countries", "transcriptions", "hours of audio",
+                                                                   "page views", "visitors", "countries", "download clicks"])
         self.assertEqual(stats("en")[3], ("2750.5", "hours of audio"))
         self.assertEqual(build.figure(5.0, "en", True), '<data value="5.0">5.0</data>')
         self.assertEqual(build.figure(5.0, "en"), '<data value="5">5</data>')

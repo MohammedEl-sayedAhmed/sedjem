@@ -118,7 +118,11 @@ requests to Aptabase. A copy of the pages anywhere but the published address, a 
 the disk sends nothing either.
 
 Their totals are published as the app's are ([usage counts](13-usage-counts.md#public-totals)): once a month, and
-while a month runs, the month so far about once a week, each newer copy replacing the last. A country, a system, a
+while a month runs, the month so far about once a week, each newer copy replacing the last. The month so far holds
+headline numbers only: page views, visitors, the number of countries, download clicks and the visits, and for the app
+the active and new installs, the number of countries, the transcriptions and the hours of audio. Each copy stays in
+the repository's history, and two copies of the same month can be subtracted. A breakdown in both copies would show
+the values of one install that started between them, so the month so far has no breakdown. A country, a system, a
 site that linked to the website or a tag is named only when at least three visitors came with it that month. One part has no such rule: the visits, which the website draws as a world map and a calendar. A visit is
 one session of page views and download clicks, and the totals hold only how many visits there were, how many came from
 each country and how many on each day. The countries of the visits are not folded, so a country with one or two visits
@@ -127,10 +131,12 @@ of a link, no IP address, no session number and no hash of a user. The desktop a
 three-install rule.
 
 The website shows these numbers in its section "Sedjem in numbers": the newest finished month and, beside it, the
-month so far, then for the most recent period the breakdowns of the desktop app's totals (countries, regions, the
-computers' system, graphics card and memory, how Sedjem was installed, its version, the model, language and length of
-recordings) and of the website's (the visitors' countries, their devices and systems, the sites and tags of links they
-came from, the visits by country on the map and by day in the calendar). Every breakdown but the visits folds a value
+headline numbers of the month so far, then the breakdowns of the newest finished month: those of the desktop app's
+totals (countries, regions, the computers' system, graphics card and memory, how Sedjem was installed, its version, the
+model, language and length of recordings) and of the website's (the visitors' countries, their devices and systems, the
+sites and tags of links they came from). The visits, by country on the map and by day in the calendar, are those of
+the month so far, or of the newest finished month when there is no month so far or it has no visits. Every breakdown
+but the visits folds a value
 into "other" when it has fewer than three of what it counts: installs for the app's, transcriptions for the runs,
 visitors for the website's countries, systems, sites and tags, and page views for the devices, which the totals count
 by page view.

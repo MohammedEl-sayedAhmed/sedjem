@@ -91,15 +91,13 @@ USAGE = {
     },
 }
 
-# The month so far: December, to the 2nd, beside November, with its own app and website parts
+# The month so far: December, to the 2nd, beside November, with the headline numbers of its app and website parts
+# alone, as tools/usage_totals.py writes them: no breakdown
 SO_FAR = {"month": "2026-12", "through": "2026-12-02",
-          "app": totals("2026-12", 33, 3, 120, 61.0, {"cohere": 100, "whisper_medium": 20, "whisper_large": 0,
-                                                       "other_local": 0, "hosted": 0}, {"EG": 20, "SA": 10, "other": 3},
-                        {"hardware": {"gpu": {"nvidia": 20, "intel": 13}}, "weekly": {"active_installs": {"2026-W49": 30}}}),
+          "app": {"month": "2026-12", "exported": "2026-12-02", "installs": {"active": 33, "new": 3, "countries": {"count": 3}},
+                  "runs": {"transcriptions": 120, "hours": 61.0}},
           "website": {"month": "2026-12", "exported": "2026-12-02", "page_views": 210, "visitors": 150,
-                      "countries": {"count": 4, "page_views": {"EG": 150, "other": 60}},
-                      "devices": {"phone": 100, "tablet": 10, "desktop": 100},
-                      "downloads": {"clicks": 9, "platforms": {"windows": 9, "linux": 0, "source": 0}},
+                      "countries": {"count": 4}, "downloads": {"clicks": 9},
                       "visits": {"total": 3, "countries": {"EG": 2, "SA": 1}, "days": {"2026-12-01": 1, "2026-12-02": 2}}}}
 USAGE_SO_FAR = {**USAGE, "so_far": SO_FAR}
 
