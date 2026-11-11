@@ -187,6 +187,7 @@ caption_github = 'GitHub’s numbers are as of {{day}} and read every day (<a hr
 caption_counts = 'The anonymous counts are totalled once a month, and for the month under way every week (<a href="{{method}}">the method</a>).'
 so_far = "{{month}}, so far, to {{day}}"
 census = "Who runs Sedjem: {{period}}"
+visits_title = "Website visits: {{period}}"
 value = "Value"
 unit_installs = "Installs"
 unit_transcriptions = "Transcriptions"

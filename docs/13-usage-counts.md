@@ -214,12 +214,20 @@ all the same, export the same files during the month (a weekly export is enough)
 python tools/usage_totals.py aptabase/last-month.csv aptabase/this-month.csv --website aptabase/website-this-month.csv --so-far --exported 2026-11-09
 ```
 
-It totals the month of `--exported` up to that day, in the same way, and writes it into `docs/usage.json` under its own
-key, `so_far`, with the `month`, the last day it covers (`through`) and its `app` and `website` parts. The months, the
-README and the table below are not touched. A later `--so-far` run replaces it, and the run for that month once it is
-finished (the monthly step below), or for a later month, removes it. The website shows it beside the newest finished
-month, marked "so far, to 9 November", and draws its breakdowns and its visits, by country on the map and by day in the
-calendar.
+It totals the month of `--exported` up to that day, in the same way, and writes its headline numbers into
+`docs/usage.json` under its own key, `so_far`, with the `month`, the last day it covers (`through`) and its `app` and
+`website` parts. The `app` part holds the active installs, the new installs, the number of countries, the
+transcriptions and the hours of audio. The `website` part holds the page views, the visitors, the number of countries,
+the download clicks and the visits by country and by day. No breakdown goes into the month so far. Each weekly copy
+stays in the git history, and a reader can subtract two copies of the same month. If one install starts between them,
+the difference of a breakdown shows that install's values: its country, region, system, graphics card, memory and
+version of Sedjem. The three-install rule below holds inside one copy, but not across two copies. With headline numbers
+only, the difference shows none of these values. The finished month's run keeps every breakdown, folded as below.
+
+The months, the README and the table below are not touched. A later `--so-far` run replaces the month so far, and the
+run for that month once it is finished (the monthly step below), or for a later month, removes it. The website shows
+its numbers beside the newest finished month, marked "so far, to 9 November", and draws its visits, by country on the
+map and by day in the calendar. The website's breakdowns are those of the newest finished month.
 
 
 

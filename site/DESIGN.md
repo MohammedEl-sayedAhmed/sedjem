@@ -454,10 +454,12 @@ it, the month so far when docs/usage.json has one, marked "so far, to 9 November
 large, the installs also as a row of the brand's ear, one for each install (past 24, one stands for N, said under
 the row), the transcriptions and hours smaller (hours always with one decimal, as the file has them), the most used
 model, and the website's page views, countries and download clicks in one line; a count of one takes the singular
-("1 country"). The runs of a month so far are those of the weeks reported, so they are labelled as that and name the
-week they run up to in plain words ("the week of 2 November"), and are left out when no week has reported. Under them
-the census of the most recent period, headed "Who runs Sedjem: November 2026, so far, to 9 November", the month so far
-when there is one, else the newest month. A value with fewer than 3 installs, transcriptions or visitors is added to
+("1 country"). A month so far has headline numbers only, so it has no most used model. Its runs are those of the
+weeks that had ended by its last day, so they are labelled as the weeks reported and name the week they run up to in
+plain words ("the week of 2 November"), and are left out when no week of the month has ended. Under them, when the
+month so far has visits, its map and calendar, headed "Website visits: November 2026, so far, to 9 November". Then
+the census of the newest finished month, headed "Who runs Sedjem: October 2026"; it draws its own map and calendar
+only when there is no month so far. A value with fewer than 3 installs, transcriptions or visitors is added to
 "other"; a breakdown that would show one group is left out, and so is a group with none, so a small month shows
 little, which is honest. Each breakdown takes the form that fits its data and has a table of its counts for screen
 readers:

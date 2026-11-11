@@ -619,11 +619,13 @@ def visit_totals(w):
     return {"total": total, "countries": countries, "days": days} if total else None
 
 
-def census(t, w, month_, through):
+def census(t, w, month_, through, own_visits=True):
     """The census of one period: {"month", "through" (the last day of a month so far, else None), "groups": [(group,
     [(breakdown, [(value, count)])])] with the small groups folded into "other", a breakdown left out when it would
-    show only one group, and a group left out when it has none, "visits": the website's visits as totals (their number, by country and by day), or None}."""
-    counts, visits = census_counts(t, w), visit_totals(w)
+    show only one group, and a group left out when it has none, "visits": the website's visits as totals (their number, by country and by day), or None,
+    "map": whether it draws the world map}. Without its own visits (own_visits=False: the month so far shows its own)
+    it has no map, no visits and so no calendar."""
+    counts, visits = census_counts(t, w), visit_totals(w) if own_visits else None
     groups = []
     for group, breakdowns in CENSUS:
         # the website's countries stay while there are visits: the map and its list count those, not the folded page views
@@ -631,17 +633,33 @@ def census(t, w, month_, through):
                  if len(rows := folded(counts[key])) >= 2 or (key == "wcountries" and visits and visits["countries"])]
         if shown:
             groups.append((group, shown))
-    return {"month": month_, "through": through, "groups": groups, "visits": visits}
+    return {"month": month_, "through": through, "groups": groups, "visits": visits, "map": own_visits}
 
 
-def app_part(t):
+def weeks_ended(month_, through):
+    """The ISO weeks a month counts (those whose Thursday is in it) that had ended before through (a date, its last
+    day): a week's runs are reported after it ends. ["2026-W45"], oldest first."""
+    first = date.fromisoformat(f"{month_}-01")
+    monday = first + timedelta(days=(3 - first.weekday()) % 7 - 3)  # the Monday of the week of the month's first Thursday
+    out = []
+    while monday + timedelta(days=6) < through and (monday + timedelta(days=3)).strftime("%Y-%m") == month_:
+        year, number, _ = monday.isocalendar()
+        out.append(f"{year}-W{number:02d}")
+        monday += timedelta(days=7)
+    return out
+
+
+def app_part(t, through=None):
     """One period's app totals as the page reads them: the installs, their countries, the transcriptions, the hours
-    of audio and the most used model (None when none was used)."""
-    models = {e: count(t["runs"]["models"].get(e, 0)) for e in ENGINES}
+    of audio and the most used model (None when none was used, or the totals don't say: a month so far has no
+    breakdown). The weeks whose runs are counted are the month's weekly ones, or, for a month so far (through, its
+    last day), those that had ended by then."""
+    models = {e: count((t["runs"].get("models") or {}).get(e, 0)) for e in ENGINES}
     hours = t["runs"]["hours"]
     if isinstance(hours, bool) or not isinstance(hours, (int, float)) or not 0 <= hours < 10 ** 9:
         raise ValueError(f"{hours!r} isn't a number of hours")
-    weeks = sorted(k for k in (t.get("weekly", {}).get("active_installs") or {}) if re.fullmatch(r"\d{4}-W\d\d", str(k)))
+    weeks = weeks_ended(t["month"], through) if through else \
+        sorted(k for k in (t.get("weekly", {}).get("active_installs") or {}) if re.fullmatch(r"\d{4}-W\d\d", str(k)))
     return {"month": t["month"], "weeks": len(weeks), "last_week": weeks[-1] if weeks else "",
             "installs": count(t["installs"]["active"]),
             "countries": count(t["installs"]["countries"]["count"]),
@@ -659,9 +677,10 @@ def monthly(path):
     """The anonymous counts' totals in docs/usage.json (tools/usage_totals.py): {"app": the newest finished month's
     installs, countries, transcriptions, hours of audio and most used model, "website": its page views, countries and
     download clicks (None when it has none), "so_far": the month so far, {"month", "through", "app", "website"}, or
-    None, "census": the breakdowns of the most recent period (the month so far when there is one, else the newest
-    month) as census() has them}. {} while the file isn't there, before the first month is exported; None, with a
-    line in the log, when it can't be read. A part that can't be read is left out alone."""
+    None, "census": the breakdowns of the newest finished month as census() has them (a month so far holds headline
+    numbers only, tools/usage_totals.py), "visits": the month so far's website visits, {"month", "through", "visits"},
+    or None (then the census has the newest month's own)}. {} while the file isn't there, before the first month is
+    exported; None, with a line in the log, when it can't be read. A part that can't be read is left out alone."""
     try:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
     except FileNotFoundError:
@@ -686,7 +705,7 @@ def monthly(path):
         except (AttributeError, KeyError, TypeError, ValueError) as e:
             raw_site = None
             note(f"the website's totals for {newest} in {path} can't be read ({e!r}); they are left out")
-    so_far = picture = None
+    so_far = seen = None
     raw = data.get("so_far")
     if isinstance(raw, dict):
         try:
@@ -695,7 +714,7 @@ def monthly(path):
                 raise ValueError(f"{month_!r} through {through!r}")
             if month_ > newest:
                 parts_ = {}
-                for part, make in (("app", app_part), ("website", website_part)):
+                for part, make in (("app", lambda t: app_part(t, date.fromisoformat(through))), ("website", website_part)):
                     try:
                         parts_[part] = make(raw[part]) if isinstance(raw.get(part), dict) else None
                     except (AttributeError, KeyError, TypeError, ValueError) as e:
@@ -703,12 +722,12 @@ def monthly(path):
                         note(f"the month so far's {part} totals in {path} can't be read ({e!r}); they are left out")
                 if parts_["app"] or parts_["website"]:
                     so_far = {"month": month_, "through": through, **parts_}
-                    picture = census(raw.get("app") if parts_["app"] else None,
-                                     raw.get("website") if parts_["website"] else None, month_, through)
+                    visits = visit_totals(raw["website"]) if parts_["website"] else None
+                    seen = {"month": month_, "through": through, "visits": visits} if visits else None
         except (KeyError, TypeError, ValueError) as e:
             note(f"the month so far in {path} can't be read ({e!r}); it is left out")
-    return {"app": app, "website": site, "so_far": so_far,
-            "census": picture or census(months[newest], raw_site, newest, None)}
+    return {"app": app, "website": site, "so_far": so_far, "visits": seen,
+            "census": census(months[newest], raw_site, newest, None, own_visits=not seen)}
 
 
 # ---- the section of numbers: a grid of cards, each a figure as a dashboard shows one, drawn here from the numbers ---
@@ -1066,12 +1085,13 @@ def key_row(items):
             + "".join(f'<li><span class="sw {swatch}"></span>{text}</li>' for swatch, text in items) + "</ul>")
 
 
-def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
+def crowd(key, title, rows, kind, unit, say, words, lang, visits=None, map_=True):
     """One breakdown of the census, in the form that fits it: a quiet list of names and shares (most of them), the
     devices as three glyphs with their shares, local or hosted as one small ring, and the website's countries as a
     list under the world map, which shades the countries by their visits (all of them, unfolded, and the list counts
     the same visits; without the visits, both use the page views of those that pass the fold) under a legend of its
-    ramp; each with a table for screen readers."""
+    ramp, or as the list alone when map_ is False (the month so far draws the map); each with a table for screen
+    readers."""
     total = sum(n for _, n in rows)
     named = [("other" if v == "other" else f"c{i}", label_of(kind, key, v, say, words), n) for i, (v, n) in enumerate(rows)]
     lead = next((k for k, _, _ in named if k != "other"), None)
@@ -1092,7 +1112,7 @@ def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
             shade, whole, unit_key, label = visits["countries"], visits["total"], "visit_count", say("legend_visits")
         else:
             shade, whole, unit_key, label = {v: n for v, n in rows if v != "other"}, total, "view_count", say("legend_views")
-        drawn, low, high = world_map(shade, whole, unit_key, say, words)
+        drawn, low, high = world_map(shade, whole, unit_key, say, words) if map_ else ("", 0, 0)
         if drawn:  # the legend over the map, which spans the card, and the list of countries under it
             picture = f'{ramp_key(label, low, high)}<div class="map-row">{drawn}</div>{picture}'
     else:
@@ -1102,23 +1122,39 @@ def crowd(key, title, rows, kind, unit, say, words, lang, visits=None):
                     [(name, plain(n, lang), share_of(n, total)) for _, name, n in named], boxed=True) + spoken + "</div>")
 
 
+def daily_html(visits, month_, say, words, lang):
+    """The website's visits of each day of a period, as a calendar with its table; nothing without days."""
+    days = visits["days"] if visits else None
+    if not days:
+        return ""
+    return (f'<div class="crowd chart-box"><p class="crowd-title">{say("daily")}</p>'
+            f'{calendar_grid(days, month_, say, words, lang)}'
+            + table(say("daily"), [say("day"), say("unit_visits")], [(day(d, words), plain(n, lang)) for d, n in days], boxed=True)
+            + "</div>")
+
+
 def census_html(c, say, words, lang):
-    """The census of the most recent period: its groups (where, computers, how it is used, website visitors), each
-    with its breakdowns, and the website's visits of each day, as a calendar, under the visitors."""
+    """The census of the newest month: its groups (where, computers, how it is used, website visitors), each with its
+    breakdowns, and the website's visits of each day, as a calendar, under the visitors."""
     chosen = {g: dict(items) for g, items in c["groups"]}
     out = []
     for group, breakdowns in CENSUS:
-        inner = "".join(crowd(key, say(f"t_{key}"), chosen[group][key], kind, unit, say, words, lang, c["visits"])
+        inner = "".join(crowd(key, say(f"t_{key}"), chosen[group][key], kind, unit, say, words, lang, c["visits"], c["map"])
                         for key, kind, unit in breakdowns if key in chosen.get(group, {}))
-        if group == "visitors" and c["visits"] and c["visits"]["days"]:
-            days = c["visits"]["days"]
-            inner += (f'<div class="crowd chart-box"><p class="crowd-title">{say("daily")}</p>'
-                      f'{calendar_grid(days, c["month"], say, words, lang)}'
-                      + table(say("daily"), [say("day"), say("unit_visits")], [(day(d, words), plain(n, lang)) for d, n in days], boxed=True)
-                      + "</div>")
+        if group == "visitors":
+            inner += daily_html(c["visits"], c["month"], say, words, lang)
         if inner:
             out.append(f'<div class="group group-{group}"><h4>{say(f"g_{group}")}</h4>{inner}</div>')
     return "".join(out)
+
+
+def visits_html(v, title, say, words, lang):
+    """The month so far's website visits, under its title: the world map with the list of countries under it, and the
+    calendar of each day; totals only, as the census draws a finished month's."""
+    inner = (crowd("wcountries", say("t_wcountries"), [], "country", "views", say, words, lang, v["visits"])
+             + daily_html(v["visits"], v["month"], say, words, lang))
+    return (f'<div class="census census-visits"><h4 class="census-title">{title}</h4>'
+            f'<div class="groups"><div class="group group-visits">{inner}</div></div></div>')
 
 
 def week_of(week, words):
@@ -1230,15 +1266,15 @@ def numbers(words, lang, gh, totals):
     elif totals:
         app, site, sofar, picture = totals["app"], totals["website"], totals["so_far"], totals["census"]
         periods = period_html(app, site, month(app["month"], words), say, lang)
+        seen = ""
         if sofar:
-            periods += period_html(sofar["app"], sofar["website"], say("so_far", month=month(sofar["month"], words),
-                                   day=day(date.fromisoformat(sofar["through"]), words, year=False)), say, lang, True, words)
-        named = (say("so_far", month=month(picture["month"], words), day=day(date.fromisoformat(picture["through"]), words,
-                                                                         year=False))
-                 if picture["through"] else month(picture["month"], words))
+            named = say("so_far", month=month(sofar["month"], words), day=day(date.fromisoformat(sofar["through"]), words, year=False))
+            periods += period_html(sofar["app"], sofar["website"], named, say, lang, True, words)
+            if totals["visits"]:  # the month so far's map and calendar, under the two periods
+                seen = visits_html(totals["visits"], say("visits_title", period=named), say, words, lang)
         groups = census_html(picture, say, words, lang)
-        body = (f'<div class="periods">{periods}</div>'
-                + (f'<div class="census"><h4 class="census-title">{say("census", period=named)}</h4>'
+        body = (f'<div class="periods">{periods}</div>{seen}'
+                + (f'<div class="census"><h4 class="census-title">{say("census", period=month(picture["month"], words))}</h4>'
                    f'<div class="groups">{groups}</div></div>' if groups else ""))
         cards.append(card("counts", say("counts"), body, 3))
     if totals is not None:

@@ -48,9 +48,13 @@ The month so far: during a month, export the same files and run
   python tools/usage_totals.py last-month.csv this-month.csv --website this-month-website.csv --so-far --exported 2026-11-09
 (weekly is enough). --so-far totals the month of --exported, up to that day, in the same way, and writes it into
 docs/usage.json under its own key, "so_far", with the month and the last day it covers ("through"), and its "app"
-and "website" parts. README.md and docs/13-usage-counts.md are not touched: they show finished months only. A later
---so-far run replaces it, and the run for that month once it is finished (or for a later one) removes it. The
-website shows it beside the newest finished month.
+and "website" parts. These parts hold headline numbers only (HEADLINE): the app's active and new installs, its number
+of countries, transcriptions and hours, and the website's page views, visitors, number of countries, download clicks
+and visits by country and by day. No breakdown goes in: each weekly copy stays in git history, and two copies of the
+same month could be subtracted, so the difference of a breakdown would show the values of the one install that came
+between them. The fold under 3 holds inside one copy, not across two. README.md and docs/13-usage-counts.md are not
+touched: they show finished months only. A later --so-far run replaces it, and the run for that month once it is
+finished (or for a later one) removes it. The website shows its numbers beside the newest finished month.
 
 Options: --so-far (the month so far, as above; not with --month), --website (the website's exports; either set alone totals only its part), --month 2026-11 (the month to
 total; default the month before --exported), --exported 2026-12-03 (the day of the exports; default today), --root
@@ -134,6 +138,12 @@ WEBSITE = {"page_view": {"page": ("en", "ar", "404"), "device": ("phone", "table
                                     "email")},
            "download": {"platform": ("windows", "linux", "source"), "place": ("hero", "get"), "page": ("en", "ar", "404")}}
 HOST = re.compile(r"[a-z0-9._:\[\]-]{1,60}")
+# What the month so far may hold of each part: its headline numbers, by their place in the month's totals, and
+# nothing else
+HEADLINE = {"app": (("month",), ("exported",), ("installs", "active"), ("installs", "new"),
+                    ("installs", "countries", "count"), ("runs", "transcriptions"), ("runs", "hours")),
+            "website": (("month",), ("exported",), ("page_views",), ("visitors",), ("countries", "count"),
+                        ("downloads", "clicks"), ("visits",))}
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
           "November", "December")
 
@@ -474,11 +484,33 @@ def put_block(text, block, name):
     return f"{text[:start + len(START)]}\n{block}\n{text[end:]}"
 
 
+def headline(part, totals_):
+    """The headline numbers of one part ("app" or "website") of a month's totals, as HEADLINE lists them, in the same
+    places; a number the totals don't have is left out."""
+    out = {}
+    for path in HEADLINE[part]:
+        value = totals_
+        for key in path:
+            value = value.get(key) if isinstance(value, dict) else None
+        if value is not None:
+            place = out
+            for key in path[:-1]:
+                place = place.setdefault(key, {})
+            place[path[-1]] = value
+    return out
+
+
+def so_far_part(so_far):
+    """The month so far as docs/usage.json may hold it: its month, its last day and the headline numbers of its parts."""
+    return {"month": so_far.get("month"), "through": so_far.get("through"),
+            **{part: headline(part, so_far[part]) for part in HEADLINE if isinstance(so_far.get(part), dict)}}
+
+
 def write(root, t=None, site=None, so_far=None):
     """Add the app's month (t) and the website's (site) to docs/usage.json, keeping the other months, and write the
     app's totals into README.md and docs/13-usage-counts.md. so_far ({"month", "through", "app", "website"}) replaces
     the month so far in docs/usage.json and writes nothing else; a finished month that is its month or a later one
-    removes it."""
+    removes it. The month so far is written with its headline numbers only, a kept one too."""
     root = Path(root)
     path = root / OUT
     try:
@@ -492,6 +524,7 @@ def write(root, t=None, site=None, so_far=None):
     finished = [x["month"] for x in (t, site) if x]
     if not so_far and current and any(m >= str(current.get("month")) for m in finished):
         current = None
+    current = so_far_part(current) if current else None
     data = {"about": "Monthly totals of Sedjem's anonymous usage counts (months) and of its website's (website), made "
                      "by tools/usage_totals.py from Aptabase's exports; see docs/13-usage-counts.md", "months": months,
             **({"website": website} if website else {}), **({"so_far": current} if current else {})}

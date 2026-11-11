@@ -181,6 +181,7 @@ caption_github = 'أرقام GitHub لحد {{day}}، وبتتقري كل يوم 
 caption_counts = 'الأرقام المجهولة بتتجمع مرة كل شهر، وللشهر الجاري كل أسبوع (<a href="{{method}}">طريقة الحساب</a>).'  # new
 so_far = "{{month}}، لحد دلوقتي، لحد {{day}}"  # new
 census = "مين بيشغّل Sedjem: {{period}}"  # new
+visits_title = "زيارات الموقع: {{period}}"  # new
 value = "القيمة"  # new
 unit_installs = "النسخ"  # new
 unit_transcriptions = "النصوص"  # new
