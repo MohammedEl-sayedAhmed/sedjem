@@ -653,7 +653,7 @@ class SiteInBrowserTest(unittest.TestCase):
             });
             const tops = Array.from(sec.querySelectorAll('.card')).map(c => [c.id, Math.round(c.getBoundingClientRect().top), Math.round(c.getBoundingClientRect().width)]);
             return {out, figures: sec.querySelectorAll('.card data').length, soon: sec.querySelectorAll('.soon').length, tops}; }"""
-        for base, figures, soon in ((self.base, 12, 0), (self.plain_base, 0, 1)):
+        for base, figures, soon in ((self.base, 13, 0), (self.plain_base, 0, 1)):
             for path in PAGES:
                 for width in (320, 390, 768, 1024, 1280, 1440):
                     for scripts in (True, False) if width in (390, 1440) else (True,):
