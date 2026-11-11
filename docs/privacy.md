@@ -135,7 +135,8 @@ headline numbers of the month so far, then the breakdowns of the newest finished
 totals (countries, regions, the computers' system, graphics card and memory, how Sedjem was installed, its version, the
 model, language and length of recordings) and of the website's (the visitors' countries, their devices and systems, the
 sites and tags of links they came from). The visits, by country on the map and by day in the calendar, are those of
-the month so far, or of the newest finished month when there is no month so far. Every breakdown but the visits folds a value
+the month so far, or of the newest finished month when there is no month so far or it has no visits. Every breakdown
+but the visits folds a value
 into "other" when it has fewer than three of what it counts: installs for the app's, transcriptions for the runs,
 visitors for the website's countries, systems, sites and tags, and page views for the devices, which the totals count
 by page view.

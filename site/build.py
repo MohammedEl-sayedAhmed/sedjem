@@ -24,8 +24,9 @@ from the files the Repository stats workflow keeps on the stats branch, read fro
 the anonymous counts' totals from docs/usage.json (tools/usage_totals.py). The downloads lead, a wide line with each
 stable release tagged by its version in mono; the page views and the stars are smaller. In one bar the part the
 bar is about is the brand's teal and the other parts are greys, so one accent leads. The counts' card, "The anonymous
-counts", shows the newest finished month and, beside it, the month so far when docs/usage.json has one ("so far, to
-9 November"), then a census of the most recent period in four groups, each breakdown in the form that fits its data:
+counts", shows the newest finished month and, beside it, the headline numbers of the month so far when
+docs/usage.json has one ("so far, to 9 November"), then the month so far's visits on a map and a calendar, then a
+census of the newest finished month in four groups, each breakdown in the form that fits its data:
 the installs as a row of the brand's ears, a quiet list of names and shares (largest first, "other" last, a hairline
 under each row) for the countries, regions, systems, graphics cards, memory, versions, models, languages, lengths,
 sites and link tags, the devices as three line glyphs (Lucide, ISC) with their shares, local or hosted as one small
@@ -620,7 +621,7 @@ def visit_totals(w):
 
 
 def census(t, w, month_, through, own_visits=True):
-    """The census of one period: {"month", "through" (the last day of a month so far, else None), "groups": [(group,
+    """The census of one period: {"month", "through" (the last day it covers; None for a finished month), "groups": [(group,
     [(breakdown, [(value, count)])])] with the small groups folded into "other", a breakdown left out when it would
     show only one group, and a group left out when it has none, "visits": the website's visits as totals (their number, by country and by day), or None,
     "map": whether it draws the world map}. Without its own visits (own_visits=False: the month so far shows its own)
