@@ -669,15 +669,15 @@ def app_part(t, through=None):
 
 
 def website_part(w):
-    """One period's website totals as the page reads them: page views, countries and download clicks."""
-    return {"page_views": count(w["page_views"]), "countries": count(w["countries"]["count"]),
-            "clicks": count(w["downloads"]["clicks"])}
+    """One period's website totals as the page reads them: page views, visitors, countries and download clicks."""
+    return {"page_views": count(w["page_views"]), "visitors": count(w["visitors"]),
+            "countries": count(w["countries"]["count"]), "clicks": count(w["downloads"]["clicks"])}
 
 
 def monthly(path):
     """The anonymous counts' totals in docs/usage.json (tools/usage_totals.py): {"app": the newest finished month's
-    installs, countries, transcriptions, hours of audio and most used model, "website": its page views, countries and
-    download clicks (None when it has none), "so_far": the month so far, {"month", "through", "app", "website"}, or
+    installs, countries, transcriptions, hours of audio and most used model, "website": its page views, visitors,
+    countries and download clicks (None when it has none), "so_far": the month so far, {"month", "through", "app", "website"}, or
     None, "census": the breakdowns of the newest finished month as census() has them (a month so far holds headline
     numbers only, tools/usage_totals.py), "visits": the month so far's website visits, {"month", "through", "visits"},
     or None (then the census has the newest month's own)}. {} while the file isn't there, before the first month is
@@ -1166,8 +1166,8 @@ def week_of(week, words):
 
 def period_html(app, site, title, say, lang, so_far=False, words=None):
     """One period's numbers: its title, the installs and their countries large with the installs as a row of ears, the
-    transcriptions and hours smaller, the most used model, and the website's page views, countries and download
-    clicks in one line."""
+    transcriptions and hours smaller, the most used model, and the website's page views, visitors, countries and
+    download clicks in one line."""
     stats = ""
     if app:
         stats = (counted(app["installs"], "installs", say, lang) + counted(app["countries"], "countries", say, lang)
@@ -1185,6 +1185,7 @@ def period_html(app, site, title, say, lang, so_far=False, words=None):
     if site:
         web = (f'<div class="website"><h4>{say("website")}</h4>'
                + counted(site["page_views"], "page_views", say, lang, " stat-small")
+               + counted(site["visitors"], "visitors", say, lang, " stat-small")
                + counted(site["countries"], "countries", say, lang, " stat-small")
                + counted(site["clicks"], "clicks", say, lang, " stat-small") + "</div>")
     return f'<div class="period"><h4>{title}</h4><div class="stats">{stats}</div>{web}</div>'

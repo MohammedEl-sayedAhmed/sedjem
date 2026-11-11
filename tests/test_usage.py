@@ -1498,7 +1498,7 @@ class Totals(unittest.TestCase):
         read = build.monthly(root / "docs" / "usage.json")
         self.assertEqual(read["app"], {"month": "2026-11", "weeks": 3, "last_week": "2026-W47", "installs": 11, "countries": 4,
                                        "transcriptions": 17, "hours": 7.8, "model": "cohere"})
-        self.assertEqual(read["website"], {"page_views": 16, "countries": 3, "clicks": 5})
+        self.assertEqual(read["website"], {"page_views": 16, "visitors": 8, "countries": 3, "clicks": 5})
         self.assertIsNone(read["so_far"])
         self.assertEqual((read["census"]["month"], read["census"]["through"], read["census"]["visits"]["total"]), ("2026-11", None, 1),
                          "the export's rows share one session, so one visit")

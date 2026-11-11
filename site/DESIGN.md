@@ -453,7 +453,7 @@ The sixth card is "The anonymous counts", across a row of its own. At its head t
 it, the month so far when docs/usage.json has one, marked "so far, to 9 November": the installs and their countries
 large, the installs also as a row of the brand's ear, one for each install (past 24, one stands for N, said under
 the row), the transcriptions and hours smaller (hours always with one decimal, as the file has them), the most used
-model, and the website's page views, countries and download clicks in one line; a count of one takes the singular
+model, and the website's page views, visitors, countries and download clicks in one line; a count of one takes the singular
 ("1 country"). A month so far has headline numbers only, so it has no most used model. Its runs are those of the
 weeks that had ended by its last day, so they are labelled as the weeks reported and name the week they run up to in
 plain words ("the week of 2 November"), and are left out when no week of the month has ended. Under them, when the

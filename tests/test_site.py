@@ -644,7 +644,7 @@ class SiteTest(unittest.TestCase):
         numbers |= {f"numbers.g_{group}" for group, _ in build.CENSUS}
         numbers |= {f"numbers.t_{key}" for _, bs in build.CENSUS for key, *_ in bs}
         numbers |= {f"numbers.unit_{unit}" for _, bs in build.CENSUS for *_, unit in bs}
-        numbers |= {f"numbers.{key}{end}" for key in ("installs", "countries", "transcriptions", "hours", "page_views", "clicks") for end in ("", "_one")}
+        numbers |= {f"numbers.{key}{end}" for key in ("installs", "countries", "transcriptions", "hours", "page_views", "visitors", "clicks") for end in ("", "_one")}
         numbers |= {f"numbers.v_{key}_{v}" for key, values in {
             "kind": ("installer", "linux_build", "source"), "gpu": ("none", "intel", "amd", "nvidia"),
             "hosted": ("local", "hosted"), "languages": ("ar", "en", "auto"), "devices": ("phone", "tablet", "desktop"),
@@ -1261,7 +1261,7 @@ class NumbersTest(unittest.TestCase):
         self.assertEqual(c["stats"], [(str(u["installs"]["active"]), "installs ran Sedjem"),
                                       (str(u["installs"]["countries"]["count"]), "countries"),
                                       (str(u["runs"]["transcriptions"]), "transcriptions"), (str(u["runs"]["hours"]), "hours of audio"),
-                                      (str(w["page_views"]), "page views"), (str(w["countries"]["count"]), "countries"),
+                                      (str(w["page_views"]), "page views"), (str(w["visitors"]), "visitors"), (str(w["countries"]["count"]), "countries"),
                                       (str(w["downloads"]["clicks"]), "download clicks")])
         (model,) = self.full["en"].find(lambda n: "model" in n.classes())
         self.assertEqual(squash(model.text()), "Most used model: whisper-medium code-switching")
@@ -1481,7 +1481,7 @@ class NumbersTest(unittest.TestCase):
         written alike: Western digits and the same separators, as the Arabic copy writes every number."""
         values = {lang: [(d.attrs["value"], d.text()) for d in section.find(lambda n: n.tag == "data")]
                   for lang, section in self.full.items()}
-        self.assertEqual(len(values["en"]), 5 + 7)  # the figure of each of GitHub's cards, and seven of the counts'
+        self.assertEqual(len(values["en"]), 5 + 8)  # the figure of each of GitHub's cards, and eight of the counts'
         self.assertEqual(values["en"], values["ar"])
         points = {lang: [plot.attrs["data-points"] for plot in section.find(lambda n: "plot" in n.classes())]
                   for lang, section in self.full.items()}
@@ -1683,7 +1683,7 @@ class NumbersTest(unittest.TestCase):
             self.assertEqual([(t.attrs["datetime"]) for t in periods[1].find(lambda n: n.tag == "time")], ["2026-12", "2026-12-02"],
                              "the month and its last day; no week of December has ended, so no runs")
             figures = [[d.attrs["value"] for d in p.find(lambda n: n.tag == "data")] for p in periods]
-            self.assertEqual(figures, [["1204", "23", "5310", "2750.5", "12345", "31", "678"], ["33", "3", "210", "4", "9"]])
+            self.assertEqual(figures, [["1204", "23", "5310", "2750.5", "12345", "7000", "31", "678"], ["33", "3", "210", "150", "4", "9"]])
             self.assertFalse(periods[1].find(lambda n: "model" in n.classes()), "a month so far has no breakdown of the models")
             titles = [squash(t.text()) for t in card.find(lambda n: "census-title" in n.classes())]
             self.assertEqual(titles, {"en": ["Website visits: December 2026, so far, to 2 December", "Who runs Sedjem: November 2026"],
@@ -1709,7 +1709,7 @@ class NumbersTest(unittest.TestCase):
         period = sections["en"].find(lambda n: "period" in n.classes())[1]
         self.assertEqual([t.attrs["datetime"] for t in period.find(lambda n: n.tag == "time")], ["2026-12", "2026-12-08", "2026-11-30"],
                          "the month, its last day and the week of the runs")
-        self.assertEqual([d.attrs["value"] for d in period.find(lambda n: n.tag == "data")], ["33", "3", "120", "61.0", "210", "4", "9"])
+        self.assertEqual([d.attrs["value"] for d in period.find(lambda n: n.tag == "data")], ["33", "3", "120", "61.0", "210", "150", "4", "9"])
         self.assertEqual(build.weeks_ended("2026-12", date(2026, 12, 7)), ["2026-W49"], "the week ended on Sunday the 6th")
         self.assertEqual(build.weeks_ended("2026-12", date(2026, 12, 6)), [], "not before it ends")
         self.assertEqual(build.weeks_ended("2026-11", date(2026, 11, 30)), ["2026-W45", "2026-W46", "2026-W47", "2026-W48"],
@@ -1741,7 +1741,7 @@ class NumbersTest(unittest.TestCase):
         del data["so_far"]["app"]
         sections, _ = self.build("so-far-website", stats=self.stats, usage=fixture.write_usage(self.dir / "so-far-website.json", data))
         periods = sections["en"].find(lambda n: "period" in n.classes())
-        self.assertEqual([len(p.find(lambda n: "stat" in n.classes())) for p in periods], [7, 3])
+        self.assertEqual([len(p.find(lambda n: "stat" in n.classes())) for p in periods], [8, 4])
 
     def test_a_count_of_one_takes_the_singular(self):
         """"1 country", "1 install", "1 transcription", "1 hour of audio", "1 page view" and "1 download click", in both
@@ -1752,17 +1752,17 @@ class NumbersTest(unittest.TestCase):
         sf["app"]["installs"]["active"] = 1
         sf["app"]["installs"]["countries"]["count"] = 1
         sf["app"]["runs"].update({"transcriptions": 1, "hours": 1.0})
-        sf["website"].update({"page_views": 1, "countries": {"count": 1}, "downloads": {"clicks": 1}})
+        sf["website"].update({"page_views": 1, "visitors": 1, "countries": {"count": 1}, "downloads": {"clicks": 1}})
         sections, _ = self.build("singular", stats=self.stats, usage=fixture.write_usage(self.dir / "singular.json", data))
         stats = lambda lang: self.cards(sections[lang])["counts"]["stats"]  # noqa: E731
-        self.assertEqual(stats("en")[7:], [("1", "install ran Sedjem"), ("1", "country"), ("1", "transcriptions in the weeks reported so far"),
+        self.assertEqual(stats("en")[8:], [("1", "install ran Sedjem"), ("1", "country"), ("1", "transcriptions in the weeks reported so far"),
                                            ("1.0", "hours of audio in the weeks reported so far"),
-                                           ("1", "page view"), ("1", "country"), ("1", "download click")])
-        self.assertEqual(stats("ar")[7:], [("1", "نسخة من Sedjem اشتغلت"), ("1", "دولة"), ("1", "نصوص اتعملت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
+                                           ("1", "page view"), ("1", "visitor"), ("1", "country"), ("1", "download click")])
+        self.assertEqual(stats("ar")[8:], [("1", "نسخة من Sedjem اشتغلت"), ("1", "دولة"), ("1", "نصوص اتعملت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
                                            ("1.0", "ساعات صوت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
-                                           ("1", "مشاهدة صفحة"), ("1", "دولة"), ("1", "ضغطة على التحميل")])
-        self.assertEqual([label for _, label in stats("en")[:7]], ["installs ran Sedjem", "countries", "transcriptions", "hours of audio",
-                                                                   "page views", "countries", "download clicks"])
+                                           ("1", "مشاهدة صفحة"), ("1", "زائر"), ("1", "دولة"), ("1", "ضغطة على التحميل")])
+        self.assertEqual([label for _, label in stats("en")[:8]], ["installs ran Sedjem", "countries", "transcriptions", "hours of audio",
+                                                                   "page views", "visitors", "countries", "download clicks"])
         self.assertEqual(stats("en")[3], ("2750.5", "hours of audio"))
         self.assertEqual(build.figure(5.0, "en", True), '<data value="5.0">5.0</data>')
         self.assertEqual(build.figure(5.0, "en"), '<data value="5">5</data>')
