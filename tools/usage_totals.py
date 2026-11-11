@@ -56,6 +56,12 @@ between them. The fold under 3 holds inside one copy, not across two. README.md 
 touched: they show finished months only. A later --so-far run replaces it, and the run for that month once it is
 finished (or for a later one) removes it. The website shows its numbers beside the newest finished month.
 
+One copy came before that rule: November 2026 so far, to 9 November, with every breakdown (FULL_COPIES), and a finished
+month can be subtracted from it too. So the finished month's part keeps its breakdowns only when at least 3 active
+installs (the app's part) or visitors (the website's) came after that copy. With fewer, the part has its headline
+numbers only, marked "headline_only", the table in docs/13-usage-counts.md says "not published" for its hosted share,
+and the script says so when it runs.
+
 Options: --so-far (the month so far, as above; not with --month), --website (the website's exports; either set alone totals only its part), --month 2026-11 (the month to
 total; default the month before --exported), --exported 2026-12-03 (the day of the exports; default today), --root
 (the repository to write into; default this one).
@@ -144,6 +150,10 @@ HEADLINE = {"app": (("month",), ("exported",), ("installs", "active"), ("install
                     ("installs", "countries", "count"), ("runs", "transcriptions"), ("runs", "hours")),
             "website": (("month",), ("exported",), ("page_views",), ("visitors",), ("countries", "count"),
                         ("downloads", "clicks"), ("visits",))}
+# The copies of a month so far with every breakdown that git history holds, from before the month so far held headline
+# numbers only: by month, the last day the copy covers, the app's active installs in it and the website's visitors.
+# November 2026, to 9 November, is in commit 5373008.
+FULL_COPIES = {"2026-11": {"through": "2026-11-09", "app": 12, "website": 31}}
 MONTHS = ("January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
           "November", "December")
 
@@ -454,7 +464,7 @@ def readme_block(t):
     """The newest month, in two sentences, for README.md."""
     i, runs = t["installs"], t["runs"]
     where = f", in {plural(i['countries']['count'], 'country', 'countries')}" if i["countries"]["count"] else ""
-    hosted = f", {round(runs['hosted_share'] * 100)}% of them with hosted services" if runs["hosted_share"] is not None else ""
+    hosted = f", {round(runs['hosted_share'] * 100)}% of them with hosted services" if runs.get("hosted_share") is not None else ""
     return (f"In {month_name(t['month'])}, {plural(i['active'], 'install')} ran Sedjem{where}, and "
             f"{i['new']:,} {'was' if i['new'] == 1 else 'were'} new. They made "
             f"{plural(runs['transcriptions'], 'transcription')} of {runs['hours']:,} hours of audio{hosted}. Every "
@@ -467,12 +477,17 @@ def docs_block(months):
              "|---|---|---|---|---|---|---|"]
     for t in sorted(months.values(), key=lambda t: t["month"], reverse=True):
         i, runs = t["installs"], t["runs"]
-        hosted = f"{round(runs['hosted_share'] * 100)}%" if runs["hosted_share"] is not None else "none"
+        hosted = "not published" if t.get("headline_only") else \
+            f"{round(runs['hosted_share'] * 100)}%" if runs["hosted_share"] is not None else "none"
         lines.append(f"| {month_name(t['month'])} | {i['active']:,} | {i['new']:,} | {i['countries']['count']} | "
                      f"{runs['transcriptions']:,} | {runs['hours']:,} | {hosted} |")
     lines.append("")
     lines.append("Each month's other totals (retention, settings, hardware, the models downloaded, weekly use, the "
                  "runs, speed, failures and features) are in [docs/usage.json](usage.json).")
+    short = [month_name(m) for m, t in sorted(months.items()) if t.get("headline_only")]
+    if short:
+        lines[-1] += (f" {' and '.join(short)} {'has' if len(short) == 1 else 'have'} headline numbers only, for the "
+                      "reason given above.")
     return "\n".join(lines)
 
 
@@ -504,6 +519,23 @@ def so_far_part(so_far):
     """The month so far as docs/usage.json may hold it: its month, its last day and the headline numbers of its parts."""
     return {"month": so_far.get("month"), "through": so_far.get("through"),
             **{part: headline(part, so_far[part]) for part in HEADLINE if isinstance(so_far.get(part), dict)}}
+
+
+def after_copy(part, totals_):
+    """How many active installs (the "app" part) or visitors (the "website" part) a finished month has beyond the copy
+    of it with every breakdown in git history (FULL_COPIES), or None when there is no such copy."""
+    copy = FULL_COPIES.get(totals_["month"], {}).get(part)
+    if copy is None:
+        return None
+    return (totals_["installs"]["active"] if part == "app" else totals_["visitors"]) - copy
+
+
+def publishable(part, totals_):
+    """A finished month's part as it may be published. With a full copy of the month in git history, it keeps its
+    breakdowns only when at least LEAST installs (or visitors) came after that copy; with fewer, it has its headline
+    numbers only, marked "headline_only", as the difference of a breakdown would show their values."""
+    more = after_copy(part, totals_)
+    return totals_ if more is None or more >= LEAST else {**headline(part, totals_), "headline_only": True}
 
 
 def write(root, t=None, site=None, so_far=None):
@@ -580,7 +612,7 @@ def main(argv=None):
             write(args.root, so_far={"month": month, "through": args.exported,
                                      **({"app": t} if t else {}), **({"website": site} if site else {})})
         else:
-            write(args.root, t, site)
+            write(args.root, publishable("app", t) if t else None, publishable("website", site) if site else None)
     except ExportError as e:
         sys.exit(f"usage_totals: {e}")
     if t:
@@ -591,6 +623,13 @@ def main(argv=None):
         print(f"The website in {month_name(site['month'])}: {site['page_views']} page views by {site['visitors']} "
               f"visitors, {site['countries']['count']} countries, {site['downloads']['clicks']} download clicks"
               + (f"; {site['skipped']} events left out" if site["skipped"] else ""))
+    for part, x, unit in (("app", t, "install"), ("website", site, "visitor")):
+        more = after_copy(part, x) if x and not args.so_far else None
+        if more is not None and more < LEAST:
+            through = FULL_COPIES[month]["through"]
+            print(f"{month_name(month)}, the {part}: headline numbers only. Git history "
+                  f"holds a copy of the month to {int(through[8:])} {MONTHS[int(through[5:7]) - 1]} with every breakdown, "
+                  f"and {plural(max(more, 0), unit)} came after it, fewer than {LEAST}.")
     print(f"Wrote {OUT.as_posix()}" + (", README.md and docs/13-usage-counts.md" if t and not args.so_far else "") + ". Keep the exports in aptabase/ (git ignores it); they never go into the repository.")
 
 

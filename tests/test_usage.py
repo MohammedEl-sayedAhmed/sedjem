@@ -1267,6 +1267,9 @@ class Totals(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-totals-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
+        copies = mock.patch.object(totals, "FULL_COPIES", {})  # the made-up November has no full copy in git history
+        copies.start()
+        self.addCleanup(copies.stop)
 
     def write(self, text, name="sedjem-release-2026-11-01.csv"):
         path = self.tmp / name
@@ -1722,6 +1725,61 @@ class Totals(unittest.TestCase):
         self.assertEqual((read["visits"]["month"], read["visits"]["through"], read["visits"]["visits"]["total"]), ("2026-12", "2026-12-04", 1))
         self.assertIsNone(read["census"]["visits"], "the map and the calendar are the month so far's")
         self.assertEqual(dict(read["census"]["groups"])["where"][0], ("countries", [("EG", 4), ("SA", 3), ("other", 4)]))
+
+    def test_a_finished_month_with_a_full_copy_in_git_history(self):
+        """A copy of a month so far with every breakdown, from before the month so far held headline numbers only, stays
+        in git history (FULL_COPIES), and the finished month can be subtracted from it. A part of the finished month keeps
+        its breakdowns only when at least 3 installs (or visitors) came after that copy; with fewer, docs/usage.json, the
+        README and the docs' table have its headline numbers only, and the page reads them."""
+        spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
+        full = (totals.totals(totals.read(self.exports()), "2026-11", "2026-12-03"),
+                totals.website_totals(totals.read(Path(site)), "2026-11", "2026-12-03"))
+        read = lambda: json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))  # noqa: E731
+
+        # the made-up November has 11 active installs and 8 visitors: 2 of each after a copy with 9 and 6
+        copy = {"2026-11": {"through": "2026-11-09", "app": 9, "website": 6}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
+        for part in ("app", "website"):
+            self.assertIn(f"November 2026, the {part}: headline numbers only. Git history holds a copy of the month to 9 "
+                          f"November with every breakdown, and 2 {'installs' if part == 'app' else 'visitors'} came after "
+                          "it, fewer than 3.", out.getvalue())
+        data = read()
+        nov, web = data["months"]["2026-11"], data["website"]["2026-11"]
+        self.assertEqual(nov, {**totals.headline("app", full[0]), "headline_only": True})
+        self.assertEqual(web, {**totals.headline("website", full[1]), "headline_only": True})
+        self.assertEqual((sorted(nov), sorted(web)), (["exported", "headline_only", "installs", "month", "runs"],
+                         ["countries", "downloads", "exported", "headline_only", "month", "page_views", "visitors", "visits"]))
+        readme = " ".join((root / "README.md").read_text(encoding="utf-8").split())
+        self.assertIn("In November 2026, 11 installs ran Sedjem, in 4 countries, and 5 were new. They made 17 "
+                      "transcriptions of 7.8 hours of audio. Every month's", readme)
+        docs = (root / "docs" / "13-usage-counts.md").read_text(encoding="utf-8")
+        self.assertIn("| November 2026 | 11 | 5 | 4 | 17 | 7.8 | not published |", docs)
+        self.assertIn("November 2026 has headline numbers only, for the reason given above.", " ".join(docs.split()))
+        page = build.monthly(root / "docs" / "usage.json")
+        self.assertEqual((page["app"]["installs"], page["app"]["model"], page["website"]["visitors"]), (11, None, 8))
+        self.assertEqual([key for _, shown in page["census"]["groups"] for key, _ in shown], ["wcountries"],
+                         "the map of the website's visits, and no breakdown")
+
+        # 3 of each after the copy: every breakdown; and a month without a copy keeps them all
+        copy = {"2026-11": {"through": "2026-11-09", "app": 8, "website": 5}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
+            totals.main([*app, "--website", site, "--month", "2026-10", "--exported", "2026-12-03", "--root", str(root)])
+        self.assertNotIn("headline numbers only", out.getvalue())
+        data = read()
+        self.assertEqual((data["months"]["2026-11"], data["website"]["2026-11"]), full)
+        self.assertNotIn("headline_only", data["months"]["2026-10"])
+        docs = (root / "docs" / "13-usage-counts.md").read_text(encoding="utf-8")
+        self.assertIn("| November 2026 | 11 | 5 | 4 | 17 | 7.8 | 24% |", docs)
+        self.assertNotIn("headline numbers only", docs[docs.index(totals.START):docs.index(totals.END)])
 
     def test_the_exports_are_kept_where_git_ignores_them(self):
         """The Aptabase exports hold daily hashes and session ids: they are kept in aptabase/, which git ignores, and

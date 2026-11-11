@@ -122,7 +122,10 @@ while a month runs, the month so far about once a week, each newer copy replacin
 headline numbers only: page views, visitors, the number of countries, download clicks and the visits, and for the app
 the active and new installs, the number of countries, the transcriptions and the hours of audio. Each copy stays in
 the repository's history, and two copies of the same month can be subtracted. A breakdown in both copies would show
-the values of one install that started between them, so the month so far has no breakdown. A country, a system, a
+the values of one install that started between them, so the month so far has no breakdown. One copy, November 2026
+to 9 November, went in with every breakdown before this rule. The finished November keeps its breakdowns only when at
+least three installs (or, for the website, three visitors) came after that copy; with fewer, it has headline numbers
+only too. A country, a system, a
 site that linked to the website or a tag is named only when at least three visitors came with it that month. One part has no such rule: the visits, which the website draws as a world map and a calendar. A visit is
 one session of page views and download clicks, and the totals hold only how many visits there were, how many came from
 each country and how many on each day. The countries of the visits are not folded, so a country with one or two visits
