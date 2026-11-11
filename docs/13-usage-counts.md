@@ -234,7 +234,9 @@ One copy came before this rule. November 2026 so far, to 9 November, went into t
 finished month's run checks how many active installs came after that copy, which had 12. With three or more, November
 keeps every breakdown. With fewer, `docs/usage.json` holds November's headline numbers only, marked `headline_only`,
 and the table below says "not published" for its hosted share. The website's part has the same check with its
-visitors, 31 in that copy. `FULL_COPIES` in `tools/usage_totals.py` lists the copy, and
+visitors, 31 in that copy. The check counts the installs after the copy as one group, not each value. The difference
+can still show that one or two of them have a value the finished month names, but not which values belong to the same
+install. `FULL_COPIES` in `tools/usage_totals.py` lists the copy, and
 [ADR 17](adr/0017-the-month-so-far-weekly-with-headline-numbers-only.md) records the decision.
 
 
