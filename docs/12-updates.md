@@ -129,8 +129,11 @@ the old folder can be deleted once it runs. Replacing the running build in place
 A copy that isn't a git checkout, a Windows copy that the installer didn't put there, or a build for
 another system can't update itself. *Download* opens the release page instead.
 
-Only HTTPS connections to GitHub are made, and only this repository's release files are downloaded.
-Each one is checked against the release's `SHA256SUMS.txt` before it is used.
+The Windows installer and the Linux build download only this repository's release files, over HTTPS from
+GitHub. Each one is checked against the release's `SHA256SUMS.txt` before it is used. An update from source
+fetches main from the checkout's origin. When a requirement file changed, uv or pip also downloads its packages
+from the package index that the Python environment is set to use, which is PyPI unless you changed it
+([privacy policy](privacy.md#what-sedjem-contacts-and-when)).
 
 ## Updating by hand from source
 
