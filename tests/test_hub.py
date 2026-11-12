@@ -32,6 +32,7 @@ from app.engines import local_command  # noqa: E402
 from app.server import make_server  # noqa: E402
 
 SHA = "1234567890abcdef1234567890abcdef12345678"  # the one commit of every stand-in repository
+DOWNLOAD_RUNS = {"queued", "downloading", "verifying", "unpacking", "converting"}  # a download's states until it ends
 
 
 def pack_string(b):
@@ -642,7 +643,7 @@ class ApiTests(unittest.TestCase):
         end = time.time() + 30
         while time.time() < end:
             m = self.model(mid)
-            if m and m["ready"]:
+            if m and m["ready"] and (m["download"] or {}).get("state") not in DOWNLOAD_RUNS:
                 return m
             time.sleep(0.1)
         self.fail(f"{mid} not ready: {self.model(mid)}")
