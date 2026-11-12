@@ -750,6 +750,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
 | `app/remote.py` | running jobs on another computer: pairing, the serving side's HTTPS server, sending a job and collecting its transcript ([running jobs on another computer](15-remote-runs.md)) |
 | `sysinfo.py` | this computer and a recording's format (PyAV), for the details and `transcribe.py`'s `.meta.json` |
+| `style_hint.py` | Whisper large-v3's Egyptian style hint, which the app adds before a job's terms. It loads no speech engine, so the engines stay in the model process |
 | `app/static/` | the interface (HTML, CSS and JavaScript, no build step) |
 | `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the speaker models, the details, the video (on short clips made by `tests/media.py`), and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
 

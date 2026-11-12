@@ -2,8 +2,10 @@
 and the window class of the browser window; and how it picks its port when started again. No display is needed.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
+import ast
 import json
 import os
+import re
 import socket
 import sys
 import tempfile
@@ -106,6 +108,23 @@ class PortTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+class BuildTests(unittest.TestCase):
+    def test_the_build_names_each_module_the_app_reads_from_the_top_folder(self):
+        """The app imports a few modules from the repository's top folder, such as sysinfo.py and style_hint.py. The
+        desktop build (desktop/build.py) names each one, as it names the model process's modules."""
+        named = set(re.findall(r'"--hidden-import", "([\w.]+)"', (ROOT / "desktop" / "build.py").read_text(encoding="utf-8")))
+        top = {p.stem for p in ROOT.glob("*.py")}
+        used = set()
+        for path in (ROOT / "app").glob("*.py"):
+            for node in ast.parse(path.read_text(encoding="utf-8")).body:  # the imports at the top of each file
+                if isinstance(node, ast.Import):
+                    used |= {a.name.split(".")[0] for a in node.names}
+                elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                    used.add(node.module.split(".")[0])
+        self.assertIn("style_hint", used & top)
+        self.assertLessEqual(used & top, named)
 
 
 class IconTests(unittest.TestCase):

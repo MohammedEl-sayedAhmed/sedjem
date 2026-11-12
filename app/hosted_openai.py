@@ -20,6 +20,8 @@ import numpy as np
 import requests
 import soundfile as sf
 
+from style_hint import STYLE_PROMPT  # not from transcribe.py: that loads the speech engines
+
 from . import engines
 from .config import ROOT, replace_file
 from .engines import Cancelled, EngineError, Multipart, split_terms, upload_progress
@@ -446,7 +448,6 @@ def whisper_prompt(opts, room=200):
         terms.append(t)
     head = []
     if opts.get("language", "ar") != "en":
-        from transcribe import STYLE_PROMPT
         head = [STYLE_PROMPT]
     text = " ".join(head + ([", ".join(terms)] if terms else []))
     return [("prompt", text)] if text else []

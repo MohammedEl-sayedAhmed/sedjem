@@ -104,8 +104,10 @@ The browser tests (`tests/test_ui*.py`) skip without Playwright or a browser, un
   `models/`. Never read, list, quote or commit them.
 - A local job needs its model downloaded first, in Settings → Models: faster-whisper runs with
   `local_files_only=True`.
-- Keep heavy libraries out of the app process: the models and the GPU probe run in the worker subprocess. A module
-  that is imported dynamically needs `--hidden-import` or `--collect-*` in `desktop/build.py`.
+- Keep heavy libraries out of the app process: the models and the GPU probe run in the worker subprocess. Only the
+  worker (`app/worker.py`) imports `transcribe.py`, which loads the engines; the app reads the style hint from
+  `style_hint.py`. A module that is imported dynamically needs `--hidden-import` or `--collect-*` in
+  `desktop/build.py`.
 - CI runs the tests on Ubuntu and Windows. Keep the retries for replacing and deleting files on Windows, and stay on
   Python 3.12.
 - A scripted request that changes something needs the `X-Sedjem: 1` header, and every request must be addressed to
