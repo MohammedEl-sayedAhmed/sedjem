@@ -43,7 +43,8 @@ they cite; each timestamp is that of the commit that carried the decision out, i
 from [PR #39](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/39), running jobs on another computer. Records
 12 to 14 were written with the change they record, which pins everything the pipeline installs by hash
 ([ADR 14](../adr/0014-everything-the-builds-install-is-pinned-by-hash.md)), each stamped with the time it was
-decided. Records 15 and 16 were written with the CodeQL ratchet and the Scorecard workflow they record.
+decided. Records 15 and 16 were written with the CodeQL ratchet and the Scorecard workflow they record, and record
+17 with the Release workflow's job that starts the website's build.
 
 ## Index
 
@@ -65,3 +66,4 @@ decided. Records 15 and 16 were written with the CodeQL ratchet and the Scorecar
 | AgDR-0014 | [Setups from source and Update now keep the requirement files](AgDR-0014-source-setups-keep-the-requirement-files.md) | executed | Copies that run from source and older versions that update stay as they are; the locks cover what is built and checked. |
 | AgDR-0015 | [A CodeQL ratchet on a baseline branch that the workflow writes through the API](AgDR-0015-codeql-ratchet-on-a-baseline-branch.md) | executed | A pull request fails only on CodeQL findings that main lacks, compared with fingerprints on the `security-baseline` branch; it passes while the branch does not exist, so main's 23 open alerts do not block everything. |
 | AgDR-0016 | [A weekly OpenSSF Scorecard run that reports to the Security tab](AgDR-0016-weekly-openssf-scorecard.md) | executed | An independent score of the pipeline's supply-chain practices, weekly and when the branch protection changes, published to scorecard.dev with the findings in the Security tab. |
+| AgDR-0017 | [The Release workflow starts the website's build in a job of its own](AgDR-0017-the-release-workflow-starts-the-website.md) | executed | A job after the build, whatever winget's result, starts Pages on main when the release is a published stable one; only it gets `actions: write`, and the nightly preview does not change. |

@@ -40,6 +40,7 @@ WRITERS = {
     ("desktop.yml", "release"): {"contents", "discussions"},
     ("preview.yml", "build"): {"contents", "discussions"}, ("preview.yml", "prune"): {"contents"},
     ("release.yml", "tag"): {"contents"}, ("release.yml", "build"): {"contents", "discussions"},
+    ("release.yml", "site"): {"actions"},
     ("codeql.yml", "analyze"): {"security-events"}, ("codeql.yml", "update-baseline"): {"contents"},
     ("codeql-baseline-guard.yml", "guard"): {"contents", "issues"},
     ("scorecard.yml", "analysis"): {"security-events", "id-token"},
@@ -457,6 +458,29 @@ class Release(unittest.TestCase):
         self.assertEqual(build["with"], {"version": "${{ inputs.version }}", "commit": "${{ needs.check.outputs.commit }}"})
         self.assertEqual(build["secrets"], {"WINGET_TOKEN": "${{ secrets.WINGET_TOKEN }}"})
         self.assertEqual(check["outputs"]["commit"], "${{ steps.check.outputs.commit }}")
+
+    def test_a_published_release_starts_the_website_on_main(self):
+        # the release is published with the workflow's token, which starts no other workflow, and a failed winget
+        # fails the build; the site job follows the build whatever its result, and only a stable release starts Pages
+        site = self.jobs["site"]
+        self.assertEqual(site["needs"], ["tag", "build"])
+        self.assertEqual(site["if"], "${{ !cancelled() && needs.tag.result == 'success' }}")
+        self.assertEqual(site["permissions"], {"contents": "read", "actions": "write"})
+        (step,) = site["steps"]
+        self.assertEqual(step["env"]["VERSION"], "${{ inputs.version }}")
+        script = step["run"]
+        self.assertIn('releases/tags/v$VERSION" 2> "$errors"', script)
+        self.assertNotIn("2>&1", script, "a warning must not be read as the release's JSON")
+        self.assertIn('grep -q "HTTP 404" "$errors"', script)
+        self.assertIn("prerelease=$(jq -r '.prerelease' <<< \"$release\")", script)
+        self.assertEqual(script.count("gh workflow run"), 1)
+        self.assertIn('false) gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY" ;;', script,
+                      "only a stable release")
+        self.assertIn("*) echo \"::error::", script, "a release without the field fails the step")
+        # nothing else starts a workflow: the nightly preview leaves the downloads as they are
+        for name in ("preview.yml", "desktop.yml"):
+            for job_id, _, script in runs(load(name)):
+                self.assertNotIn("gh workflow run", script, f"{name}: {job_id}")
 
 
 @unittest.skipIf(yaml is None, "no PyYAML")

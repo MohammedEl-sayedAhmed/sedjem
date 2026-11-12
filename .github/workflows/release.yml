@@ -10,6 +10,9 @@
 #            does, and publishes: the notes in .github/release-notes/vX.Y.Z.md, or a draft from the commits since
 #            the previous release when there is no such file. Its publishing job uses the "release" environment,
 #            which can ask for an approval first, and is followed by winget.
+#   site     once the build has ended, whatever winget's result, the Pages workflow is started on main when the
+#            release is published, so that the website offers its downloads. A release published with this
+#            workflow's token starts no other workflow, and Pages follows the Desktop build only when it runs alone.
 # Run again after a failed build, a release goes on from the tag it made.
 name: Release
 
@@ -95,3 +98,37 @@ jobs:
       commit: ${{ needs.check.outputs.commit }}
     secrets:
       WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+  site:
+    # after the build, also when it failed: winget runs after the release is published, and its failure must not
+    # keep the old downloads on the website. Nothing to do when the tag wasn't made or the run was cancelled
+    needs: [tag, build]
+    if: ${{ !cancelled() && needs.tag.result == 'success' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read  # the release
+      actions: write  # starts the Pages workflow
+    steps:
+      - name: Start the Pages workflow on main once the release is published
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          # the errors apart from the release's JSON, so that a warning can't be read as part of it
+          errors="$RUNNER_TEMP/release-errors.txt"
+          if ! release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" 2> "$errors"); then
+            if grep -q "HTTP 404" "$errors"; then
+              echo "::notice::v$VERSION isn't published, so the website keeps the downloads it has."
+              exit 0
+            fi
+            echo "::error::The release v$VERSION could not be read: $(cat "$errors")"
+            exit 1
+          fi
+          # JSON that jq can't read stops the step here (bash -e), so a missed build shows in the run
+          prerelease=$(jq -r '.prerelease' <<< "$release")
+          case "$prerelease" in
+            false) gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY" ;;
+            true) echo "::notice::v$VERSION is a pre-release, so the website keeps the downloads it has." ;;
+            *) echo "::error::The release v$VERSION has no pre-release field ($prerelease)."; exit 1 ;;
+          esac
