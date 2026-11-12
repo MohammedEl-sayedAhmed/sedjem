@@ -9,6 +9,7 @@ adds "update" to /api/status, in the shapes agreed for issue #11, through Playwr
 Headless Chromium against a Sedjem server with demo transcripts (see tests/ui_support.py).
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_updates.py" -v
 """
+import copy
 import hashlib
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -457,6 +458,34 @@ class Updates(UiTestCase):
         self.assertEqual(self.page.inner_text("#updSkip"), "Skip this version")
         self.assertEqual(self.page.locator("#set-panel .upd-card-head .status").count(), 0)
         pill.wait_for()
+
+    def test_a_load_from_before_a_change_is_asked_again(self):
+        """The tab loads the state each time it opens. When Don't skip is clicked before that answer is back, the
+        server may have read the state before the click: still skipped. That answer must not put the skip back
+        over the click's own answer, so the page asks again (issue #62)."""
+        fake = self.fake(available=release())
+        self.open()
+        self.ready()
+        self.open_tab()
+        self.page.click("#updSkip")
+        self.page.wait_for_selector("#updSkip:has-text(\"Don't skip\")")
+        self.page.click("#settings button:has-text('Close')")
+
+        fake.hold.add("state")
+        self.open_tab()  # its GET waits, and the tab shows what the page has: skipped
+        before = copy.deepcopy(fake.state)  # what the server read for that GET
+        self.page.click("#updSkip")
+        self.page.wait_for_selector(".toast >> text=No longer skipped")
+        self.assertEqual(self.page.inner_text("#updSkip"), "Skip this version")
+        gets = sum(c[:2] == ("GET", "state") for c in fake.calls)
+        fake.hold.discard("state")
+        (_, route, _), = fake.held
+        fake.held.clear()
+        route.fulfill(json=before)
+        self.ready()
+        self.assertEqual(self.page.inner_text("#updSkip"), "Skip this version")
+        self.assertEqual(self.page.locator("#set-panel .upd-card-head .status").count(), 0)
+        self.assertEqual(sum(c[:2] == ("GET", "state") for c in fake.calls), gets + 1, "asked again")
 
     def test_update_now_blocked_gives_the_commands(self):
         commands = ['cd "/home/you/sedjem"', "git stash", "git pull --ff-only origin main",
