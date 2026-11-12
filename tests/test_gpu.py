@@ -9,6 +9,7 @@ import io
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import threading
@@ -183,6 +184,39 @@ class WhisperGgufPromptTests(unittest.TestCase):
         turbo = {**m, "cohere_model": "models/hf/x/whisper-large-v3-turbo-Q8_0.gguf"}
         cmd = engines.local_command(cfg, turbo, "in.flac", "out", "progress.json", {"prompt": "Jira"})
         self.assertEqual(cmd[cmd.index("--prompt") + 1], "Jira")
+
+    def test_a_job_with_a_hint_loads_no_speech_engine_in_the_app(self):
+        """The hint comes from style_hint.py, not transcribe.py, so the engines load only in the model process. A new
+        Python starts a local job with a hint (the model process replaced) and builds a hosted Whisper prompt."""
+        code = """
+import atexit, json, shutil, sys, tempfile, types
+from pathlib import Path
+from app import engines, hosted_openai
+from app.config import Config
+home = Path(tempfile.mkdtemp(prefix="sedjem-hint-"))
+atexit.register(shutil.rmtree, home, True)
+cfg = Config(home=home)
+model = {"id": "hf-x", "kind": "local", "engine": "gguf", "prompt": True,
+         "cohere_model": "models/hf/x/whisper-large-v3-Q8_0.gguf", "hub": {"architecture": "whisper"}}
+seen = {}
+def spawn(cmd, log, env):
+    seen["cmd"] = cmd
+    return types.SimpleNamespace(wait=lambda timeout=None: None, returncode=0)
+engines.spawn = spawn
+(home / "job").mkdir()
+engines.run_local(cfg, model, home / "job", {"options": {"prompt": "Jira"}}, lambda state: None, lambda: False)
+fields = hosted_openai.whisper_prompt({"prompt": "Jira", "language": "ar"})
+heavy = ("faster_whisper", "ctranslate2", "sherpa_onnx", "transcribe", "speakers")
+print(json.dumps({"prompt": seen["cmd"][seen["cmd"].index("--prompt") + 1], "hosted": fields[0][1],
+                  "loaded": [m for m in heavy if m in sys.modules]}))
+"""
+        p = subprocess.run([sys.executable, "-c", code], cwd=ROOT, capture_output=True, text=True, encoding="utf-8",
+                           timeout=120, env={**os.environ, "PYTHONPATH": str(ROOT)})
+        self.assertEqual(p.returncode, 0, p.stderr[-2000:])
+        out = json.loads(p.stdout.strip().splitlines()[-1])
+        self.assertEqual(out["prompt"], f"{transcribe.STYLE_PROMPT} Jira", "the hint still reaches the model")
+        self.assertEqual(out["hosted"], f"{transcribe.STYLE_PROMPT} Jira")
+        self.assertEqual(out["loaded"], [])
 
 
 class FakeWhisperModel:

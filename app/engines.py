@@ -16,6 +16,8 @@ from pathlib import Path
 
 import requests
 
+from style_hint import STYLE_PROMPT, gets_style_hint  # not from transcribe.py: that loads the speech engines
+
 from .config import FROZEN, ROOT
 from .transcript import from_transcribe_py, lines_from_words, relabel
 
@@ -74,7 +76,6 @@ def local_command(cfg, model, audio, out_dir, progress_file, options):
     cmd += cfg.speaker_args(options.get("speakers", "none"))  # the speaker model chosen in Settings, or TitaNet-small
     hint = (options.get("prompt") or "").strip()
     if hint and model.get("prompt"):
-        from transcribe import STYLE_PROMPT, gets_style_hint
         name = Path(whisper or "").name if model["engine"] == "whisper" else Path(model.get("cohere_model") or "").name
         if gets_style_hint(name) and (model["engine"] == "whisper" or (model.get("hub") or {}).get("architecture") == "whisper"):
             hint = f"{STYLE_PROMPT} {hint}"  # keep large-v3's Egyptian style hint, add the terms

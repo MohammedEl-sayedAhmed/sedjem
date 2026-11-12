@@ -242,6 +242,7 @@ uv pip install --python .venv-bench pyarrow
 | `speakers.py` | voice-based speaker separation |
 | `nemotron.py` | NVIDIA Nemotron-3-Diarization in NumPy, the speaker model that can replace the voiceprints |
 | `sysinfo.py` | this computer and the input file's format, for the `.meta.json` (the app uses it too) |
+| `style_hint.py` | Whisper large-v3's Egyptian style hint, and which models get it (the app uses it too; it loads no speech engine) |
 | `align.py` | forced alignment for engines without word times (experimental) |
 | `bench/serve.sh` | starts llama-server (127.0.0.1 only) for r2t2, qwen3asr or audar |
 | `bench/prepare_data.py`, `run_bench.py`, `run_configs.sh`, `score.py` | the public-set benchmark |
