@@ -7,9 +7,10 @@
    renderSettings, openSettings, refreshStatus) when they run. */
 "use strict";
 
-// data: what GET /api/updates (or a POST) answered last; the rest is what this page is doing with it
+// data: what GET /api/updates (or a POST) answered last; changes: how many times a change (a POST) was sent or
+// answered; the rest is what this page is doing with it
 const UPD = { data: null, error: "", loading: null, checking: false, installing: false, asked: false, seen: null,
-  started: false, timer: null, restart: null, sig: "" };
+  started: false, timer: null, restart: null, sig: "", changes: 0 };
 const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (localStorage)
 const UPD_FROM = "sedjem-update-from";  // what ran before Update now, to say "Updated to …" once it is back
 const UPD_BUSY = new Set(["downloading", "verifying", "installing"]);
@@ -108,7 +109,7 @@ async function updAnswer(on) {
   if (b.getAttribute("aria-disabled") === "true") return;
   b.setAttribute("aria-disabled", "true");
   try {
-    if (on !== null) updSetData(await api.post("/api/updates/settings", { enabled: on }));
+    if (on !== null) updSetData(await updPost("settings", { enabled: on }));
     if (usage) await usageSave(usage.checked, false);
   } catch (e) { toast(e.message, "error"); b.removeAttribute("aria-disabled"); return; }
   UPD.asked = true;
@@ -146,11 +147,20 @@ function updHideNotice() {
 // The state, as the server has it
 // ---------------------------------------------------------------------------------------------
 // GET /api/updates: when Settings → Updates opens, when something new is out, and every second while an update
-// is being installed. A server gone in the middle of an install is restarting.
+// is being installed. A server gone in the middle of an install is restarting. When a change was sent or answered
+// while the GET was on its way, the server may have read the state before the change, and that answer would put
+// back what the change's own answer replaced (Skip this version after a click on Don't skip). So it asks again.
 function loadUpdates() {
   if (!UPD.loading) UPD.loading = (async () => {
-    try { updSetData(await api.get("/api/updates")); UPD.error = ""; }
-    catch (e) {
+    try {
+      let changes, d;
+      do {
+        changes = UPD.changes;
+        d = await api.get("/api/updates");
+      } while (changes !== UPD.changes);
+      updSetData(d);
+      UPD.error = "";
+    } catch (e) {
       UPD.error = e.message;
       if (UPD_BUSY.has(UPD.data?.install?.state)) updWaitForRestart();
     }
@@ -158,6 +168,14 @@ function loadUpdates() {
     updRedraw();
   })();
   return UPD.loading;
+}
+
+// A change: POST /api/updates/<path>. Its answer is the state after the change. UPD.changes moves when it is sent
+// and when it is answered, so that a GET on its way at either time asks again.
+async function updPost(path, body) {
+  UPD.changes++;
+  try { return await api.post(`/api/updates/${path}`, body); }
+  finally { UPD.changes++; }
 }
 
 // A new answer from the server: kept, and followed (the progress polled, the restart waited for). What happens
@@ -433,7 +451,7 @@ function bindUpdates() {
 
 // The switch and the channel, saved at once; the pill follows
 async function updSettings(change) {
-  try { updSetData(await api.post("/api/updates/settings", change)); toast("Saved"); }
+  try { updSetData(await updPost("settings", change)); toast("Saved"); }
   catch (e) { toast(e.message, "error"); }
   updRedraw(true);
   refreshStatus();
@@ -444,7 +462,7 @@ async function updCheck() {
   if (UPD.checking) return;
   UPD.checking = true;
   updRedraw(true);
-  try { updSetData(await api.post("/api/updates/check")); }
+  try { updSetData(await updPost("check")); }
   catch (e) { toast(e.message, "error"); }
   UPD.checking = false;
   updRedraw(true);
@@ -452,7 +470,7 @@ async function updCheck() {
 }
 
 async function updSkip(skip) {
-  try { updSetData(await api.post("/api/updates/skip", { skip })); }
+  try { updSetData(await updPost("skip", { skip })); }
   catch (e) { toast(e.message, "error"); return; }
   updRedraw(true);
   toast(skip ? "Skipped. Sedjem tells you again when something newer is out" : "No longer skipped");
@@ -483,7 +501,7 @@ async function updInstall(ask) {
   if (ask && !confirm(updConfirm(a))) return;
   if (restarts) updPut(UPD_FROM, JSON.stringify({ version: d.running?.version, commit: d.running?.commit, at: Date.now() }));
   UPD.installing = true;
-  try { updSetData(await api.post("/api/updates/install")); }
+  try { updSetData(await updPost("install")); }
   catch (e) { updPut(UPD_FROM, null); toast(e.message, "error"); }
   finally { UPD.installing = false; }
   updRedraw(true);
