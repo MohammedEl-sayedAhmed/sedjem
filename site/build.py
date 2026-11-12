@@ -22,7 +22,7 @@ page and the docs can't drift; those files are the repository's, and one that ca
 "Sedjem in numbers", near the end, is a grid of charts drawn here as SVG: GitHub's downloads, stars and page views
 from the files the Repository stats workflow keeps on the stats branch, read from a folder given with --stats, and
 the anonymous counts' totals from docs/usage.json (tools/usage_totals.py). The downloads lead, a wide line with each
-stable release tagged by its version in mono; the page views and the stars are smaller. In one bar the part the
+stable release tagged by its version in mono on the day it was published (UTC); the page views and the stars are smaller. In one bar the part the
 bar is about is the brand's teal and the other parts are greys, so one accent leads. The counts' card, "The anonymous
 counts", shows the newest finished month and, beside it, the headline numbers of the month so far when
 docs/usage.json has one ("so far, to 9 November"), then the month so far's visits on a map and a calendar, then a
@@ -35,7 +35,8 @@ docs/images/make/worldmap.py from Natural Earth's public-domain data; countries 
 calendar. Stacked bars stay for a whole split in two or three parts (the releases, the systems). One accent leads in
 each picture, the brand's teal, and the rest is grey. A value with fewer than 3 installs, transcriptions or visitors
 is added to "other", a breakdown that would show one group is left out, and so is a group with none. The downloads link the
-latest release's files, with their names, sizes and SHA256, read from a folder given with --release. The build never
+latest release's files, with their names, sizes and SHA256, read from a folder given with --release, which also holds
+the list of releases that gives each one's day. The build never
 fetches anything: pages.yml downloads the files into the folders with the API before it builds. Without the stats
 folder GitHub's charts are left out, without docs/usage.json the page says when the first totals come, and without
 the release folder the downloads link the release's page with their general wording. A file that is missing or
@@ -50,6 +51,7 @@ counts as a clone) and without downloading a release's files (a download adds to
       gh api -H "Accept: application/vnd.github.raw" "repos/MohammedEl-sayedAhmed/sedjem/contents/$f?ref=stats" > stats/$f
     done
     gh api repos/MohammedEl-sayedAhmed/sedjem/releases/latest > release/release.json
+    gh api --paginate --slurp "repos/MohammedEl-sayedAhmed/sedjem/releases?per_page=100" > release/releases.json
 
 The 404 page links its files from the site's path (/sedjem/), as GitHub Pages serves it at any address, so it
 shows unstyled in a local preview. site/DESIGN.md has the design notes, and tests/test_site.py checks the result;
@@ -68,7 +70,7 @@ import shutil
 import struct
 import sys
 import tomllib
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -488,13 +490,13 @@ def release_file(rel, system, words, lang):
     return f'<dl class="file">{"".join(rows)}</dl>'
 
 
-def weekly(series):
+def weekly(series, keep=()):
     """A running total of more than DAILY days by the week, so a chart and its table grow by a point a week: the first
-    day, the last, and every seventh day back from the last."""
+    day, the last, every seventh day back from the last, and the days in keep (a release's)."""
     if len(series) <= DAILY:
         return series
     last = series[-1][0]
-    return [p for i, p in enumerate(series) if i == 0 or (last - p[0]).days % 7 == 0]
+    return [p for i, p in enumerate(series) if i == 0 or (last - p[0]).days % 7 == 0 or p[0] in keep]
 
 
 def platform_of(asset):
@@ -503,42 +505,78 @@ def platform_of(asset):
     return "windows" if name.endswith((".exe", ".msi")) else "linux" if "linux" in name else "other"
 
 
-def github(folder):
+def published(folder):
+    """The day each release that isn't a preview was published, in UTC, as {version: date}: from releases.json (gh api
+    --paginate --slurp repos/OWNER/NAME/releases, every release, a page at a time) and from release.json. Listing the
+    releases counts no download. {} without a folder; a releases.json that is missing or can't be read adds nothing,
+    with a line in the log (release() speaks for release.json)."""
+    days = {}
+    if folder is None:
+        return days
+    for name in ("releases.json", "release.json"):
+        try:
+            data = json.loads((Path(folder) / name).read_text(encoding="utf-8"))
+            rows = [data] if isinstance(data, dict) else [r for page in data for r in (page if isinstance(page, list) else [page])]
+            found = {}
+            for r in rows:
+                stable = re.fullmatch(r"v(\d+(?:\.\d+)*)", str(r["tag_name"]))
+                if not stable or r.get("prerelease") or r.get("draft") or not r.get("published_at"):
+                    continue
+                when = datetime.fromisoformat(str(r["published_at"]))
+                if when.tzinfo is None:
+                    raise ValueError(f"{r['published_at']!r} has no time zone")
+                found[stable.group(1)] = when.astimezone(timezone.utc).date()
+        except FileNotFoundError:
+            if name == "releases.json":
+                note("no releases.json, so the downloads chart marks the latest release only")
+            continue
+        except (OSError, UnicodeDecodeError, ValueError, KeyError, TypeError, AttributeError) as e:
+            if name == "releases.json":
+                note(f"releases.json can't be read ({e!r}); the downloads chart marks the latest release only")
+            continue
+        days = found | days  # releases.json first: it has every release
+    return days
+
+
+def github(folder, out_on=None):
     """GitHub's numbers from the stats files in folder, as many as could be read. From downloads.csv, whose rows are
     a snapshot of every release file's running total each day: the day they are of, the app's downloads in all on each
-    day (by the week past DAILY days; its files, not the checksums; previews included, as the README's badge counts
-    them), each release's on the
-    newest day with the previews added up apart, the downloads by system, and the day each release that isn't a
-    preview was first counted, when that is after the first day. From repo.csv the stars each day (by the week past
-    DAILY days), and from views.csv
-    the page views of each day in the last VIEWS_DAYS days recorded, or from the first day recorded when that is
-    later (views_whole False). None without a folder."""
+    day (by the week past DAILY days, and on each release's day; its files, not the checksums; previews included, as
+    the README's badge counts them), each release's on the newest day with the previews added up apart, and the
+    downloads by system. A file that leaves the snapshots, as a preview's do once preview.yml deletes it, keeps its
+    last count, so the totals never fall; the README's badge and the stats branch's charts count the same way. From
+    out_on ({version: day published}, from published()) the day each release that isn't a preview came out, marked on
+    the chart when the stats have that day. From repo.csv the stars each day (by the week past DAILY days), and from
+    views.csv the page views of each day in the last VIEWS_DAYS days recorded, or from the first day recorded when
+    that is later (views_whole False). None without a folder."""
     if folder is None:
         return None
+    out_on = out_on or {}
     gh = {}
     downloads = stats_rows(folder, "downloads.csv")
     if downloads:
         app = [r for r in downloads if not r["asset"].lower().endswith(".txt")]
         days = sorted({r["date"] for r in downloads})
-        newest = [r for r in app if r["date"] == days[-1]]
-        by_release = {}
-        for r in newest:
-            by_release[r["release"]] = by_release.get(r["release"], 0) + r["downloads"]
+        of_day, kept, totals = {}, {}, []
+        for r in app:
+            of_day.setdefault(r["date"], []).append(r)
+        for d in days:  # each file at its newest count up to the day, a deleted one at its last
+            kept.update({(r["release"], r["asset"]): r["downloads"] for r in of_day.get(d, [])})
+            totals.append((d, sum(kept.values())))
+        by_release, platforms = {}, {}
+        for (tag, asset), n in kept.items():
+            by_release[tag] = by_release.get(tag, 0) + n
+            platforms[platform_of(asset)] = platforms.get(platform_of(asset), 0) + n
         stable = sorted((tag for tag in by_release if version_key(tag)), key=version_key, reverse=True)
-        first_seen = {}
-        for r in sorted(app, key=lambda r: r["date"]):
-            first_seen.setdefault(r["release"], r["date"])
+        versions = [STABLE.fullmatch(tag).group(1) for tag in stable]
         marks = {}
-        for tag in sorted(stable, key=version_key):  # the newest of a day's releases names it
-            if first_seen[tag] > days[0]:
-                marks[first_seen[tag]] = STABLE.fullmatch(tag).group(1)
-        platforms = {}
-        for r in newest:
-            platforms[platform_of(r["asset"])] = platforms.get(platform_of(r["asset"]), 0) + r["downloads"]
-        gh.update(day=days[-1], downloads=weekly([(d, sum(r["downloads"] for r in app if r["date"] == d)) for d in days]),
-                  releases=[(STABLE.fullmatch(tag).group(1), by_release[tag]) for tag in stable],
+        for v in reversed(versions):  # the newest of a day's releases names it
+            if v in out_on and days[0] <= out_on[v] <= days[-1]:
+                marks[out_on[v]] = v
+        gh.update(day=days[-1], downloads=weekly(totals, keep=marks),
+                  releases=[(v, by_release[tag]) for v, tag in zip(versions, stable)],
                   previews=sum(n for tag, n in by_release.items() if not version_key(tag)),
-                  marks=sorted(marks.items()),
+                  marks=sorted(marks.items()), out_on={v: out_on[v] for v in versions if v in out_on},
                   platforms=[(p, platforms[p]) for p in ("windows", "linux", "other") if platforms.get(p)])
     repo = stats_rows(folder, "repo.csv")
     if repo:
@@ -1217,7 +1255,7 @@ def numbers(words, lang, gh, totals):
                                  + table(say("downloads_title"), [say("day"), say("downloads_title")], rows), span=3))
         if gh["releases"]:
             latest, n = gh["releases"][0]
-            out = next((d for d, r in gh["marks"] if r == latest), None)
+            out = gh["out_on"].get(latest)
             older = sum(m for _, m in gh["releases"][1:])
             bar = [("latest", latest, n)] + ([("older", say("older"), older)] if older else []) \
                 + ([("previews", say("previews"), gh["previews"])] if gh["previews"] else [])
@@ -1510,7 +1548,7 @@ def build(out=ROOT / "_site", counts_key=COUNTS_KEY, counts_host=COUNTS_HOST, st
     out = prepare(Path(out))
     m = meeting()
     cards, clips = measured(bench_sources())
-    gh, totals, rel = github(stats), monthly(usage), release(latest)
+    gh, totals, rel = github(stats, published(latest)), monthly(usage), release(latest)
     offered = rel["version"] if rel else version()
     href = {k: (rel or {}).get("files", {}).get(k, {}).get("url", LATEST) for k in RELEASE_FILES}
     css = (SITE / "styles.css").read_text(encoding="utf-8")
@@ -1552,7 +1590,7 @@ if __name__ == "__main__":
     ap.add_argument("--stats", type=Path, help="a folder with the stats branch's downloads.csv, repo.csv and views.csv; "
                                                "without it GitHub's numbers are left out")
     ap.add_argument("--release", type=Path, help="a folder with the latest release's release.json (and SHA256SUMS.txt "
-                                                 "for a release without digests); without it the downloads link the "
-                                                 "release's page")
+                                                 "for a release without digests) and the list of releases, releases.json; "
+                                                 "without it the downloads link the release's page")
     args = ap.parse_args()
     print(f"built {build(args.out, stats=args.stats, latest=args.release)}")

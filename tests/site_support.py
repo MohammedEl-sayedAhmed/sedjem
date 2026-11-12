@@ -1,6 +1,7 @@
 """Made-up numbers for the website's tests (tests/test_site.py and tests/test_ui_site.py): the stats branch's files as
 .github/scripts/repo_stats.py writes them, docs/usage.json as tools/usage_totals.py writes it, large enough to need
-thousands separators, and the latest release as GitHub's API gives it, with its SHA256SUMS.txt. Nothing here is real,
+thousands separators, and the latest release as GitHub's API gives it, with its SHA256SUMS.txt and the list of
+releases. Nothing here is real,
 and nothing is fetched.
 """
 import json
@@ -110,20 +111,37 @@ FILES = {"windows": ("Sedjem-0.10.0-setup.exe", 91924074, "d4e1374575e5b9c9c9f6c
 SUMS = "".join(f"{sha}  {name}\n" for name, _, sha in FILES.values())
 
 
+# The day each release was published, as GitHub gives it (UTC). 0.10.0 came out in the evening of 1 December, after
+# that day's stats run, so the stats first counted it on 2 December
+PUBLISHED = {"v0.9.2": "2026-11-20T10:04:11Z", "v0.10.0": "2026-12-01T19:30:00Z",
+             "v0.10.1-preview.20261201": "2026-12-01T08:00:00Z"}
+
+
+def releases_json(published=PUBLISHED):
+    """releases.json, the list of releases as gh api --paginate --slurp gives it: a list of pages, newest first."""
+    rows = [{"tag_name": tag, "published_at": when, "prerelease": "-" in tag, "draft": False}
+            for tag, when in sorted(published.items(), key=lambda kv: kv[1], reverse=True)]
+    return [rows]
+
+
 def release_json(tag=TAG, files=FILES, digests=True, **extra):
     """release.json for the release with tag and files, each with GitHub's digest when digests is True."""
     assets = [{"name": name, "size": size, "browser_download_url": f"https://github.com/MohammedEl-sayedAhmed/sedjem/releases/download/{tag}/{name}",
                **({"digest": f"sha256:{sha}"} if digests else {})} for name, size, sha in files.values()]
     assets.append({"name": "SHA256SUMS.txt", "size": len(SUMS),
                    "browser_download_url": f"https://github.com/MohammedEl-sayedAhmed/sedjem/releases/download/{tag}/SHA256SUMS.txt"})
-    return {"tag_name": tag, "prerelease": False, "draft": False, "assets": assets, **extra}
+    return {"tag_name": tag, "prerelease": False, "draft": False, "published_at": PUBLISHED.get(tag), "assets": assets,
+            **extra}
 
 
-def write_release(folder, data=None, sums=None):
-    """release.json (and SHA256SUMS.txt, when sums is given) in folder; returns the folder."""
+def write_release(folder, data=None, sums=None, releases=None):
+    """release.json (and SHA256SUMS.txt, when sums is given) and releases.json (releases, or releases_json(); none when
+    releases is False) in folder; returns the folder."""
     folder = Path(folder)
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "release.json").write_text(json.dumps(data or release_json()), encoding="utf-8")
+    if releases is not False:
+        (folder / "releases.json").write_text(json.dumps(releases or releases_json()), encoding="utf-8")
     if sums is not None:
         (folder / "SHA256SUMS.txt").write_text(sums, encoding="utf-8")
     return folder

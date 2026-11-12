@@ -1,6 +1,7 @@
 """Tests for the repository statistics (.github/scripts/repo_stats.py): the daily history grows past
 GitHub's 14 days, a day reported again replaces the old numbers, snapshots keep one set of rows a day,
-the checksum list isn't counted as a download, the badges and summary show the totals, and a run without
+the checksum list isn't counted as a download, a deleted release keeps its last count, the badges and summary
+show the totals, and a run without
 access to the traffic keeps the old traffic files, says so, records the rest and then fails (also when
 nothing changed), while a run with it passes, and so does a preview into a folder. The star history is
 rebuilt from the stargazers and forks, which are read a hundred to a request. The charts are valid SVG whose
@@ -80,6 +81,23 @@ class Update(unittest.TestCase):
                          {"schemaVersion": 1, "label": "downloads", "message": "11", "color": stats.COLOUR})
         self.assertIn("| Downloads of the app, all releases | 11 |", new["README.md"])
         self.assertIn("| v0.1.0 | SHA256SUMS.txt | 7 |", new["README.md"], "still listed, just not counted")
+
+    def test_a_deleted_release_keeps_its_last_count(self):
+        # a preview counted on two days, then deleted (as preview.yml does once a newer one comes out): GitHub's
+        # numbers lose it, but the badge, the summary and the chart keep its last count, so they never fall
+        new = {}
+        for today, downloads in (("2026-11-06", (("v0.1.0", "Sedjem-setup.exe", 60), ("v0.2.0-preview.1", "Sedjem-p1-setup.exe", 3))),
+                                 ("2026-11-07", (("v0.1.0", "Sedjem-setup.exe", 61), ("v0.2.0-preview.1", "Sedjem-p1-setup.exe", 4),
+                                                 ("v0.2.0-preview.1", "SHA256SUMS.txt", 2))),
+                                 ("2026-11-08", (("v0.1.0", "Sedjem-setup.exe", 62), ("v0.2.0-preview.2", "Sedjem-p2-setup.exe", 0)))):
+            new = stats.update(new, fetched(downloads=downloads), REPO, today)
+        self.assertEqual(json.loads(new["badges/downloads.json"])["message"], "66", "62 + 0, and the deleted preview's 4")
+        self.assertIn("| Downloads of the app, all releases | 66 |", new["README.md"])
+        self.assertIn("| v0.2.0-preview.1 (deleted) | Sedjem-p1-setup.exe | 4 |", new["README.md"])
+        self.assertIn("| v0.2.0-preview.1 (deleted) | SHA256SUMS.txt | 2 |", new["README.md"], "listed, not counted")
+        self.assertNotIn("v0.2.0-preview.1,", new["downloads.csv"].split("2026-11-08", 1)[1], "the snapshot is GitHub's")
+        points, _ = Plot(chart(new), "downloads").series("downloads")
+        self.assertEqual(points, [("2026-11-06", 63), ("2026-11-07", 65), ("2026-11-08", 66)])
 
     def test_drafts_are_left_out(self):
         f = fetched()

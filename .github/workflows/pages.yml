@@ -16,7 +16,7 @@
 # The page's numbers come from the stats branch, whose files are downloaded through the API: never a checkout or a
 # fetch of that branch, which GitHub would count as a clone. The latest release's details come from the API too;
 # GitHub gives each file's SHA256, so its SHA256SUMS.txt is downloaded only for a release without them, as every
-# download would add to its count. A file that can't be downloaded or read leaves its part of the page as it is
+# download would add to its count. The list of releases gives the day each one was published. A file that can't be downloaded or read leaves its part of the page as it is
 # without it, with a warning, and never stops the publication.
 name: Pages
 
@@ -120,6 +120,18 @@ jobs:
           else
             rm -f "$folder/release.json"
             echo "::warning::The latest release could not be read; the downloads link its page, without sizes or SHA256."
+          fi
+
+      - name: Download the list of releases (through the API)
+        # the day each release was published, for the downloads chart; a list counts no download
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          folder="$RUNNER_TEMP/release"
+          mkdir -p "$folder"
+          if ! gh api --paginate --slurp "repos/$GITHUB_REPOSITORY/releases?per_page=100" > "$folder/releases.json"; then
+            rm -f "$folder/releases.json"
+            echo "::warning::The list of releases could not be read; the downloads chart marks the latest release only."
           fi
 
       - name: Build

@@ -107,6 +107,25 @@ def total(rows, key):
     return sum(int(r[key]) for r in rows)
 
 
+def kept(rows):
+    """Each day's downloads of every file counted on that day or before, at its newest count up to that day, from the
+    daily snapshots: {date: {(release, asset): downloads}}. A release that is deleted, as each preview is once
+    preview.yml removes it, leaves GitHub's numbers, so its files keep the last count recorded and the totals never
+    fall."""
+    of_day, out, files = {}, {}, {}
+    for r in rows:
+        of_day.setdefault(r["date"], []).append(r)
+    for day in sorted(of_day):
+        files = {**files, **{(r["release"], r["asset"]): int(r["downloads"]) for r in of_day[day]}}
+        out[day] = files
+    return out
+
+
+def app_total(files):
+    """The downloads of the app in {(release, asset): downloads}: its files, not the checksum lists."""
+    return sum(n for (_, asset), n in files.items() if is_app(asset))
+
+
 def badge(label, n):
     return json.dumps({"schemaVersion": 1, "label": label, "message": f"{n:,}", "color": COLOUR}) + "\n"
 
@@ -116,7 +135,9 @@ def summary(tables, repo, today, traffic_read):
     latest = lambda rows: [r for r in rows if r["date"] == max((x["date"] for x in rows), default="")]
     downloads, referrers, info = latest(tables["downloads.csv"]), latest(tables["referrers.csv"]), latest(tables["repo.csv"])
     since = min((r["date"] for r in clones + views), default=None)
-    app = [r for r in downloads if is_app(r["asset"])]
+    files = kept(tables["downloads.csv"]).get(downloads[0]["date"], {}) if downloads else {}
+    shown_now = {(r["release"], r["asset"]) for r in downloads}
+    deleted = {f: n for f, n in files.items() if f not in shown_now}
     lines = [f"# {repo.split('/')[-1].capitalize()} statistics", "",
              f"Updated on {today} by the Repository stats workflow on main (`.github/workflows/stats.yml`), from "
              "GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day "
@@ -130,7 +151,7 @@ def summary(tables, repo, today, traffic_read):
               'of the app, the stars and forks over time, and the clones and page views per day"></a>'
               for theme, path in CHARTS.items()] + [""]
     lines += ["## Totals", "", "| | |", "|---|---|",
-              f"| Downloads of the app, all releases | {total(app, 'downloads'):,} |"]
+              f"| Downloads of the app, all releases | {app_total(files):,} |"]
     if since:
         lines += [f"| Clones since {since} | {total(clones, 'clones'):,} ({total(clones, 'unique'):,} unique per day, added up) |",
                   f"| Page views since {since} | {total(views, 'views'):,} ({total(views, 'unique'):,} unique per day, added up) |"]
@@ -140,6 +161,7 @@ def summary(tables, repo, today, traffic_read):
     if downloads:
         lines += ["", "## Downloads by release", "", "| Release | File | Downloads |", "|---|---|---|"]
         lines += [f"| {r['release']} | {r['asset']} | {int(r['downloads']):,} |" for r in downloads]
+        lines += [f"| {tag} (deleted) | {asset} | {n:,} |" for (tag, asset), n in deleted.items()]
     days = sorted({r["date"] for r in clones + views}, reverse=True)[:30]
     if days:
         c, v = {r["date"]: r for r in clones}, {r["date"]: r for r in views}
@@ -157,6 +179,9 @@ def summary(tables, repo, today, traffic_read):
               "",
               "Clones include those by build machines: every run of the Desktop build workflow clones the repository. "
               "The stats workflow does not, so it adds nothing to the counts.",
+              "",
+              "A release that is deleted leaves GitHub's numbers, as each preview does once a newer one replaces it. "
+              "Its files keep the last count recorded here, marked (deleted), so the totals and the badge never fall.",
               "",
               "Stars and forks come from GitHub's lists of the current stargazers and forks, which give the day of "
               "each star and fork, so their history reaches back to the first star. A star that is taken back "
@@ -192,8 +217,7 @@ def update(old, fetched, repo, today):
     new = {name: write_csv(rows, FIELDS[name]) for name, rows in tables.items()}
     new["state.json"] = json.dumps(state, indent=1, sort_keys=True) + "\n"
     new["README.md"] = summary(tables, repo, today, state.get("traffic_read"))
-    latest = [x for x in tables["downloads.csv"] if x["date"] == today]
-    new["badges/downloads.json"] = badge("downloads", total([x for x in latest if is_app(x["asset"])], "downloads"))
+    new["badges/downloads.json"] = badge("downloads", app_total(kept(tables["downloads.csv"]).get(today, {})))
     new["badges/clones.json"] = badge("clones", total(tables["clones.csv"], "clones"))
     published = [(rel["published_at"][:10], rel["tag_name"]) for rel in releases if rel.get("published_at")]
     data = chart_data(tables, published, today)
@@ -365,14 +389,10 @@ def daily(rows, key, last):
 
 
 def chart_data(tables, releases, today):
-    """The numbers the charts draw, by day: the running total of app downloads (from the daily snapshots),
-    stars and forks (each from its first day), clones and views with their uniques, and the releases
+    """The numbers the charts draw, by day: the running total of app downloads (from the daily snapshots, a
+    deleted release's files at their last count), stars and forks (each from its first day), clones and views with their uniques, and the releases
     [(day, tag)]; first and last are the days the time axis spans."""
-    by_day = {}
-    for r in tables["downloads.csv"]:
-        by_day.setdefault(r["date"], 0)
-        if is_app(r["asset"]):
-            by_day[r["date"]] += int(r["downloads"])
+    by_day = {d: app_total(files) for d, files in kept(tables["downloads.csv"]).items()}
     last = date.fromisoformat(today)
     traffic = lambda name, key: [(date.fromisoformat(r["date"]), int(r[key]), int(r["unique"])) for r in tables[name]]
     data = {"downloads": corners(sorted((date.fromisoformat(d), n) for d, n in by_day.items())),

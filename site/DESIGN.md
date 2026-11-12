@@ -435,8 +435,10 @@ and, in the dark theme, the lit top edge. One chart leads and the rest are small
 - the downloads in all lead, across the whole row: the number at 56 px from 1000 px, with how many came in the last
   seven days (or since the first day, while the history is shorter than a week), over the running total drawn 170 px
   high, the widest and tallest picture in the section. Each stable release is marked on the line by a ring and a
-  small tag in Plex Mono above it, `0.3.1`, the way the transcript sets a timecode; the tags of releases close
-  together are staggered, with a hairline down to the ring. The line keeps no axis and no dates;
+  small tag in Plex Mono above it, `0.3.1`, the way the transcript sets a timecode, on the day GitHub says it was
+  published (UTC), not the day the morning stats first counted it; the tags of releases close together are
+  staggered, with a hairline down to the ring. A release that is deleted, as old previews are, keeps its last count,
+  so the total never falls. The line keeps no axis and no dates;
 - the latest release's downloads, with the day it came out, over a thin bar of it, the older releases and the
   previews, with a legend of names and shares;
 - the larger system's share, with the other's, over a thin bar of the two and its legend;
