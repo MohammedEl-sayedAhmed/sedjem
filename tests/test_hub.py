@@ -640,6 +640,9 @@ class ApiTests(unittest.TestCase):
         return next((m for m in self.call("GET", "/api/status")[1]["models"] if m["id"] == mid), None)
 
     def wait_ready(self, mid):
+        """Waits until the model is ready and its download no longer runs. A status reads the download's files a
+        moment before it checks the model, so when the last file is put in place between the two, it says ready
+        while the download still runs and its files are not all installed (issue #90)."""
         end = time.time() + 30
         while time.time() < end:
             m = self.model(mid)
