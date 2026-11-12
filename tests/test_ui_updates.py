@@ -11,6 +11,7 @@ Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_updates.py" -v
 """
 import copy
 import hashlib
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -207,6 +208,18 @@ class Updates(UiTestCase):
 
     def stored(self, key):
         return self.page.evaluate("(k) => localStorage.getItem(k)", key)
+
+    def take_held(self, fake, what, count):
+        """Waits until count requests for what are held, and takes them from the fake, oldest first."""
+        deadline = time.monotonic() + 10
+        while sum(h[0] == what for h in fake.held) < count:
+            self.assertLess(time.monotonic(), deadline, f"{count} requests for {what} held")
+            self.page.wait_for_timeout(50)
+        fake.hold.discard(what)
+        items = [h for h in fake.held if h[0] == what]
+        for item in items:
+            fake.held.remove(item)
+        return items
 
     # ---- the first-start question ----------------------------------------------------------------------------
     def test_the_first_start_question_yes(self):
@@ -486,6 +499,51 @@ class Updates(UiTestCase):
         self.assertEqual(self.page.inner_text("#updSkip"), "Skip this version")
         self.assertEqual(self.page.locator("#set-panel .upd-card-head .status").count(), 0)
         self.assertEqual(sum(c[:2] == ("GET", "state") for c in fake.calls), gets + 1, "asked again")
+
+    def test_two_quick_changes_end_on_the_last(self):
+        """Two quick clicks on the switch: off, then on again. The first click's answer comes back last, built from
+        the state between the two clicks. The page must not end on it, but on the switch as the server has it, and
+        it asks once more (issue #100)."""
+        fake = self.fake()
+        self.open()
+        self.ready()
+        self.open_tab()
+        fake.hold.add("settings")
+        self.page.locator("#updAuto").uncheck()
+        self.page.locator("#updAuto").check()
+        (_, first, body), second = self.take_held(fake, "settings", 2)
+        self.assertEqual([body, second[2]], [{"enabled": False}, {"enabled": True}])
+        fake.state["enabled"] = False  # the server saves the first click,
+        between = copy.deepcopy(fake.state)  # and reads the state for its answer before the second click is saved
+        gets = sum(c[:2] == ("GET", "state") for c in fake.calls)
+        fake.answer(*second)  # the second click's answer comes back first
+        self.page.wait_for_selector(".toast >> text=Saved")
+        first.fulfill(json=between)
+        self.page.wait_for_function("() => [...document.querySelectorAll('#toasts .toast')]"
+                                    ".filter((t) => t.textContent === 'Saved').length === 2")
+        self.assertTrue(self.page.is_checked("#updAuto"))
+        self.assertTrue(self.page.evaluate("() => UPD.data.enabled"))
+        self.assertEqual(sum(c[:2] == ("GET", "state") for c in fake.calls), gets + 1, "asked once more")
+
+    def test_a_check_answered_after_a_later_change_is_not_lost(self):
+        """The switch turned off while Check now waits for GitHub. The check's answer comes back after the switch's,
+        so the page does not show it over the newer answer. What the check found still shows, from one more load."""
+        fake = self.fake(checked=ago(days=3))
+        fake.hold.add("check")
+        self.open()
+        self.ready()
+        self.open_tab()
+        self.page.click("#updCheck")
+        self.page.wait_for_selector("#updCheck[aria-disabled=true]:has-text('Checking…')")
+        self.page.locator("#updAuto").uncheck()
+        self.page.wait_for_selector(".toast >> text=Saved")
+        self.assertFalse(self.page.is_checked("#updAuto"))
+        fake.check = lambda s: s.update(checked=ago(seconds=1), found="update", available=release())
+        fake.release("check")
+        self.page.wait_for_selector("#updCheck:not([aria-disabled]):has-text('Check now')")
+        self.assertEqual(self.page.inner_text("#updWhen"), "Checked just now")
+        self.page.wait_for_selector("#set-panel .upd-card-head:has-text('Sedjem 0.3.0')")
+        self.assertFalse(self.page.is_checked("#updAuto"))
 
     def test_update_now_blocked_gives_the_commands(self):
         commands = ['cd "/home/you/sedjem"', "git stash", "git pull --ff-only origin main",
