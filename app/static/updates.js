@@ -8,9 +8,11 @@
 "use strict";
 
 // data: what GET /api/updates (or a POST) answered last; changes: how many times a change (a POST) was sent or
-// answered; the rest is what this page is doing with it
+// answered; open: how many changes are on their way; newest: of the changes whose answers the page showed, the
+// value of changes when the newest one was sent; again: changes overlapped, so the state is loaded again when none
+// is on its way; the rest is what this page is doing with it
 const UPD = { data: null, error: "", loading: null, checking: false, installing: false, asked: false, seen: null,
-  started: false, timer: null, restart: null, sig: "", changes: 0 };
+  started: false, timer: null, restart: null, sig: "", changes: 0, open: 0, newest: 0, again: false };
 const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (localStorage)
 const UPD_FROM = "sedjem-update-from";  // what ran before Update now, to say "Updated to …" once it is back
 const UPD_BUSY = new Set(["downloading", "verifying", "installing"]);
@@ -109,7 +111,7 @@ async function updAnswer(on) {
   if (b.getAttribute("aria-disabled") === "true") return;
   b.setAttribute("aria-disabled", "true");
   try {
-    if (on !== null) updSetData(await updPost("settings", { enabled: on }));
+    if (on !== null) await updPost("settings", { enabled: on });
     if (usage) await usageSave(usage.checked, false);
   } catch (e) { toast(e.message, "error"); b.removeAttribute("aria-disabled"); return; }
   UPD.asked = true;
@@ -170,12 +172,28 @@ function loadUpdates() {
   return UPD.loading;
 }
 
-// A change: POST /api/updates/<path>. Its answer is the state after the change. UPD.changes moves when it is sent
-// and when it is answered, so that a GET on its way at either time asks again.
+// A change: POST /api/updates/<path>. Its answer is the state after the change, and the page shows it. UPD.changes
+// moves when a change is sent and when it is answered, so that a GET on its way at either time asks again.
+// Changes can overlap (two quick clicks on the switch). Their answers can then come back in another order than
+// they were sent, and an answer can come from the state between the two changes. So an answer never replaces the
+// answer of a change sent after it, and when overlapping changes are all answered, the page loads the state again.
 async function updPost(path, body) {
-  UPD.changes++;
-  try { return await api.post(`/api/updates/${path}`, body); }
-  finally { UPD.changes++; }
+  const sent = ++UPD.changes;
+  UPD.open++;
+  try {
+    const d = await api.post(`/api/updates/${path}`, body);
+    if (sent > UPD.newest) {
+      UPD.newest = sent;
+      updSetData(d);
+    }
+  } finally {
+    if (UPD.changes !== sent) UPD.again = true;  // another change was sent or answered while this one was on its way
+    UPD.changes++;
+    if (!--UPD.open && UPD.again) {
+      UPD.again = false;
+      await loadUpdates();
+    }
+  }
 }
 
 // A new answer from the server: kept, and followed (the progress polled, the restart waited for). What happens
@@ -451,7 +469,7 @@ function bindUpdates() {
 
 // The switch and the channel, saved at once; the pill follows
 async function updSettings(change) {
-  try { updSetData(await updPost("settings", change)); toast("Saved"); }
+  try { await updPost("settings", change); toast("Saved"); }
   catch (e) { toast(e.message, "error"); }
   updRedraw(true);
   refreshStatus();
@@ -462,7 +480,7 @@ async function updCheck() {
   if (UPD.checking) return;
   UPD.checking = true;
   updRedraw(true);
-  try { updSetData(await updPost("check")); }
+  try { await updPost("check"); }
   catch (e) { toast(e.message, "error"); }
   UPD.checking = false;
   updRedraw(true);
@@ -470,7 +488,7 @@ async function updCheck() {
 }
 
 async function updSkip(skip) {
-  try { updSetData(await updPost("skip", { skip })); }
+  try { await updPost("skip", { skip }); }
   catch (e) { toast(e.message, "error"); return; }
   updRedraw(true);
   toast(skip ? "Skipped. Sedjem tells you again when something newer is out" : "No longer skipped");
@@ -501,7 +519,7 @@ async function updInstall(ask) {
   if (ask && !confirm(updConfirm(a))) return;
   if (restarts) updPut(UPD_FROM, JSON.stringify({ version: d.running?.version, commit: d.running?.commit, at: Date.now() }));
   UPD.installing = true;
-  try { updSetData(await updPost("install")); }
+  try { await updPost("install"); }
   catch (e) { updPut(UPD_FROM, null); toast(e.message, "error"); }
   finally { UPD.installing = false; }
   updRedraw(true);
