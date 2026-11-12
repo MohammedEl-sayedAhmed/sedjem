@@ -115,16 +115,20 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ inputs.version }}
         run: |
-          if ! release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" 2>&1); then
-            if [[ "$release" == *"HTTP 404"* ]]; then
+          # the errors apart from the release's JSON, so that a warning can't be read as part of it
+          errors="$RUNNER_TEMP/release-errors.txt"
+          if ! release=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$VERSION" 2> "$errors"); then
+            if grep -q "HTTP 404" "$errors"; then
               echo "::notice::v$VERSION isn't published, so the website keeps the downloads it has."
               exit 0
             fi
-            echo "::error::The release v$VERSION could not be read: $release"
+            echo "::error::The release v$VERSION could not be read: $(cat "$errors")"
             exit 1
           fi
-          if [ "$(jq -r '.prerelease' <<< "$release")" != false ]; then
-            echo "::notice::v$VERSION is a pre-release, so the website keeps the downloads it has."
-            exit 0
-          fi
-          gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"
+          # JSON that jq can't read stops the step here (bash -e), so a missed build shows in the run
+          prerelease=$(jq -r '.prerelease' <<< "$release")
+          case "$prerelease" in
+            false) gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY" ;;
+            true) echo "::notice::v$VERSION is a pre-release, so the website keeps the downloads it has." ;;
+            *) echo "::error::The release v$VERSION has no pre-release field ($prerelease)."; exit 1 ;;
+          esac

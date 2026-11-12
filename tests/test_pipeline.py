@@ -469,12 +469,14 @@ class Release(unittest.TestCase):
         (step,) = site["steps"]
         self.assertEqual(step["env"]["VERSION"], "${{ inputs.version }}")
         script = step["run"]
-        self.assertIn('releases/tags/v$VERSION', script)
-        self.assertIn('"HTTP 404"', script)
-        self.assertIn("'.prerelease'", script)
-        self.assertLess(script.index("'.prerelease'"), script.index("gh workflow run"), "only a stable release")
+        self.assertIn('releases/tags/v$VERSION" 2> "$errors"', script)
+        self.assertNotIn("2>&1", script, "a warning must not be read as the release's JSON")
+        self.assertIn('grep -q "HTTP 404" "$errors"', script)
+        self.assertIn("prerelease=$(jq -r '.prerelease' <<< \"$release\")", script)
         self.assertEqual(script.count("gh workflow run"), 1)
-        self.assertTrue(script.rstrip().endswith('gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY"'))
+        self.assertIn('false) gh workflow run pages.yml --ref main --repo "$GITHUB_REPOSITORY" ;;', script,
+                      "only a stable release")
+        self.assertIn("*) echo \"::error::", script, "a release without the field fails the step")
         # nothing else starts a workflow: the nightly preview leaves the downloads as they are
         for name in ("preview.yml", "desktop.yml"):
             for job_id, _, script in runs(load(name)):

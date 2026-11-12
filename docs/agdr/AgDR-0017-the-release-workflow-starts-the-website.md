@@ -1,6 +1,6 @@
 ---
 id: AgDR-0017
-timestamp: 2026-11-12T14:30:00Z
+timestamp: 2026-11-12T12:16:47Z
 agent: claude-code
 model: claude-opus-5-5
 trigger: user-prompt
@@ -38,11 +38,13 @@ publishing job and the nightly preview as they are. The `site` job needs the tag
 the run was cancelled or the tag was not made. It reads `vX.Y.Z` through the API. When that is a published stable
 release, it runs `gh workflow run pages.yml --ref main`, as `pages.yml`'s `on-main` job does for a release published
 by a person. When the release is not published, or is a pre-release, it starts nothing and leaves a notice. When the
-API cannot be read, it fails, so that a missed build shows in the run.
+API or its answer cannot be read, it fails, so that a missed build shows in the run. The API's errors are kept apart
+from its answer, so that a warning is never read as part of the release.
 
 ## Consequences
 
-- A stable release reaches the site within about 15 minutes of being published, also when winget fails.
+- The Pages workflow starts at most 15 minutes after a stable release is published, once winget has ended, also
+  when winget fails. The site shows the release once that build is deployed, a few minutes later.
 - A run whose release was not published, such as a refused approval, starts no build.
 - A tag pushed by hand still reaches the site through the Desktop build's success, as before.
 - `tests/test_pipeline.py` lists the job among those that may write, and checks its condition and its script.
