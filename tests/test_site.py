@@ -1128,9 +1128,10 @@ class NumbersTest(unittest.TestCase):
         cls.dir = Path(cls.tmp.name)
         cls.stats = fixture.write_stats(cls.dir / "stats")
         cls.usage = fixture.write_usage(cls.dir / "usage.json")
-        cls.full = cls.sections(build.build(cls.dir / "full", stats=cls.stats, usage=cls.usage))
+        cls.release = fixture.write_release(cls.dir / "release")
+        cls.full = cls.sections(build.build(cls.dir / "full", stats=cls.stats, usage=cls.usage, latest=cls.release))
         cls.so_far = fixture.write_usage(cls.dir / "usage-so-far.json", fixture.USAGE_SO_FAR)
-        cls.sofar = cls.sections(build.build(cls.dir / "sofar", stats=cls.stats, usage=cls.so_far))
+        cls.sofar = cls.sections(build.build(cls.dir / "sofar", stats=cls.stats, usage=cls.so_far, latest=cls.release))
 
     @classmethod
     def tearDownClass(cls):
@@ -1148,8 +1149,10 @@ class NumbersTest(unittest.TestCase):
         return found
 
     def build(self, name, **kwargs):
-        """A build with other numbers, and what it said in the log."""
+        """A build with other numbers (and the made-up releases, unless latest is given), and what it said in the
+        log."""
         log = io.StringIO()
+        kwargs.setdefault("latest", self.release)
         with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
             out = build.build(self.dir / name, **kwargs)
         return self.sections(out), log.getvalue()
@@ -1225,14 +1228,15 @@ class NumbersTest(unittest.TestCase):
         self.assertEqual((c["figure"], c["title"], c["line"]),
                          ((str(fixture.TOTAL), fmt(fixture.TOTAL)), "Downloads, all releases", f"+{fmt(e['week'])} since {e['per_day'][0][0].day} {e['per_day'][0][0]:%B}"))
         self.assertEqual(e["week"], fixture.TOTAL - 380, "the history is shorter than a week, so it counts from its first day")
-        out = {d: r.removeprefix("v") for r, d in e["first_seen"].items() if d > e["per_day"][0][0] and not "-" in r}
-        self.assertEqual(out, {fixture.DAY: "0.10.0"})
+        out = {date.fromisoformat(fixture.PUBLISHED[r][:10]): r.removeprefix("v") for r in e["releases"] if "-" not in r
+               and e["per_day"][0][0] <= date.fromisoformat(fixture.PUBLISHED[r][:10])}
+        self.assertEqual(out, {fixture.DAY - timedelta(1): "0.10.0"}, "published the evening before the stats counted it")
         self.assertEqual(c["table"], [[long_day(d) + (f" ({out[d]} out)" if d in out else ""), fmt(n)] for d, n in e["per_day"]])
         c = cards["releases"]
         older = sum(n for r, n in e["releases"].items() if r != "v0.10.0" and "-" not in r)
         whole = fixture.LATEST + older + 7
         self.assertEqual((c["figure"], c["title"], c["line"]),
-                         ((str(fixture.LATEST), fmt(fixture.LATEST)), "Downloads of 0.10.0", "the latest release, out on 2 December"))
+                         ((str(fixture.LATEST), fmt(fixture.LATEST)), "Downloads of 0.10.0", "the latest release, out on 1 December"))
         self.assertEqual(c["parts"], [("part-latest", fixture.LATEST), ("part-older", older), ("part-previews", 7)])
         self.assertEqual(c["legend"], [("0.10.0", share(fixture.LATEST, whole)), ("Older releases", share(older, whole)),
                                        ("Previews", "<1%")])
@@ -1271,7 +1275,7 @@ class NumbersTest(unittest.TestCase):
         picture (the lead chart 170 px high with room for the tags above its line, the others 40 px), from the lowest
         value (or 0 for the page views) at the bottom to the highest at the top; a
         smooth curve through every point that never overshoots one; the last stretch dashed to the dot on the last
-        day; and a ring on each release day before it."""
+        day; and a ring on the day each release was published, before the last day."""
         e = self.expected()
         section = self.full["en"]
         down = lambda v, lo, hi, h, top: round(top + (1 - (v - lo) / ((hi - lo) or 1)) * (h - top - 4), 1)  # noqa: E731
@@ -1309,15 +1313,18 @@ class NumbersTest(unittest.TestCase):
                 else:
                     self.assertEqual(stops, [])
                     self.assertFalse(card.find(lambda n: "wash" in n.classes()))
-        # a release first counted before the last day is a ring on the line; on the last day, the dot stands for it
+        # a release is a ring on the line on the day it was published, here 0.10.0 on the fourth of five days, though
+        # the stats first counted it on the fifth; one published on the last day has the dot instead
+        rings = lambda section: [r.attrs["cx"] for r in section.find(  # noqa: E731
+            lambda n: n.attrs.get("id") == "numbers-downloads")[0].find(lambda n: n.tag == "circle" and "mark" in n.classes())]
+        self.assertEqual(rings(self.full["en"]), ["75%"])
         downloads = list(fixture.DOWNLOADS) + [(d, "v0.9.5", "Sedjem-0.9.5-setup.exe", n) for d, n in
                                                (("2026-11-30", 3), ("2026-12-01", 4), ("2026-12-02", 5))]
-        sections, _ = self.build("ring", stats=fixture.write_stats(self.dir / "ring-stats", downloads=downloads), usage=self.usage)
-        (card,) = sections["en"].find(lambda n: n.attrs.get("id") == "numbers-downloads")
-        rings = [r.attrs["cx"] for r in card.find(lambda n: n.tag == "circle" and "mark" in n.classes())]
-        self.assertEqual(rings, ["50%"], "0.9.5, first counted on the third of five days")
-        self.assertIn("30 November 2026 (0.9.5 out)", str(self.cards(sections["en"])["downloads"]["table"]))
-        self.assertFalse(self.full["en"].find(lambda n: n.tag == "circle" and "mark" in n.classes()))
+        published = fixture.PUBLISHED | {"v0.9.5": "2026-11-29T21:10:00Z", "v0.10.0": "2026-12-02T07:00:00Z"}
+        sections, _ = self.build("ring", stats=fixture.write_stats(self.dir / "ring-stats", downloads=downloads), usage=self.usage,
+                                 latest=fixture.write_release(self.dir / "ring-release", releases=fixture.releases_json(published)))
+        self.assertEqual(rings(sections["en"]), ["25%"], "0.9.5, published on the second of five days, counted from the third")
+        self.assertIn("29 November 2026 (0.9.5 out)", str(self.cards(sections["en"])["downloads"]["table"]))
         # each release is named on the lead's line by a small mono tag, the last day's too; the others have none
         tags = lambda section: [(t.text(), t.attrs["style"]) for t in section.find(lambda n: "tag" in n.classes())]  # noqa: E731
         self.assertEqual([name for name, _ in tags(sections["en"])], ["0.9.5", "0.10.0"])
@@ -1325,7 +1332,7 @@ class NumbersTest(unittest.TestCase):
         (card,) = sections["en"].find(lambda n: n.attrs.get("id") == "numbers-views")
         self.assertFalse(card.find(lambda n: "tag" in n.classes()))
         (first, last) = tags(sections["en"])
-        self.assertIn("--x: 50%", first[1])
+        self.assertIn("--x: 25%", first[1])
         self.assertIn("--x: 100%", last[1])
 
     def test_a_long_history_is_drawn_by_the_week(self):
@@ -1393,7 +1400,7 @@ class NumbersTest(unittest.TestCase):
 
     def test_the_dates_are_the_numbers_own(self):
         """GitHub's numbers are as of the newest day in its daily snapshots, said under the grid; the latest release is
-        out on the day it was first counted, the stars count from their first day, the page views run to the last day
+        out on the day it was published (UTC), not the later day the stats first counted it, the stars count from their first day, the page views run to the last day
         recorded, and the counts are of the newest month, each named in the page's language and in a time element."""
         for lang, section in self.full.items():
             (source,) = section.find(lambda n: "numbers-source" in n.classes())
@@ -1403,7 +1410,7 @@ class NumbersTest(unittest.TestCase):
                 lambda n: n.attrs.get("id") == f"numbers-{key}")[0].find(lambda n: n.tag == "time" and not n.inside(lambda m: m.tag == "table"))]
             self.assertEqual(times("counts"), [("2026-11", {"en": "November 2026", "ar": "نوفمبر 2026"}[lang])] * 3,
                              "the month, the census that names it and the calendar of its days")
-            self.assertEqual(times("releases"), [("2026-12-02", {"en": "2 December", "ar": "2 ديسمبر"}[lang])])
+            self.assertEqual(times("releases"), [("2026-12-01", {"en": "1 December", "ar": "1 ديسمبر"}[lang])])
             self.assertEqual(times("stars"), [("2026-12-01", {"en": "1 December", "ar": "1 ديسمبر"}[lang])])
             self.assertEqual(times("views"), [])
         # with a shorter history the page views say from when, and the average is over the days recorded
@@ -1412,6 +1419,87 @@ class NumbersTest(unittest.TestCase):
         views = self.cards(sections["en"])["views"]
         self.assertEqual((views["title"], views["line"]),
                          ("Repository page views since 22 November", f"about {round(sum(n for _, n, _ in short) / 10, 1)} a day"))
+
+    def test_a_release_is_dated_the_day_it_was_published(self):
+        """A release published after the day's stats run is first counted the next day, but the page dates it by
+        published_at, in UTC: its ring, its row in the table and "out on". Without the list of releases, or with one
+        that can't be read, which the log says, release.json still dates the latest release; a release published
+        before the stats began has no ring but is still out on its day."""
+        def built(name, published=None, releases=None, data=None):
+            name = f"dated-{name}"
+            folder = fixture.write_release(self.dir / f"{name}-release", data, releases=releases if releases is not None
+                                           else fixture.releases_json(published or fixture.PUBLISHED))
+            sections, log = self.build(name, stats=self.stats, usage=self.usage, latest=folder)
+            card = self.cards(sections["en"])
+            marked = [row[0] for row in card["downloads"]["table"] if row[0].endswith(" out)")]
+            return marked, card["releases"]["line"], log
+        # 3:30 in the morning of 2 December in Riyadh is the evening of 1 December in UTC
+        late = fixture.PUBLISHED | {"v0.10.0": "2026-12-02T01:30:00+03:00"}
+        self.assertEqual(built("utc", late, data=fixture.release_json(published_at=late["v0.10.0"])),
+                         (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December", ""))
+        self.assertEqual(built("evening")[:2], (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        marked, line, log = built("none", releases=False)
+        self.assertEqual((marked, line), (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        self.assertIn("numbers: no releases.json, so the downloads chart marks the latest release only\n", log,
+                      "a warning in a GitHub Actions run, with ::warning:: before it")
+        older = fixture.PUBLISHED | {"v0.9.2": "2026-11-29T09:00:00Z"}  # 0.9.2 in the stats' days: only the list has it
+        self.assertEqual(built("listed", older)[0], ["29 November 2026 (0.9.2 out)", "1 December 2026 (0.10.0 out)"])
+        self.assertEqual(built("unlisted", releases=False)[0], ["1 December 2026 (0.10.0 out)"])
+        marked, line, log = built("broken", releases=[[{"tag_name": "v0.10.0", "published_at": "1 December"}]])
+        self.assertEqual((marked, line), (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        self.assertIn("releases.json can't be read", log)
+        early = fixture.PUBLISHED | {"v0.10.0": "2026-11-27T12:00:00Z"}
+        self.assertEqual(built("early", early, data=fixture.release_json(published_at=early["v0.10.0"]))[:2],
+                         ([], "the latest release, out on 27 November"))
+        # two releases on one day: one mark, named by the newer, whichever was published first
+        for name, morning in (("same-day", "v0.9.2"), ("same-day-swapped", "v0.10.0")):
+            same = fixture.PUBLISHED | {"v0.9.2": "2026-12-01T19:30:00Z", "v0.10.0": "2026-12-01T19:30:00Z", morning: "2026-12-01T06:00:00Z"}
+            self.assertEqual(built(name, same, data=fixture.release_json(published_at=same["v0.10.0"]))[:2],
+                             (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+
+    def test_a_long_history_keeps_each_release_day(self):
+        """Past DAILY days the downloads are drawn by the week, and the day each release was published stays a point
+        of the line and a row of the table, between the weeks."""
+        start = date(2026, 10, 1)
+        days = [start + timedelta(i) for i in range(build.DAILY + 20)]
+        downloads = [(d.isoformat(), "v0.9.2", "Sedjem-0.9.2-setup.exe", 100 + i) for i, d in enumerate(days)]
+        out = days[-10]  # not a whole number of weeks before the last day
+        downloads += [(d.isoformat(), "v0.10.0", "Sedjem-0.10.0-setup.exe", 5) for d in days if d > out]
+        published = {"v0.9.2": "2026-09-20T10:00:00Z", "v0.10.0": f"{out.isoformat()}T20:00:00Z"}
+        sections, _ = self.build("long", stats=fixture.write_stats(self.dir / "long-stats", downloads=downloads),
+                                 usage=self.usage, latest=fixture.write_release(
+                                     self.dir / "long-release", releases=fixture.releases_json(published)))
+        table = self.cards(sections["en"])["downloads"]["table"]
+        self.assertIn([long_day(out) + " (0.10.0 out)", f"{100 + days.index(out):,}"], table)
+        self.assertLess(len(table), 20, "drawn by the week")
+
+    def test_a_deleted_preview_keeps_its_last_count(self):
+        """A preview leaves GitHub's numbers once preview.yml deletes it; its downloads keep their last count, so the
+        running total never falls and the previews' part of the latest release's bar still holds them."""
+        gone = [(d, "v0.9.3-preview.20261127", "Sedjem-0.9.3-preview.20261127-setup.exe", n)
+                for d, n in (("2026-11-28", 2), ("2026-11-29", 4), ("2026-11-30", 5))]
+        sections, _ = self.build("deleted", stats=fixture.write_stats(self.dir / "deleted-stats",
+                                                                      downloads=list(fixture.DOWNLOADS) + gone),
+                                 usage=self.usage)
+        cards = self.cards(sections["en"])
+        totals = [int(n.replace(",", "")) for _, n in cards["downloads"]["table"]]
+        self.assertEqual(totals, [382, 392, 400, 405, fixture.TOTAL + 5])
+        self.assertEqual(totals, sorted(totals), "the running total never falls")
+        self.assertEqual(cards["downloads"]["figure"][0], str(fixture.TOTAL + 5))
+        self.assertIn(["Previews", "12"], cards["releases"]["table"])
+
+    def test_a_stable_release_deleted_by_hand_is_not_the_latest(self):
+        """A stable release deleted by hand keeps its downloads in the total and in the table of releases, but the
+        latest release is the newest one still published."""
+        gone = [(d, "v0.10.1", "Sedjem-0.10.1-setup.exe", n) for d, n in (("2026-11-30", 1), ("2026-12-01", 3))]
+        sections, _ = self.build("deleted-stable", stats=fixture.write_stats(self.dir / "deleted-stable-stats",
+                                                                             downloads=list(fixture.DOWNLOADS) + gone),
+                                 usage=self.usage)
+        cards = self.cards(sections["en"])
+        self.assertEqual((cards["releases"]["title"], cards["releases"]["figure"][0]), ("Downloads of 0.10.0", str(fixture.LATEST)))
+        self.assertEqual(cards["releases"]["table"], [["0.10.0", f"{fixture.LATEST:,}"], ["0.10.1", "3"], ["0.9.2", "463"],
+                                                      ["Previews", "7"]])
+        self.assertEqual(cards["downloads"]["figure"][0], str(fixture.TOTAL + 3))
 
     def test_before_the_first_month_the_page_says_when_it_comes(self):
         """Without docs/usage.json the counts' card is a calm hatched one with a line saying the first totals,
