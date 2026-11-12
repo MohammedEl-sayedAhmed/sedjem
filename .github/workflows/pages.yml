@@ -6,9 +6,11 @@
 # or `gh workflow run pages.yml`). Pages must be turned on in the repository's settings with GitHub Actions as its
 # source. To build and look at it locally, see site/build.py's docstring.
 #
-# A release reaches the site two ways. The Desktop build workflow publishes one for a pushed tag with the workflow's
-# own token, which never starts another workflow, so its run's success starts this one. A release published by a
-# person starts this one too (release: published), but the github-pages environment deploys from main only, and
+# A release reaches the site three ways. The Release workflow (release.yml), the usual way, publishes it with the
+# workflow's own token, which never starts another workflow, and its run is "Release", not "Desktop build", so its
+# site job starts this workflow on main once the release is published, also when winget failed. The Desktop build
+# workflow publishes one for a pushed tag the same way, so its run's success starts this one. A release published by
+# a person starts this one too (release: published), but the github-pages environment deploys from main only, and
 # such a run is on the release's tag, so it only asks for a run on main.
 #
 # The page's numbers come from the stats branch, whose files are downloaded through the API: never a checkout or a

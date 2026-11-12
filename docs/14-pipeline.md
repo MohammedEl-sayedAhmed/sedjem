@@ -12,7 +12,7 @@ the rules for public text, and the choices still open.
 |---|---|---|
 | Tests (`tests.yml`) | every push to main and every pull request | the quick checks, then the test suite on Linux and Windows and the setup from source on Windows |
 | Desktop build (`desktop.yml`) | pull requests that change how the app is built or started, by hand, and when Release or Nightly preview calls it | the tests again, both builds with their self-tests, the installer and its update tests; publishes only when called or for a pushed tag |
-| Release (`release.yml`) | by hand, with the version | checks the version and the commit, tags it, and has the Desktop build publish it |
+| Release (`release.yml`) | by hand, with the version | checks the version and the commit, tags it, has the Desktop build publish it, and then starts Pages on main |
 | Nightly preview (`preview.yml`) | once a day | a pre-release of main's newest tested commit ([updates](12-updates.md#nightly-preview-builds)) |
 | CodeQL (`codeql.yml`) | every push to main and pull request, and on Mondays | CodeQL's security queries on the Python, the JavaScript and the workflows; a pull request fails only on findings that main doesn't have (`codeql-ratchet`), and main's findings are written to the `security-baseline` branch ([the ratchet](#the-codeql-ratchet)) |
 | CodeQL baseline guard (`codeql-baseline-guard.yml`) | every push to the `security-baseline` branch | puts back what anyone but the CodeQL workflow pushed there, and opens an issue |
@@ -20,7 +20,7 @@ the rules for public text, and the choices still open.
 | Footprints (`footprints.yml`) | every pull request, also when its title or description is edited | fails on AI-tool attribution in the commits, the title or the description ([ADR 15](adr/0015-no-ai-tool-attribution-in-the-history.md)) |
 | Security (`security.yml`) | every push to main and pull request, and on Mondays | pip-audit on the locks, every package the workflows install, and the dependency review of a pull request |
 | Dependabot (`.github/dependabot.yml`) | on Mondays | pull requests that update the pip requirements and the actions |
-| Pages (`pages.yml`) | pushes to main that change the website or the benchmark results it shows, after each day's stats, after a release, by hand | the website ([site/build.py](../site/build.py)), built from main; it never follows a run for a fork's pull request |
+| Pages (`pages.yml`) | pushes to main that change the website or the benchmark results it shows, after each day's stats, after a release (the Release workflow starts it, also when winget failed), by hand | the website ([site/build.py](../site/build.py)), built from main; it never follows a run for a fork's pull request |
 | Repository stats (`stats.yml`) | once a day | the numbers and charts on the `stats` branch |
 
 The quick checks are one job, `checks`, of a minute or two, and the slower jobs of the Tests workflow start only
@@ -124,7 +124,10 @@ The Release workflow ([`.github/scripts/release.py`](../.github/scripts/release.
   the newest release, both the way *Update now* does, and publishes the release with its files, its notes and a
   link to the privacy policy. Without a notes file, the draft is published as it is. Publishing also opens the
   release's post in the Discussions' Announcements, where users follow new versions (a preview opens none), so
-  that category must keep its name. The release then goes to winget.
+  that category must keep its name. The release then goes to winget;
+- once the build has ended, also when winget failed, starts the Pages workflow on main if the release is
+  published, so that the website offers its downloads. A release published with a workflow's token starts no
+  other workflow, and Pages follows the Desktop build only when that runs alone, for a pushed tag.
 
 Publishing a stable release uses the GitHub environment `release`, which has the maintainer as its required
 reviewer ([ADR 16](adr/0016-branch-protection-with-seven-checks-and-a-linear-history.md)). Running the workflow
