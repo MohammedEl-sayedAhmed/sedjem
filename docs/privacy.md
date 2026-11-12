@@ -126,11 +126,12 @@ the values of one install that started between them, so the month so far has no 
 to 9 November, went in with every breakdown before this rule. The finished November keeps its breakdowns only when at
 least three installs (or, for the website, three visitors) came after that copy; with fewer, it has headline numbers
 only too. The check counts those installs as one group, not each value. The difference can still show that one or two
-of them have a value the finished month names, such as a graphics card. It also ties that value to any value they all
-share, such as their country, and to a value that goes with it, as CUDA goes with an NVIDIA card. So it can show much of
-one install's values, as the totals of one month with three installs can, since the hardware counts are not folded. A
-country, a system, a
-site that linked to the website or a tag is named only when at least three visitors came with it that month. One part has no such rule: the visits, which the website draws as a world map and a calendar. A visit is
+of them have a value the finished month names, such as a country or a graphics card. It also ties that value to any
+value they all share, such as their country, and to a value that goes with it, as CUDA goes with an NVIDIA card. So it
+can show much of one install's values, as the totals of one month with three installs can, since the hardware counts
+are not folded. A country, a system, a site that linked to the website or a tag is named only when at least three
+visitors came with it that month. One part has no such rule: the visits, which the website draws as a world map and a
+calendar. A visit is
 one session of page views and download clicks, and the totals hold only how many visits there were, how many came from
 each country and how many on each day. The countries of the visits are not folded, so a country with one or two visits
 shows on the map. Nothing is kept for a single visit: no hour, system or device of one, no region, no language, no tag
