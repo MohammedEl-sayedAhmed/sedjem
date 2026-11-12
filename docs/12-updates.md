@@ -132,7 +132,7 @@ another system can't update itself. *Download* opens the release page instead.
 The Windows installer and the Linux build download only this repository's release files, over HTTPS from
 GitHub. Each one is checked against the release's `SHA256SUMS.txt` before it is used. An update from source
 fetches main from the checkout's origin. When a requirement file changed, uv or pip also downloads its packages
-from the package index that the Python environment is set to use, which is PyPI unless you changed it
+from the package index that it is set to use, which is PyPI unless you changed it
 ([privacy policy](privacy.md#what-sedjem-contacts-and-when)).
 
 ## Updating by hand from source

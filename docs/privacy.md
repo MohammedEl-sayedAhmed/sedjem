@@ -29,18 +29,19 @@ here.
   from a Hugging Face link asks it about that model.
 - GitHub ([privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)):
   `github.com` for the other speaker models, from the releases of the sherpa-onnx project, and for Sedjem's own
-  releases when you update; `api.github.com` to check for updates, once a day if you allowed it when Sedjem first
-  asked, or when you click *Check now*. Some checks tell GitHub which version is running
-  ([updates](12-updates.md#what-is-sent-to-github)). The self-test with `--models` also fetches a public speech
-  sample from GitHub.
+  releases when you update (Sedjem run from the source code fetches the main branch instead, with `git fetch` from
+  the checkout's origin, which is GitHub for a clone of this repository); `api.github.com` to check for updates,
+  once a day if you allowed it when Sedjem first asked, or when you click *Check now*. Some checks tell GitHub which
+  version is running ([updates](12-updates.md#what-is-sent-to-github)). The self-test with `--models` also fetches a
+  public speech sample from GitHub.
 - PyPI, run by the Python Software Foundation
   ([privacy notice](https://policies.python.org/pypi.org/Privacy-Notice/)), in two cases:
   - its file host (`files.pythonhosted.org`), for what you download in Settings: NVIDIA's cuBLAS and NVRTC
     libraries, which Whisper uses on an NVIDIA graphics card, and Deno, which YouTube links need;
   - `pypi.org` and its file host, when you click *Update now* in Sedjem run from the source code and the new version
     changes a requirement file. Then uv or pip installs the packages in that file
-    ([updates from source](12-updates.md#from-source)). They use the package index that your Python environment is
-    set to use, which is PyPI unless you changed it. The desktop app and the Windows installer don't do this.
+    ([updates from source](12-updates.md#from-source)) from the package index that it is set to use, which is PyPI
+    unless you changed it. The desktop app and the Windows installer don't do this.
 - YouTube, which is Google's ([privacy policy](https://policies.google.com/privacy)), with its video hosts
   (`*.googlevideo.com`), when you add a link: Sedjem asks, through yt-dlp, for that video or playlist, its streams and
   its captions, and downloads them.

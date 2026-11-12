@@ -28,7 +28,7 @@ Update now runs only when the user asks, one at a time:
            Sedjem-<version>/, which opens in the file manager
 The windows and linux updates download only this repository's release files, over HTTPS (the tests' stand-in for the
 API, on 127.0.0.1, is the one exception). A source update reaches the checkout's origin, and for changed requirement
-files uv or pip reach the package index (PyPI unless the environment is set to another).
+files uv or pip reach the package index they are set to use (PyPI unless changed).
 """
 import hashlib
 import importlib.metadata
