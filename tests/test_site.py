@@ -1438,9 +1438,10 @@ class NumbersTest(unittest.TestCase):
         self.assertEqual(built("utc", late, data=fixture.release_json(published_at=late["v0.10.0"])),
                          (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December", ""))
         self.assertEqual(built("evening")[:2], (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
-        self.assertEqual(built("none", releases=False),
-                         (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December",
-                          "numbers: no releases.json, so the downloads chart marks the latest release only\n"))
+        marked, line, log = built("none", releases=False)
+        self.assertEqual((marked, line), (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        self.assertIn("numbers: no releases.json, so the downloads chart marks the latest release only\n", log,
+                      "a warning in a GitHub Actions run, with ::warning:: before it")
         older = fixture.PUBLISHED | {"v0.9.2": "2026-11-29T09:00:00Z"}  # 0.9.2 in the stats' days: only the list has it
         self.assertEqual(built("listed", older)[0], ["29 November 2026 (0.9.2 out)", "1 December 2026 (0.10.0 out)"])
         self.assertEqual(built("unlisted", releases=False)[0], ["1 December 2026 (0.10.0 out)"])
