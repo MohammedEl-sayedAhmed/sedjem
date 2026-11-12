@@ -47,8 +47,9 @@ started.
 - A release's ring and its row in the table are on its published day, when the stats have that day. "Out on" is its
   published day in any case. Past 35 days, the line is drawn by the week, and it keeps each release's day.
 - `site/build.py` and `.github/scripts/repo_stats.py` both carry each file's newest count forward from day to day,
-  so a file that leaves the snapshots keeps its last count. The stats branch's summary lists such a file with
-  "(deleted)".
+  so a file that leaves the snapshots keeps its last count. The stats branch's summary adds up the deleted releases
+  in one row, so its table does not grow with each preview. The latest release on the site is the newest one still
+  published, so a stable release deleted by hand is not shown as the latest.
 
 ## Consequences
 

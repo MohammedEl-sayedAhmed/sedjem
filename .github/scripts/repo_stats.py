@@ -161,7 +161,10 @@ def summary(tables, repo, today, traffic_read):
     if downloads:
         lines += ["", "## Downloads by release", "", "| Release | File | Downloads |", "|---|---|---|"]
         lines += [f"| {r['release']} | {r['asset']} | {int(r['downloads']):,} |" for r in downloads]
-        lines += [f"| {tag} (deleted) | {asset} | {n:,} |" for (tag, asset), n in deleted.items()]
+        gone = sorted({tag for tag, _ in deleted})
+        if gone:  # one row for all of them, so the table doesn't grow with each deleted preview
+            lines.append(f"| {len(gone)} deleted release{'' if len(gone) == 1 else 's'} | the app's files | "
+                         f"{app_total(deleted):,} |")
     days = sorted({r["date"] for r in clones + views}, reverse=True)[:30]
     if days:
         c, v = {r["date"]: r for r in clones}, {r["date"]: r for r in views}
@@ -181,7 +184,8 @@ def summary(tables, repo, today, traffic_read):
               "The stats workflow does not, so it adds nothing to the counts.",
               "",
               "A release that is deleted leaves GitHub's numbers, as each preview does once a newer one replaces it. "
-              "Its files keep the last count recorded here, marked (deleted), so the totals and the badge never fall.",
+              "Its files keep the last count recorded here, so the totals and the badge never fall; the table "
+              "adds up the deleted releases in one row.",
               "",
               "Stars and forks come from GitHub's lists of the current stargazers and forks, which give the day of "
               "each star and fork, so their history reaches back to the first star. A star that is taken back "

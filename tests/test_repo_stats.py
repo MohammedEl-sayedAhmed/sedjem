@@ -93,11 +93,17 @@ class Update(unittest.TestCase):
             new = stats.update(new, fetched(downloads=downloads), REPO, today)
         self.assertEqual(json.loads(new["badges/downloads.json"])["message"], "66", "62 + 0, and the deleted preview's 4")
         self.assertIn("| Downloads of the app, all releases | 66 |", new["README.md"])
-        self.assertIn("| v0.2.0-preview.1 (deleted) | Sedjem-p1-setup.exe | 4 |", new["README.md"])
-        self.assertIn("| v0.2.0-preview.1 (deleted) | SHA256SUMS.txt | 2 |", new["README.md"], "listed, not counted")
+        self.assertIn("| 1 deleted release | the app's files | 4 |", new["README.md"], "one row; the checksums not counted")
+        self.assertNotIn("v0.2.0-preview.1", new["README.md"])
         self.assertNotIn("v0.2.0-preview.1,", new["downloads.csv"].split("2026-11-08", 1)[1], "the snapshot is GitHub's")
         points, _ = Plot(chart(new), "downloads").series("downloads")
         self.assertEqual(points, [("2026-11-06", 63), ("2026-11-07", 65), ("2026-11-08", 66)])
+        # more deleted previews still make one row
+        for today, downloads in (("2026-11-09", (("v0.1.0", "Sedjem-setup.exe", 63), ("v0.2.0-preview.3", "Sedjem-p3-setup.exe", 1))),
+                                 ("2026-11-10", (("v0.1.0", "Sedjem-setup.exe", 63),))):
+            new = stats.update(new, fetched(downloads=downloads), REPO, today)
+        self.assertIn("| 3 deleted releases | the app's files | 5 |", new["README.md"], "4 + 0 + 1, still one row")
+        self.assertEqual(json.loads(new["badges/downloads.json"])["message"], "68")
 
     def test_drafts_are_left_out(self):
         f = fetched()

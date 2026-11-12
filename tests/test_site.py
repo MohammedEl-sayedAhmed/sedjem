@@ -1451,6 +1451,11 @@ class NumbersTest(unittest.TestCase):
         early = fixture.PUBLISHED | {"v0.10.0": "2026-11-27T12:00:00Z"}
         self.assertEqual(built("early", early, data=fixture.release_json(published_at=early["v0.10.0"]))[:2],
                          ([], "the latest release, out on 27 November"))
+        # two releases on one day: one mark, named by the newer, whichever was published first
+        for name, morning in (("same-day", "v0.9.2"), ("same-day-swapped", "v0.10.0")):
+            same = fixture.PUBLISHED | {"v0.9.2": "2026-12-01T19:30:00Z", "v0.10.0": "2026-12-01T19:30:00Z", morning: "2026-12-01T06:00:00Z"}
+            self.assertEqual(built(name, same, data=fixture.release_json(published_at=same["v0.10.0"]))[:2],
+                             (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
 
     def test_a_long_history_keeps_each_release_day(self):
         """Past DAILY days the downloads are drawn by the week, and the day each release was published stays a point
@@ -1482,6 +1487,19 @@ class NumbersTest(unittest.TestCase):
         self.assertEqual(totals, sorted(totals), "the running total never falls")
         self.assertEqual(cards["downloads"]["figure"][0], str(fixture.TOTAL + 5))
         self.assertIn(["Previews", "12"], cards["releases"]["table"])
+
+    def test_a_stable_release_deleted_by_hand_is_not_the_latest(self):
+        """A stable release deleted by hand keeps its downloads in the total and in the table of releases, but the
+        latest release is the newest one still published."""
+        gone = [(d, "v0.10.1", "Sedjem-0.10.1-setup.exe", n) for d, n in (("2026-11-30", 1), ("2026-12-01", 3))]
+        sections, _ = self.build("deleted-stable", stats=fixture.write_stats(self.dir / "deleted-stable-stats",
+                                                                             downloads=list(fixture.DOWNLOADS) + gone),
+                                 usage=self.usage)
+        cards = self.cards(sections["en"])
+        self.assertEqual((cards["releases"]["title"], cards["releases"]["figure"][0]), ("Downloads of 0.10.0", str(fixture.LATEST)))
+        self.assertEqual(cards["releases"]["table"], [["0.10.0", f"{fixture.LATEST:,}"], ["0.10.1", "3"], ["0.9.2", "463"],
+                                                      ["Previews", "7"]])
+        self.assertEqual(cards["downloads"]["figure"][0], str(fixture.TOTAL + 3))
 
     def test_before_the_first_month_the_page_says_when_it_comes(self):
         """Without docs/usage.json the counts' card is a calm hatched one with a line saying the first totals,

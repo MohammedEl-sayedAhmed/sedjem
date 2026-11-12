@@ -542,8 +542,8 @@ def github(folder, out_on=None):
     """GitHub's numbers from the stats files in folder, as many as could be read. From downloads.csv, whose rows are
     a snapshot of every release file's running total each day: the day they are of, the app's downloads in all on each
     day (by the week past DAILY days, and on each release's day; its files, not the checksums; previews included, as
-    the README's badge counts them), each release's on the newest day with the previews added up apart, and the
-    downloads by system. A file that leaves the snapshots, as a preview's do once preview.yml deletes it, keeps its
+    the README's badge counts them), each release's on the newest day with the previews added up apart (the latest
+    still published first), and the downloads by system. A file that leaves the snapshots, as a preview's do once preview.yml deletes it, keeps its
     last count, so the totals never fall; the README's badge and the stats branch's charts count the same way. From
     out_on ({version: day published}, from published()) the day each release that isn't a preview came out, marked on
     the chart when the stats have that day. From repo.csv the stars each day (by the week past DAILY days), and from
@@ -568,9 +568,14 @@ def github(folder, out_on=None):
             by_release[tag] = by_release.get(tag, 0) + n
             platforms[platform_of(asset)] = platforms.get(platform_of(asset), 0) + n
         stable = sorted((tag for tag in by_release if version_key(tag)), key=version_key, reverse=True)
+        # the latest is the newest release still published, so one deleted by hand is never "the latest"; the rest
+        # follow by version
+        current = {r["release"] for r in of_day.get(days[-1], [])}
+        latest = next((tag for tag in stable if tag in current), None)
+        stable.sort(key=lambda tag: tag != latest)
         versions = [STABLE.fullmatch(tag).group(1) for tag in stable]
         marks = {}
-        for v in reversed(versions):  # the newest of a day's releases names it
+        for v in sorted(versions, key=lambda v: version_key(v)):  # the newest of a day's releases names it
             if v in out_on and days[0] <= out_on[v] <= days[-1]:
                 marks[out_on[v]] = v
         gh.update(day=days[-1], downloads=weekly(totals, keep=marks),
