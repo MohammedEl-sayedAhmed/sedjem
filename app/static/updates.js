@@ -8,9 +8,9 @@
 "use strict";
 
 // data: what GET /api/updates (or a POST) answered last; changes: how many times a change (a POST) was sent or
-// answered; open: how many changes are on their way; newest: the value of changes when the change whose answer
-// is in data was sent; again: changes overlapped, so the state is loaded again when none is on its way; the rest
-// is what this page is doing with it
+// answered; open: how many changes are on their way; newest: of the changes whose answers the page showed, the
+// value of changes when the newest one was sent; again: changes overlapped, so the state is loaded again when none
+// is on its way; the rest is what this page is doing with it
 const UPD = { data: null, error: "", loading: null, checking: false, installing: false, asked: false, seen: null,
   started: false, timer: null, restart: null, sig: "", changes: 0, open: 0, newest: 0, again: false };
 const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (localStorage)

@@ -503,11 +503,17 @@ class Updates(UiTestCase):
     def test_two_quick_changes_end_on_the_last(self):
         """Two quick clicks on the switch: off, then on again. The first click's answer comes back last, built from
         the state between the two clicks. The page must not end on it, but on the switch as the server has it, and
-        it asks once more (issue #100)."""
+        it asks once more. The switch never goes back to off on the way (issue #100)."""
         fake = self.fake()
         self.open()
         self.ready()
         self.open_tab()
+        self.page.evaluate("""() => {  // each answer the page shows (the switch in it), and each "Saved"
+          window.shown = []; window.saved = 0;
+          const show = updSetData, say = toast;
+          updSetData = (d) => { shown.push(d.enabled); show(d); };
+          toast = (msg, kind) => { if (msg === "Saved") saved++; say(msg, kind); };
+        }""")
         fake.hold.add("settings")
         self.page.locator("#updAuto").uncheck()
         self.page.locator("#updAuto").check()
@@ -517,12 +523,12 @@ class Updates(UiTestCase):
         between = copy.deepcopy(fake.state)  # and reads the state for its answer before the second click is saved
         gets = sum(c[:2] == ("GET", "state") for c in fake.calls)
         fake.answer(*second)  # the second click's answer comes back first
-        self.page.wait_for_selector(".toast >> text=Saved")
+        self.page.wait_for_function("() => saved === 1")
         first.fulfill(json=between)
-        self.page.wait_for_function("() => [...document.querySelectorAll('#toasts .toast')]"
-                                    ".filter((t) => t.textContent === 'Saved').length === 2")
+        self.page.wait_for_function("() => saved === 2")
         self.assertTrue(self.page.is_checked("#updAuto"))
         self.assertTrue(self.page.evaluate("() => UPD.data.enabled"))
+        self.assertNotIn(False, self.page.evaluate("() => shown"), "the switch never went back to off")
         self.assertEqual(sum(c[:2] == ("GET", "state") for c in fake.calls), gets + 1, "asked once more")
 
     def test_a_check_answered_after_a_later_change_is_not_lost(self):
