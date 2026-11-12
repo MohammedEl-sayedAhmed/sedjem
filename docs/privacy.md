@@ -33,10 +33,14 @@ here.
   asked, or when you click *Check now*. Some checks tell GitHub which version is running
   ([updates](12-updates.md#what-is-sent-to-github)). The self-test with `--models` also fetches a public speech
   sample from GitHub.
-- PyPI's file host (`files.pythonhosted.org`), run by the Python Software Foundation
-  ([privacy notice](https://policies.python.org/pypi.org/Privacy-Notice/)), only for what you download in Settings:
-  NVIDIA's cuBLAS and NVRTC libraries, which Whisper uses on an NVIDIA graphics card, and Deno, which YouTube links
-  need.
+- PyPI, run by the Python Software Foundation
+  ([privacy notice](https://policies.python.org/pypi.org/Privacy-Notice/)), in two cases:
+  - its file host (`files.pythonhosted.org`), for what you download in Settings: NVIDIA's cuBLAS and NVRTC
+    libraries, which Whisper uses on an NVIDIA graphics card, and Deno, which YouTube links need;
+  - `pypi.org` and its file host, when you click *Update now* in Sedjem run from the source code and the new version
+    changes a requirement file. Then uv or pip installs the packages in that file
+    ([updates from source](12-updates.md#from-source)). They use the package index that your Python environment is
+    set to use, which is PyPI unless you changed it. The desktop app and the Windows installer don't do this.
 - YouTube, which is Google's ([privacy policy](https://policies.google.com/privacy)), with its video hosts
   (`*.googlevideo.com`), when you add a link: Sedjem asks, through yt-dlp, for that video or playlist, its streams and
   its captions, and downloads them.
