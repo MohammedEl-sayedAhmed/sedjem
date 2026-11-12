@@ -229,6 +229,18 @@ run for that month once it is finished (the monthly step below), or for a later 
 its numbers beside the newest finished month, marked "so far, to 9 November", and draws its visits, by country on the
 map and by day in the calendar. The website's breakdowns are those of the newest finished month.
 
+One copy came before this rule. November 2026 so far, to 9 November, went into the repository with every breakdown
+(commit 5373008), and the git history keeps it. A reader can subtract it from the finished November too. So the
+finished month's run checks how many active installs came after that copy, which had 12. With three or more, November
+keeps every breakdown. With fewer, `docs/usage.json` holds November's headline numbers only, marked `headline_only`,
+and the table below says "not published" for its hosted share. The website's part has the same check with its
+visitors, 31 in that copy. The check counts the installs after the copy as one group, not each value. The difference
+can still show that one or two of them have a value the finished month names, such as a country or a graphics card. It
+also ties that value to any value they all share, such as their country, and to a value that goes with it, as CUDA
+goes with an NVIDIA card. So it can show much of one install's values, as the totals of one month with three installs
+can, since the hardware counts are not folded. It names no value that the finished month adds to `other`.
+`FULL_COPIES` in `tools/usage_totals.py` lists the copy, and [ADR 17](adr/0017-the-month-so-far-weekly-with-headline-numbers-only.md) records the decision.
+
 
 
 Only totals are published. A country is listed only when at least three installs were active there that month, and
