@@ -18,6 +18,7 @@ import sys
 import tempfile
 import threading
 import time
+import tomllib
 import unittest
 import urllib.error
 import urllib.request
@@ -39,9 +40,9 @@ GPU = {"devices": [{"name": "NVIDIA GeForce RTX 3060", "kind": "cuda", "type": "
 LINES = [{"start": 0.0, "end": 1.2, "speaker": "1", "text": "order ال discount code"},
          {"start": 1.2, "end": 2.0, "speaker": "2", "text": "Let's start the sprint planning."}]
 COHERE = "models/cohere-transcribe-arabic-07-2026-gguf/cohere-transcribe-arabic-07-2026-Q4_K_M.gguf"
-# all the files of large-v3's download in app/config.toml: model.bin alone is not a whole model (#110)
-LARGE_V3 = [f"models/faster-whisper-large-v3/{name}"
-            for name in ("model.bin", "config.json", "preprocessor_config.json", "tokenizer.json", "vocabulary.json")]
+# all the files of large-v3's download, from the shipped config: model.bin alone is not a whole model (#110)
+LARGE_V3 = [f["path"] for m in tomllib.loads((ROOT / "app" / "config.toml").read_text(encoding="utf-8"))["models"]
+            if m["id"] == "large-v3" for f in m["files"]]
 LOOPBACK = ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 REAL_PRIVATE = remote.private
 

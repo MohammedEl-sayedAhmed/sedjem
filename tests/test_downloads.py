@@ -236,6 +236,17 @@ class PathTests(unittest.TestCase):
             self.assertEqual(cfg.whisper_source(m), "large-v3")
             self.assertEqual(cfg.availability(m), (True, None))
 
+    def test_a_package_is_not_needed_once_unpacked(self):
+        """A download file with `unpack` is a package, deleted once its members are copied out of it, so a Whisper
+        model from a personal config that comes in one does not need it to be ready."""
+        home = Path(tempfile.mkdtemp(prefix="sedjem-home-"))
+        self.addCleanup(shutil.rmtree, home, ignore_errors=True)
+        cfg = Config(home=home)
+        m = {"id": "packed", "kind": "local", "engine": "whisper", "whisper_model": "models/packed",
+             "files": [{"path": "models/packed/packed.zip", "size": 10, "unpack": {"model.bin": 10}}]}
+        put_files(cfg, [{"path": "models/packed/model.bin", "size": 10}])
+        self.assertEqual(cfg.whisper_source(m), str(home / "models/packed"))
+
     def test_worker_command_from_source(self):
         self.assertEqual(worker_command(Config()), [sys.executable, "-m", "app.worker"])
 

@@ -104,10 +104,9 @@ class ModelDetails(HubTestCase):
         self.assertIn("Word timestamps", text, "the facts that aren't results follow")
 
     def test_no_shared_copy_while_a_download_runs(self):
-        """A status can say a model is ready while its download still runs: a Whisper model is ready once model.bin,
-        its first file, is in place, and any model can be as its last file is put in place between the two reads of one
-        status (#90). The details box then says "Not downloaded", as the row says Downloading, and not that the model
-        uses the copy in the Hugging Face cache (#103)."""
+        """One status can say a model is ready while its download still runs: its last file was put in place between
+        the two reads of that status (#90). The details box then says "Not downloaded", as the row says Downloading,
+        and not that the model uses the copy in the Hugging Face cache (#103)."""
         self.open()
         self.open_settings("models")
         self.button("Cohere Transcribe Arabic").click()
