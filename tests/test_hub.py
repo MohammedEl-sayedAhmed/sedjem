@@ -32,6 +32,7 @@ from app.engines import local_command  # noqa: E402
 from app.server import make_server  # noqa: E402
 
 SHA = "1234567890abcdef1234567890abcdef12345678"  # the one commit of every stand-in repository
+DOWNLOAD_RUNS = {"queued", "downloading", "verifying", "unpacking", "converting"}  # a download's states until it ends
 
 
 def pack_string(b):
@@ -639,10 +640,13 @@ class ApiTests(unittest.TestCase):
         return next((m for m in self.call("GET", "/api/status")[1]["models"] if m["id"] == mid), None)
 
     def wait_ready(self, mid):
+        """Waits until the model is ready and its download no longer runs. A status reads the download's files a
+        moment before it checks the model, so when the last file is put in place between the two, it says ready
+        while the download still runs and its files are not all installed (issue #90)."""
         end = time.time() + 30
         while time.time() < end:
             m = self.model(mid)
-            if m and m["ready"]:
+            if m and m["ready"] and (m["download"] or {}).get("state") not in DOWNLOAD_RUNS:
                 return m
             time.sleep(0.1)
         self.fail(f"{mid} not ready: {self.model(mid)}")
