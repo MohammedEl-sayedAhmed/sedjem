@@ -13,7 +13,7 @@ from unittest import mock
 import numpy as np
 import soundfile as sf
 from playwright.sync_api import expect
-from test_remote import COHERE, LOOPBACK, REAL_PRIVATE, Computer, StandIn, wait_for
+from test_remote import COHERE, LARGE_V3, LOOPBACK, REAL_PRIVATE, Computer, StandIn, wait_for
 from ui_support import UiTestCase  # (puts the project on the path)
 
 from app import engines, remote
@@ -30,7 +30,7 @@ class OtherComputers(UiTestCase):
         cls.patches.append(mock.patch.object(engines, "run_local", side_effect=cls.stand_in))
         for p in cls.patches:
             p.start()
-        cls.b = Computer("GPU laptop", [COHERE, "models/faster-whisper-large-v3/model.bin"])
+        cls.b = Computer("GPU laptop", [COHERE, *LARGE_V3])
         cls.b.app.cfg.save_settings(remote_serve=True)
         cls.b.app.remote.apply()
         cls.wav = cls.home / "call.wav"
