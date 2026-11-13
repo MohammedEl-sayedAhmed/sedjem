@@ -40,7 +40,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import site_support as fixture
-from ui_support import REQUIRED, launch, machine_trouble, sync_playwright
+from ui_support import REQUIRED, TRACES, launch, machine_trouble, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -166,6 +166,46 @@ class SiteInBrowserTest(unittest.TestCase):
         page.goto(base + path, wait_until="load", referer=referer)
         return page
 
+    def assert_no_sideways_scroll(self, page, width):
+        """The page is no wider than the screen. When it is, the message names what reaches past either edge of the
+        screen (the left one on a right-to-left page) with no box around it that clips it, the furthest first, and
+        the errors the page logged, such as a stylesheet that did not load. With SEDJEM_UI_TRACES set (as in CI) a
+        screenshot of the page is kept there, and the message names it. A page once measured 753 px wide on a 390 px
+        phone, with nothing to show why (issue #63)."""
+        wide = page.evaluate("document.documentElement.scrollWidth")
+        if wide <= width:
+            return
+        found = page.evaluate("""(width) => { const out = [];
+            document.querySelectorAll('body *').forEach(e => {
+              const b = e.getBoundingClientRect();
+              if ((b.right <= width + 0.5 && b.left >= -0.5) || !e.getClientRects().length) return;
+              for (let up = e.parentElement; up && up !== document.body; up = up.parentElement)
+                if (getComputedStyle(up).overflowX !== 'visible') return;
+              const name = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')
+                + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).join('.') : '');
+              out.push([Math.max(b.right - width, -b.left), `${name} ${Math.round(b.left)} to ${Math.round(b.right)} px`]);
+            });
+            out.sort((a, b) => b[0] - a[0]);
+            return {count: out.length, names: out.slice(0, 10).map((x) => x[1])}; }""", width)
+        if found["count"]:
+            past = "; ".join(found["names"]) + (f" (and {found['count'] - 10} more)" if found["count"] > 10 else "")
+        else:  # text that does not wrap, say, or a box the search took for one that clips
+            past = "no element found past the screen"
+        message = f"the page is {wide} px wide on a {width} px screen. Past the screen: {past}."
+        if getattr(page, "errors", None):
+            message += f" The page logged: {page.errors}."
+        if TRACES:
+            url = urlsplit(page.url)  # the port tells the builds apart, the path the pages
+            name = "".join(c if c.isalnum() or c in "._-" else "_" for c in f"{self.id()}-{width}-{url.port}{url.path}")
+            shot = Path(TRACES) / f"{name}-{time.time_ns()}.png"  # each subtest's own picture, never another's
+            try:
+                shot.parent.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(shot), full_page=True)
+                message += f" Screenshot: {shot.name}."
+            except Exception as e:  # noqa: BLE001 — a page with no picture still fails, with the message
+                message += f" No screenshot: {(str(e).splitlines() or [type(e).__name__])[0]}."
+        self.fail(message)
+
     def counts(self, page, n):
         """The n events a page has sent, once it has sent them, and after a moment in which no more came."""
         deadline = time.monotonic() + 10
@@ -183,7 +223,7 @@ class SiteInBrowserTest(unittest.TestCase):
                     # the images below the first screen load too, so their requests are seen
                     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
                     page.wait_for_load_state("networkidle")
-                    self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                    self.assert_no_sideways_scroll(page, width)
                     self.assertEqual(page.outside, [])
                     self.assertEqual(page.errors, [])
         # the build that counts here sends one thing off this computer, its page view, and only to Aptabase's EU host
@@ -288,7 +328,7 @@ class SiteInBrowserTest(unittest.TestCase):
                 menu.locator("summary").click()
                 self.assertEqual(menu.locator("nav a").evaluate_all("as => as.filter(a => a.getClientRects().length).length"), 3)
                 self.assertFalse(menu.locator("[data-theme-switch]").is_visible())  # the theme needs the script
-                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 390)
+                self.assert_no_sideways_scroll(page, 390)
 
     def theme(self, page):
         """The theme on the page's attribute (None when it follows the system), the colour it is drawn in, and the
@@ -426,7 +466,7 @@ class SiteInBrowserTest(unittest.TestCase):
                             pixels = sizes[name.replace(".webp", ".png")]
                             self.assertGreaterEqual(w, pixels[0] / density[form] - 0.01, name)
                             self.assertGreaterEqual(h, pixels[1] / density[form] - 0.01, name)
-                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        self.assert_no_sideways_scroll(page, width)
 
     def test_the_speakers_names_read_in_both_themes(self):
         """The hero's names are drawn in their speakers' colours, bold, with nothing before them, and each colour is
@@ -664,7 +704,7 @@ class SiteInBrowserTest(unittest.TestCase):
                             found = page.evaluate(boxes)
                             self.assertEqual(found["out"], [])
                             self.assertEqual((found["figures"], found["soon"]), (figures, soon))
-                            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                            self.assert_no_sideways_scroll(page, width)
                             if figures:
                                 rows = {}
                                 for key, top, card_width in found["tops"]:
@@ -724,7 +764,7 @@ class SiteInBrowserTest(unittest.TestCase):
                         page.evaluate("document.fonts.ready.then(() => true)")
                         found = page.evaluate(boxes)
                         self.assertEqual(found["out"], [])
-                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        self.assert_no_sideways_scroll(page, width)
                         rows = {}
                         for card in found["cards"]:
                             rows.setdefault(card["top"], []).append(card)
