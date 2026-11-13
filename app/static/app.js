@@ -2035,8 +2035,10 @@ function renderSettings(focus) {
 // everything known about the model when the row is opened
 function modelsPanel(items) {
   const rows = items.map(({ id, title, d, hub, m, note, icon }) => {
-    const cached = !d.installed && model(id)?.ready;  // found elsewhere, e.g. the Hugging Face cache
     const busy = DL_ACTIVE.has(d.state);
+    // Found elsewhere, e.g. the Hugging Face cache. Not while a download runs: a model can be ready before its
+    // download says installed, as its last file is put in place, or for Whisper once model.bin, its first file, is (#103).
+    const cached = !d.installed && !busy && model(id)?.ready;
     let status, sub, actions = "";
     if (busy) { status = ""; sub = "Downloading"; }
     else if (d.installed) {

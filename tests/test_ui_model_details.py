@@ -102,6 +102,31 @@ class ModelDetails(HubTestCase):
         self.assertIn("No NVIDIA graphics card was found on this computer", text)
         self.assertIn("Word timestamps", text, "the facts that aren't results follow")
 
+    def test_no_shared_copy_while_a_download_runs(self):
+        """A status can say a model is ready while its download still runs: a Whisper model is ready once model.bin,
+        its first file, is in place, and any model can be as its last file is put in place between the two reads of one
+        status (#90). The details box then says "Not downloaded", as the row says Downloading, and not that the model
+        uses the copy in the Hugging Face cache (#103)."""
+        self.open()
+        self.open_settings("models")
+        self.button("Cohere Transcribe Arabic").click()
+        expect(self.details("Cohere Transcribe Arabic")).to_be_visible()
+        on_disk = """state => {
+          const m = S.status.models.find((x) => x.id === "cohere");
+          m.ready = true;
+          m.download = { ...m.download, installed: false, state };
+          if (state === null) delete m.download.state;  // no download job at all
+          renderSettings();
+          return [...document.querySelectorAll("#settingsBody .set-details dt")]
+              .find((dt) => dt.textContent === "On disk").nextElementSibling.textContent;
+        }"""
+        self.assertEqual(self.page.evaluate(on_disk, "downloading"), "Not downloaded")
+        self.assertEqual(self.page.evaluate(on_disk, "verifying"), "Not downloaded")
+        self.assertEqual(self.page.evaluate(on_disk, "done"), "Uses the copy in the Hugging Face cache",
+                         "once the download has ended, a ready model that is not downloaded is the shared copy")
+        self.assertEqual(self.page.evaluate(on_disk, None), "Uses the copy in the Hugging Face cache",
+                         "the usual shared copy: no download was ever started")
+
     def test_a_hosted_services_details(self):
         self.open()
         self.open_settings("hosted")
