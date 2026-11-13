@@ -167,33 +167,44 @@ class SiteInBrowserTest(unittest.TestCase):
         return page
 
     def assert_no_sideways_scroll(self, page, width):
-        """The page is no wider than the screen. When it is, the message names what reaches past the screen with no
-        box around it that clips it, and with SEDJEM_UI_TRACES set (as in CI) a screenshot of the page is kept there.
-        A page once measured 753 px wide on a 390 px phone, with nothing to show why (issue #63)."""
+        """The page is no wider than the screen. When it is, the message names what reaches past either edge of the
+        screen (the left one on a right-to-left page) with no box around it that clips it, the furthest first, and
+        the errors the page logged, such as a stylesheet that did not load. With SEDJEM_UI_TRACES set (as in CI) a
+        screenshot of the page is kept there, and the message names it. A page once measured 753 px wide on a 390 px
+        phone, with nothing to show why (issue #63)."""
         wide = page.evaluate("document.documentElement.scrollWidth")
         if wide <= width:
             return
-        past = page.evaluate("""(width) => { const out = [];
+        found = page.evaluate("""(width) => { const out = [];
             document.querySelectorAll('body *').forEach(e => {
               const b = e.getBoundingClientRect();
-              if (b.right <= width + 0.5 || !e.getClientRects().length) return;
+              if ((b.right <= width + 0.5 && b.left >= -0.5) || !e.getClientRects().length) return;
               for (let up = e.parentElement; up && up !== document.body; up = up.parentElement)
                 if (getComputedStyle(up).overflowX !== 'visible') return;
               const name = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')
                 + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).join('.') : '');
-              out.push(`${name} ${Math.round(b.left)} to ${Math.round(b.right)} px`);
+              out.push([Math.max(b.right - width, -b.left), `${name} ${Math.round(b.left)} to ${Math.round(b.right)} px`]);
             });
-            return out.slice(0, 10); }""", width)
+            out.sort((a, b) => b[0] - a[0]);
+            return {count: out.length, names: out.slice(0, 10).map((x) => x[1])}; }""", width)
+        if found["count"]:
+            past = "; ".join(found["names"]) + (f" (and {found['count'] - 10} more)" if found["count"] > 10 else "")
+        else:  # text that does not wrap, say, or a box the search took for one that clips
+            past = "no element found past the screen"
+        message = f"the page is {wide} px wide on a {width} px screen. Past the screen: {past}."
+        if getattr(page, "errors", None):
+            message += f" The page logged: {page.errors}."
         if TRACES:
-            folder = Path(TRACES)
-            folder.mkdir(parents=True, exist_ok=True)
             url = urlsplit(page.url)  # the port tells the builds apart, the path the pages
             name = "".join(c if c.isalnum() or c in "._-" else "_" for c in f"{self.id()}-{width}-{url.port}{url.path}")
+            shot = Path(TRACES) / f"{name}-{time.time_ns()}.png"  # each subtest's own picture, never another's
             try:
-                page.screenshot(path=str(folder / f"{name}.png"), full_page=True)
+                shot.parent.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(shot), full_page=True)
+                message += f" Screenshot: {shot.name}."
             except Exception as e:  # noqa: BLE001 — a page with no picture still fails, with the message
-                print(f"\n(no screenshot: {str(e).splitlines()[0]})", file=sys.stderr)
-        self.fail(f"the page is {wide} px wide on a {width} px screen; past the screen: {past}")
+                message += f" No screenshot: {(str(e).splitlines() or [type(e).__name__])[0]}."
+        self.fail(message)
 
     def counts(self, page, n):
         """The n events a page has sent, once it has sent them, and after a moment in which no more came."""
