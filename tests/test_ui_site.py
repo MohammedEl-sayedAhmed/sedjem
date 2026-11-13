@@ -40,7 +40,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import site_support as fixture
-from ui_support import REQUIRED, launch, machine_trouble, sync_playwright
+from ui_support import REQUIRED, TRACES, launch, machine_trouble, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -168,8 +168,8 @@ class SiteInBrowserTest(unittest.TestCase):
 
     def assert_no_sideways_scroll(self, page, width):
         """The page is no wider than the screen. When it is, the message names what reaches past the screen with no
-        box around it that clips it. A page once measured 753 px wide on a 390 px phone, with nothing to show why
-        (issue #63)."""
+        box around it that clips it, and with SEDJEM_UI_TRACES set (as in CI) a screenshot of the page is kept there.
+        A page once measured 753 px wide on a 390 px phone, with nothing to show why (issue #63)."""
         wide = page.evaluate("document.documentElement.scrollWidth")
         if wide <= width:
             return
@@ -184,6 +184,15 @@ class SiteInBrowserTest(unittest.TestCase):
               out.push(`${name} ${Math.round(b.left)} to ${Math.round(b.right)} px`);
             });
             return out.slice(0, 10); }""", width)
+        if TRACES:
+            folder = Path(TRACES)
+            folder.mkdir(parents=True, exist_ok=True)
+            url = urlsplit(page.url)  # the port tells the builds apart, the path the pages
+            name = "".join(c if c.isalnum() or c in "._-" else "_" for c in f"{self.id()}-{width}-{url.port}{url.path}")
+            try:
+                page.screenshot(path=str(folder / f"{name}.png"), full_page=True)
+            except Exception as e:  # noqa: BLE001 — a page with no picture still fails, with the message
+                print(f"\n(no screenshot: {str(e).splitlines()[0]})", file=sys.stderr)
         self.fail(f"the page is {wide} px wide on a {width} px screen; past the screen: {past}")
 
     def counts(self, page, n):
