@@ -104,12 +104,14 @@ def machine_trouble(text):
 
 
 def launch(playwright, args=()):
-    """The browser, with args for its command line."""
+    """The browser, with args for its command line. Its sound goes to no device (--disable-audio-output): media still
+    plays, and its time moves on. On the Windows runners, the click that started a new browser's first sound twice
+    timed out: for 12 to 15 seconds after it, the browser drew no new frame (issue #92)."""
     headless = os.environ.get("SEDJEM_UI_HEADED") != "1"
     tried = []
     for options in ({}, {"channel": "chrome"}, {"channel": "msedge"}):
         try:
-            return playwright.chromium.launch(headless=headless, args=list(args), **options)
+            return playwright.chromium.launch(headless=headless, args=["--disable-audio-output", *args], **options)
         except PlaywrightError as e:
             tried.append(f"{options or 'bundled'}: {str(e).splitlines()[0]}")
     message = "no Chromium for Playwright (" + "; ".join(tried) + ")"
