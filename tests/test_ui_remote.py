@@ -112,6 +112,7 @@ class OtherComputers(UiTestCase):
         # the page may still show the details it drew while the job ran ("Processor") until it loads the finished
         # job, whose details name the computer it ran on (issue #96)
         self.page.wait_for_selector(".det-dev .det-sub:has-text('Ran on GPU laptop')")
+        self.assertEqual(self.page.inner_text(".det-dev .det-sub"), "Ran on GPU laptop · Graphics card · CUDA")
         self.assertEqual(self.stand_in.calls[-1]["home"], self.b.home)
         self.page.click("#moreDetails summary")
         rows = dict(zip(self.texts("#moreDetails dt"), self.texts("#moreDetails dd")))
