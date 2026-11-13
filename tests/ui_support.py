@@ -109,7 +109,7 @@ def launch(playwright, args=()):
     tried = []
     for options in ({}, {"channel": "chrome"}, {"channel": "msedge"}):
         try:
-            return playwright.chromium.launch(headless=headless, args=list(args), **options)
+            return playwright.chromium.launch(headless=headless, args=["--disable-audio-output", *args], **options)
         except PlaywrightError as e:
             tried.append(f"{options or 'bundled'}: {str(e).splitlines()[0]}")
     message = "no Chromium for Playwright (" + "; ".join(tried) + ")"
