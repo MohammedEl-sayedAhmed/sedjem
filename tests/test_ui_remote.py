@@ -109,8 +109,9 @@ class OtherComputers(UiTestCase):
         self.page.wait_for_url(re.compile(r"#/job/"))
         jid = self.page.url.rsplit("/", 1)[1]
         wait_for(lambda: self.app.store.get(jid)["status"] == "done", what="the job sent to the GPU laptop")
-        self.page.wait_for_selector(".det-dev")
-        self.assertIn("Ran on GPU laptop", self.page.inner_text(".det-dev .det-sub"))
+        # the page may still show the details it drew while the job ran ("Processor") until it loads the finished
+        # job, whose details name the computer it ran on (issue #96)
+        self.page.wait_for_selector(".det-dev .det-sub:has-text('Ran on GPU laptop')")
         self.assertEqual(self.stand_in.calls[-1]["home"], self.b.home)
         self.page.click("#moreDetails summary")
         rows = dict(zip(self.texts("#moreDetails dt"), self.texts("#moreDetails dd")))
