@@ -99,7 +99,9 @@ class SidebarOrder(UiTestCase):
                          ["Newest first", "Oldest first", "Title A to Z", "Title Z to A", "Longest first", "Shortest first",
                           "Last changed", "Recording date"])
         self.assertEqual(self.shown(), with_headings(ADDED))
-        self.assertEqual(self.shown()[:2], ["# Today", "Design sync"])
+        # Today, unless the run passed midnight since this module was imported (issue #104): heading() reads the clock
+        # now, as the page does when it draws
+        self.assertEqual(self.shown()[:2], ["# " + heading(TODAY), "Design sync"])
         self.assertEqual(self.page.locator("#jobList .job-item").count(), 7, "a recording once, a course once")
         self.assertEqual(self.lectures(), ["Variables", "Loops"])
         self.assertIsNone(self.kept(), "nothing is kept until an order is chosen")
