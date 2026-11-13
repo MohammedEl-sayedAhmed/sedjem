@@ -39,6 +39,9 @@ GPU = {"devices": [{"name": "NVIDIA GeForce RTX 3060", "kind": "cuda", "type": "
 LINES = [{"start": 0.0, "end": 1.2, "speaker": "1", "text": "order ال discount code"},
          {"start": 1.2, "end": 2.0, "speaker": "2", "text": "Let's start the sprint planning."}]
 COHERE = "models/cohere-transcribe-arabic-07-2026-gguf/cohere-transcribe-arabic-07-2026-Q4_K_M.gguf"
+# all the files of large-v3's download in app/config.toml: model.bin alone is not a whole model (#110)
+LARGE_V3 = [f"models/faster-whisper-large-v3/{name}"
+            for name in ("model.bin", "config.json", "preprocessor_config.json", "tokenizer.json", "vocabulary.json")]
 LOOPBACK = ("127.0.0.1", "::1", "::ffff:127.0.0.1")
 REAL_PRIVATE = remote.private
 
@@ -69,7 +72,7 @@ def home(name, models):
     (folder / "app_data").mkdir()
     (folder / "app_data" / "settings.json").write_text(json.dumps({"update_check": False, "usage_counts": False}))
     (folder / "app_data" / "config.toml").write_text(f'[remote]\nport = 0\nname = "{name}"\n', encoding="utf-8")
-    for path in models:  # a model file is enough for the model to count as installed
+    for path in models:  # its files are enough for a model to count as ready
         (folder / path).parent.mkdir(parents=True, exist_ok=True)
         (folder / path).write_bytes(b"stand-in")
     return folder
@@ -262,7 +265,7 @@ class TwoComputers(unittest.TestCase):
         cls.retry.start()
         # the small laptop has Cohere; the GPU laptop has Cohere and Whisper large-v3
         cls.a = Computer("Small laptop", [COHERE])
-        cls.b = Computer("GPU laptop", [COHERE, "models/faster-whisper-large-v3/model.bin"])
+        cls.b = Computer("GPU laptop", [COHERE, *LARGE_V3])
         t = np.arange(int(16000 * 2.5)) / 16000
         cls.wav = cls.a.home / "call.wav"
         sf.write(cls.wav, (0.2 * np.sin(2 * np.pi * 330 * t)).astype(np.float32), 16000)

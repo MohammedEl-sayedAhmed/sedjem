@@ -164,17 +164,31 @@ class DownloadTests(unittest.TestCase):
         self.assertFalse((self.home / "models/test/model.bin").exists())
 
 
+def small_model(cfg, model_id):
+    """A model of the config whose download files are 10 bytes each, so that a test can put them in place."""
+    m = cfg.models[model_id]
+    m["files"] = [{**f, "size": 10} for f in m["files"]]
+    return m
+
+
+def put_files(cfg, files):
+    """Put download files in place at their full size, as a download leaves them."""
+    for f in files:
+        p = cfg.path(f["path"])
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_bytes(b"x" * f["size"])
+
+
 class PathTests(unittest.TestCase):
     def test_models_resolve_under_the_data_folder(self):
         home = Path(tempfile.mkdtemp(prefix="sedjem-home-"))
         try:
             cfg = Config(home=home)
             self.assertEqual(cfg.storage, home / "app_data")
-            m = cfg.models["whisper-medium"]
+            m = small_model(cfg, "whisper-medium")
             self.assertIsNone(cfg.whisper_source(m))  # nothing downloaded in an empty home
             folder = home / m["whisper_model"]
-            folder.mkdir(parents=True)
-            (folder / "model.bin").write_bytes(b"")
+            put_files(cfg, m["files"])
             self.assertEqual(cfg.whisper_source(m), str(folder))
             self.assertEqual(cfg.availability(m), (True, None))
             cmd = local_command(cfg, m, home / "a.flac", home / "out", home / "p.json",
@@ -184,6 +198,43 @@ class PathTests(unittest.TestCase):
             self.assertNotIn("--speakers", cmd)
         finally:
             shutil.rmtree(home, ignore_errors=True)
+
+    def test_a_whisper_model_needs_all_the_files_of_its_download(self):
+        """A download puts each file in place once it is checked, model.bin first for the built-in Whisper models.
+        One that stopped after model.bin leaves a folder that is not a whole model: not ready, and the download
+        shows what is left (#110)."""
+        home = Path(tempfile.mkdtemp(prefix="sedjem-home-"))
+        self.addCleanup(shutil.rmtree, home, ignore_errors=True)
+        cfg = Config(home=home)
+        with mock.patch("huggingface_hub.try_to_load_from_cache", return_value=None):  # not this computer's cache
+            for mid in ("whisper-medium", "large-v3"):
+                with self.subTest(mid):
+                    m = small_model(cfg, mid)
+                    first, *rest = m["files"]
+                    self.assertTrue(first["path"].endswith("/model.bin"), "the case of #110: model.bin comes first")
+                    put_files(cfg, [first])
+                    self.assertIsNone(cfg.whisper_source(m))
+                    self.assertEqual(cfg.availability(m), (False, "not downloaded"))
+                    status = Downloads(cfg).status(mid)
+                    self.assertFalse(status["installed"])
+                    self.assertEqual(status["missing"], sum(f["size"] for f in rest))
+                    put_files(cfg, rest)
+                    self.assertEqual(cfg.whisper_source(m), str(cfg.path(m["whisper_model"])))
+                    self.assertTrue(Downloads(cfg).status(mid)["installed"])
+
+    def test_large_v3_from_the_hugging_face_cache(self):
+        """Large-v3 runs from the Hugging Face cache when Sedjem has no whole copy of its own: none at all, or a
+        download that stopped after model.bin."""
+        home = Path(tempfile.mkdtemp(prefix="sedjem-home-"))
+        self.addCleanup(shutil.rmtree, home, ignore_errors=True)
+        cfg = Config(home=home)
+        m = small_model(cfg, "large-v3")
+        with mock.patch("huggingface_hub.try_to_load_from_cache", return_value="/hf/model.bin") as cache:
+            self.assertEqual(cfg.whisper_source(m), "large-v3")
+            cache.assert_called_with("Systran/faster-whisper-large-v3", "model.bin")
+            put_files(cfg, m["files"][:1])
+            self.assertEqual(cfg.whisper_source(m), "large-v3")
+            self.assertEqual(cfg.availability(m), (True, None))
 
     def test_worker_command_from_source(self):
         self.assertEqual(worker_command(Config()), [sys.executable, "-m", "app.worker"])
