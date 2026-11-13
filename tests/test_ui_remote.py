@@ -12,6 +12,7 @@ from unittest import mock
 
 import numpy as np
 import soundfile as sf
+from playwright.sync_api import expect
 from test_remote import COHERE, LOOPBACK, REAL_PRIVATE, Computer, StandIn, wait_for
 from ui_support import UiTestCase  # (puts the project on the path)
 
@@ -110,9 +111,10 @@ class OtherComputers(UiTestCase):
         jid = self.page.url.rsplit("/", 1)[1]
         wait_for(lambda: self.app.store.get(jid)["status"] == "done", what="the job sent to the GPU laptop")
         # the page may still show the details it drew while the job ran ("Processor") until it loads the finished
-        # job, whose details name the computer it ran on (issue #96)
-        self.page.wait_for_selector(".det-dev .det-sub:has-text('Ran on GPU laptop')")
-        self.assertEqual(self.page.inner_text(".det-dev .det-sub"), "Ran on GPU laptop · Graphics card · CUDA")
+        # job, whose details name the computer it ran on (issue #96). The whole line is waited for, so that a line
+        # drawn while the job ran never passes for it.
+        device = self.page.locator(".det-dev .det-sub")
+        expect(device).to_have_text("Ran on GPU laptop · Graphics card · CUDA", timeout=10_000)
         self.assertEqual(self.stand_in.calls[-1]["home"], self.b.home)
         self.page.click("#moreDetails summary")
         rows = dict(zip(self.texts("#moreDetails dt"), self.texts("#moreDetails dd")))
