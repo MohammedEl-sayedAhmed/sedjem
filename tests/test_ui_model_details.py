@@ -4,6 +4,7 @@ server whose Hugging Face is the local stand-in of tests/test_hub.py (see HubTes
 internet.
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui*.py" -v
 """
+import shutil
 import unittest
 
 from test_ui_hub import GGUF, HubTestCase  # first: it puts the project on sys.path
@@ -126,6 +127,21 @@ class ModelDetails(HubTestCase):
                          "once the download has ended, a ready model that is not downloaded is the shared copy")
         self.assertEqual(self.page.evaluate(on_disk, None), "Uses the copy in the Hugging Face cache",
                          "the usual shared copy: no download was ever started")
+
+    def test_a_whisper_download_that_stopped_after_model_bin(self):
+        """model.bin is the first file of the built-in Whisper downloads. A download that stopped after it leaves a
+        model that is not ready: its row offers the download of what is left, not a shared copy (#110)."""
+        folder = self.app.cfg.path(self.cfg("whisper-medium")["whisper_model"])
+        folder.mkdir(parents=True)
+        self.addCleanup(shutil.rmtree, folder, ignore_errors=True)
+        (folder / "model.bin").write_bytes(b"stand-in")
+        self.open()
+        self.open_settings("models")
+        title = "whisper-medium code-switching"
+        expect(self.page.locator(f"{row(title)} .status")).to_have_text("Not downloaded")
+        expect(self.page.locator(f"{row(title)} [data-dl='whisper-medium']")).to_contain_text("Download (")
+        self.button(title).click()
+        expect(self.details(title).locator("dt:text-is('On disk') + dd")).to_have_text("Not downloaded")
 
     def test_a_hosted_services_details(self):
         self.open()
