@@ -99,7 +99,9 @@ class SidebarOrder(UiTestCase):
                          ["Newest first", "Oldest first", "Title A to Z", "Title Z to A", "Longest first", "Shortest first",
                           "Last changed", "Recording date"])
         self.assertEqual(self.shown(), with_headings(ADDED))
-        self.assertEqual(self.shown()[:2], ["# Today", "Design sync"])
+        # Today, unless the run passed midnight since this module was imported (issue #104): heading() reads the clock
+        # now, as the page does when it draws
+        self.assertEqual(self.shown()[:2], ["# " + heading(TODAY), "Design sync"])
         self.assertEqual(self.page.locator("#jobList .job-item").count(), 7, "a recording once, a course once")
         self.assertEqual(self.lectures(), ["Variables", "Loops"])
         self.assertIsNone(self.kept(), "nothing is kept until an order is chosen")
@@ -128,8 +130,9 @@ class SidebarOrder(UiTestCase):
         fixed = [{**x, "text": "order ال promo code بسرعة"} if i == 0 else x for i, x in enumerate(LINES)]
         self.assertEqual(self.api("PATCH", f"/api/jobs/{A2}", {"lines": fixed})["status"], 200)  # not the main transcript
         self.assertEqual(self.api("PATCH", f"/api/jobs/{BUDGET}", {"lines": fixed})["status"], 200)
+        saved = datetime.now().astimezone().isoformat()  # when the server saved it, not when this module was imported
         self.page.evaluate("refreshJobs()")
-        changed = [("Budget call", NOW.isoformat()), ("Design sync", TODAY),
+        changed = [("Budget call", saved), ("Design sync", TODAY),
                    ("Standup", "2026-09-26T10:00:35+03:00"), ("Planning", "2026-09-26T10:00:05+03:00"),
                    ("اجتماع الفريق", "2026-09-01T12:00:05+03:00"), ("Python course", "2026-08-01T09:05:05+03:00"),
                    ("Broken file", "2026-07-15T08:00:05+03:00")]
