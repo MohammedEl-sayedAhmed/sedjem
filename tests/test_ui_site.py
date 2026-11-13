@@ -166,6 +166,26 @@ class SiteInBrowserTest(unittest.TestCase):
         page.goto(base + path, wait_until="load", referer=referer)
         return page
 
+    def assert_no_sideways_scroll(self, page, width):
+        """The page is no wider than the screen. When it is, the message names what reaches past the screen with no
+        box around it that clips it. A page once measured 753 px wide on a 390 px phone, with nothing to show why
+        (issue #63)."""
+        wide = page.evaluate("document.documentElement.scrollWidth")
+        if wide <= width:
+            return
+        past = page.evaluate("""(width) => { const out = [];
+            document.querySelectorAll('body *').forEach(e => {
+              const b = e.getBoundingClientRect();
+              if (b.right <= width + 0.5 || !e.getClientRects().length) return;
+              for (let up = e.parentElement; up && up !== document.body; up = up.parentElement)
+                if (getComputedStyle(up).overflowX !== 'visible') return;
+              const name = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')
+                + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).join('.') : '');
+              out.push(`${name} ${Math.round(b.left)} to ${Math.round(b.right)} px`);
+            });
+            return out.slice(0, 10); }""", width)
+        self.fail(f"the page is {wide} px wide on a {width} px screen; past the screen: {past}")
+
     def counts(self, page, n):
         """The n events a page has sent, once it has sent them, and after a moment in which no more came."""
         deadline = time.monotonic() + 10
@@ -183,7 +203,7 @@ class SiteInBrowserTest(unittest.TestCase):
                     # the images below the first screen load too, so their requests are seen
                     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
                     page.wait_for_load_state("networkidle")
-                    self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                    self.assert_no_sideways_scroll(page, width)
                     self.assertEqual(page.outside, [])
                     self.assertEqual(page.errors, [])
         # the build that counts here sends one thing off this computer, its page view, and only to Aptabase's EU host
@@ -288,7 +308,7 @@ class SiteInBrowserTest(unittest.TestCase):
                 menu.locator("summary").click()
                 self.assertEqual(menu.locator("nav a").evaluate_all("as => as.filter(a => a.getClientRects().length).length"), 3)
                 self.assertFalse(menu.locator("[data-theme-switch]").is_visible())  # the theme needs the script
-                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 390)
+                self.assert_no_sideways_scroll(page, 390)
 
     def theme(self, page):
         """The theme on the page's attribute (None when it follows the system), the colour it is drawn in, and the
@@ -426,7 +446,7 @@ class SiteInBrowserTest(unittest.TestCase):
                             pixels = sizes[name.replace(".webp", ".png")]
                             self.assertGreaterEqual(w, pixels[0] / density[form] - 0.01, name)
                             self.assertGreaterEqual(h, pixels[1] / density[form] - 0.01, name)
-                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        self.assert_no_sideways_scroll(page, width)
 
     def test_the_speakers_names_read_in_both_themes(self):
         """The hero's names are drawn in their speakers' colours, bold, with nothing before them, and each colour is
@@ -664,7 +684,7 @@ class SiteInBrowserTest(unittest.TestCase):
                             found = page.evaluate(boxes)
                             self.assertEqual(found["out"], [])
                             self.assertEqual((found["figures"], found["soon"]), (figures, soon))
-                            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                            self.assert_no_sideways_scroll(page, width)
                             if figures:
                                 rows = {}
                                 for key, top, card_width in found["tops"]:
@@ -724,7 +744,7 @@ class SiteInBrowserTest(unittest.TestCase):
                         page.evaluate("document.fonts.ready.then(() => true)")
                         found = page.evaluate(boxes)
                         self.assertEqual(found["out"], [])
-                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        self.assert_no_sideways_scroll(page, width)
                         rows = {}
                         for card in found["cards"]:
                             rows.setdefault(card["top"], []).append(card)
