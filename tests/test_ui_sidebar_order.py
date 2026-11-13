@@ -130,8 +130,9 @@ class SidebarOrder(UiTestCase):
         fixed = [{**x, "text": "order ال promo code بسرعة"} if i == 0 else x for i, x in enumerate(LINES)]
         self.assertEqual(self.api("PATCH", f"/api/jobs/{A2}", {"lines": fixed})["status"], 200)  # not the main transcript
         self.assertEqual(self.api("PATCH", f"/api/jobs/{BUDGET}", {"lines": fixed})["status"], 200)
+        saved = datetime.now().astimezone().isoformat()  # when the server saved it, not when this module was imported
         self.page.evaluate("refreshJobs()")
-        changed = [("Budget call", NOW.isoformat()), ("Design sync", TODAY),
+        changed = [("Budget call", saved), ("Design sync", TODAY),
                    ("Standup", "2026-09-26T10:00:35+03:00"), ("Planning", "2026-09-26T10:00:05+03:00"),
                    ("اجتماع الفريق", "2026-09-01T12:00:05+03:00"), ("Python course", "2026-08-01T09:05:05+03:00"),
                    ("Broken file", "2026-07-15T08:00:05+03:00")]
