@@ -1,6 +1,6 @@
 # Sedjem statistics
 
-Updated on 2026-11-15 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
+Updated on 2026-11-16 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
 <a href="charts/activity-light.svg#gh-light-mode-only"><img src="charts/activity-light.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
 <a href="charts/activity-dark.svg#gh-dark-mode-only"><img src="charts/activity-dark.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
@@ -9,7 +9,7 @@ Updated on 2026-11-15 by the Repository stats workflow on main (`.github/workflo
 
 | | |
 |---|---|
-| Downloads of the app, all releases | 107 |
+| Downloads of the app, all releases | 116 |
 | Clones since 2026-10-05 | 3,365 (700 unique per day, added up) |
 | Page views since 2026-10-05 | 682 (144 unique per day, added up) |
 | Stars, forks, watchers | 9, 0, 0 |
@@ -18,8 +18,8 @@ Updated on 2026-11-15 by the Repository stats workflow on main (`.github/workflo
 
 | Release | File | Downloads |
 |---|---|---|
-| v0.3.4 | Sedjem-0.3.4-linux-x64.tar.gz | 1 |
-| v0.3.4 | Sedjem-0.3.4-setup.exe | 1 |
+| v0.3.4 | Sedjem-0.3.4-linux-x64.tar.gz | 6 |
+| v0.3.4 | Sedjem-0.3.4-setup.exe | 5 |
 | v0.3.4 | SHA256SUMS.txt | 1 |
 | v0.3.4-preview.20261113 | Sedjem-0.3.4-preview.20261113-linux-x64.tar.gz | 1 |
 | v0.3.4-preview.20261113 | Sedjem-0.3.4-preview.20261113-setup.exe | 1 |
@@ -85,7 +85,7 @@ Updated on 2026-11-15 by the Repository stats workflow on main (`.github/workflo
 | 2026-10-17 | 3 | 3 | 15 | 5 |
 | 2026-10-16 | 0 | 0 | 14 | 2 |
 
-## Where visitors came from (the 14 days to 2026-11-15)
+## Where visitors came from (the 14 days to 2026-11-16)
 
 | Site | Views | Unique visitors |
 |---|---|---|
