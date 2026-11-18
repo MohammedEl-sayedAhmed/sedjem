@@ -157,13 +157,16 @@ jobs:
         shell: pwsh
         run: |
           .\app.cmd --server --port 8799
-          $status = $null
+          $ping = $null
           foreach ($i in 1..90) {
-            try { $status = Invoke-RestMethod http://127.0.0.1:8799/api/status; break } catch { Start-Sleep -Seconds 1 }
+            try { $ping = Invoke-RestMethod http://127.0.0.1:8799/api/ping; break } catch { Start-Sleep -Seconds 1 }
           }
-          if (-not $status -or $status.app -ne "sedjem") { throw "app.cmd did not start Sedjem" }
+          if (-not $ping -or $ping.app -ne "sedjem") { throw "app.cmd did not start Sedjem" }
+          # every other request carries the secret in the data folder, which only this user can read (app/session.py)
+          $auth = @{ "X-Sedjem-Token" = "$(Get-Content -Raw app_data\session.key)".Trim() }
+          $status = Invoke-RestMethod http://127.0.0.1:8799/api/status -Headers $auth
           "Sedjem $($status.version) answered, reading $($status.home)"
-          Invoke-RestMethod -Method Post http://127.0.0.1:8799/api/quit -Headers @{ "X-Sedjem" = "1" } | Out-Null
+          Invoke-RestMethod -Method Post http://127.0.0.1:8799/api/quit -Headers ($auth + @{ "X-Sedjem" = "1" }) | Out-Null
 
       - name: Self-test from the venv
         shell: cmd
