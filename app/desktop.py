@@ -29,7 +29,7 @@ from . import engines, report, updates
 from . import transcript as T
 from . import history
 from .config import FROZEN, ROOT, Config
-from .server import make_server, slug
+from .server import NotLocal, make_server, slug
 
 WM_CLASS = "Sedjem"  # the window class on Linux, which the desktop matches to sedjem.desktop for the icon
 LAUNCHER = """[Desktop Entry]
@@ -209,6 +209,14 @@ def show_address(url):
         ctypes.windll.user32.MessageBoxW(None, text, "Sedjem", 0x40)  # MB_ICONINFORMATION
 
 
+def show_error(text):
+    """Why the app can't start: on the console or in sedjem.log, and in a message box in the Windows build."""
+    print(text, file=sys.stderr, flush=True)
+    if os.name == "nt" and getattr(sys, "frozen", False):
+        import ctypes
+        ctypes.windll.user32.MessageBoxW(None, text, "Sedjem", 0x10)  # MB_ICONERROR
+
+
 def native_window(url, app, title="Sedjem"):
     """Show the app in a pywebview window until it is closed. False if no GUI backend is available."""
     try:
@@ -305,7 +313,11 @@ def main(argv=None):
                 show_address(url)
         return
 
-    server, app = make_server(cfg, port=pick_port(preferred))
+    try:
+        server, app = make_server(cfg, port=pick_port(preferred))
+    except NotLocal as e:  # [server] host would let other computers in
+        show_error(str(e))
+        sys.exit(1)
     app.desktop = True
     url = f"http://127.0.0.1:{server.server_address[1]}/"
     threading.Thread(target=server.serve_forever, daemon=True, name="sedjem-server").start()

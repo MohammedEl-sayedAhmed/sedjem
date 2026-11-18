@@ -397,5 +397,63 @@ class Backlog(unittest.TestCase):
             shutil.rmtree(home, ignore_errors=True)
 
 
+class LocalOnly(unittest.TestCase):
+    """The app has no login, so the server listens on this computer only: another [server] host, set in
+    app/config.toml or in the data folder's config.toml, stops the start with the reason."""
+
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp(prefix="sedjem-host-"))
+        self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
+
+    def config(self, host, where):
+        """A Config whose [server] host is `host`, set in the settings file or in the data folder's override,
+        each in a home folder of its own."""
+        home = Path(tempfile.mkdtemp(dir=self.home))
+        storage = home / "app_data"
+        storage.mkdir()
+        if where == "data folder":
+            (storage / "config.toml").write_text(f'[server]\nhost = "{host}"\n', encoding="utf-8")
+            return Config(home=home)
+        settings = home / "settings.toml"
+        text = (ROOT / "app" / "config.toml").read_text(encoding="utf-8")
+        settings.write_text(text.replace('host = "127.0.0.1"', f'host = "{host}"', 1), encoding="utf-8")
+        return Config(settings, home=home)
+
+    def test_another_host_is_refused_with_the_reason(self):
+        from app.server import NotLocal
+        for where, host in (("data folder", "0.0.0.0"), ("settings file", "192.168.1.20")):
+            with self.subTest(where=where):
+                cfg = self.config(host, where)
+                self.assertEqual(cfg.server["host"], host)
+                with mock.patch("app.server.Server") as server, self.assertRaises(NotLocal) as refused:
+                    make_server(cfg, port=0)
+                server.assert_not_called()  # nothing listens
+                message = str(refused.exception)
+                self.assertIn(f'host is "{host}"', message)
+                self.assertIn("no login", message)
+                self.assertIn(str(cfg.file), message)
+                self.assertIn(str(cfg.storage / "config.toml"), message)
+
+    def test_this_computer_is_accepted(self):
+        for host in ("127.0.0.1", "localhost"):
+            with self.subTest(host=host):
+                server, _app = make_server(self.config(host, "data folder"), port=0)
+                server.server_close()
+
+    def test_the_app_says_why_and_does_not_start(self):
+        import socket
+        import subprocess
+        home = self.config("0.0.0.0", "data folder").home
+        with socket.socket() as s:  # a free port, so that a start that went wrong wouldn't take 8765
+            s.bind(("127.0.0.1", 0))
+            port = str(s.getsockname()[1])
+        env = {**os.environ, "SEDJEM_HOME": str(home), "DO_NOT_TRACK": "1"}
+        run = subprocess.run([sys.executable, "-m", "app", "--no-browser", "--port", port], cwd=ROOT, env=env,
+                             capture_output=True, text=True, timeout=120)
+        self.assertEqual(run.returncode, 1, run.stdout + run.stderr)
+        self.assertIn('host is "0.0.0.0"', run.stderr)
+        self.assertNotIn("Sedjem is running", run.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

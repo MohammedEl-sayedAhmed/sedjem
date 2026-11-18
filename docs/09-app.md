@@ -356,7 +356,8 @@ All model settings live in [`app/config.toml`](../app/config.toml). Each `[[mode
 | AssemblyAI | hosted | Universal-3.5 Pro, which follows code-switching | `speech_models`, `expected_languages`, `base_url` (US or EU), `delete_after`, API key |
 | Azure AI Speech | hosted | the `ar-EG` locale; Microsoft stores nothing | region (in *Settings → Hosted services*), `locale`, `max_speakers`, `max_minutes`, `endpoint`, API key |
 
-The other sections are `[server]` (host and port; keep it on 127.0.0.1), `[storage]` (the data
+The other sections are `[server]` (host and port; the host is 127.0.0.1, `localhost` or `::1`, since the app
+has no login, and it doesn't start with any other), `[storage]` (the data
 folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language)
 and `[local]` (Python, CPU threads, the speaker models and the one chosen, `performance_while_running`).
 Personal overrides go in `app_data/config.toml` with the same layout, so `app/config.toml` can stay as
@@ -671,9 +672,9 @@ the speaker step with a stand-in model process).
 
 ## Privacy
 
-- The server listens on 127.0.0.1 only, answers only requests addressed to that host, and refuses
-  changes that don't carry the app's own header, so other websites open in the same browser can't
-  use it.
+- The server listens on this computer only: the app doesn't start if `[server] host` names an address that other
+  computers can reach, and says why. It answers only requests addressed to 127.0.0.1, and refuses changes that
+  don't carry the app's own header, so other websites open in the same browser can't use it.
 - With local models, the recording and its transcript never leave the computer, unless you pick a paired computer
   under *Run on*: then the recording goes to that computer alone, over the local network and encrypted, and is deleted
   there once the transcript is back. Other computers can send recordings here only after *Run jobs for other computers*
