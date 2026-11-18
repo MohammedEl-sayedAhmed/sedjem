@@ -1,5 +1,5 @@
-"""Tests for the links between the docs: every relative link in README.md and the markdown files under
-docs/ must reach a file, and a link to a heading (#anchor) must reach a heading of that file, as GitHub
+"""Tests for the links between the docs: every relative link in README.md, SECURITY.md and the markdown files
+under docs/ must reach a file, and a link to a heading (#anchor) must reach a heading of that file, as GitHub
 names its anchors. Offline, standard library only.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
@@ -8,7 +8,7 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DOCS = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
+DOCS = [ROOT / "README.md", ROOT / "SECURITY.md", *sorted((ROOT / "docs").rglob("*.md"))]
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 
 
