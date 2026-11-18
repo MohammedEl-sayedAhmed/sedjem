@@ -952,11 +952,13 @@ class Handler(BaseHTTPRequestHandler):
         write into a folder (as "files"); or with combined: true, one file with them all (text, Markdown or JSON).
         Transcriptions that have no transcript yet are left out."""
         p = self.body_json(limit=500_000)
-        ids, fmt = p.get("ids"), p.get("format")
+        ids = p.get("ids")
+        # the format's own name from the table, not the request's text, since it goes into a header (file name)
+        fmt = {name: name for name in T.EXPORTS}.get(str(p.get("format")))
         if not (isinstance(ids, list) and 1 <= len(ids) <= 5000
                 and all(isinstance(x, str) and re.fullmatch(ID, x) for x in ids)):
             raise ApiError(400, "ids: a list of transcription ids")
-        if fmt not in T.EXPORTS:
+        if fmt is None:
             raise ApiError(400, "unknown format")
         combined = p.get("combined") is True
         if combined and fmt not in exports.COMBINED:
