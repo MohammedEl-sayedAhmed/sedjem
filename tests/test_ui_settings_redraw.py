@@ -66,14 +66,20 @@ class SettingsWhileDownloading(UiTestCase):
 
 
     def test_a_list_being_chosen_from_is_not_redrawn(self):
-        """The default model's list (Settings → Models): a redraw would close it while it is open."""
+        """The default model's list (Settings → Models): a redraw would close it while it is open. Drawn in the app's
+        style (appearance: base-select), an open list has the focus on one of its options."""
         self.open()
         self.open_settings("models")
-        self.page.focus("#settings select[data-setting='default_model']")
         self.page.evaluate("() => (window.__list = document.querySelector('#settings select[data-setting=\"default_model\"]'))")
-        self.page.wait_for_timeout(3500)  # two status checks while it is focused
-        self.assertTrue(self.page.evaluate("() => window.__list.isConnected && window.__list === document.activeElement"),
-                        "the same list, still focused")
+        self.page.click("#settings select[data-setting='default_model']")
+        is_open = "() => { try { return window.__list.matches(':open'); } catch (e) { return null; } }"
+        opened = self.page.evaluate(is_open)
+        self.page.wait_for_timeout(3500)  # two status checks while it is open
+        self.assertTrue(self.page.evaluate("() => window.__list.isConnected"), "the same list, not redrawn")
+        if opened is not None:  # an engine that has :open for a select
+            self.assertTrue(opened, "the click opened the list")
+            self.assertTrue(self.page.evaluate(is_open), "still open")
+        self.page.keyboard.press("Escape")
         self.page.click("#settings .dlg-head")  # leaving the list lets the progress redraw again
         self.wait_for_redraws(1)
 

@@ -269,9 +269,10 @@ async function cancelDownload(id) {
 function refreshDownloadViews() {
   if (S.route.name === "new") { renderModelGrid(); ytRefreshNote(); }
   // A redraw rebuilds Settings and would wipe what is being typed there (a key, a link), or close a list being
-  // chosen from (the default model); the progress shows at the next status check after the field is left.
+  // chosen from (the default model; while a list drawn in the app's style is open, an option in it has the focus).
+  // The progress shows at the next status check after the field is left.
   const typing = document.activeElement?.closest("#settings")
-    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea, select");
+    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea, select, select *");
   if ($("#settings").open && !typing) renderSettings();
 }
 
