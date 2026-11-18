@@ -415,7 +415,7 @@ class SettingsTests(unittest.TestCase):
 
     def test_defaults_come_from_the_config(self):
         self.assertEqual(self.cfg.settings(), {"performance_while_running": False, "device": "auto", "threads": 10,
-                                               "speaker_model": "titanet-small",
+                                               "speaker_model": "titanet-small", "default_model": None,  # [defaults] model
                                                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
                                                "mcp_write": False,  # assistants only read until the user says
                                                "update_check": None, "update_channel": "stable", "update_skip": None,
@@ -426,7 +426,7 @@ class SettingsTests(unittest.TestCase):
         self.cfg.save_settings(device="cpu", threads=2, performance_while_running=True)
         again = Config(home=self.home)
         self.assertEqual(again.settings(), {"performance_while_running": True, "device": "cpu", "threads": 2,
-                                            "speaker_model": "titanet-small",
+                                            "speaker_model": "titanet-small", "default_model": None,
                                             "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [], "mcp_write": False,
                                             "update_check": None, "update_channel": "stable", "update_skip": None,
                                             "usage_counts": None, "remote_serve": False})

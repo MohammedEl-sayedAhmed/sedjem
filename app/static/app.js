@@ -2142,11 +2142,28 @@ function modelsPanel(items) {
       ${busy ? `<div class="set-item-more">${downloadBlock(id, d, true)}</div>` : ""}
       ${open ? detailsBox("models", id, title, localDetails(m, d, cached)) : ""}</div>`;
   }).join("");
-  return `<h3>Models on this computer</h3>
+  return `${defaultModelRow()}
+    <h3>Models on this computer</h3>
     <div class="set-items">${rows || '<p class="hint">No downloadable models are configured.</p>'}</div>
     ${speakerGroup()}
     <p class="hint">Downloads resume if the connection drops and are checked against a pinned checksum before use.
       <button type="button" class="linkish" data-set-tab="add">Find more models</button></p>`;
+}
+
+// The model a new transcription starts with, saved as default_model (saved at once, like the switches) and used by
+// the new transcription page and the API (S.status.defaults.model). One that isn't ready can still be chosen: until it
+// is, the page starts with the first ready model, as it does when [defaults] model isn't ready.
+function defaultModelRow() {
+  const models = S.status.models || [], pick = S.status.defaults?.model;
+  if (!models.length) return "";
+  const opts = models.map((m) => `<option value="${esc(m.id)}"${m.id === pick ? " selected" : ""}>${esc(m.title)}${m.ready ? "" : " (not ready)"}</option>`).join("");
+  const chosen = model(pick), note = chosen && !chosen.ready ? " It isn't ready yet, so the first ready model is selected until it is." : "";
+  return `<div class="set-list def-model">
+      <div class="set-row">
+        <div class="set-text"><b id="defModelName">Default model</b><span class="hint" id="defModelHint">Selected when a new transcription starts.${esc(note)}</span></div>
+        <select data-setting="default_model" aria-labelledby="defModelName" aria-describedby="defModelHint">${opts}</select>
+      </div>
+    </div>`;
 }
 
 // Speaker labels: the speaker models, one row each with a radio button for the one that labels the speakers (saved at
@@ -2337,9 +2354,9 @@ function bindSettings(focus) {
   $$("[data-power]").forEach((b) => (b.onclick = async () => {
     try { await api.post("/api/power", { profile: b.dataset.power }); await refreshStatus(); renderSettings(); toast(`Power mode: ${b.dataset.power}`); } catch (e) { toast(e.message, "error"); }
   }));
-  $$("input[data-setting]").forEach((el) => (el.onchange = async () => {
+  $$("input[data-setting], select[data-setting]").forEach((el) => (el.onchange = async () => {
     const key = el.dataset.setting;
-    const value = el.type === "radio" ? el.value  // the speaker model (Settings → Models)
+    const value = el.type === "radio" || el.tagName === "SELECT" ? el.value  // the speaker model, the default model (Settings → Models)
       : key === "device" ? (el.checked ? "auto" : "cpu") : key === "threads" ? parseInt(el.value, 10) : el.checked;
     if (key === "threads" && !(value >= 1 && value <= cores)) { el.value = threads; return; }
     try { S.status = await api.post("/api/settings", { [key]: value }); renderTop(); renderSettings(); if (S.route.name === "new") renderModelGrid(); toast("Saved"); }
