@@ -237,7 +237,7 @@ class App:
             "deno": self.downloads.status("deno") if "deno" in items else None,  # for YouTube links
             "youtube": {"runtime": youtube.runtime(self.cfg), "courses": str(self.cfg.courses)},
             "gpu": self.gpu, "gpu_probing": self.gpu_probing,
-            "defaults": self.cfg.defaults,
+            "defaults": {**self.cfg.defaults, "model": self.cfg.default_model()},  # with the model pinned in Settings
             "settings": settings,
             # the first-start question about checking for updates, and the top bar's pill (app/updates.py)
             "update": self.updates.summary(settings),
@@ -586,7 +586,7 @@ class Handler(BaseHTTPRequestHandler):
         """The model a request names (else the default), if it can run now; a hosted one only with the
         user's consent to upload the recording."""
         cfg = self.app.cfg
-        model = cfg.models.get(p.get("model") or default or cfg.defaults["model"])
+        model = cfg.models.get(p.get("model") or default or cfg.default_model())
         if model is None:
             raise ApiError(400, "unknown model")
         ready, reason = cfg.availability(model)

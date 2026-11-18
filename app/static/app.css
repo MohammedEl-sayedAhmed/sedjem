@@ -590,6 +590,8 @@ dialog::backdrop { background: rgba(10, 14, 20, .45); backdrop-filter: blur(2px)
 }
 .set-list > :first-child { border-top: 0; }
 label.set-row { cursor: pointer; }
+.def-model { margin-bottom: 18px; }
+.def-model select { max-width: 50%; }
 .set-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .set-text b { display: flex; align-items: center; gap: 7px; font-size: 14px; }
 .set-text b svg { width: 16px; height: 16px; color: var(--accent); }
@@ -634,6 +636,8 @@ label.set-row { cursor: pointer; }
 .hub-found.error { color: var(--danger); }
 @media (max-width: 560px) {
   .set-row { flex-wrap: wrap; }
+  .def-model .set-text { flex-basis: 100%; }
+  .def-model select { max-width: none; width: 100%; }
   .seg { width: 100%; }
   .seg button { flex: 1; justify-content: center; }
 }

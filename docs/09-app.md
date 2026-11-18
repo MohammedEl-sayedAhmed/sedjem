@@ -19,9 +19,11 @@ Local models that aren't on the computer yet can be downloaded from the app, fro
 or from *Settings → Models*. Downloads resume after a dropped connection and are checked against a
 pinned checksum.
 
-*Settings* has eight tabs. *Models* lists the models on the computer, with their downloads and
-removal, and under *Speaker labels* the speaker models, with the choice of the one that labels the
-speakers ([speaker models](#speaker-models)). *Add models* has two views: *Recommended* and *From
+*Settings* has eight tabs. *Models* has the *Default model*, the one a new transcription starts with,
+kept across restarts; the models on the computer, with their downloads and removal; and under *Speaker
+labels* the speaker models, with the choice of the one that labels the speakers
+([speaker models](#speaker-models)). A default model that isn't ready yet, with no key or not downloaded,
+can still be chosen: until it is, a new transcription starts with the first ready model. *Add models* has two views: *Recommended* and *From
 Hugging Face*. *Hosted services* holds the API keys, *Speed* the graphics card, power mode and
 processor threads, *Assistants* what assistants connected over MCP may see, how to connect them and
 what they asked ([assistants](11-assistants.md)), *Other computers* the pairing with another computer of yours that
@@ -358,7 +360,8 @@ All model settings live in [`app/config.toml`](../app/config.toml). Each `[[mode
 
 The other sections are `[server]` (host and port; the host is 127.0.0.1, `localhost` or `::1`, since the app
 has no login, and it doesn't start with any other; port 0 takes a new free one at each start), `[storage]` (the data
-folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language)
+folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language; the
+*Default model* in *Settings → Models* wins over the model here)
 and `[local]` (Python, CPU threads, the speaker models and the one chosen, `performance_while_running`).
 Personal overrides go in `app_data/config.toml` with the same layout, so `app/config.toml` can stay as
 shipped. A `[[models]]` entry there with the same `id` changes only the fields it lists, and
@@ -778,6 +781,7 @@ says only whether Sedjem answers.
 | `GET /api/prefs`, `PATCH /api/prefs` | the page's preferences (theme, the library's order, the video size, the update notices), kept in `page.json` in the data folder; PATCH takes `{name: text, or null to forget it}` |
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
 | `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
+| `POST /api/settings` with `{"default_model": …}` | the model a new transcription starts with, as in *Settings → Models*: one of the `id`s that `GET /api/status` lists under `models`, or `null` for `[defaults] model`. `GET /api/status` gives the one in use as `defaults.model`, and a job that names no model gets it |
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
 | `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&modified=&confirm_upload=` | the body is the file; `modified` is the file's modified time in milliseconds, kept as the recording's date when its tags have none |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
