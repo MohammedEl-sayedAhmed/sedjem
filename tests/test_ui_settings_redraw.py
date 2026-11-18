@@ -65,5 +65,18 @@ class SettingsWhileDownloading(UiTestCase):
         self.wait_for_redraws(1)
 
 
+    def test_a_list_being_chosen_from_is_not_redrawn(self):
+        """The default model's list (Settings → Models): a redraw would close it while it is open."""
+        self.open()
+        self.open_settings("models")
+        self.page.focus("#settings select[data-setting='default_model']")
+        self.page.evaluate("() => (window.__list = document.querySelector('#settings select[data-setting=\"default_model\"]'))")
+        self.page.wait_for_timeout(3500)  # two status checks while it is focused
+        self.assertTrue(self.page.evaluate("() => window.__list.isConnected && window.__list === document.activeElement"),
+                        "the same list, still focused")
+        self.page.click("#settings .dlg-head")  # leaving the list lets the progress redraw again
+        self.wait_for_redraws(1)
+
+
 if __name__ == "__main__":
     unittest.main()

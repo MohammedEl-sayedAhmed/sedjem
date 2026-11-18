@@ -268,10 +268,10 @@ async function cancelDownload(id) {
 }
 function refreshDownloadViews() {
   if (S.route.name === "new") { renderModelGrid(); ytRefreshNote(); }
-  // A redraw rebuilds Settings and would wipe what is being typed there (a key, a link); the progress
-  // shows at the next status check after the field is left.
+  // A redraw rebuilds Settings and would wipe what is being typed there (a key, a link), or close a list being
+  // chosen from (the default model); the progress shows at the next status check after the field is left.
   const typing = document.activeElement?.closest("#settings")
-    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea");
+    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea, select");
   if ($("#settings").open && !typing) renderSettings();
 }
 
@@ -2156,14 +2156,23 @@ function modelsPanel(items) {
 function defaultModelRow() {
   const models = S.status.models || [], pick = S.status.defaults?.model;
   if (!models.length) return "";
-  const opts = models.map((m) => `<option value="${esc(m.id)}"${m.id === pick ? " selected" : ""}>${esc(m.title)}${m.ready ? "" : " (not ready)"}</option>`).join("");
-  const chosen = model(pick), note = chosen && !chosen.ready ? " It isn't ready yet, so the first ready model is selected until it is." : "";
+  const opts = models.map((m) => `<option value="${esc(m.id)}"${m.id === pick ? " selected" : ""}>${esc(m.title)}${notReady(m)}</option>`).join("");
+  const chosen = model(pick), note = chosen && !chosen.ready ? " Not ready yet, so the first ready model is used." : "";
   return `<div class="set-list def-model">
       <div class="set-row">
-        <div class="set-text"><b id="defModelName">Default model</b><span class="hint" id="defModelHint">Selected when a new transcription starts.${esc(note)}</span></div>
-        <select data-setting="default_model" aria-labelledby="defModelName" aria-describedby="defModelHint">${opts}</select>
+        <div class="set-text"><label for="defModel"><b>Default model</b></label><span class="hint" id="defModelHint">Selected when a new transcription starts.${esc(note)}</span></div>
+        <select id="defModel" data-setting="default_model" aria-describedby="defModelHint">${opts}</select>
       </div>
     </div>`;
+}
+
+// Why a model in that list can't run yet, in the words of its card: a hosted one has no key, a local one isn't
+// downloaded (or, from Hugging Face, not converted yet)
+function notReady(m) {
+  if (m.ready) return "";
+  if (m.kind === "hosted") return " (no key)";
+  if (m.hub?.kind === "transformers" && m.download && !m.download.missing) return " (not converted)";
+  return m.download ? " (not downloaded)" : " (not ready)";
 }
 
 // Speaker labels: the speaker models, one row each with a radio button for the one that labels the speakers (saved at

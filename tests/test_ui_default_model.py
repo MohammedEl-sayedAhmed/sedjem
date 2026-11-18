@@ -42,10 +42,11 @@ class DefaultModel(UiTestCase):
     def test_a_model_that_isnt_ready(self):
         self.open()
         self.open_settings("models")
-        expect(self.choice().locator("option[value='speechmatics']")).to_contain_text("(not ready)")
+        expect(self.choice().locator("option[value='speechmatics']")).to_contain_text("(no key)")
+        expect(self.choice().locator("option[value='whisper-medium']")).to_contain_text("(not downloaded)")
         self.choice().select_option("speechmatics")
         self.page.wait_for_selector(".toast >> text=Saved")
-        expect(self.page.locator("#defModelHint")).to_contain_text("isn't ready yet, so the first ready model is selected")
+        expect(self.page.locator("#defModelHint")).to_contain_text("Not ready yet, so the first ready model is used.")
         self.page.goto(f"{self.base}/#/new")
         self.page.reload()
         self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
