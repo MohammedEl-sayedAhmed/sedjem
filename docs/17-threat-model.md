@@ -5,7 +5,7 @@ already stops it, and what is left. It was made on 18 November 2026 from the cod
 tampering, repudiation, information disclosure, denial of service, elevation of privilege) applied to each place where
 data crosses from one side to another. [How Sedjem fits together](16-architecture.md) shows the parts.
 
-Nothing found is open to an attack today. Three changes would make Sedjem harder to attack, and each has an issue:
+Three changes would make Sedjem harder to attack, and each has an issue:
 [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125) (the page and the local server),
 [#126](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/126) (code from outside) and
 [#127](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/127) (file permissions and one parser). A security
@@ -20,11 +20,11 @@ The app's page and its API are served by a local server that has no login.
   127.0.0.1, `localhost` or `[::1]`, refuses another site's Origin, and needs the `X-Sedjem: 1` header, which another
   site can't send, on every request that changes something.
 - A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
-  they are for, and only the app's own page can send them.
+  they are for, and of the websites open in a browser, only the app's own page can send them.
 - Text from outside (YouTube titles and captions, the hosted services' transcripts, paired computers, Hugging Face,
   assistants, release notes) could carry script into the page. Every such text is escaped or set as plain text, and
-  links built from data are `https://` only. A review of every place the page builds HTML, with a browser test of
-  injected script in eleven views, found none that runs.
+  links built from data are `https://` only. A one-off review of every place the page builds HTML, with injected
+  script tried in eleven views, found none that runs; the repository has no test for this yet.
 - Left: requests that only read (GET) need no header, so another site could play a recording in a media element if it
   guessed the job's ID; it can't read the bytes. The page also has no Content-Security-Policy as a second layer.
   Both are in [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125).
@@ -32,8 +32,8 @@ The app's page and its API are served by a local server that has no login.
 ## The model worker
 
 Each local transcription runs in a worker process that the app starts with the recording's path and the model's
-settings, and that writes its progress and output into the job's folder. It reads only local files and models that
-were checked when they were downloaded.
+settings, and that writes its progress and output into the job's folder. It reads only local files: models that
+were checked when they were downloaded, or models already in the Hugging Face cache.
 
 ## The hosted services
 
@@ -52,7 +52,7 @@ were checked when they were downloaded.
 
 - Spoofing a computer: pairing needs an 8-character code that lasts 10 minutes and allows 5 tries, and both sides
   prove they know it without sending it. After pairing, the sender pins the other computer's certificate (TLS 1.3) and
-  each request carries a token, which the receiver keeps only as a hash.
+  each request carries a token, which the sender keeps in `secrets.json` and the receiver only as a hash.
 - The listener answers only private network addresses. A shared network, such as public Wi-Fi, also uses private
   addresses, so pairing and the token are what keep strangers out there. An address with 10 failed tries in 10
   minutes is blocked.
@@ -70,7 +70,8 @@ only programs the user runs can reach it.
 
 - An assistant sees only what the visibility switches allow, and its provider sees what it reads.
 - A transcript could hold words that try to steer the assistant. Assistants may change transcripts only when that is
-  switched on (it is off at first), each change is a new version that can be restored, and every request is logged.
+  switched on (it is off at first), each change is a new version that can be restored, and every tool call, read
+  and prompt is logged.
   The server tells the assistant that transcript text is quoted data, not instructions.
 
 ## YouTube links
