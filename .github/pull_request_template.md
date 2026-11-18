@@ -6,6 +6,5 @@
 - [ ] A changed requirement file comes with its locks: `python .github/scripts/locks.py` (docs/14-pipeline.md).
 - [ ] The docs say what changed, in plain prose (docs/14-pipeline.md lists the rules for public text).
 - [ ] Nothing private: no recordings, transcripts or keys, and no names or paths from a personal computer.
-
-By sending a change, you agree that it may be distributed under both the AGPL and the commercial licence (see
-Licence in README.md).
+- [ ] On a first pull request: a comment says "I have read the Contributor Licence Agreement (CLA.md) and I agree
+      to it." (CONTRIBUTING.md says why.)
