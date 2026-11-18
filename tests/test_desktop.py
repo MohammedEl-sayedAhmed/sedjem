@@ -3,6 +3,7 @@ and the window class of the browser window; and how it picks its port when start
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
+import io
 import json
 import os
 import re
@@ -108,6 +109,34 @@ class PortTests(unittest.TestCase):
         finally:
             server.shutdown()
             server.server_close()
+
+
+class LocalOnlyTests(unittest.TestCase):
+    """The app has no login, so its server listens on this computer only."""
+
+    def test_another_host_stops_the_start_and_says_why(self):
+        from app.config import Config
+        with tempfile.TemporaryDirectory() as d:
+            storage = Path(d) / "app_data"
+            storage.mkdir()
+            (storage / "config.toml").write_text('[server]\nhost = "0.0.0.0"\n', encoding="utf-8")
+            cfg = Config(home=d)
+            with mock.patch.object(desktop, "Config", return_value=cfg), \
+                    mock.patch.object(desktop, "install_launcher"), \
+                    mock.patch.object(desktop, "running_port", return_value=None), \
+                    mock.patch.object(desktop, "pick_port", return_value=0), \
+                    mock.patch.object(desktop, "native_window") as window, \
+                    mock.patch.object(desktop, "show_error") as shown, \
+                    self.assertRaises(SystemExit) as stopped:
+                desktop.main([])
+        self.assertEqual(stopped.exception.code, 1)
+        self.assertIn('host is "0.0.0.0"', shown.call_args.args[0])
+        window.assert_not_called()
+
+    def test_the_reason_goes_to_the_console_or_the_log(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+            desktop.show_error("the reason")
+        self.assertEqual(err.getvalue(), "the reason\n")
 
 
 class BuildTests(unittest.TestCase):

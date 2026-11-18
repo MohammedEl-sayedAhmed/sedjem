@@ -85,7 +85,8 @@ def is_path(name):
 
 class Config:
     def __init__(self, path=None, storage=None, home=None):
-        data = tomllib.loads(Path(path or DEFAULT_CONFIG).read_text(encoding="utf-8"))
+        self.file = Path(path or DEFAULT_CONFIG)  # the settings file; <storage>/config.toml overrides it
+        data = tomllib.loads(self.file.read_text(encoding="utf-8"))
         self.home = Path(home) if home else home_dir()
         self.storage = Path(storage) if storage else self.path(data["storage"]["dir"])
         override = self.storage / "config.toml"

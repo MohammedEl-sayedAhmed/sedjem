@@ -9,7 +9,7 @@ from pathlib import Path
 
 from . import updates
 from .config import Config
-from .server import make_server
+from .server import NotLocal, make_server
 
 def running_here(port):
     """True if this app already answers on the port."""
@@ -43,6 +43,8 @@ def main():
     url = f"http://127.0.0.1:{port}/"
     try:
         server, app = make_server(cfg, port=port)
+    except NotLocal as e:  # [server] host would let other computers in
+        sys.exit(str(e))
     except OSError:
         if running_here(port):  # already running (e.g. started from the app menu): just open it
             print(f"Sedjem is already running at {url}")

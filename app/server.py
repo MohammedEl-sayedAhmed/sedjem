@@ -1,6 +1,7 @@
 """The local web server: the UI in app/static and a small JSON API (Python standard library only).
 
-Safety: it listens on 127.0.0.1, answers only requests addressed to that host (no DNS rebinding),
+Safety: it listens on this computer only (make_server refuses any other host, since the app has no login),
+answers only requests addressed to 127.0.0.1 (no DNS rebinding),
 and every request that changes something must carry the X-Sedjem header, which other websites
 open in the same browser cannot send (no cross-site requests). Running jobs for other computers
 (app/remote.py) has a server of its own, on another port, off unless it is switched on.
@@ -393,15 +394,13 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(400, "invalid JSON")
 
     def guard(self, write):
-        cfg = self.app.cfg
-        port = self.server.server_address[1]
-        if cfg.server["host"] in ("127.0.0.1", "localhost", "::1"):
-            allowed = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
-            if self.headers.get("Host") not in allowed:
-                raise ApiError(403, "requests must be addressed to 127.0.0.1")
-            origin = self.headers.get("Origin")
-            if origin and origin.removeprefix("http://") not in allowed:
-                raise ApiError(403, "cross-site request refused")
+        port = self.server.server_address[1]  # make_server listens on this computer only (LOOPBACK)
+        allowed = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+        if self.headers.get("Host") not in allowed:
+            raise ApiError(403, "requests must be addressed to 127.0.0.1")
+        origin = self.headers.get("Origin")
+        if origin and origin.removeprefix("http://") not in allowed:
+            raise ApiError(403, "cross-site request refused")
         if write and self.headers.get("X-Sedjem") != "1":
             raise ApiError(403, "missing X-Sedjem header")
 
@@ -1322,9 +1321,21 @@ class Server(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+LOOPBACK = ("127.0.0.1", "localhost", "::1")  # the hosts the server may listen on: this computer's own
+
+
+class NotLocal(ValueError):
+    """[server] host names an address that other computers can reach. The app has no login, so it doesn't start."""
+
+
 def make_server(cfg, host=None, port=None):
+    host = host or cfg.server["host"]
+    if host not in LOOPBACK:
+        raise NotLocal(f'[server] host is "{host}", but Sedjem has no login, so it listens only on this computer. '
+                       f'Set host = "127.0.0.1" under [server] in {cfg.file}, or in {cfg.storage / "config.toml"} '
+                       'if it is set there.')
     app = App(cfg)
     handler = type("BoundHandler", (Handler,), {"app": app})
-    server = Server((host or cfg.server["host"], cfg.server["port"] if port is None else port), handler)
+    server = Server((host, cfg.server["port"] if port is None else port), handler)
     app.server = server
     return server, app

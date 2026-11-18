@@ -8,7 +8,7 @@
 # which saves them to app_data/secrets.json, or come from the environment variables in key_env.
 
 [server]
-host = "127.0.0.1"          # local only: the app has no login, so don't expose it on a network
+host = "127.0.0.1"          # this computer only: the app has no login, so it doesn't start on another host
 port = 8765
 open_browser = true         # ./app.sh opens a browser tab (the desktop app opens its own window)
 
