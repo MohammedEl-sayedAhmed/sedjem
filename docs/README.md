@@ -45,8 +45,8 @@ All of this runs offline from the command line:
 .venv/bin/python transcribe.py path/to/call.wav --speakers 2      # or --speakers 0 to estimate
 ```
 
-Sedjem wraps the same pipeline in an app (`./app.sh`) that runs any of the five models, three
-local and two hosted with your own key, shows progress, and lets you play back, search, correct and
+Sedjem wraps the same pipeline in an app (`./app.sh`) that runs any of three local models,
+or one of nine hosted services with your own key, shows progress, and lets you play back, search, correct and
 export the transcript ([the app](09-app.md)). It also runs as a desktop app on Windows and Linux,
 with the local models downloaded from inside the app ([desktop app](10-desktop.md)).
 

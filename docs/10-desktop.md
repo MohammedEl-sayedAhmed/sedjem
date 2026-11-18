@@ -100,8 +100,9 @@ the same sherpa-onnx release, and NVIDIA's Nemotron-3-Diarization from Hugging F
 
 Every file is pinned in `app/config.toml` by URL (at a fixed revision), size and SHA-256. A download
 resumes after a dropped connection (HTTP range requests) and only becomes the real file once the size
-and checksum match. Files can be deleted again from the same screen. The hosted models (ElevenLabs,
-Speechmatics) need no download, only an API key.
+and checksum match. Files can be deleted again from the same screen. The nine hosted services (ElevenLabs,
+Google, Deepgram, AssemblyAI, Microsoft Azure, Speechmatics, OpenAI, Groq and Mistral) need no download, only an
+API key.
 
 ## Build it
 
