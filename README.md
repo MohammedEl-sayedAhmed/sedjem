@@ -92,7 +92,7 @@ git clone https://github.com/MohammedEl-sayedAhmed/sedjem.git
 cd sedjem
 uv venv .venv --python 3.12
 uv pip install --python .venv -r requirements.txt
-./app.sh              # opens Sedjem at http://127.0.0.1:8765
+./app.sh              # opens Sedjem in a browser window
 ./app.sh --desktop    # or in a window of its own
 ```
 

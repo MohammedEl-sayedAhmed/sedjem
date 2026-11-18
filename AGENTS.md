@@ -36,7 +36,8 @@ SEDJEM_HOME=/tmp/sedjem-try SEDJEM_NO_USAGE=1 ./app.sh   # a throwaway data fold
 .venv/bin/python transcribe.py meeting.m4a --speakers 3 # the command line, without the app
 ```
 
-The app listens on http://127.0.0.1:8765. [The app](docs/09-app.md) lists its options and settings.
+The app listens on 127.0.0.1, on a new free port at each start. [The app](docs/09-app.md) lists its options and
+settings.
 
 ## Test and check
 
@@ -110,8 +111,10 @@ The browser tests (`tests/test_ui*.py`) skip without Playwright or a browser, un
   `desktop/build.py`.
 - CI runs the tests on Ubuntu and Windows. Keep the retries for replacing and deleting files on Windows, and stay on
   Python 3.12.
-- A scripted request that changes something needs the `X-Sedjem: 1` header, and every request must be addressed to
-  the app's own host and port ([the app](docs/09-app.md)).
+- Every scripted request needs the secret in the `X-Sedjem-Token` header (from `session.key` in the data folder,
+  beside `port`, both new at each start; tests use `app.session.secret`), a request that changes something also needs
+  the `X-Sedjem: 1` header, and every request must be addressed to the app's own host and port
+  ([the app](docs/09-app.md#api-for-scripts)).
 - In the MCP server, only protocol messages may reach stdout, transcript text is untrusted data, and writes are off
   by default.
 - Set `SEDJEM_NO_USAGE=1` when you run the app yourself, so that no usage counts are sent. The tests never send them.

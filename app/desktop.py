@@ -13,7 +13,6 @@ From source:   .venv/bin/python -m app.desktop        (Windows: .venv\\Scripts\\
 Desktop build: Sedjem / Sedjem.exe (see desktop/build.py)
 """
 import argparse
-import json
 import os
 import shutil
 import socket
@@ -21,12 +20,13 @@ import subprocess
 import sys
 import threading
 import time
-import urllib.request
 import webbrowser
 from pathlib import Path
 
 from . import engines, report, updates
 from . import transcript as T
+from . import session
+from .session import Session
 from . import history
 from .config import FROZEN, ROOT, Config
 from .server import NotLocal, make_server, slug
@@ -87,29 +87,19 @@ RECORDINGS = ("Recordings (*.mp3;*.m4a;*.wav;*.ogg;*.opus;*.flac;*.aac;*.amr;*.w
               "All files (*.*)")
 
 
-def running_here(port):
-    """True if Sedjem already answers on this port (then we just show it)."""
-    try:
-        with urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=2) as r:
-            return json.load(r).get("app") == "sedjem"
-    except (OSError, ValueError):
-        return False
-
-
 def running_port(cfg, preferred):
-    """The port of a Sedjem already running on this data folder: the preferred one, or the one it noted in
-    <storage>/port when that one was taken. None if none is running."""
-    ports = [preferred]
-    try:
-        ports.append(int((cfg.storage / "port").read_text(encoding="utf-8")))
-    except (OSError, ValueError):
-        pass
-    return next((p for p in dict.fromkeys(ports) if running_here(p)), None)
+    """The port of this user's Sedjem already running on this data folder (then we just show it): the preferred one,
+    or the one it noted in <storage>/port. It proves that it knows the secret (app/session.py), so a program that only
+    took the port is never shown a window or sent the secret. None if none is running."""
+    return session.running_port(cfg.storage, preferred)
 
 
 def pick_port(preferred, wait=3.0):
-    """The preferred port, or any free one if something else keeps it. A Sedjem that was just closed can hold
-    it for a moment, so it is tried again for up to `wait` seconds."""
+    """The preferred port, or any free one if something else keeps it (0, the default: a new free one at each start,
+    app/session.py). A Sedjem that was just closed can hold it for a moment, so it is tried again for up to `wait`
+    seconds."""
+    if not preferred:
+        return 0
     deadline = time.monotonic() + wait
     while True:
         with socket.socket() as s:
@@ -133,6 +123,11 @@ class Api:
 
     def __init__(self, app):
         self._app, self._window = app, None
+
+    def session(self):
+        """The secret that lets this window's page into the server (app/session.py): the page keeps it in its
+        sessionStorage and sends it as a header. It is never in an address or a command line."""
+        return self._app.session.secret
 
     def _dialog(self, kind):
         import webview
@@ -175,6 +170,19 @@ class Api:
         self._window.destroy()
 
 
+class SessionApi:
+    """The bridge of a window that a second start opens on a copy that is already running: the secret, so that its
+    page can be let in, and links. It has no pick_file or save_export, so the page uses the browser's ways."""
+
+    def __init__(self, secret):
+        self._secret, self._window = secret, None
+
+    def session(self):
+        return self._secret
+
+    open_url = Api.open_url
+
+
 def webview2_available():
     """Windows: whether the Edge WebView2 runtime (and .NET 4.6.2+) is installed. Without it pywebview
     quietly falls back to the Internet Explorer engine, which can't run this app. Elsewhere: True."""
@@ -200,9 +208,11 @@ def webview2_available():
     return False
 
 
-def show_address(url):
-    """No window of any kind could be opened: keep serving and say where (a windowed build has no console)."""
-    text = f"Sedjem is running at {url}\n\nOpen this address in a web browser. To stop it, use Settings → Quit."
+def show_address(url, login):
+    """No window of any kind could be opened: keep serving and say where (a windowed build has no console). The
+    page is let in by opening login, <storage>/open-sedjem.html (app/session.py), which only this user can read."""
+    text = (f"Sedjem is running at {url}\n\nOpen this file in a web browser: {login}\n"
+            "It opens Sedjem and lets that browser in. To stop Sedjem, use Settings → Quit.")
     print(text, flush=True)
     if os.name == "nt" and getattr(sys, "frozen", False):
         import ctypes
@@ -217,8 +227,9 @@ def show_error(text):
         ctypes.windll.user32.MessageBoxW(None, text, "Sedjem", 0x10)  # MB_ICONERROR
 
 
-def native_window(url, app, title="Sedjem"):
-    """Show the app in a pywebview window until it is closed. False if no GUI backend is available."""
+def native_window(url, app, title="Sedjem", secret=None):
+    """Show the app in a pywebview window until it is closed. False if no GUI backend is available. Without app (a
+    copy that is already running), secret is that copy's, so the window's page can still be let in."""
     try:
         import webview
     except ImportError:
@@ -226,11 +237,12 @@ def native_window(url, app, title="Sedjem"):
     if not webview2_available():
         print("no WebView2 runtime; using a browser window", file=sys.stderr)
         return False
-    api = Api(app) if app else None
+    api = Api(app) if app else SessionApi(secret) if secret else None
     window = webview.create_window(title, url, js_api=api, width=1280, height=860, min_size=(820, 560),
                                    text_select=True)
     if api:
         api._window = window
+    if app:
         app.on_quit = window.destroy
     try:
         storage = str(app.cfg.storage / "webview") if app else None
@@ -303,14 +315,16 @@ def main(argv=None):
     if sys.stderr is None:  # a windowed build has no console: keep messages in a log file
         cfg.storage.mkdir(parents=True, exist_ok=True)
         sys.stdout = sys.stderr = open(cfg.storage / "sedjem.log", "a", encoding="utf-8", buffering=1)
-    restarted = updates.restarted()  # started again by an update (app/updates.py): take the same port back
-    preferred = restarted or args.port or cfg.server["port"]
+    updates.restarted()  # started again by an update (app/updates.py): once the copy before has stopped
+    preferred = args.port if args.port is not None else cfg.server["port"]  # 0: a new free port at each start
     running = running_port(cfg, preferred)
     if running:  # already running (e.g. started twice): just show it
         url = f"http://127.0.0.1:{running}/"
-        if args.browser or not native_window(url, None):
-            if not app_mode_browser(url, cfg.storage / "browser-profile") and not webbrowser.open(url):
-                show_address(url)
+        session = Session(cfg.storage)  # the running copy's secret, in the same data folder (app/session.py)
+        if args.browser or not native_window(url, None, secret=session.secret):
+            login = session.login_page(running)  # a browser tab is let in by this page, not by its address
+            if not app_mode_browser(login.as_uri(), cfg.storage / "browser-profile") and not webbrowser.open(login.as_uri()):
+                show_address(url, login)
         return
 
     try:
@@ -324,15 +338,12 @@ def main(argv=None):
     app.updates.start()  # checks for updates in the background, if the user agreed to it
     app.usage.start()  # sends the anonymous usage counts, while they are allowed (app/usage.py)
     app.remote.start()  # runs jobs for other computers, if that is switched on (app/remote.py)
-    port_file = cfg.storage / "port"  # so that starting it again finds this one, whichever port it has
-    try:
-        port_file.write_text(str(server.server_address[1]), encoding="utf-8")
-    except OSError:
-        pass
-    stopped = threading.Event()
+    stopped = threading.Event()  # make_server noted the port in <storage>/port, for a second start (app/session.py)
+    login = app.session.login_page(server.server_address[1])  # lets a browser tab in (app/session.py)
     try:
         if args.no_window:
-            print(f"Sedjem is running at {url} (stop with Settings → Quit or Ctrl+C)", flush=True)
+            print(f"Sedjem is running at {url} (stop with Settings → Quit or Ctrl+C)\n"
+                  f"Open {login} in a web browser to use it from there.", flush=True)
             app.on_quit = stopped.set
             while not stopped.wait(1):
                 pass
@@ -341,7 +352,7 @@ def main(argv=None):
             return
         profile = cfg.storage / "browser-profile"
         profile.mkdir(parents=True, exist_ok=True)
-        browser = app_mode_browser(url, profile)
+        browser = app_mode_browser(login.as_uri(), profile)
         if browser:
             app.on_quit = lambda: (browser.terminate(), stopped.set())
             t0 = time.time()
@@ -349,8 +360,8 @@ def main(argv=None):
             if time.time() - t0 > 5:  # the window was closed by the user
                 return
             # the browser handed the window to an instance that was already running: wait for Quit
-        elif not (restarted or webbrowser.open(url)):  # after an update the open tab reloads itself
-            show_address(url)
+        elif not webbrowser.open(login.as_uri()):  # also after an update: the old tab's secret is no longer good
+            show_address(url, login)
         print(f"Sedjem is running at {url} (close with Settings → Quit or Ctrl+C)", flush=True)
         app.on_quit = stopped.set
         while not stopped.wait(1):
@@ -361,12 +372,8 @@ def main(argv=None):
         app.runner.shutdown()
         app.remote.stop()
         server.shutdown()
+        app.session.stopped(server.server_address[1])  # before the port is free, when an update's new copy goes on
         server.server_close()
-        try:
-            if not app.restarting:  # after an update the new process has the same port and keeps the file
-                port_file.unlink(missing_ok=True)
-        except OSError:
-            pass
 
 
 if __name__ == "__main__":

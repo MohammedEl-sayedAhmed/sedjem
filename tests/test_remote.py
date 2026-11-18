@@ -91,7 +91,9 @@ class Computer:
     def call(self, method, path, body=None):
         data = None if body is None else json.dumps(body).encode()
         req = urllib.request.Request(self.base + path, data=data, method=method,
-                                     headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     headers={"X-Sedjem": "1",
+                                              "X-Sedjem-Token": self.app.session.secret,
+                                              "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=60) as r:
                 return r.status, json.loads(r.read())

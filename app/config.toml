@@ -9,8 +9,8 @@
 
 [server]
 host = "127.0.0.1"          # this computer only: the app has no login, so it doesn't start on another host
-port = 8765
-open_browser = true         # ./app.sh opens a browser tab (the desktop app opens its own window)
+port = 0                    # 0: a new free port at each start (app/session.py)
+open_browser = true         # ./app.sh opens a window (the desktop app opens its own one)
 
 [storage]
 dir = "app_data"            # one folder per transcription: 16 kHz audio, transcript, log (git-ignored)

@@ -64,7 +64,9 @@ class JobList(unittest.TestCase):
     def call(self, method, path, body=None):
         data = None if body is None else json.dumps(body).encode()
         req = urllib.request.Request(self.base + path, data=data, method=method,
-                                     headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     headers={"X-Sedjem": "1",
+                                              "X-Sedjem-Token": self.app.session.secret,
+                                              "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.loads(r.read())
 

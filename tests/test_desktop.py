@@ -16,10 +16,12 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from app import desktop  # noqa: E402
+from app.session import Session  # noqa: E402
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux desktop entries")
@@ -83,9 +85,15 @@ class PortTests(unittest.TestCase):
         self.assertGreater(other, 0)
 
     def test_finds_a_running_copy_on_the_port_it_noted(self):
+        proves = []  # the secret the stand-in proves, if any (a Sedjem of this user's own)
+
         class Status(BaseHTTPRequestHandler):
             def do_GET(self):
-                body = json.dumps({"app": "sedjem"}).encode()
+                answer = {"app": "sedjem"}
+                nonce = parse_qs(urlsplit(self.path).query).get("nonce", [""])[0]
+                if proves:
+                    answer["proof"] = proves[0].proof(nonce, self.server.server_address[1])
+                body = json.dumps(answer).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -103,6 +111,8 @@ class PortTests(unittest.TestCase):
                 unused = self.free_port()
                 self.assertIsNone(desktop.running_port(cfg, unused))
                 (Path(d) / "port").write_text(str(server.server_address[1]), encoding="utf-8")
+                self.assertIsNone(desktop.running_port(cfg, unused), "one that can't prove the secret is not ours")
+                proves.append(Session(cfg.storage))
                 self.assertEqual(desktop.running_port(cfg, unused), server.server_address[1])
                 (Path(d) / "port").write_text("not a port", encoding="utf-8")
                 self.assertIsNone(desktop.running_port(cfg, unused))

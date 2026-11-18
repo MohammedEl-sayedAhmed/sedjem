@@ -56,7 +56,7 @@ flowchart TB
   subgraph sedjem["Sedjem"]
     window["Window<br/>pywebview, or a browser in app mode"]
     ui["Web UI<br/>HTML, CSS and JavaScript, no build step"]
-    server["Local server<br/>Python http.server on 127.0.0.1:8765"]
+    server["Local server<br/>Python http.server on 127.0.0.1,<br/>a new port at each start"]
     runner["Job runner<br/>six queues on Python threads"]
     worker["Model worker<br/>one subprocess per local job:<br/>faster-whisper, transcribe.cpp, sherpa-onnx"]
     remote["Remote server<br/>HTTPS on port 8766, off until switched on"]

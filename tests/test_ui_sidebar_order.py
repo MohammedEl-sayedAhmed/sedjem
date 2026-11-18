@@ -1,11 +1,12 @@
 """Browser tests of the order of the sidebar (app/static/app.js): each order offered next to the search, with the
 headings that follow it (today and the months for the date orders, none for the others); a recording with several
 transcripts ordered as one item by its main transcript, and a course as one item whose lectures stay in lecture
-order; the search on top of an order; the choice remembered in the browser, and newest first when what was kept is
-unknown; and the choice by keyboard, by its name, and in a narrow window. Headless Chromium against a Sedjem server
+order; the search on top of an order; the choice remembered in the data folder (the page's own storage is new with
+each port), and newest first when what was kept is unknown; and the choice by keyboard, by its name, and in a narrow window. Headless Chromium against a Sedjem server
 with demo transcripts (see tests/ui_support.py).
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_sidebar_order.py" -v
 """
+import time
 import unittest
 from datetime import datetime, timedelta
 
@@ -90,7 +91,13 @@ class SidebarOrder(UiTestCase):
         return self.page.eval_on_selector_all("#jobList .lec .lt", "els => els.map(e => e.textContent.trim())")
 
     def kept(self):
-        return self.page.evaluate("() => localStorage.getItem('sedjem-sort')")
+        """The order kept with the page's preferences in the data folder, once the page's save of it has arrived."""
+        copy = self.page.evaluate("() => localStorage.getItem('sedjem-sort')")  # the page's copy, saved at once
+        deadline = time.monotonic() + 10
+        while self.prefs().get("sedjem-sort") != copy and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(self.prefs().get("sedjem-sort"), copy)
+        return copy
 
     def test_newest_first_is_the_default_with_today_and_the_months(self):
         self.open()
@@ -177,7 +184,7 @@ class SidebarOrder(UiTestCase):
 
         for stored in ("alphabetical", "toString", ""):  # an order this version doesn't know, or none
             with self.subTest(stored=stored):
-                self.page.evaluate("(v) => localStorage.setItem('sedjem-sort', v)", stored)
+                self.set_prefs(sedjem_sort=stored)
                 self.page.reload()
                 self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
                 self.assertEqual(self.page.input_value("#jobSort"), "newest")

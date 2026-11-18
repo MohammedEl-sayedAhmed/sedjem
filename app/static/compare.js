@@ -269,7 +269,7 @@ function cmpDraw() {
   CMP.current = -1;
   cmpBind();
   cmpUpdate();
-  showPlayer({ id: d.base, title: base.title });
+  showPlayer({ id: d.base, title: base.title, media_sig: d.media_sig });
 }
 
 function cmpColHead(j) {

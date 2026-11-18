@@ -13,10 +13,9 @@
 // is on its way; the rest is what this page is doing with it
 const UPD = { data: null, error: "", loading: null, checking: false, installing: false, asked: false, seen: null,
   started: false, timer: null, restart: null, sig: "", changes: 0, open: 0, newest: 0, again: false };
-const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (localStorage)
+const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (a page preference)
 const UPD_FROM = "sedjem-update-from";  // what ran before Update now, to say "Updated to …" once it is back
 const UPD_BUSY = new Set(["downloading", "verifying", "installing"]);
-const UPD_RESTART_LIMIT = 120000;  // how long the page waits for Sedjem to come back
 const UPD_KIND = { source: "Runs from the source code", windows: "Installed with the Windows installer",
   linux: "The Linux build, unpacked from its archive", other: "Another kind of install" };
 
@@ -24,7 +23,7 @@ function updGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 function updPut(key, value) {
-  try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode */ }
+  prefPut(key, value);  // kept in the data folder too, so the new copy after Update now sees it (app.js)
 }
 const updShort = (sha) => String(sha || "").slice(0, 7);
 const updHref = (url) => (/^https:\/\//i.test(String(url || "")) ? String(url) : "");  // a link only to an https address
@@ -551,50 +550,44 @@ async function updCopy(text) {
 // ---------------------------------------------------------------------------------------------
 // Restarting
 // ---------------------------------------------------------------------------------------------
-// Sedjem restarting after Update now: the page waits for it, over everything, and reloads once it answers
-// again. An answer counts when Sedjem went away first, or when it no longer says it is restarting (the new one
-// came up between two checks). After two minutes the page says so and offers to reload.
+// Sedjem restarting after Update now. When the restart works, it comes back on a new port with a new secret
+// (app/session.py), so this page can't follow it: the new copy opens a window of its own, and this one says so,
+// over everything. Meanwhile the page keeps asking this copy. If the new one stopped at once, this one keeps running
+// and says that the update failed, and the page shows that instead. Once this copy is gone, it stops asking.
 async function updWaitForRestart() {
   if (UPD.restart) return;
-  const r = (UPD.restart = { start: Date.now(), gone: false });
+  UPD.restart = { start: Date.now() };
   clearTimeout(UPD.timer);
   updHideNotice();
   const dlg = updRestartDialog();
   if (!dlg.open) dlg.showModal();
-  while (Date.now() - r.start < UPD_RESTART_LIMIT) {
+  for (;;) {
     await new Promise((done) => setTimeout(done, 1000));
-    if (await updBack(r)) { location.reload(); return; }
+    let d;
+    try { d = await api.get("/api/updates"); } catch { return; }  // this copy has quit: the new one has its own window
+    if (d.install?.state !== "restarting") {  // it didn't restart after all
+      UPD.restart = null;
+      dlg.close();
+      updSetData(d);
+      updRedraw();
+      return;
+    }
   }
-  r.over = true;
-  const source = UPD.data?.running?.kind === "source";
-  $("#updRestartTitle").textContent = "Sedjem didn't come back";
-  $("#updRestartText").textContent = `It hasn't answered for two minutes. ${source ? "Start it again with ./app.sh in the project folder" : "Open Sedjem again"}, then reload this page.`;
-  $("#updRestartBar").hidden = true;
-  $("#updReload").hidden = false;
-  $("#updReload").focus();
-}
-
-async function updBack(r) {
-  try { await api.get("/api/status"); } catch { r.gone = true; return false; }
-  if (r.gone) return true;
-  try { return (await api.get("/api/updates")).install?.state !== "restarting"; } catch { r.gone = true; return false; }
 }
 
 function updRestartDialog() {
   let dlg = $("#updRestart");
   if (dlg) return dlg;
   const installer = updAvailable(UPD.data)?.action === "installer";
+  const again = UPD.data?.running?.kind === "source" ? "start it again with <code>./app.sh</code> in the project folder" : "open Sedjem again";
   document.body.insertAdjacentHTML("beforeend", `<dialog id="updRestart" class="upd-restart" aria-labelledby="updRestartTitle" aria-describedby="updRestartText">
     <img src="/static/icon.svg" alt="" width="52" height="52">
     <h2 id="updRestartTitle">Sedjem is restarting…</h2>
-    <p id="updRestartText">${installer ? "The installer is updating it; it opens again when it's done." : "This page reloads when it's back."}</p>
-    <div class="progress indeterminate" id="updRestartBar"><i></i></div>
-    <button type="button" class="btn btn-primary" id="updReload" hidden>Reload</button></dialog>`);
+    <p id="updRestartText">${installer ? "The installer is updating it. " : ""}It opens again in a new window when it's ready, and this one can be closed. If no new window opens, ${again}.</p></dialog>`);
   dlg = $("#updRestart");
-  // it stays until Sedjem is back (the browser may still close it on a second Escape: it opens again)
-  dlg.addEventListener("cancel", (e) => UPD.restart?.over || e.preventDefault());
-  dlg.addEventListener("close", () => UPD.restart && !UPD.restart.over && dlg.showModal());
-  $("#updReload").onclick = () => location.reload();
+  // it stays: this page has no access to the new copy (the browser may still close it on a second Escape: it opens again)
+  dlg.addEventListener("cancel", (e) => e.preventDefault());
+  dlg.addEventListener("close", () => UPD.restart && dlg.showModal());
   return dlg;
 }
 

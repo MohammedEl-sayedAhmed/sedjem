@@ -128,6 +128,7 @@ for p in patches:
 srv, app = make_server(Config(home=HOME), port=0)
 threading.Thread(target=srv.serve_forever, daemon=True).start()
 BASE = f"http://127.0.0.1:{srv.server_address[1]}"
+SECRET = app.session.secret  # what the app's own window sends (app/session.py)
 print("server", BASE)
 
 HIDE_PATHS = """() => {
@@ -142,11 +143,12 @@ HIDE_PATHS = """() => {
 
 
 def api(page, method, path, body=None):
-    return page.evaluate("""async ([method, path, body]) => {
-        const r = await fetch(path, { method, headers: { "X-Sedjem": "1", "Content-Type": "application/json" },
+    return page.evaluate("""async ([method, path, body, secret]) => {
+        const r = await fetch(path, { method, headers: { "X-Sedjem": "1", "X-Sedjem-Token": secret,
+                                                         "Content-Type": "application/json" },
                                       body: body === null ? undefined : JSON.stringify(body) });
         return { status: r.status, json: await r.json().catch(() => null) };
-    }""", [method, path, body])
+    }""", [method, path, body, SECRET])
 
 
 def shoot(page, name, full=False, clip=None):
@@ -171,7 +173,8 @@ with sync_playwright() as pw:
     def new_page(dark=False, height=900, width=1440, scale=2):
         ctx = browser.new_context(viewport={"width": width, "height": height}, device_scale_factor=scale,
                                   color_scheme="dark" if dark else "light")
-        ctx.add_init_script(f"try {{ localStorage.setItem('sedjem-theme', '{'dark' if dark else 'light'}') }} catch (e) {{}}")
+        # the page lets itself in as the app's login page would; the theme follows color_scheme, as the system's
+        ctx.add_init_script(f"try {{ sessionStorage.setItem('sedjem-token', '{SECRET}') }} catch (e) {{}}")
         page = ctx.new_page()
         page.set_default_timeout(15000)
         page.on("pageerror", lambda e: errors.append(str(e)))

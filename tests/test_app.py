@@ -191,7 +191,7 @@ class Api(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def call(self, method, path, body=None, headers=None, raw=None):
-        h = {"X-Sedjem": "1", **(headers or {})}
+        h = {"X-Sedjem": "1", "X-Sedjem-Token": self.app.session.secret, **(headers or {})}
         data = raw
         if body is not None:
             data, h["Content-Type"] = json.dumps(body).encode(), "application/json"
@@ -262,7 +262,7 @@ class Api(unittest.TestCase):
         status, txt, headers = self.call("GET", f"/api/jobs/{jid}/export/txt")
         self.assertIn("Mona: edited text", txt.decode())
         self.assertIn("attachment", headers["Content-Disposition"])
-        req = urllib.request.Request(self.base + f"/api/jobs/{jid}/audio", headers={"Range": "bytes=0-99"})
+        req = urllib.request.Request(self.base + f"/api/jobs/{jid}/audio", headers={"Range": "bytes=0-99", "X-Sedjem-Token": self.app.session.secret})
         with urllib.request.urlopen(req) as resp:
             self.assertEqual(resp.status, 206)
             self.assertEqual(len(resp.read()), 100)
@@ -320,11 +320,13 @@ class Api(unittest.TestCase):
         conn = http.client.HTTPConnection("127.0.0.1", self.server.server_address[1], timeout=10)
         try:
             conn.request("POST", "/api/downloads/voiceprints/cancel", body=b"{}",
-                         headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                         headers={"X-Sedjem": "1",
+                                  "X-Sedjem-Token": self.app.session.secret,
+                                  "Content-Type": "application/json"})
             r = conn.getresponse()
             r.read()
             self.assertEqual(r.status, 200)
-            conn.request("GET", "/api/status")
+            conn.request("GET", "/api/status", headers={"X-Sedjem-Token": self.app.session.secret})
             r = conn.getresponse()
             self.assertEqual(r.status, 200)
             self.assertEqual(json.loads(r.read())["app"], "sedjem")

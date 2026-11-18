@@ -501,7 +501,9 @@ class SettingsApiTests(unittest.TestCase):
 
     def call(self, method, path, body=None):
         req = urllib.request.Request(self.base + path, method=method, data=json.dumps(body).encode() if body else None,
-                                     headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     headers={"X-Sedjem": "1",
+                                              "X-Sedjem-Token": self.app.session.secret,
+                                              "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=10) as r:
                 return r.status, json.load(r)

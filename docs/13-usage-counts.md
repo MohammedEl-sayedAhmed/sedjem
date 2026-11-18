@@ -280,4 +280,4 @@ Each month's other totals (retention, settings, hardware, the models downloaded,
 Scripts can read the switch in `GET /api/status`, whose `usage` field says whether this copy can send counts
 (`available`), whether they are on (`on`), whether the first-start dialog is to say so (`ask`) and which variable
 turns them off (`blocked`), and change it with `POST /api/settings` and `{"usage_counts": true}` or `false` (the
-header `X-Sedjem: 1` is needed).
+secret and the header `X-Sedjem: 1` are needed; see [the app's API](09-app.md#api-for-scripts)).

@@ -414,7 +414,8 @@ class Api(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def call(self, method, path, body=None, headers=None):
-        h = {"X-Sedjem": "1", "Content-Type": "application/json", **(headers or {})}
+        h = {"X-Sedjem": "1",
+             "X-Sedjem-Token": self.app.session.secret, "Content-Type": "application/json", **(headers or {})}
         req = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(),
                                      method=method, headers=h)
         try:

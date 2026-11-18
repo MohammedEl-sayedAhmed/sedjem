@@ -75,8 +75,10 @@ def check_worker(tmp):
     return {"ok": r.returncode == 0, "output": output.strip()[-3000:]}
 
 
-def get(url, data=None, headers=None, method=None):
-    req = urllib.request.Request(url, data=data, headers={"X-Sedjem": "1", **(headers or {})}, method=method)
+def get(url, data=None, headers=None, method=None, token=None):
+    """A request to the app's server; token is its secret (app/session.py), which every /api request needs."""
+    auth = {"X-Sedjem-Token": token} if token else {}
+    req = urllib.request.Request(url, data=data, headers={"X-Sedjem": "1", **auth, **(headers or {})}, method=method)
     with urllib.request.urlopen(req, timeout=60) as r:
         body = r.read()
         return json.loads(body) if "json" in r.headers.get("Content-Type", "") else body.decode("utf-8", "replace")
@@ -95,17 +97,18 @@ def check_server_and_job(tmp, results, window):
     threading.Thread(target=server.serve_forever, daemon=True).start()
     base = f"http://127.0.0.1:{server.server_address[1]}"
     try:
-        page, status = get(base + "/"), get(base + "/api/status")
+        token = app.session.secret
+        page, status = get(base + "/"), get(base + "/api/status", token=token)
         results["server"] = {"ok": "Sedjem" in page and status.get("app") == "sedjem",
                              "models": {m["id"]: m["ready"] for m in status["models"]}}
         t = np.arange(int(44100 * 2)) / 44100
         wav = Path(tmp) / "tone.wav"
         sf.write(wav, np.stack([0.2 * np.sin(2 * np.pi * 440 * t)] * 2, axis=1).astype(np.float32), 44100)
         job = get(base + "/api/jobs?model=elevenlabs&speakers=auto&name=tone.wav&confirm_upload=1",
-                  data=wav.read_bytes(), headers={"Content-Type": "audio/wav"})
+                  data=wav.read_bytes(), headers={"Content-Type": "audio/wav"}, token=token)
         r, end = None, time.time() + 120
         while time.time() < end:
-            r = get(f"{base}/api/jobs/{job['id']}")
+            r = get(f"{base}/api/jobs/{job['id']}", token=token)
             if r["job"]["status"] in ("done", "failed", "cancelled"):
                 break
             time.sleep(0.3)
@@ -258,10 +261,10 @@ def check_models(tmp):
     try:
         job = get(base + "/api/jobs", data=json.dumps({"path": str(sample), "model": "whisper-medium",
                                                          "speakers": "auto", "language": "en"}).encode(),
-                  headers={"Content-Type": "application/json"})
+                  headers={"Content-Type": "application/json"}, token=app.session.secret)
         t1, r = time.time(), None
         while time.time() - t1 < 900:
-            r = get(f"{base}/api/jobs/{job['id']}")
+            r = get(f"{base}/api/jobs/{job['id']}", token=app.session.secret)
             if r["job"]["status"] in ("done", "failed", "cancelled"):
                 break
             time.sleep(1)

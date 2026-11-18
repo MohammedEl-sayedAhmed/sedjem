@@ -47,8 +47,8 @@ Windows the built `Sedjem.exe` carries the icon, and from source the window take
 `desktop/sedjem.ico`.
 
 Closing the window quits the app, and so does *Quit Sedjem* in *Settings*. `--browser` skips the native window,
-`--server` (or `--no-window`) runs only the server, and `--port N` picks the port (the default is
-8765, or any free one). The Windows installer also adds a *Sedjem (browser window)* shortcut, which
+`--server` (or `--no-window`) runs only the server, and `--port N` picks the port (by default a new
+free one at each start). The Windows installer also adds a *Sedjem (browser window)* shortcut, which
 starts it with `--browser`. `Sedjem --mcp` opens nothing: it is the command an assistant such as
 Claude Desktop runs to read the transcriptions over MCP, answering on standard input and output
 ([assistants](11-assistants.md)).

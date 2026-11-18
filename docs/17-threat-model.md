@@ -13,14 +13,24 @@ problem that this page misses goes privately to the maintainer, as [the security
 
 ## The local server and its page
 
-The app's page and its API are served by a local server that has no login.
+The app's page and its API are served by a local server, which asks for no password.
 
 - Another website open in the same browser could try to use the API (cross-site requests, or DNS rebinding). The
   server listens on this computer only and doesn't start on another host. It answers only requests addressed to
   127.0.0.1, `localhost` or `[::1]`, refuses another site's Origin, and needs the `X-Sedjem: 1` header, which another
   site can't send, on every request that changes something.
+- Another program on the computer, including one that another user account runs, could connect to the server. Every
+  request for data needs a secret that only the user's own window has. It is kept in a file only the user can read,
+  and it never appears in a command line or an address the app opens. Before a second start trusts a copy that is
+  already running on a port, that copy proves that it knows the secret
+  ([AgDR 19](agdr/AgDR-0019-a-secret-between-the-server-and-its-window.md)).
+- A program could take the app's port while Sedjem isn't running, and leave a page or a service worker for that
+  address in the browser, which would see the next login. The port and the secret are new at each start, so such a
+  program can't know where Sedjem will be; the app opens its page with a browser profile of its own when it finds a
+  Chromium-family browser, and offers no installed web app. A port fixed with `--port` or `[server] port` gives that
+  up. On Windows the port is opened for the app alone, so no other account can bind it too.
 - A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
-  they are for, and of the websites open in a browser, only the app's own page can send them.
+  they are for, and only the user's own window can send them.
 - Text from outside (YouTube titles and captions, the hosted services' transcripts, paired computers, Hugging Face,
   assistants, release notes) could carry script into the page. Every such text is escaped or set as plain text, and
   links built from data are `https://` only. A one-off review of every place the page builds HTML, with injected

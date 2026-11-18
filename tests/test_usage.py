@@ -969,7 +969,9 @@ class AppCounts(UsageCase):
 
     def call(self, method, path, body=None):
         req = urllib.request.Request(self.base + path, method=method, data=None if body is None else json.dumps(body).encode(),
-                                     headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     headers={"X-Sedjem": "1",
+                                              "X-Sedjem-Token": self.app.session.secret,
+                                              "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 raw = r.read()

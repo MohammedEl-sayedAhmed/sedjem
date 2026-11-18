@@ -874,3 +874,11 @@ label.set-row { cursor: pointer; }
   .set-kv dd + dt { margin-top: 8px; }
   .set-kv-head { margin-top: 10px; }
 }
+
+/* A page without access to the server (app.js noAccess; app/session.py): how to open Sedjem instead */
+.no-access {
+  position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; justify-content: center;
+  align-items: center; gap: 8px; padding: 24px; text-align: center; background: var(--bg); color: var(--text);
+}
+.no-access h1 { margin: 0; font-size: 1.4rem; }
+.no-access p { max-width: 34rem; margin: 0; color: var(--muted); }

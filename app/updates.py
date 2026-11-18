@@ -1037,9 +1037,10 @@ class Updates:
                 raise InstallError(f"Installing the packages in {f} failed: {said[-1] if said else p.returncode}")
 
     def restart(self):
-        """Start this program again with the same command line and port, then quit this one. The new process waits
-        until this one has let the port go (restarted()), and writes what it prints to <storage>/sedjem.log. If it
-        ends at once (the new code can't even be loaded), this one keeps running and says so."""
+        """Start this program again with the same command line, then quit this one. The new process waits until this
+        one has let its port go (restarted()), takes a new one (app/session.py, unless --port or [server] port names
+        one), and writes what it prints to <storage>/sedjem.log. If it ends at once (the new code can't even be
+        loaded), this one keeps running and says so."""
         env = {**os.environ, RESTART_ENV: f"{os.getpid()}:{self.port() or 0}"}
         log_path = self.cfg.storage / "sedjem.log"
         try:

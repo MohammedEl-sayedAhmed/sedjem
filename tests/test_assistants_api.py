@@ -62,7 +62,8 @@ class AssistantsApi(unittest.TestCase):
         assistants.clear_log(self.cfg)
 
     def call(self, method, path, body=None, headers=None):
-        h = {"X-Sedjem": "1", "Content-Type": "application/json", **(headers or {})}
+        h = {"X-Sedjem": "1",
+             "X-Sedjem-Token": self.app.session.secret, "Content-Type": "application/json", **(headers or {})}
         req = urllib.request.Request(self.base + path, data=None if body is None else json.dumps(body).encode(),
                                      method=method, headers=h)
         try:
