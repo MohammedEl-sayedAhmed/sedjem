@@ -328,8 +328,9 @@ MIT licence.
 
 For use without these conditions, for example inside a closed-source product, commercial licences
 are available from the author: contact [Mohammed El-sayed Ahmed](https://github.com/MohammedEl-sayedAhmed).
-Contributions are welcome; by sending one you agree that it may be distributed under both the AGPL
-and the commercial licence.
+Contributions are welcome: [the contributing guide](CONTRIBUTING.md) says how, and each contributor accepts the
+[Contributor Licence Agreement](CLA.md) once, so that a contribution can be part of every licence Sedjem is offered
+under. The name and the logo are trademarks: [their page](TRADEMARKS.md) says how forks may use them.
 
 <details>
 <summary>The models', libraries' and logos' own licences</summary>

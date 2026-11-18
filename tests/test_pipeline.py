@@ -634,7 +634,8 @@ class Security(unittest.TestCase):
         config = yaml.safe_load((forms / "config.yml").read_text(encoding="utf-8"))
         self.assertTrue(config["contact_links"][0]["url"].endswith("/security/advisories/new"))
         template = (ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
-        for part in ("start with the area", "unittest discover -s tests", "Nothing private", "commercial licence"):
+        for part in ("start with the area", "unittest discover -s tests", "Nothing private", "commercial licence",
+                     "CLA.md"):
             self.assertIn(part, template)
 
 
