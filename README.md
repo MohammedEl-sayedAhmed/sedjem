@@ -244,7 +244,8 @@ In October 2026, 4 installs ran Sedjem, in 1 country, and 3 were new. They made 
 Each stable version is announced in the
 [Discussions](https://github.com/MohammedEl-sayedAhmed/sedjem/discussions), where questions and ideas are welcome
 too. On GitHub, *Watch → Custom → Releases* sends an email for each release, the nightly previews included. Bugs
-go in [the issues](https://github.com/MohammedEl-sayedAhmed/sedjem/issues).
+go in [the issues](https://github.com/MohammedEl-sayedAhmed/sedjem/issues), and security problems go privately, as
+the [security policy](SECURITY.md) says.
 
 <details>
 <summary>Nine screens of the app</summary>
