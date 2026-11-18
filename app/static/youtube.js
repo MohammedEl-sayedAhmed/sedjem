@@ -227,10 +227,13 @@ function courseBar(j) {
     : `<span class="btn btn-sm" aria-disabled="true">${after ? "" : icon}${label}${after ? icon : ""}</span>`;
   return `<nav class="course-bar" aria-label="Course">
     <span class="course-label">${YT_ICON.course}<span><b dir="${mixDir(j.course.title)}">${esc(j.course.title)}</b> · lecture ${esc(j.course.index)} of ${esc(j.course.count)}</span></span>
-    <span class="course-steps">${step(prev, "Previous", YT_ICON.prev, false)}${step(next, "Next", YT_ICON.next, true)}</span>${folder}${aiCourseButton(j)}</nav>`;
+    <span class="course-steps">${step(prev, "Previous", YT_ICON.prev, false)}${step(next, "Next", YT_ICON.next, true)}</span>${folder}
+    <button type="button" class="btn btn-sm" id="exportCourse">${ICON.download} Export course</button>${aiCourseButton(j)}</nav>`;
 }
 
 function bindCourseBar(j) {
+  const exp = $("#exportCourse");
+  if (exp) exp.onclick = () => openExportMany(j.course.id);  // the Export dialog with the course ticked (exports.js)
   const open = $("#openCourse");
   if (open) open.onclick = async () => {
     try { await api.post("/api/open-folder", { job: j.id }); } catch (e) { toast(e.message, "error"); }

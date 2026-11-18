@@ -24,7 +24,7 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, engines, hub, remote, report, session, updates, usage, video, youtube
+from . import assistants, compare, courses, engines, exports, hub, remote, report, session, updates, usage, video, youtube
 from . import transcript as T
 from . import history
 from .config import FALLBACK_SPEAKER_MODEL, FROZEN, _read_json, power_profile, set_power_profile
@@ -374,6 +374,16 @@ def log_item(entry, jobs):
             "action": str(entry.get("action") or ""), "detail": str(entry.get("detail") or ""), "ids": ids,
             "titles": [(jobs[i].get("title") or "Untitled") if i in jobs else None for i in ids], "text": asked(entry),
             "saved": entry.get("action") == "save_version" and version is not None, "version": version}
+
+
+def attachment(stem, ext, tag=""):
+    """A Content-Disposition for a download named stem.ext, with an ASCII name for clients that don't read the
+    UTF-8 one (a title in Arabic letters has none: transcript then)."""
+    name = f"{stem}.{ext}"
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]", "", name)
+    if not re.search(r"[A-Za-z0-9]", ascii_name.rsplit(".", 1)[0].removesuffix(tag)):
+        ascii_name = f"transcript{tag}.{ext}"
+    return f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{urllib.parse.quote(name)}'
 
 
 def slug(text):
@@ -934,12 +944,38 @@ class Handler(BaseHTTPRequestHandler):
         elif self.command == "GET":  # an export
             self.app.usage.exported(fmt)
         tag = f"-v{n}" if n else ""
-        name = f"{slug(job.get('title'))}{tag}.{fmt}"
-        ascii_name = re.sub(r"[^A-Za-z0-9._-]", "", name)
-        if not re.search(r"[A-Za-z0-9]", ascii_name.rsplit(".", 1)[0].removesuffix(tag)):
-            ascii_name = f"transcript{tag}.{fmt}"
-        disposition = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{urllib.parse.quote(name)}'
-        self.reply(200, body, ctype, {"Content-Disposition": disposition})
+        self.reply(200, body, ctype, {"Content-Disposition": attachment(f"{slug(job.get('title'))}{tag}", fmt, tag)})
+
+    def export_many(self, _params):
+        """{ids, format, combined, as}: the transcripts chosen in the Export dialog, in the order given
+        (app/exports.py). A zip with a file for each (as "zip", the default); their files as JSON, for the page to
+        write into a folder (as "files"); or with combined: true, one file with them all (text, Markdown or JSON).
+        Transcriptions that have no transcript yet are left out."""
+        p = self.body_json(limit=500_000)
+        ids, fmt = p.get("ids"), p.get("format")
+        if not (isinstance(ids, list) and 1 <= len(ids) <= 5000
+                and all(isinstance(x, str) and re.fullmatch(ID, x) for x in ids)):
+            raise ApiError(400, "ids: a list of transcription ids")
+        if fmt not in T.EXPORTS:
+            raise ApiError(400, "unknown format")
+        combined = p.get("combined") is True
+        if combined and fmt not in exports.COMBINED:
+            raise ApiError(400, "subtitles can't be combined into one file")
+        try:
+            jobs = exports.chosen(self.app.store, ids)
+        except KeyError as e:
+            raise ApiError(404, f"no such transcription: {e.args[0]}")
+        if not jobs:
+            raise ApiError(400, "none of these transcriptions has a transcript yet")
+        self.app.usage.exported(fmt, len(jobs))  # a file of this format for each (app/usage.py)
+        if p.get("as") == "files" and not combined:
+            return self.json({"files": [{"path": a, "text": b} for a, b in exports.files(jobs, fmt, slug)]})
+        stem = exports.name(jobs, slug)
+        if combined:
+            body, ctype, ext = exports.combined(jobs, fmt).encode(), T.EXPORTS[fmt][1], fmt
+        else:
+            body, ctype, ext = exports.zipped(exports.files(jobs, fmt, slug)), "application/zip", "zip"
+        self.reply(200, body, ctype, {"Content-Disposition": attachment(stem, ext)})
 
     # transcripts of one recording: grouping, comparing and combining them (app/compare.py)
     def job_group(self, _params, jid):
@@ -1372,6 +1408,7 @@ ROUTES = [
     ("GET", rf"/api/jobs/{ID}/audio", Handler.audio),
     ("GET", rf"/api/jobs/{ID}/video", Handler.video),
     ("GET", rf"/api/jobs/{ID}/export/(\w+)", Handler.export),
+    ("POST", r"/api/export", Handler.export_many),
     ("GET", rf"/api/jobs/{ID}/group", Handler.job_group),
     ("POST", rf"/api/jobs/{ID}/branch", Handler.branch_job),
     ("POST", rf"/api/jobs/{ID}/main", Handler.set_main),

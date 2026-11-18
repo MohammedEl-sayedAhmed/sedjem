@@ -390,6 +390,7 @@ function renderSidebar() {
   bindCourses();
   refreshGroupBar();
   refreshRerunMenu();
+  expRefresh();  // the Export dialog's list, if it is open (exports.js)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -2600,6 +2601,7 @@ $("#themeBtn").onclick = () => {
   prefPut("sedjem-theme", dark ? "dark" : "light");
 };
 $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
+$("#exportManyBtn").onclick = () => openExportMany();  // many transcripts at once (exports.js)
 $("#jobSearch").oninput = renderSidebar;
 $("#jobSort").innerHTML = Object.entries(SORTS).map(([v, [label]]) => `<option value="${v}">${label}</option>`).join("");
 $("#jobSort").value = sortKept();

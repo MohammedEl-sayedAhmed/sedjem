@@ -23,7 +23,7 @@ import time
 import webbrowser
 from pathlib import Path
 
-from . import engines, report, updates
+from . import engines, exports, report, updates
 from . import transcript as T
 from . import session
 from .session import Session
@@ -161,6 +161,45 @@ class Api:
         Path(path).write_text(T.EXPORTS[fmt][0](job, lines, details), encoding="utf-8")
         self._app.usage.exported(fmt)  # one more export of this format in the usage counts (app/usage.py)
         return str(path)
+
+    def _chosen(self, ids, fmt):
+        """The transcripts the Export dialog chose, with a transcript (app/exports.py), or [] for anything amiss."""
+        if fmt not in T.EXPORTS or not isinstance(ids, list):
+            return []
+        try:
+            return exports.chosen(self._app.store, [x for x in ids if isinstance(x, str)])
+        except KeyError:
+            return []
+
+    def save_many(self, ids, fmt, combined=False):
+        """The Export dialog's zip, or its one combined file, saved where the user picks here: the path, or None."""
+        jobs = self._chosen(ids, fmt)
+        if not jobs:
+            return None
+        one = bool(combined) and fmt in exports.COMBINED
+        name = f"{exports.name(jobs, slug)}.{fmt if one else 'zip'}"
+        result = self._window.create_file_dialog(self._dialog("SAVE"), save_filename=name)
+        path = result[0] if isinstance(result, (list, tuple)) else result
+        if not path:
+            return None
+        data = exports.combined(jobs, fmt).encode() if one else exports.zipped(exports.files(jobs, fmt, slug))
+        Path(path).write_bytes(data)
+        self._app.usage.exported(fmt, len(jobs))
+        return str(path)
+
+    def export_folder(self, ids, fmt):
+        """The transcripts chosen in the Export dialog, a file for each (app/exports.py), written into a folder picked
+        here: {"folder", "count"}, or None when none was picked or there is nothing to export."""
+        jobs = self._chosen(ids, fmt)
+        if not jobs:
+            return None
+        result = self._window.create_file_dialog(self._dialog("FOLDER"))
+        folder = result[0] if isinstance(result, (list, tuple)) else result
+        if not folder:
+            return None
+        count = exports.write(folder, exports.files(jobs, fmt, slug))
+        self._app.usage.exported(fmt, count)
+        return {"folder": str(folder), "count": count}
 
     def open_url(self, url):
         if isinstance(url, str) and url.startswith("https://"):

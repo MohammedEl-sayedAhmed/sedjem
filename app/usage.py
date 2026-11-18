@@ -623,9 +623,10 @@ class Usage:
                 add["youtube_captions"] = 1
         self.count(**add)
 
-    def exported(self, fmt):
+    def exported(self, fmt, n=1):
+        """n more exports of this format (an export of many transcripts counts a file for each)."""
         if fmt in FORMATS:
-            self.count(**{fmt: 1})
+            self.count(**{fmt: n})
 
     def compared(self):
         self.count(compares=1)

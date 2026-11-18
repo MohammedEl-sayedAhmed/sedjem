@@ -94,7 +94,11 @@ goes on without it, and the job's log and the Video line under *More details* sa
 including mp3 and m4a files with an album cover, get no video.
 
 Exports are plain text, SRT and WebVTT subtitles, Markdown and JSON, with your names and edits
-applied, or you can copy the text. Arabic lines are laid out right to left automatically. There are
+applied, or you can copy the text. *Export…* at the foot of the sidebar exports many at once: tick
+transcriptions, a whole course or all of them, pick one format, and get a zip with a file for each (a
+course's lectures numbered in a folder of their own), one combined file in text, Markdown or JSON, or,
+in Chrome, Edge and the desktop app, the files in a folder you pick. *Export course* on a lecture's page
+opens it with the course ticked. Arabic lines are laid out right to left automatically. There are
 light and dark themes, the layout works in a narrow window, and the page loads nothing from outside
 (no CDN, web fonts or analytics scripts; the app's anonymous usage counts are sent by its server, as
 [privacy](#privacy) says).
@@ -791,6 +795,7 @@ says only whether Sedjem answers.
 | `POST /api/jobs/<id>/branch` with `{"version": …, "name": …}` | a branch: a new transcript of the recording that starts as that version |
 | `POST /api/jobs/<id>/main` with `{"main": true}` | the recording's main transcript (`false` unmarks it) |
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
+| `POST /api/export` with `{"ids": […], "format": …}` | many transcripts at once, in the order given: a zip with a file for each; with `"combined": true`, one file (`txt`, `md` or `json`); with `"as": "files"`, the files as JSON (`path` and `text`). Transcriptions without a transcript are left out |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
 | `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
 | `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, …}` | one transcription per video (all of them without `entries`), queued in playlist order |
