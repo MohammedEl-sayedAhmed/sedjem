@@ -349,7 +349,9 @@ class Flow(unittest.TestCase):
     @classmethod
     def call(cls, method, path, body=None):
         req = urllib.request.Request(cls.base + path, data=None if body is None else json.dumps(body).encode(),
-                                     method=method, headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     method=method, headers={"X-Sedjem": "1",
+                                                             "X-Sedjem-Token": cls.app.session.secret,
+                                                             "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 return r.status, json.loads(r.read())

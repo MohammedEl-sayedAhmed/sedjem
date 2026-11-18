@@ -2,8 +2,11 @@
 and the window class of the browser window; and how it picks its port when started again. No display is needed.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
+import ast
+import io
 import json
 import os
+import re
 import socket
 import sys
 import tempfile
@@ -13,10 +16,12 @@ import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
+from urllib.parse import parse_qs, urlsplit
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from app import desktop  # noqa: E402
+from app.session import Session  # noqa: E402
 
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "Linux desktop entries")
@@ -80,9 +85,15 @@ class PortTests(unittest.TestCase):
         self.assertGreater(other, 0)
 
     def test_finds_a_running_copy_on_the_port_it_noted(self):
+        proves = []  # the secret the stand-in proves, if any (a Sedjem of this user's own)
+
         class Status(BaseHTTPRequestHandler):
             def do_GET(self):
-                body = json.dumps({"app": "sedjem"}).encode()
+                answer = {"app": "sedjem"}
+                nonce = parse_qs(urlsplit(self.path).query).get("nonce", [""])[0]
+                if proves:
+                    answer["proof"] = proves[0].proof(nonce, self.server.server_address[1])
+                body = json.dumps(answer).encode()
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(body)))
@@ -100,12 +111,59 @@ class PortTests(unittest.TestCase):
                 unused = self.free_port()
                 self.assertIsNone(desktop.running_port(cfg, unused))
                 (Path(d) / "port").write_text(str(server.server_address[1]), encoding="utf-8")
+                self.assertIsNone(desktop.running_port(cfg, unused), "one that can't prove the secret is not ours")
+                proves.append(Session(cfg.storage))
                 self.assertEqual(desktop.running_port(cfg, unused), server.server_address[1])
                 (Path(d) / "port").write_text("not a port", encoding="utf-8")
                 self.assertIsNone(desktop.running_port(cfg, unused))
         finally:
             server.shutdown()
             server.server_close()
+
+
+class LocalOnlyTests(unittest.TestCase):
+    """The app has no login, so its server listens on this computer only."""
+
+    def test_another_host_stops_the_start_and_says_why(self):
+        from app.config import Config
+        with tempfile.TemporaryDirectory() as d:
+            storage = Path(d) / "app_data"
+            storage.mkdir()
+            (storage / "config.toml").write_text('[server]\nhost = "0.0.0.0"\n', encoding="utf-8")
+            cfg = Config(home=d)
+            with mock.patch.object(desktop, "Config", return_value=cfg), \
+                    mock.patch.object(desktop, "install_launcher"), \
+                    mock.patch.object(desktop, "running_port", return_value=None), \
+                    mock.patch.object(desktop, "pick_port", return_value=0), \
+                    mock.patch.object(desktop, "native_window") as window, \
+                    mock.patch.object(desktop, "show_error") as shown, \
+                    self.assertRaises(SystemExit) as stopped:
+                desktop.main([])
+        self.assertEqual(stopped.exception.code, 1)
+        self.assertIn('host is "0.0.0.0"', shown.call_args.args[0])
+        window.assert_not_called()
+
+    def test_the_reason_goes_to_the_console_or_the_log(self):
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as err:
+            desktop.show_error("the reason")
+        self.assertEqual(err.getvalue(), "the reason\n")
+
+
+class BuildTests(unittest.TestCase):
+    def test_the_build_names_each_module_the_app_reads_from_the_top_folder(self):
+        """The app imports a few modules from the repository's top folder, such as sysinfo.py and style_hint.py. The
+        desktop build (desktop/build.py) names each one, as it names the model process's modules."""
+        named = set(re.findall(r'"--hidden-import", "([\w.]+)"', (ROOT / "desktop" / "build.py").read_text(encoding="utf-8")))
+        top = {p.stem for p in ROOT.glob("*.py")}
+        used = set()
+        for path in (ROOT / "app").glob("*.py"):
+            for node in ast.parse(path.read_text(encoding="utf-8")).body:  # the imports at the top of each file
+                if isinstance(node, ast.Import):
+                    used |= {a.name.split(".")[0] for a in node.names}
+                elif isinstance(node, ast.ImportFrom) and node.level == 0 and node.module:
+                    used.add(node.module.split(".")[0])
+        self.assertIn("style_hint", used & top)
+        self.assertLessEqual(used & top, named)
 
 
 class IconTests(unittest.TestCase):

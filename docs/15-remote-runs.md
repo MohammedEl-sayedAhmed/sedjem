@@ -114,7 +114,8 @@ recording then travels encrypted twice, by Tailscale and by Sedjem, and still on
 
 ## For scripts
 
-The app's API (127.0.0.1, with the `X-Sedjem: 1` header for changes) has these calls; see also
+The app's API (127.0.0.1, with the secret on every request and the `X-Sedjem: 1` header for changes) has these
+calls; see also
 [the app's API](09-app.md#api-for-scripts).
 
 | Call | What |

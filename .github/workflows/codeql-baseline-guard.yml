@@ -11,9 +11,10 @@
 # pushed commit, so the branch carries main's files (the CodeQL workflow builds each baseline commit on main's
 # tree), and a push that removes this file from the branch is not guarded. GitHub starts no push workflow for a
 # branch deletion either: a deleted baseline is written again by the next push to main, the weekly run or a run by
-# hand on main, and until then the ratchet fails every pull request once CODEQL_RATCHET_ARMED is true. The real
-# control is a repository ruleset on `security-baseline` that restricts updates and deletions, with GitHub Actions as
-# its bypass actor; this workflow is what remains without one.
+# hand on main, and until then the ratchet fails every pull request once CODEQL_RATCHET_ARMED is true. A ruleset
+# with no bypass actor blocks deleting the branch and pushing to it with force. One that would also stop other
+# pushes needs GitHub Actions as a bypass actor, which GitHub accepts only for an organisation's repository, so
+# this workflow is what puts such pushes back.
 name: CodeQL baseline guard
 
 on:

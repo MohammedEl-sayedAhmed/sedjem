@@ -1,15 +1,17 @@
 """Browser tests of updates in the app (app/static/updates.js): the first-start question and both answers, the
 top-bar pill, the notice once for each new version (not again after a reload, not for a skipped one), Settings →
 Updates on both channels with the release notes and the list of changes, Check now and its errors, Skip this
-version and Don't skip, Update now where it can't run (the commands, copied), its progress through the restart
-and the reload, a failure and Try again, the restart that never comes back, release notes drawn safely, the dark
-theme and a narrow window.
+version and Don't skip, Update now where it can't run (the commands, copied), its progress up to the restart, the
+page that can't follow the new copy to its new port and says so, the new window saying what it was updated to, a
+failure and Try again, release notes drawn safely, the dark theme and a narrow window.
 The server's side of updates (app/updates.py) is stood in for: FakeUpdates answers /api/updates and its POSTs and
 adds "update" to /api/status, in the shapes agreed for issue #11, through Playwright's request interception.
 Headless Chromium against a Sedjem server with demo transcripts (see tests/ui_support.py).
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_updates.py" -v
 """
+import copy
 import hashlib
+import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlparse
@@ -17,7 +19,6 @@ from urllib.parse import urlparse
 from ui_support import UiTestCase
 
 REPO = "https://github.com/MohammedEl-sayedAhmed/sedjem"
-REFUSED = "Failed to load resource: net::ERR_CONNECTION_REFUSED"  # how the browser logs the server being away
 CONFLICT = "Failed to load resource: the server responded with a status of 409"
 NOTES = """Sedjem 0.3.0 tells you when a newer version is out, and updates itself.
 
@@ -59,6 +60,9 @@ def ago(**delta):
 
 def sha(text):
     return hashlib.sha1(text.encode()).hexdigest()
+
+
+REFUSED = "Failed to load resource: net::ERR_CONNECTION_REFUSED"  # how the browser logs the server being away
 
 
 def running(**fields):
@@ -106,7 +110,7 @@ class FakeUpdates:
                       "checking": False, "error": None, "found": None, "note": None, "available": None, "install": None,
                       **state}
         self.calls, self.hold, self.held, self.offers, self.refuse = [], set(), [], {}, {}
-        self.check, self.down = None, 0
+        self.check, self.down, self.gone = None, 0, False  # gone: this copy has quit (the restart worked)
         page.route(lambda url: urlparse(url).path.startswith("/api/updates"), self.updates)
         page.route(lambda url: urlparse(url).path == "/api/status", self.status)
 
@@ -117,8 +121,8 @@ class FakeUpdates:
         return f"Update available · {a['version']}" if a["channel"] == "stable" else f"{a['ahead']} new changes"
 
     def status(self, route):
-        if self.down:
-            self.down -= 1
+        if self.gone or self.down:
+            self.down = max(0, self.down - 1)
             route.abort("connectionrefused")
             return
         response = route.fetch()
@@ -127,6 +131,9 @@ class FakeUpdates:
         route.fulfill(response=response, json=status)
 
     def updates(self, route):
+        if self.gone:
+            route.abort("connectionrefused")
+            return
         request = route.request
         what = urlparse(request.url).path.removeprefix("/api/updates").strip("/") or "state"
         body = request.post_data_json if request.method == "POST" else None
@@ -206,6 +213,39 @@ class Updates(UiTestCase):
 
     def stored(self, key):
         return self.page.evaluate("(k) => localStorage.getItem(k)", key)
+
+    def kept(self, key, present=True):
+        """Waits until the server keeps the page's preference key (or no longer does), and returns its value."""
+        deadline = time.monotonic() + 10
+        while (key in self.prefs()) != present and time.monotonic() < deadline:
+            time.sleep(0.1)
+        self.assertEqual(key in self.prefs(), present, key)
+        return self.prefs().get(key)
+
+    def new_window(self):
+        """What the new copy opens after a restart: the app on a new port, whose page has nothing in its own storage
+        yet (the test's server stays on one port; clearing localStorage stands in for the new origin)."""
+        self.page.evaluate("() => localStorage.clear()")
+        self.page.reload()
+        self.ready()
+
+    def no_reload(self):
+        """The page stays as it is: it doesn't wait for the new copy, which is on another port."""
+        self.page.evaluate("() => (window.before = true)")
+        self.page.wait_for_timeout(3000)
+        self.assertTrue(self.page.evaluate("() => window.before ?? false"), "the page wasn't loaded again")
+
+    def take_held(self, fake, what, count):
+        """Waits until count requests for what are held, and takes them from the fake, oldest first."""
+        deadline = time.monotonic() + 10
+        while sum(h[0] == what for h in fake.held) < count:
+            self.assertLess(time.monotonic(), deadline, f"{count} requests for {what} held")
+            self.page.wait_for_timeout(50)
+        fake.hold.discard(what)
+        items = [h for h in fake.held if h[0] == what]
+        for item in items:
+            fake.held.remove(item)
+        return items
 
     # ---- the first-start question ----------------------------------------------------------------------------
     def test_the_first_start_question_yes(self):
@@ -458,6 +498,85 @@ class Updates(UiTestCase):
         self.assertEqual(self.page.locator("#set-panel .upd-card-head .status").count(), 0)
         pill.wait_for()
 
+    def test_a_load_from_before_a_change_is_asked_again(self):
+        """The tab loads the state each time it opens. When Don't skip is clicked before that answer is back, the
+        server may have read the state before the click: still skipped. That answer must not put the skip back
+        over the click's own answer, so the page asks again (issue #62)."""
+        fake = self.fake(available=release())
+        self.open()
+        self.ready()
+        self.open_tab()
+        self.page.click("#updSkip")
+        self.page.wait_for_selector("#updSkip:has-text(\"Don't skip\")")
+        self.page.click("#settings button:has-text('Close')")
+
+        fake.hold.add("state")
+        self.open_tab()  # its GET waits, and the tab shows what the page has: skipped
+        before = copy.deepcopy(fake.state)  # what the server read for that GET
+        self.page.click("#updSkip")
+        self.page.wait_for_selector(".toast >> text=No longer skipped")
+        self.assertEqual(self.page.inner_text("#updSkip"), "Skip this version")
+        gets = sum(c[:2] == ("GET", "state") for c in fake.calls)
+        fake.hold.discard("state")
+        (_, route, _), = fake.held
+        fake.held.clear()
+        route.fulfill(json=before)
+        self.ready()
+        self.assertEqual(self.page.inner_text("#updSkip"), "Skip this version")
+        self.assertEqual(self.page.locator("#set-panel .upd-card-head .status").count(), 0)
+        self.assertEqual(sum(c[:2] == ("GET", "state") for c in fake.calls), gets + 1, "asked again")
+
+    def test_two_quick_changes_end_on_the_last(self):
+        """Two quick clicks on the switch: off, then on again. The first click's answer comes back last, built from
+        the state between the two clicks. The page must not end on it, but on the switch as the server has it, and
+        it asks once more. The switch never goes back to off on the way (issue #100)."""
+        fake = self.fake()
+        self.open()
+        self.ready()
+        self.open_tab()
+        self.page.evaluate("""() => {  // each answer the page shows (the switch in it), and each "Saved"
+          window.shown = []; window.saved = 0;
+          const show = updSetData, say = toast;
+          updSetData = (d) => { shown.push(d.enabled); show(d); };
+          toast = (msg, kind) => { if (msg === "Saved") saved++; say(msg, kind); };
+        }""")
+        fake.hold.add("settings")
+        self.page.locator("#updAuto").uncheck()
+        self.page.locator("#updAuto").check()
+        (_, first, body), second = self.take_held(fake, "settings", 2)
+        self.assertEqual([body, second[2]], [{"enabled": False}, {"enabled": True}])
+        fake.state["enabled"] = False  # the server saves the first click,
+        between = copy.deepcopy(fake.state)  # and reads the state for its answer before the second click is saved
+        gets = sum(c[:2] == ("GET", "state") for c in fake.calls)
+        fake.answer(*second)  # the second click's answer comes back first
+        self.page.wait_for_function("() => saved === 1")
+        first.fulfill(json=between)
+        self.page.wait_for_function("() => saved === 2")
+        self.assertTrue(self.page.is_checked("#updAuto"))
+        self.assertTrue(self.page.evaluate("() => UPD.data.enabled"))
+        self.assertNotIn(False, self.page.evaluate("() => shown"), "the switch never went back to off")
+        self.assertEqual(sum(c[:2] == ("GET", "state") for c in fake.calls), gets + 1, "asked once more")
+
+    def test_a_check_answered_after_a_later_change_is_not_lost(self):
+        """The switch turned off while Check now waits for GitHub. The check's answer comes back after the switch's,
+        so the page does not show it over the newer answer. What the check found still shows, from one more load."""
+        fake = self.fake(checked=ago(days=3))
+        fake.hold.add("check")
+        self.open()
+        self.ready()
+        self.open_tab()
+        self.page.click("#updCheck")
+        self.page.wait_for_selector("#updCheck[aria-disabled=true]:has-text('Checking…')")
+        self.page.locator("#updAuto").uncheck()
+        self.page.wait_for_selector(".toast >> text=Saved")
+        self.assertFalse(self.page.is_checked("#updAuto"))
+        fake.check = lambda s: s.update(checked=ago(seconds=1), found="update", available=release())
+        fake.release("check")
+        self.page.wait_for_selector("#updCheck:not([aria-disabled]):has-text('Check now')")
+        self.assertEqual(self.page.inner_text("#updWhen"), "Checked just now")
+        self.page.wait_for_selector("#set-panel .upd-card-head:has-text('Sedjem 0.3.0')")
+        self.assertFalse(self.page.is_checked("#updAuto"))
+
     def test_update_now_blocked_gives_the_commands(self):
         commands = ['cd "/home/you/sedjem"', "git stash", "git pull --ff-only origin main",
                     ".venv/bin/python -m pip install -r requirements.txt"]
@@ -497,23 +616,23 @@ class Updates(UiTestCase):
         self.assertIn("indeterminate", self.page.get_attribute("#updProgress .progress", "class"))
         fake.state["install"] = install("installing", done=48_000_000)
         self.page.wait_for_selector("#updProgress b:has-text('Running the installer')")
-        self.assertTrue(self.stored("sedjem-update-from"), "what ran before, to say what it was updated to")
+        # what ran before, kept in the data folder, so that the new copy's window says what it was updated to
+        self.assertIn('"version"', self.kept("sedjem-update-from"))
 
-        self.page.evaluate("() => (window.before = true)")
-        with self.page.expect_event("load", timeout=20_000):
-            fake.down = 2  # away for two checks, then the new one answers
-            fake.state["install"] = install("restarting", done=48_000_000)
-            self.page.wait_for_selector("#updRestart[open]")
-            self.assertEqual(self.page.inner_text("#updRestartTitle"), "Sedjem is restarting…")
-            self.assertIn("The installer is updating it", self.page.inner_text("#updRestartText"))
-            fake.state.update(running=running(version="0.3.0", commit=sha("v0.3.0"), kind="windows"), available=None,
-                              install=None, found="up to date")
-        self.ready()
-        self.assertIsNone(self.page.evaluate("() => window.before ?? null"), "the page was loaded again")
+        fake.state["install"] = install("restarting", done=48_000_000)
+        self.page.wait_for_selector("#updRestart[open]")
+        self.assertEqual(self.page.inner_text("#updRestartTitle"), "Sedjem is restarting…")
+        self.assertEqual(self.text("#updRestartText"), "The installer is updating it. It opens again in a new window when "
+                         "it's ready, and this one can be closed. If no new window opens, open Sedjem again.")
+        fake.gone = True  # the installer has started, and this copy has quit
+        self.no_reload()
+        self.assertTrue(self.page.is_visible("#updRestart"), "it stays: the new copy opens its own window")
+        fake.gone = False
+        fake.state.update(running=running(version="0.3.0", commit=sha("v0.3.0"), kind="windows"), available=None,
+                          install=None, found="up to date")
+        self.new_window()
         self.page.wait_for_selector(".toast >> text=Updated to 0.3.0")
-        self.assertIsNone(self.stored("sedjem-update-from"))
-        self.assertEqual(fake.down, 0)
-        self.assertEqual(len([e for e in self.errors if e.startswith(REFUSED)]), 2)
+        self.kept("sedjem-update-from", present=False)
         self.errors = [e for e in self.errors if not e.startswith(REFUSED)]
 
     def test_restarting_from_source_to_the_latest_changes(self):
@@ -525,12 +644,16 @@ class Updates(UiTestCase):
         self.page.click("#updInstall")
         self.page.wait_for_selector("#updProgress b:has-text('Fetching the changes')")
         self.assertIn(f"Update to the newest changes on main ({sha(TITLES[0])[:7]})? Sedjem runs git pull", asked[0])
-        self.page.evaluate("() => (window.before = true)")
-        with self.page.expect_event("load", timeout=20_000):
-            fake.state["install"] = install("restarting")  # the new one comes up between two checks
-            self.page.wait_for_selector("#updRestart[open]")
-            fake.state.update(running=running(commit=sha(TITLES[0])), available=None, install=None)
-        self.ready()
+        fake.state["install"] = install("restarting")
+        self.page.wait_for_selector("#updRestart[open]")
+        self.assertIn("If no new window opens, start it again with ./app.sh in the project folder.",
+                      self.text("#updRestartText"))
+        fake.gone = True  # the new copy came up, and this one quit
+        self.no_reload()
+        fake.gone = False
+        fake.state.update(running=running(commit=sha(TITLES[0])), available=None, install=None)
+        self.new_window()
+        self.errors = [e for e in self.errors if not e.startswith(REFUSED)]
         self.page.wait_for_selector(f".toast >> text=Updated to the latest changes ({sha(TITLES[0])[:7]})")
 
     def test_a_failed_update_and_try_again(self):
@@ -597,7 +720,23 @@ class Updates(UiTestCase):
         self.page.wait_for_selector("#set-panel .upd-done", state="detached")
         self.assertEqual(self.texts("#set-panel .upd-actions > *"), ["Download", "Skip this version"])
 
-    def test_the_restart_gives_up_after_two_minutes(self):
+    def test_a_new_copy_that_stops_at_once_leaves_this_one_saying_so(self):
+        fake = self.fake(available=release())
+        self.open()
+        self.open_tab()
+        self.page.once("dialog", lambda d: d.accept())
+        self.page.click("#updInstall")
+        self.page.wait_for_selector("#updProgress")
+        fake.state["install"] = install("restarting")
+        self.page.wait_for_selector("#updRestart[open]")
+        error = "The new version stopped at once (exit code 1). This one keeps running."
+        fake.state["install"] = install("failed", error=error)  # the old copy noticed within its grace period
+        self.page.wait_for_selector("#updRestart[open]", state="detached")
+        self.page.wait_for_selector("#set-panel .upd-failed")
+        self.assertEqual(self.text("#set-panel .upd-failed .set-text"), f"The update failed {error}")
+        self.kept("sedjem-update-from", present=False)  # no "Updated to" later
+
+    def test_the_restart_dialog_stays_and_says_where_sedjem_opens(self):
         fake = self.fake(available=release())
         self.page.clock.install()
         self.open()
@@ -605,20 +744,15 @@ class Updates(UiTestCase):
         self.page.once("dialog", lambda d: d.accept())
         self.page.click("#updInstall")
         self.page.wait_for_selector("#updProgress")
-        fake.down = 10_000
         fake.state["install"] = install("restarting")
         self.page.clock.run_for(1100)  # the next look at the progress
         self.page.wait_for_selector("#updRestart[open]")
         self.page.keyboard.press("Escape")
         self.assertTrue(self.page.is_visible("#updRestart"), "it can't be put away")
-        self.page.clock.run_for(125_000)
-        self.page.wait_for_selector("#updRestartTitle:has-text(\"Sedjem didn't come back\")")
-        self.assertEqual(self.page.inner_text("#updRestartText"), "It hasn't answered for two minutes. Start it again with "
-                         "./app.sh in the project folder, then reload this page.")
-        self.assertTrue(self.page.is_visible("#updReload"))
-        self.assertFalse(self.page.is_visible("#updRestartBar"))
-        self.assertEqual(self.page.evaluate("() => document.activeElement.id"), "updReload")
-        self.errors = [e for e in self.errors if not e.startswith(REFUSED)]
+        self.page.clock.run_for(125_000)  # it doesn't wait for the new copy, so nothing changes after two minutes
+        self.assertEqual(self.text("#updRestartText"), "It opens again in a new window when it's ready, and this one can "
+                         "be closed. If no new window opens, start it again with ./app.sh in the project folder.")
+        self.assertEqual(self.page.locator("#updRestart button, #updRestart .progress").count(), 0)
 
     # ---- safety, the dark theme, a narrow window -------------------------------------------------------------
     def test_release_notes_and_changes_are_text_not_markup(self):

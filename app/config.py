@@ -85,7 +85,8 @@ def is_path(name):
 
 class Config:
     def __init__(self, path=None, storage=None, home=None):
-        data = tomllib.loads(Path(path or DEFAULT_CONFIG).read_text(encoding="utf-8"))
+        self.file = Path(path or DEFAULT_CONFIG)  # the settings file; <storage>/config.toml overrides it
+        data = tomllib.loads(self.file.read_text(encoding="utf-8"))
         self.home = Path(home) if home else home_dir()
         self.storage = Path(storage) if storage else self.path(data["storage"]["dir"])
         override = self.storage / "config.toml"
@@ -241,8 +242,14 @@ class Config:
             if not name:
                 continue
             if is_path(name):
-                if (self.path(name) / "model.bin").exists():
-                    return str(self.path(name))
+                # model.bin and every file of the model's own download that goes in this folder, but a package
+                # (deleted once unpacked). A download puts each file in place once it is checked, model.bin first
+                # for the built-in Whisper models, so a download that stopped after it leaves model.bin without
+                # the files faster-whisper also reads (#110)
+                folder = self.path(name)
+                own = [self.path(f["path"]) for f in model.get("files", []) if not f.get("unpack")]
+                if (folder / "model.bin").exists() and all(p.exists() for p in own if p.parent == folder):
+                    return str(folder)
             else:
                 from huggingface_hub import try_to_load_from_cache
                 if isinstance(try_to_load_from_cache(f"Systran/faster-whisper-{name}", "model.bin"), str):

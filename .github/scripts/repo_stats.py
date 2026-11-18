@@ -21,9 +21,12 @@ Tokens, from the environment:
   STATS_TOKEN   reads clones, views and referrers, which need Administration read access: a fine-grained
                 token for this repository. If it is missing, GITHUB_TOKEN is tried; when neither can read
                 them, the traffic files are left as they were and the summary says when they were last read.
+                The run then fails, once the rest is saved: GitHub keeps clones and views for 14 days only,
+                so a day that isn't read by then is lost, and a green run would hide that until it is too late.
 
 To look at the result without changing the branch, write the files into a folder instead:
     GITHUB_TOKEN=$(gh auth token) python3 .github/scripts/repo_stats.py --repo OWNER/NAME --out stats-preview
+A preview whose token can't read the traffic says so and still ends normally.
 """
 import argparse
 import csv
@@ -104,6 +107,25 @@ def total(rows, key):
     return sum(int(r[key]) for r in rows)
 
 
+def kept(rows):
+    """Each day's downloads of every file counted on that day or before, at its newest count up to that day, from the
+    daily snapshots: {date: {(release, asset): downloads}}. A release that is deleted, as each preview is once
+    preview.yml removes it, leaves GitHub's numbers, so its files keep the last count recorded and the totals never
+    fall."""
+    of_day, out, files = {}, {}, {}
+    for r in rows:
+        of_day.setdefault(r["date"], []).append(r)
+    for day in sorted(of_day):
+        files = {**files, **{(r["release"], r["asset"]): int(r["downloads"]) for r in of_day[day]}}
+        out[day] = files
+    return out
+
+
+def app_total(files):
+    """The downloads of the app in {(release, asset): downloads}: its files, not the checksum lists."""
+    return sum(n for (_, asset), n in files.items() if is_app(asset))
+
+
 def badge(label, n):
     return json.dumps({"schemaVersion": 1, "label": label, "message": f"{n:,}", "color": COLOUR}) + "\n"
 
@@ -113,7 +135,9 @@ def summary(tables, repo, today, traffic_read):
     latest = lambda rows: [r for r in rows if r["date"] == max((x["date"] for x in rows), default="")]
     downloads, referrers, info = latest(tables["downloads.csv"]), latest(tables["referrers.csv"]), latest(tables["repo.csv"])
     since = min((r["date"] for r in clones + views), default=None)
-    app = [r for r in downloads if is_app(r["asset"])]
+    files = kept(tables["downloads.csv"]).get(downloads[0]["date"], {}) if downloads else {}
+    shown_now = {(r["release"], r["asset"]) for r in downloads}
+    deleted = {f: n for f, n in files.items() if f not in shown_now}
     lines = [f"# {repo.split('/')[-1].capitalize()} statistics", "",
              f"Updated on {today} by the Repository stats workflow on main (`.github/workflows/stats.yml`), from "
              "GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day "
@@ -127,7 +151,7 @@ def summary(tables, repo, today, traffic_read):
               'of the app, the stars and forks over time, and the clones and page views per day"></a>'
               for theme, path in CHARTS.items()] + [""]
     lines += ["## Totals", "", "| | |", "|---|---|",
-              f"| Downloads of the app, all releases | {total(app, 'downloads'):,} |"]
+              f"| Downloads of the app, all releases | {app_total(files):,} |"]
     if since:
         lines += [f"| Clones since {since} | {total(clones, 'clones'):,} ({total(clones, 'unique'):,} unique per day, added up) |",
                   f"| Page views since {since} | {total(views, 'views'):,} ({total(views, 'unique'):,} unique per day, added up) |"]
@@ -137,6 +161,10 @@ def summary(tables, repo, today, traffic_read):
     if downloads:
         lines += ["", "## Downloads by release", "", "| Release | File | Downloads |", "|---|---|---|"]
         lines += [f"| {r['release']} | {r['asset']} | {int(r['downloads']):,} |" for r in downloads]
+        gone = sorted({tag for tag, _ in deleted})
+        if gone:  # one row for all of them, so the table doesn't grow with each deleted preview
+            lines.append(f"| {len(gone)} deleted release{'' if len(gone) == 1 else 's'} | the app's files | "
+                         f"{app_total(deleted):,} |")
     days = sorted({r["date"] for r in clones + views}, reverse=True)[:30]
     if days:
         c, v = {r["date"]: r for r in clones}, {r["date"]: r for r in views}
@@ -154,6 +182,10 @@ def summary(tables, repo, today, traffic_read):
               "",
               "Clones include those by build machines: every run of the Desktop build workflow clones the repository. "
               "The stats workflow does not, so it adds nothing to the counts.",
+              "",
+              "A release that is deleted leaves GitHub's numbers, as each preview does once a newer one replaces it. "
+              "Its files keep the last count recorded here, so the totals and the badge never fall; the table "
+              "adds up the deleted releases in one row.",
               "",
               "Stars and forks come from GitHub's lists of the current stargazers and forks, which give the day of "
               "each star and fork, so their history reaches back to the first star. A star that is taken back "
@@ -189,8 +221,7 @@ def update(old, fetched, repo, today):
     new = {name: write_csv(rows, FIELDS[name]) for name, rows in tables.items()}
     new["state.json"] = json.dumps(state, indent=1, sort_keys=True) + "\n"
     new["README.md"] = summary(tables, repo, today, state.get("traffic_read"))
-    latest = [x for x in tables["downloads.csv"] if x["date"] == today]
-    new["badges/downloads.json"] = badge("downloads", total([x for x in latest if is_app(x["asset"])], "downloads"))
+    new["badges/downloads.json"] = badge("downloads", app_total(kept(tables["downloads.csv"]).get(today, {})))
     new["badges/clones.json"] = badge("clones", total(tables["clones.csv"], "clones"))
     published = [(rel["published_at"][:10], rel["tag_name"]) for rel in releases if rel.get("published_at")]
     data = chart_data(tables, published, today)
@@ -362,14 +393,10 @@ def daily(rows, key, last):
 
 
 def chart_data(tables, releases, today):
-    """The numbers the charts draw, by day: the running total of app downloads (from the daily snapshots),
-    stars and forks (each from its first day), clones and views with their uniques, and the releases
+    """The numbers the charts draw, by day: the running total of app downloads (from the daily snapshots, a
+    deleted release's files at their last count), stars and forks (each from its first day), clones and views with their uniques, and the releases
     [(day, tag)]; first and last are the days the time axis spans."""
-    by_day = {}
-    for r in tables["downloads.csv"]:
-        by_day.setdefault(r["date"], 0)
-        if is_app(r["asset"]):
-            by_day[r["date"]] += int(r["downloads"])
+    by_day = {d: app_total(files) for d, files in kept(tables["downloads.csv"]).items()}
     last = date.fromisoformat(today)
     traffic = lambda name, key: [(date.fromisoformat(r["date"]), int(r[key]), int(r["unique"])) for r in tables[name]]
     data = {"downloads": corners(sorted((date.fromisoformat(d), n) for d, n in by_day.items())),
@@ -655,9 +682,6 @@ def fetch(repo, token, traffic_token):
             if e.status not in (401, 403):
                 raise
             got["clones"] = got["views"] = got["referrers"] = None
-    if got["clones"] is None:
-        print("::warning::Clones and views could not be read: set the STATS_TOKEN secret "
-              "(a fine-grained token for this repository with Administration read access).")
     return got
 
 
@@ -704,7 +728,8 @@ def main(argv=None):
         sys.exit("needs --repo (or GITHUB_REPOSITORY) and GITHUB_TOKEN")
     today = datetime.now(timezone.utc).date().isoformat()
     head, old = read_branch(args.repo, token, args.branch)
-    new = update(old, fetch(args.repo, token, os.environ.get("STATS_TOKEN")), args.repo, today)
+    got = fetch(args.repo, token, os.environ.get("STATS_TOKEN"))
+    new = update(old, got, args.repo, today)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         # the job's summary has no branch to resolve the charts' paths against
         raw = f"https://raw.githubusercontent.com/{args.repo}/{args.branch}/"
@@ -717,11 +742,21 @@ def main(argv=None):
             with open(os.path.join(args.out, p), "w", encoding="utf-8") as f:
                 f.write(t)
         print(f"wrote {len(new)} files to {args.out} ({len(changed)} differ from the {args.branch} branch)")
-    elif changed:
+        if got["clones"] is None:
+            print("Clones, views and referrers could not be read with this token, so the traffic files are the "
+                  f"{args.branch} branch's.")
+        return
+    if changed:
         sha = commit(args.repo, token, args.branch, head, changed, f"Stats for {today}")
         print(f"{args.branch}: {sha[:7]}, {len(changed)} files updated")
     else:
         print("nothing changed")
+    if got["clones"] is None:
+        # after the rest is recorded, and as a failed run, so that GitHub's email for it comes within the 14 days
+        print("::error::Clones, views and referrers could not be read, so the rest is recorded and this run fails. "
+              "GitHub keeps them for 14 days only. Set the STATS_TOKEN secret to a fine-grained token for this "
+              "repository with Administration: Read-only permission.")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -256,7 +256,9 @@ class Status(unittest.TestCase):
         self.base = f"http://127.0.0.1:{self.server.server_address[1]}"
 
     def call(self, method, path, body=None):
-        req = urllib.request.Request(self.base + path, method=method, headers={"X-Sedjem": "1", "Content-Type": "application/json"},
+        req = urllib.request.Request(self.base + path, method=method, headers={"X-Sedjem": "1",
+                                                                               "X-Sedjem-Token": self.app.session.secret,
+                                                                               "Content-Type": "application/json"},
                                      data=None if body is None else json.dumps(body).encode())
         try:
             with urllib.request.urlopen(req, timeout=30) as r:

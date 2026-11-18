@@ -59,7 +59,9 @@ class UpdatesEndToEnd(UiTestCase):
     def call(self, method, path):
         """The API straight from the test (no page needed), with the header every change needs."""
         req = urllib.request.Request(self.base + path, method=method, data=b"{}" if method == "POST" else None,
-                                     headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     headers={"X-Sedjem": "1",
+                                              "X-Sedjem-Token": self.app.session.secret,
+                                              "Content-Type": "application/json"})
         with urllib.request.urlopen(req, timeout=30) as r:
             return json.load(r)
 

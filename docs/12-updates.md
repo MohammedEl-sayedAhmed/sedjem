@@ -92,9 +92,11 @@ installed. Then Sedjem:
    environment made with uv has no pip), else `python -m pip install`. This happens before the merge,
    so if it fails the checkout stays as it was;
 4. moves the checkout to the offered commit (`git merge --ff-only <commit>`);
-5. starts again with the same command line and port, and the old process quits. The open page waits
-   and reloads once the new one answers. If the new process stops right away (the updated code can't
-   start), the old one keeps running and *Settings* says so.
+5. starts again with the same command line, and the old process quits. The new one has a new secret,
+   and a new port unless `--port` or `[server] port` names one, so it opens a window of its own (not with
+   `--no-browser`, `--server` or `open_browser = false`); the open page can't follow it, says so, and
+   can be closed. If the new process stops right away (the updated code can't start), the old one keeps
+   running, and the open page closes its message and shows that in *Settings*.
 
 If the checkout was moved on by hand after the check, with `git pull` while Sedjem was running, so that it
 already has the offered commit, it isn't moved again. Sedjem installs the requirement files that changed since
@@ -129,8 +131,11 @@ the old folder can be deleted once it runs. Replacing the running build in place
 A copy that isn't a git checkout, a Windows copy that the installer didn't put there, or a build for
 another system can't update itself. *Download* opens the release page instead.
 
-Only HTTPS connections to GitHub are made, and only this repository's release files are downloaded.
-Each one is checked against the release's `SHA256SUMS.txt` before it is used.
+The Windows installer and the Linux build download only this repository's release files, over HTTPS from
+GitHub. Each one is checked against the release's `SHA256SUMS.txt` before it is used. An update from source
+fetches main from the checkout's origin. When a requirement file changed, uv or pip also downloads its packages
+from the package index that it is set to use, which is PyPI unless you changed it
+([privacy policy](privacy.md#what-sedjem-contacts-and-when)).
 
 ## Updating by hand from source
 
@@ -170,7 +175,8 @@ release, so the desktop app on *Latest changes* moves from preview to preview an
 | `tests/test_updates.py`, `tests/github_support.py` | the tests, against a stand-in for GitHub's API and throwaway git repositories |
 | `tests/test_ui_updates.py`, `tests/test_ui_updates_e2e.py` | the browser tests of the question, the pill, the notice and *Settings → Updates*, the second with the real checks against the stand-in |
 
-Scripts can use the same calls as *Settings* (every change needs the header `X-Sedjem: 1`):
+Scripts can use the same calls as *Settings* (every request needs the secret, and every change the header
+`X-Sedjem: 1`; see [the app's API](09-app.md#api-for-scripts)):
 `GET /api/updates` for the state, and `POST /api/updates/check`, `/api/updates/settings`
 (`{"enabled", "channel"}`), `/api/updates/skip` (`{"skip"}`) and `/api/updates/install`.
 `GET /api/status` has an `update` field with what the top bar needs.

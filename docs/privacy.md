@@ -29,14 +29,19 @@ here.
   from a Hugging Face link asks it about that model.
 - GitHub ([privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement)):
   `github.com` for the other speaker models, from the releases of the sherpa-onnx project, and for Sedjem's own
-  releases when you update; `api.github.com` to check for updates, once a day if you allowed it when Sedjem first
-  asked, or when you click *Check now*. Some checks tell GitHub which version is running
-  ([updates](12-updates.md#what-is-sent-to-github)). The self-test with `--models` also fetches a public speech
-  sample from GitHub.
-- PyPI's file host (`files.pythonhosted.org`), run by the Python Software Foundation
-  ([privacy notice](https://policies.python.org/pypi.org/Privacy-Notice/)), only for what you download in Settings:
-  NVIDIA's cuBLAS and NVRTC libraries, which Whisper uses on an NVIDIA graphics card, and Deno, which YouTube links
-  need.
+  releases when you update (Sedjem run from the source code fetches the main branch instead, with `git fetch` from
+  the checkout's origin, which is GitHub for a clone of this repository); `api.github.com` to check for updates,
+  once a day if you allowed it when Sedjem first asked, or when you click *Check now*. Some checks tell GitHub which
+  version is running ([updates](12-updates.md#what-is-sent-to-github)). The self-test with `--models` also fetches a
+  public speech sample from GitHub.
+- PyPI, run by the Python Software Foundation
+  ([privacy notice](https://policies.python.org/pypi.org/Privacy-Notice/)), in two cases:
+  - its file host (`files.pythonhosted.org`), for what you download in Settings: NVIDIA's cuBLAS and NVRTC
+    libraries, which Whisper uses on an NVIDIA graphics card, and Deno, which YouTube links need;
+  - `pypi.org` and its file host, when you click *Update now* in Sedjem run from the source code and the new version
+    changes a requirement file. Then uv or pip installs the packages in that file
+    ([updates from source](12-updates.md#from-source)) from the package index that it is set to use, which is PyPI
+    unless you changed it. The desktop app and the Windows installer don't do this.
 - YouTube, which is Google's ([privacy policy](https://policies.google.com/privacy)), with its video hosts
   (`*.googlevideo.com`), when you add a link: Sedjem asks, through yt-dlp, for that video or playlist, its streams and
   its captions, and downloads them.
@@ -90,8 +95,11 @@ What is counted:
 
 - `page_view`, each time a page is opened: which page (`en`, `ar`, or `404` for the page of a missing address), the
   size of the window as `phone` (under 700 pixels wide), `tablet` (under 1100) or `desktop`, the theme on show
-  (`light`, `dark`, or `system` when the page follows the system's), and the site whose link led there, as its host
-  name alone, such as `github.com`, or `none`
+  (`light`, `dark`, or `system` when the page follows the system's), the site whose link led there, as its host
+  name alone, such as `github.com`, or `none`, and the tag of a shared link: a link to the website in a post can end
+  in `?src=linkedin` (or `utm_source=linkedin`), since many apps don't say which site a visit came from. The tag is
+  sent as `source`, only when it is one of `linkedin`, `x` (`twitter` counts as `x`), `facebook`, `reddit`,
+  `youtube`, `telegram`, `whatsapp` or `email`, and as `none` otherwise
 - `download`, when a download button or link is clicked: `windows`, `linux` or `source`, where it was, at the top of
   the page (`hero`) or in the *Get Sedjem* section (`get`), and which page
 
@@ -106,15 +114,45 @@ browser's `User-Agent`; by its terms it uses them only in memory, to find the co
 pseudonymous hash that changes every day, and doesn't store them.
 
 The website never sets a cookie and keeps nothing in the browser for the counts (only the theme picked with its
-button is kept there). It never sends the full address of the page that linked to it, anything typed or read on the
-page, scrolling or time spent on it, or anything that would tie one visit to another.
+button is kept there). It never sends the full address of the page that linked to it, nor the page's own address
+(of that, only a tag from the list above), anything typed or read on the page, scrolling or time spent on it, or
+anything that would tie one visit to another.
 
 Nothing is counted when the browser has Do Not Track or Global Privacy Control turned on, or when a blocker stops
 requests to Aptabase. A copy of the pages anywhere but the published address, a local preview or a page opened from
 the disk sends nothing either.
 
-Their totals are published once a month, as the app's are ([usage counts](13-usage-counts.md#public-totals)): a
-country or a site that linked to the website is named only when at least three visitors came from it that month.
+Their totals are published as the app's are ([usage counts](13-usage-counts.md#public-totals)): once a month, and
+while a month runs, the month so far about once a week, each newer copy replacing the last. The month so far holds
+headline numbers only: page views, visitors, the number of countries, download clicks and the visits, and for the app
+the active and new installs, the number of countries, the transcriptions and the hours of audio. Each copy stays in
+the repository's history, and two copies of the same month can be subtracted. A breakdown in both copies would show
+the values of one install that started between them, so the month so far has no breakdown. One copy, November 2026
+to 9 November, went in with every breakdown before this rule. The finished November keeps its breakdowns only when at
+least three installs (or, for the website, three visitors) came after that copy; with fewer, it has headline numbers
+only too. The check counts those installs as one group, not each value. The difference can still show that one or two
+of them have a value the finished month names, such as a country or a graphics card. It also ties that value to any
+value they all share, such as their country, and to a value that goes with it, as CUDA goes with an NVIDIA card. So it
+can show much of one install's values, as the totals of one month with three installs can, since the hardware counts
+are not folded. A country, a system, a site that linked to the website or a tag is named only when at least three
+visitors came with it that month. One part has no such rule: the visits, which the website draws as a world map and a
+calendar. A visit is
+one session of page views and download clicks, and the totals hold only how many visits there were, how many came from
+each country and how many on each day. The countries of the visits are not folded, so a country with one or two visits
+shows on the map. Nothing is kept for a single visit: no hour, system or device of one, no region, no language, no tag
+of a link, no IP address, no session number and no hash of a user. The desktop app's totals stay totals, with the
+three-install rule.
+
+The website shows these numbers in its section "Sedjem in numbers": the newest finished month and, beside it, the
+headline numbers of the month so far, then the breakdowns of the newest finished month: those of the desktop app's
+totals (countries, regions, the computers' system, graphics card and memory, how Sedjem was installed, its version, the
+model, language and length of recordings) and of the website's (the visitors' countries, their devices and systems, the
+sites and tags of links they came from). The visits, by country on the map and by day in the calendar, are those of
+the month so far, or of the newest finished month when there is no month so far or it has no visits. Every breakdown
+but the visits folds a value
+into "other" when it has fewer than three of what it counts: installs for the app's, transcriptions for the runs,
+visitors for the website's countries, systems, sites and tags, and page views for the devices, which the totals count
+by page view.
 
 ## Another computer of yours
 

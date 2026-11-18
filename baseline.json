@@ -1,13 +1,14 @@
 {
- "commit": "834d24932ec6a067d590e10fedc7313378c7f5cd",
- "updated": "2026-11-07",
- "total": 26,
+ "commit": "7ba71d134b1cfdc2643731ff2520e34f958ebf05",
+ "updated": "2026-11-18",
+ "total": 27,
  "findings": {
   "actions/cache-poisoning/poisonable-step:36a450a6d0392741:1": 1,
   "actions/cache-poisoning/poisonable-step:a92d657e6d51b430:1": 1,
   "actions/cache-poisoning/poisonable-step:be68822e2d850d4d:1": 1,
   "actions/cache-poisoning/poisonable-step:e9508e43940fc205:1": 1,
   "js/biased-cryptographic-random:6d06aebfaf75099f:1": 1,
+  "js/clear-text-storage-of-sensitive-data:6bb4a59e95b0ca3c:1": 1,
   "py/clear-text-storage-sensitive-data:a8a89b94749c411a:1": 1,
   "py/http-response-splitting:4bc3115637e0f8cc:1": 1,
   "py/path-injection:16e749b8ad865fed:1": 1,

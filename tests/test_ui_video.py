@@ -26,8 +26,9 @@ class VideoPage(UiTestCase):
         self.page.wait_for_function("() => video.readyState >= 1")
 
     def media(self):
-        return self.page.evaluate("""() => { const v = video, a = audio;
-            return { video: v.getAttribute('src'), audio: a.getAttribute('src'), inPage: document.getElementById('view').contains(v),
+        """The addresses of the video and the audio, without the ?sig= that the app adds to them (app/session.py)."""
+        return self.page.evaluate("""() => { const v = video, a = audio, bare = (s) => s && s.split('?sig=')[0];
+            return { video: bare(v.getAttribute('src')), audio: bare(a.getAttribute('src')), inPage: document.getElementById('view').contains(v),
                      paused: v.paused, time: v.currentTime, current: [...document.querySelectorAll('#transcript .line.current')].map(e => +e.dataset.i) }; }""")
 
     def test_the_video_shows_in_the_side_column_and_the_bar_plays_it(self):

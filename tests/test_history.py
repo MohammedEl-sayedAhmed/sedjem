@@ -334,7 +334,9 @@ class HistoryApi(unittest.TestCase):
 
     def call(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
-        headers = {"X-Sedjem": "1", **({"Content-Type": "application/json"} if data else {})}
+        headers = {"X-Sedjem": "1",
+                   "X-Sedjem-Token": self.app.session.secret,
+                   **({"Content-Type": "application/json"} if data else {})}
         req = urllib.request.Request(self.base + path, data=data, method=method, headers=headers)
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
@@ -473,6 +475,7 @@ class EditsAreSaved(unittest.TestCase):
         server, app = make_server(Config(storage=self.tmp / "data"), port=0)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{server.server_address[1]}"
+        self.app = app  # the secret is new at every start
         return server, app
 
     def stop(self, server, app):

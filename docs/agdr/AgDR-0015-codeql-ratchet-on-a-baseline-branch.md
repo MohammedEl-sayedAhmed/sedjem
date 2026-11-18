@@ -73,11 +73,12 @@ needs no stored credential, as with `stats`, and puts the logic where unit tests
   still fixed or dismissed on their own schedule.
 - Until the branch exists the check proves nothing. The maintainer should make it required after the first push to
   main has written the branch.
-- Someone with write access can still delete the branch. The next push to main, the weekly run or a run by hand on
-  main writes it again, and until then, with `CODEQL_RATCHET_ARMED` set, every pull request fails the check, so a
-  deletion cannot let a finding through. The real control is a repository ruleset on `security-baseline`
-  that restricts updates and deletions, with GitHub Actions as the bypass actor. It is a setting for the maintainer,
-  and not applied by this change.
+- A ruleset on `security-baseline`, with no bypass actor, blocks deleting the branch and pushing to it with force.
+  It never blocks the CodeQL workflow or the guard, since both only add commits on top. A ruleset that would also
+  stop other pushes needs GitHub Actions as a bypass actor, which GitHub accepts only in a repository that an
+  organisation owns, so such pushes stay possible here: the guard workflow puts them back. If the branch went
+  missing all the same, the next push to main, the weekly run or a run by hand on main writes it again, and until
+  then, with `CODEQL_RATCHET_ARMED` set, every pull request fails the check.
 - A pull request can change the script or the workflow that judges it. The check stops a slip, not a person who
   rewrites it.
 - If CodeQL changes its fingerprint, the baseline no longer matches. The next write on main repairs it, and until

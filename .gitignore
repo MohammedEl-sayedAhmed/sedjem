@@ -71,3 +71,5 @@ app/_build.json
 *.part
 *.part[0-9]
 *.joining
+# Aptabase's exports hold daily visitor hashes and session ids; they never go into the repository
+/aptabase/

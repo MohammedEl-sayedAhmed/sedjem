@@ -27,7 +27,9 @@ import functools
 import importlib.util
 import json
 import re
+import socket
 import struct
+import sys
 import tempfile
 import threading
 import time
@@ -38,7 +40,7 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 import site_support as fixture
-from ui_support import REQUIRED, launch, machine_trouble, sync_playwright
+from ui_support import REQUIRED, TRACES, launch, machine_trouble, sync_playwright
 
 ROOT = Path(__file__).resolve().parent.parent
 _spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
@@ -74,6 +76,18 @@ class Quiet(SimpleHTTPRequestHandler):
         pass
 
 
+class SiteServer(ThreadingHTTPServer):
+    """A built site on a free port. A page opens several connections at once. With the default listen queue of 5,
+    Windows refuses the ones that don't fit while the server is busy (Linux makes them wait), so a stylesheet or a
+    script goes missing and some other test fails each run. The app's server has the same queue (app/server.py)."""
+    request_queue_size = 64
+
+    def handle_error(self, request, client_address):
+        if isinstance(sys.exc_info()[1], ConnectionError):  # the browser dropped a connection: no traceback in the log
+            return
+        super().handle_error(request, client_address)
+
+
 class SiteInBrowserTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -89,7 +103,7 @@ class SiteInBrowserTest(unittest.TestCase):
         cls.counting = build.build(tmp / "counting", counts_key=STAND_IN_KEY, counts_host="127.0.0.1")
         # and without numbers: no stats, and no totals yet
         cls.plain = build.build(tmp / "plain", usage=tmp / "no-usage.json")
-        cls.servers = [ThreadingHTTPServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
+        cls.servers = [SiteServer(("127.0.0.1", 0), functools.partial(Quiet, directory=str(out)))
                        for out in (cls.out, cls.counting, cls.plain)]
         for server in cls.servers:
             threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -152,6 +166,46 @@ class SiteInBrowserTest(unittest.TestCase):
         page.goto(base + path, wait_until="load", referer=referer)
         return page
 
+    def assert_no_sideways_scroll(self, page, width):
+        """The page is no wider than the screen. When it is, the message names what reaches past either edge of the
+        screen (the left one on a right-to-left page) with no box around it that clips it, the furthest first, and
+        the errors the page logged, such as a stylesheet that did not load. With SEDJEM_UI_TRACES set (as in CI) a
+        screenshot of the page is kept there, and the message names it. A page once measured 753 px wide on a 390 px
+        phone, with nothing to show why (issue #63)."""
+        wide = page.evaluate("document.documentElement.scrollWidth")
+        if wide <= width:
+            return
+        found = page.evaluate("""(width) => { const out = [];
+            document.querySelectorAll('body *').forEach(e => {
+              const b = e.getBoundingClientRect();
+              if ((b.right <= width + 0.5 && b.left >= -0.5) || !e.getClientRects().length) return;
+              for (let up = e.parentElement; up && up !== document.body; up = up.parentElement)
+                if (getComputedStyle(up).overflowX !== 'visible') return;
+              const name = e.tagName.toLowerCase() + (e.id ? '#' + e.id : '')
+                + (typeof e.className === 'string' && e.className.trim() ? '.' + e.className.trim().split(/\\s+/).join('.') : '');
+              out.push([Math.max(b.right - width, -b.left), `${name} ${Math.round(b.left)} to ${Math.round(b.right)} px`]);
+            });
+            out.sort((a, b) => b[0] - a[0]);
+            return {count: out.length, names: out.slice(0, 10).map((x) => x[1])}; }""", width)
+        if found["count"]:
+            past = "; ".join(found["names"]) + (f" (and {found['count'] - 10} more)" if found["count"] > 10 else "")
+        else:  # text that does not wrap, say, or a box the search took for one that clips
+            past = "no element found past the screen"
+        message = f"the page is {wide} px wide on a {width} px screen. Past the screen: {past}."
+        if getattr(page, "errors", None):
+            message += f" The page logged: {page.errors}."
+        if TRACES:
+            url = urlsplit(page.url)  # the port tells the builds apart, the path the pages
+            name = "".join(c if c.isalnum() or c in "._-" else "_" for c in f"{self.id()}-{width}-{url.port}{url.path}")
+            shot = Path(TRACES) / f"{name}-{time.time_ns()}.png"  # each subtest's own picture, never another's
+            try:
+                shot.parent.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(shot), full_page=True)
+                message += f" Screenshot: {shot.name}."
+            except Exception as e:  # noqa: BLE001 — a page with no picture still fails, with the message
+                message += f" No screenshot: {(str(e).splitlines() or [type(e).__name__])[0]}."
+        self.fail(message)
+
     def counts(self, page, n):
         """The n events a page has sent, once it has sent them, and after a moment in which no more came."""
         deadline = time.monotonic() + 10
@@ -169,7 +223,7 @@ class SiteInBrowserTest(unittest.TestCase):
                     # the images below the first screen load too, so their requests are seen
                     page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
                     page.wait_for_load_state("networkidle")
-                    self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                    self.assert_no_sideways_scroll(page, width)
                     self.assertEqual(page.outside, [])
                     self.assertEqual(page.errors, [])
         # the build that counts here sends one thing off this computer, its page view, and only to Aptabase's EU host
@@ -274,7 +328,7 @@ class SiteInBrowserTest(unittest.TestCase):
                 menu.locator("summary").click()
                 self.assertEqual(menu.locator("nav a").evaluate_all("as => as.filter(a => a.getClientRects().length).length"), 3)
                 self.assertFalse(menu.locator("[data-theme-switch]").is_visible())  # the theme needs the script
-                self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), 390)
+                self.assert_no_sideways_scroll(page, 390)
 
     def theme(self, page):
         """The theme on the page's attribute (None when it follows the system), the colour it is drawn in, and the
@@ -412,7 +466,7 @@ class SiteInBrowserTest(unittest.TestCase):
                             pixels = sizes[name.replace(".webp", ".png")]
                             self.assertGreaterEqual(w, pixels[0] / density[form] - 0.01, name)
                             self.assertGreaterEqual(h, pixels[1] / density[form] - 0.01, name)
-                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        self.assert_no_sideways_scroll(page, width)
 
     def test_the_speakers_names_read_in_both_themes(self):
         """The hero's names are drawn in their speakers' colours, bold, with nothing before them, and each colour is
@@ -484,16 +538,32 @@ class SiteInBrowserTest(unittest.TestCase):
 
     def test_each_page_opened_sends_one_page_view(self):
         """One page_view each time a page is opened, to Aptabase's EU address with the key, from a fixed list of values
-        but the referrer, which is the linking site's host without www.; with the browser's language, the system in
-        one word, the version the page offers and a session number of the moment, new for each page opened."""
+        but the referrer, which is the linking site's host without www.; the tag of a shared link (src or utm_source)
+        only when it is on the list; with the browser's language, the system in one word, the version the page offers
+        and a session number of the moment, new for each page opened."""
         version = build.version()
         for path, width, stored, platform, referer, expected in (
-                ("/", 390, None, "Windows", None, {"page": "en", "device": "phone", "theme": "system", "referrer": "none"}),
+                ("/", 390, None, "Windows", None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "none"}),
                 ("/ar/", 768, "dark", "macOS", "https://www.github.com/MohammedEl-sayedAhmed/sedjem",
-                 {"page": "ar", "device": "tablet", "theme": "dark", "referrer": "github.com"}),
+                 {"page": "ar", "device": "tablet", "theme": "dark", "referrer": "github.com", "source": "none"}),
                 ("/", 1440, "light", "Linux x86_64", "https://news.ycombinator.com/item?id=1",
-                 {"page": "en", "device": "desktop", "theme": "light", "referrer": "news.ycombinator.com"}),
-                ("/", 1099, None, None, None, {"page": "en", "device": "tablet", "theme": "system", "referrer": "none"})):
+                 {"page": "en", "device": "desktop", "theme": "light", "referrer": "news.ycombinator.com",
+                  "source": "none"}),
+                ("/", 1099, None, None, None,
+                 {"page": "en", "device": "tablet", "theme": "system", "referrer": "none", "source": "none"}),
+                ("/?src=linkedin", 390, None, "Android", None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "linkedin"}),
+                ("/ar/?utm_source=LinkedIn&utm_medium=social", 1440, None, None, "https://www.linkedin.com/",
+                 {"page": "ar", "device": "desktop", "theme": "system", "referrer": "linkedin.com",
+                  "source": "linkedin"}),
+                ("/?src=myspace", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "none"}),
+                # the first of the two on the list, so a stray src doesn't hide utm_source; twitter is x
+                ("/?src=newsletter-42&utm_source=linkedin", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "linkedin"}),
+                ("/?utm_source=Twitter", 390, None, None, None,
+                 {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "x"})):
             with self.subTest(path, width=width, platform=platform):
                 page = self.open(path, width, base=self.counting_base, stored=stored, platform=platform,
                                  locale="ar-EG", referer=referer)
@@ -536,7 +606,8 @@ class SiteInBrowserTest(unittest.TestCase):
                    lambda route: route.continue_(url=route.request.url.replace("/sedjem/", "/", 1)))
         page.goto(self.counting_base + "/404.html", wait_until="load")
         view, missing = self.counts(page, 2)
-        self.assertEqual(missing["props"], {"page": "404", "device": "tablet", "theme": "dark", "referrer": "none"})
+        self.assertEqual(missing["props"], {"page": "404", "device": "tablet", "theme": "dark", "referrer": "none",
+                                            "source": "none"})
         self.assertNotEqual(missing["sessionId"], view["sessionId"])
         self.assertEqual(page.errors, [])
 
@@ -597,8 +668,9 @@ class SiteInBrowserTest(unittest.TestCase):
     def test_the_grid_fits_from_a_phone_to_a_desktop(self):
         """The grid of numbers from 320 to 1440 px on both pages, with every number and without any, with and without
         scripts: nothing in it reaches past its card or the column, nothing overflows its own box, and the page doesn't
-        scroll sideways, and every number is there without scripts. From 1000 px the figure cards stand three to a row,
-        all of a width, and the counts' month across a row of its own; below, one under the other."""
+        scroll sideways, and every number is there without scripts. From 1000 px the downloads lead across a row, then the
+        latest release's, the systems' and the page views' cards stand three to a row, all of a width, the stars under the
+        page views, and the counts across a row of their own; below, one under the other."""
         boxes = """() => { const sec = document.querySelector('section[aria-labelledby="numbers"]');
             const column = sec.querySelector('.wrap').getBoundingClientRect();
             const out = [];
@@ -621,7 +693,7 @@ class SiteInBrowserTest(unittest.TestCase):
             });
             const tops = Array.from(sec.querySelectorAll('.card')).map(c => [c.id, Math.round(c.getBoundingClientRect().top), Math.round(c.getBoundingClientRect().width)]);
             return {out, figures: sec.querySelectorAll('.card data').length, soon: sec.querySelectorAll('.soon').length, tops}; }"""
-        for base, figures, soon in ((self.base, 12, 0), (self.plain_base, 0, 1)):
+        for base, figures, soon in ((self.base, 13, 0), (self.plain_base, 0, 1)):
             for path in PAGES:
                 for width in (320, 390, 768, 1024, 1280, 1440):
                     for scripts in (True, False) if width in (390, 1440) else (True,):
@@ -632,21 +704,22 @@ class SiteInBrowserTest(unittest.TestCase):
                             found = page.evaluate(boxes)
                             self.assertEqual(found["out"], [])
                             self.assertEqual((found["figures"], found["soon"]), (figures, soon))
-                            self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                            self.assert_no_sideways_scroll(page, width)
                             if figures:
                                 rows = {}
                                 for key, top, card_width in found["tops"]:
                                     rows.setdefault(top, []).append((key, card_width))
                                 if width >= 1000:
                                     self.assertEqual([[k for k, _ in row] for row in rows.values()],
-                                                     [["numbers-downloads", "numbers-releases", "numbers-platforms"],
-                                                      ["numbers-views", "numbers-stars"], ["numbers-counts"]])
+                                                     [["numbers-downloads"], ["numbers-releases", "numbers-platforms", "numbers-views"],
+                                                      ["numbers-stars"], ["numbers-counts"]])
                                     widths = {k: w for row in rows.values() for k, w in row}
                                     whole = widths.pop("numbers-counts")
-                                    wide = widths.pop("numbers-stars")  # it fills the row before the counts
+                                    lead = widths.pop("numbers-downloads")  # the downloads lead across the whole row
+                                    self.assertAlmostEqual(widths.pop("numbers-stars"), widths["numbers-views"], delta=1, msg="stacked under the page views")
                                     self.assertEqual(len(set(widths.values())), 1, widths)
-                                    self.assertAlmostEqual(wide, 2 * widths["numbers-views"] + 24, delta=2)
-                                    self.assertAlmostEqual(whole, 3 * widths["numbers-views"] + 2 * 24, delta=2)
+                                    self.assertAlmostEqual(lead, 3 * widths["numbers-views"] + 2 * 24, delta=2)
+                                    self.assertAlmostEqual(whole, lead, delta=2)
                                 else:
                                     self.assertEqual(len(rows), 6)
                             self.assertEqual(page.errors, [])
@@ -691,7 +764,7 @@ class SiteInBrowserTest(unittest.TestCase):
                         page.evaluate("document.fonts.ready.then(() => true)")
                         found = page.evaluate(boxes)
                         self.assertEqual(found["out"], [])
-                        self.assertLessEqual(page.evaluate("document.documentElement.scrollWidth"), width)
+                        self.assert_no_sideways_scroll(page, width)
                         rows = {}
                         for card in found["cards"]:
                             rows.setdefault(card["top"], []).append(card)
@@ -774,6 +847,27 @@ class SiteInBrowserTest(unittest.TestCase):
         self.assertEqual(page.evaluate("""async () => [document.cookie, localStorage.length, sessionStorage.length,
             (await indexedDB.databases()).length, (await caches.keys()).length]"""), ["", 0, 0, 0, 0])
         self.assertEqual(page.errors, [])
+
+
+class Backlog(unittest.TestCase):
+    """A page opens several connections at once while the site's server may still be busy: none is refused, as with
+    the app's server (tests/test_app.py, Backlog). No browser needed."""
+
+    def test_a_burst_of_connections_waits_instead_of_being_refused(self):
+        server = SiteServer(("127.0.0.1", 0), Quiet)  # listening, but not accepting yet
+        socks = []
+        try:
+            for _ in range(30):
+                socks.append(socket.create_connection(("127.0.0.1", server.server_address[1]), timeout=5))
+            self.assertEqual(len(socks), 30)
+        finally:
+            for s in socks:
+                s.close()
+            server.server_close()
+
+    def test_the_site_server_keeps_the_app_servers_queue(self):
+        from app.server import Server
+        self.assertEqual(SiteServer.request_queue_size, Server.request_queue_size)
 
 
 if __name__ == "__main__":

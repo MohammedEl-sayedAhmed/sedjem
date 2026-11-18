@@ -564,7 +564,9 @@ class ThroughTheApp(Base):
         super().tearDownClass()
 
     def call(self, method, path, body=None):
-        req = urllib.request.Request(self.api + path, method=method, headers={"X-Sedjem": "1", "Content-Type": "application/json"},
+        req = urllib.request.Request(self.api + path, method=method, headers={"X-Sedjem": "1",
+                                                                              "X-Sedjem-Token": self.app.session.secret,
+                                                                              "Content-Type": "application/json"},
                                      data=json.dumps(body).encode() if body is not None else None)
         try:
             with urllib.request.urlopen(req, timeout=30) as r:

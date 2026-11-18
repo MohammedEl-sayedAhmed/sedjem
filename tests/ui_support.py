@@ -104,12 +104,14 @@ def machine_trouble(text):
 
 
 def launch(playwright, args=()):
-    """The browser, with args for its command line."""
+    """The browser, with args for its command line. Its sound goes to no device (--disable-audio-output): media still
+    plays, and its time moves on. On the Windows runners, the click that started a new browser's first sound twice
+    timed out: for 12 to 15 seconds after it, the browser drew no new frame (issue #92)."""
     headless = os.environ.get("SEDJEM_UI_HEADED") != "1"
     tried = []
     for options in ({}, {"channel": "chrome"}, {"channel": "msedge"}):
         try:
-            return playwright.chromium.launch(headless=headless, args=list(args), **options)
+            return playwright.chromium.launch(headless=headless, args=["--disable-audio-output", *args], **options)
         except PlaywrightError as e:
             tried.append(f"{options or 'bundled'}: {str(e).splitlines()[0]}")
     message = "no Chromium for Playwright (" + "; ".join(tried) + ")"
@@ -172,7 +174,12 @@ class UiTestCase(unittest.TestCase):
         cls.stop()
 
     def setUp(self):
+        # each test starts without the page's preferences, which the server keeps in the data folder (app/server.py)
+        (self.app.cfg.storage / "page.json").unlink(missing_ok=True)
         self.context = self.browser.new_context(viewport={"width": 1280, "height": 800}, accept_downloads=True)
+        # the window's own secret (app/session.py), which the app's page keeps in the session storage of its own address
+        self.context.add_init_script(
+            f"try {{ sessionStorage.setItem('sedjem-token', {json.dumps(self.app.session.secret)}); }} catch (e) {{}}")
         if TRACES:
             self.context.tracing.start(screenshots=True, snapshots=True)
         self.page = self.context.new_page()
@@ -218,11 +225,24 @@ class UiTestCase(unittest.TestCase):
         self.page.goto(f"{self.base}/{route}", timeout=30_000)
         self.page.wait_for_function("() => typeof S !== 'undefined' && S.status", timeout=30_000)
 
+    def prefs(self):
+        """The page's preferences as the server keeps them, in the data folder (app/server.py)."""
+        try:
+            return json.loads((self.app.cfg.storage / "page.json").read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return {}
+
+    def set_prefs(self, **changes):
+        """Change the page's preferences as the page would (/api/prefs); names with _ for -, None to forget one."""
+        r = self.api("PATCH", "/api/prefs", {k.replace("_", "-"): v for k, v in changes.items()})
+        assert r["status"] == 200, r
+
     def api(self, method, path, body=None):
         """Call the app's API from the page (with the header every change needs)."""
         return self.page.evaluate(
             """async ([method, path, body]) => {
-                const r = await fetch(path, { method, headers: { "X-Sedjem": "1", "Content-Type": "application/json" },
+                const r = await fetch(path, { method, headers: { "X-Sedjem": "1", "Content-Type": "application/json",
+                                                           "X-Sedjem-Token": sessionStorage.getItem("sedjem-token") },
                                               body: body === null ? undefined : JSON.stringify(body) });
                 return { status: r.status, json: await r.json().catch(() => null) };
             }""", [method, path, body])

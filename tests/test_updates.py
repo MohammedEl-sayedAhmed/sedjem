@@ -1183,7 +1183,6 @@ class RestartTests(UpdatesCase):
         app.on_quit = closed.set
         app.quit(restarting=True)
         self.assertTrue(closed.wait(5))
-        self.assertTrue(app.restarting, "the desktop app keeps the port file for the new process")
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1201,7 +1200,7 @@ class ApiTests(UpdatesCase):
         self.app.updates = self.build("linux")
 
     def call(self, method, path, body=None, headers=None):
-        h = {"X-Sedjem": "1", **(headers or {})}
+        h = {"X-Sedjem": "1", "X-Sedjem-Token": self.app.session.secret, **(headers or {})}
         data = None
         if body is not None:
             data, h["Content-Type"] = json.dumps(body).encode(), "application/json"

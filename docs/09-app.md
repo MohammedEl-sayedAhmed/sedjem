@@ -5,7 +5,7 @@ pick a model, and you get a transcript with speaker labels that you can play bac
 and export.
 
 ```sh
-./app.sh                      # starts it and opens http://127.0.0.1:8765 in the browser
+./app.sh                      # starts it and opens it in a browser window
 ./app.sh --no-browser         # starts the server only
 ./app.sh --desktop            # opens it in a window of its own (see the desktop notes)
 ./app.sh --install-launcher   # optional: adds Sedjem to the desktop's application menu
@@ -356,7 +356,8 @@ All model settings live in [`app/config.toml`](../app/config.toml). Each `[[mode
 | AssemblyAI | hosted | Universal-3.5 Pro, which follows code-switching | `speech_models`, `expected_languages`, `base_url` (US or EU), `delete_after`, API key |
 | Azure AI Speech | hosted | the `ar-EG` locale; Microsoft stores nothing | region (in *Settings → Hosted services*), `locale`, `max_speakers`, `max_minutes`, `endpoint`, API key |
 
-The other sections are `[server]` (host and port; keep it on 127.0.0.1), `[storage]` (the data
+The other sections are `[server]` (host and port; the host is 127.0.0.1, `localhost` or `::1`, since the app
+has no login, and it doesn't start with any other; port 0 takes a new free one at each start), `[storage]` (the data
 folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language)
 and `[local]` (Python, CPU threads, the speaker models and the one chosen, `performance_while_running`).
 Personal overrides go in `app_data/config.toml` with the same layout, so `app/config.toml` can stay as
@@ -671,9 +672,18 @@ the speaker step with a stand-in model process).
 
 ## Privacy
 
-- The server listens on 127.0.0.1 only, answers only requests addressed to that host, and refuses
-  changes that don't carry the app's own header, so other websites open in the same browser can't
-  use it.
+- The server listens on this computer only: the app doesn't start if `[server] host` names an address that other
+  computers can reach, and says why. It answers only requests addressed to 127.0.0.1, and refuses changes that
+  don't carry the app's own header, so other websites open in the same browser can't use it.
+- Every request for data needs a secret that only your own window has. The app makes a new one each time it starts,
+  on a new port, and keeps it in `session.key` in the data folder, a file that only your account can read (on
+  Windows, the data folder's own permissions keep it, as they keep `secrets.json` and the transcripts). So other
+  programs on the computer, those of other user accounts included, can't use the app. The desktop window gets the
+  secret from the app. A browser window is let in by the page the app opens, `open-sedjem.html` in the data folder,
+  with a browser profile of the app's own when Edge, Chrome, Chromium or Brave is installed. The secret stops working
+  when the app stops: a window opened at the address alone, or one from before the app restarted, says how to open
+  Sedjem instead. The page's preferences, such as the theme and the library's order, are kept in `page.json` in the
+  data folder.
 - With local models, the recording and its transcript never leave the computer, unless you pick a paired computer
   under *Run on*: then the recording goes to that computer alone, over the local network and encrypted, and is deleted
   there once the transcript is back. Other computers can send recordings here only after *Run jobs for other computers*
@@ -750,6 +760,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/report.py` | the details of each transcription: what a job records, and how the page and the exports word it |
 | `app/remote.py` | running jobs on another computer: pairing, the serving side's HTTPS server, sending a job and collecting its transcript ([running jobs on another computer](15-remote-runs.md)) |
 | `sysinfo.py` | this computer and a recording's format (PyAV), for the details and `transcribe.py`'s `.meta.json` |
+| `style_hint.py` | Whisper large-v3's Egyptian style hint, which the app adds before a job's terms. It loads no speech engine, so the engines stay in the model process |
 | `app/static/` | the interface (HTML, CSS and JavaScript, no build step) |
 | `tests/` | unit tests: helpers, the API parsers, the HTTP API against mock services, downloads, paths, the speaker models, the details, the video (on short clips made by `tests/media.py`), and the forced-alignment path. `RUN_MODEL_TESTS=1` also runs whisper-medium on a public clip |
 
@@ -757,10 +768,14 @@ Run the tests with `.venv/bin/python -m unittest discover -s tests -v`.
 
 ## API for scripts
 
-Every change needs the header `X-Sedjem: 1`.
+Every request needs the header `X-Sedjem-Token` with the secret in `session.key` in the data folder, and every change
+also needs the header `X-Sedjem: 1`. The app's port is in `port` in the data folder. The secret is new each time the
+app starts, and so is the port, unless `--port` or `[server] port` names one. `GET /api/ping` needs neither header: it
+says only whether Sedjem answers.
 
 | Call | What |
 |---|---|
+| `GET /api/prefs`, `PATCH /api/prefs` | the page's preferences (theme, the library's order, the video size, the update notices), kept in `page.json` in the data folder; PATCH takes `{name: text, or null to forget it}` |
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
 | `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |

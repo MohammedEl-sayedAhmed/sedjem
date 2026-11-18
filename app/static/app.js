@@ -102,11 +102,46 @@ function raiseToasts(box) {
 // ---------------------------------------------------------------------------------------------
 // API
 // ---------------------------------------------------------------------------------------------
+// The page's access to the server (app/session.py): the secret, sent as the X-Sedjem-Token header, never in an
+// address (audio and video carry the job's own ?sig= instead). It is kept in sessionStorage, which belongs to this tab
+// and this origin, port included, and ends with the tab (a cookie would go to every server on 127.0.0.1). A browser
+// tab gets it from the page the app opens (open-sedjem.html, then /api/login); the desktop window asks its bridge.
+const TOKEN_KEY = "sedjem-token";
+let token = (() => { try { return sessionStorage.getItem(TOKEN_KEY); } catch (e) { return null; } })();
+const authHeaders = () => (token ? { "X-Sedjem-Token": token } : {});
+
+async function signIn() {
+  if (!window.pywebview) {  // the bridge appears a moment after the page loads
+    await new Promise((resolve) => { window.addEventListener("pywebviewready", resolve, { once: true }); setTimeout(resolve, 1500); });
+  }
+  let secret = null;
+  try { secret = await window.pywebview?.api?.session?.(); } catch (e) { secret = null; }
+  if (!secret) return false;
+  token = secret;
+  try { sessionStorage.setItem(TOKEN_KEY, secret); } catch (e) { /* kept in memory only */ }
+  return true;
+}
+let signingIn = null;  // one attempt at a time, shared by the requests that were refused meanwhile
+const signInOnce = () => (signingIn ??= signIn().catch(() => false).finally(() => { signingIn = null; }));
+
+function noAccess() {  // a tab that wasn't opened by the app: say how to open it
+  if (document.getElementById("noAccess")) return;
+  document.body.insertAdjacentHTML("beforeend", `<div id="noAccess" class="no-access" role="alert">
+    <h1>Open Sedjem from its own window</h1>
+    <p>This page has no access to Sedjem, or Sedjem has restarted since it opened. Open Sedjem from its menu, or start
+    it with <code>./app.sh</code>: the page that opens is let in.</p></div>`);
+}
+
 const api = {
   async req(method, path, body) {
-    const opt = { method, headers: { "X-Sedjem": "1" } };
-    if (body !== undefined) { opt.headers["Content-Type"] = "application/json"; opt.body = JSON.stringify(body); }
-    const r = await fetch(path, opt);
+    const opt = () => {
+      const o = { method, headers: { "X-Sedjem": "1", ...authHeaders() } };
+      if (body !== undefined) { o.headers["Content-Type"] = "application/json"; o.body = JSON.stringify(body); }
+      return o;
+    };
+    let r = await fetch(path, opt());
+    if (r.status === 401 && await signInOnce()) r = await fetch(path, opt());
+    if (r.status === 401) noAccess();
     const data = await r.json().catch(() => ({}));
     if (!r.ok) throw new Error(data.error || `${r.status} ${r.statusText}`);
     return data;
@@ -120,6 +155,7 @@ const api = {
       const xhr = new XMLHttpRequest();
       xhr.open("POST", "/api/jobs?" + new URLSearchParams(params));
       xhr.setRequestHeader("X-Sedjem", "1");
+      if (token) xhr.setRequestHeader("X-Sedjem-Token", token);
       xhr.setRequestHeader("Content-Type", file.type && file.type !== "application/json" ? file.type : "application/octet-stream");
       xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded, e.total);
       xhr.onload = () => {
@@ -133,6 +169,26 @@ const api = {
     });
   },
 };
+
+// The page's preferences: the theme, the library's order, the large video, and updates.js's notes. The port, and with
+// it this page's origin and its localStorage, is new at each start (app/session.py), so the server keeps them in the
+// data folder (/api/prefs). loadPrefs copies them into localStorage, where the code reads them; prefPut saves a
+// change in both.
+const PREFS = ["sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from"];
+function prefPut(key, value) {
+  try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode */ }
+  api.patch("/api/prefs", { [key]: value ?? null }).catch(() => {});
+}
+async function loadPrefs() {
+  const kept = await api.get("/api/prefs");
+  for (const key of PREFS) {
+    try { if (typeof kept[key] === "string") localStorage.setItem(key, kept[key]); else localStorage.removeItem(key); } catch { /* private mode */ }
+  }
+  const theme = kept["sedjem-theme"];
+  if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+  $("#jobSort").value = sortKept();
+  showVideoLarge(videoLarge());
+}
 
 // ---------------------------------------------------------------------------------------------
 // State
@@ -272,7 +328,7 @@ const SORTS = {
   recorded: ["Recording date", "recorded", -1],
 };
 const DATED = new Set(["added", "changed", "recorded"]);
-const SORT_KEY = "sedjem-sort";  // localStorage: the order chosen, newest first when what is kept is unknown
+const SORT_KEY = "sedjem-sort";  // a page preference: the order chosen, newest first when what is kept is unknown
 const sortKept = () => { try { const v = localStorage.getItem(SORT_KEY); return Object.hasOwn(SORTS, v) ? v : "newest"; } catch { return "newest"; } };
 const stamp = (iso) => Date.parse(iso) || 0;
 const byTitle = new Intl.Collator(undefined, { numeric: true, sensitivity: "base" });
@@ -1225,6 +1281,7 @@ function applyJob(r) {
   S.partial = r.partial;
   S.hasAudio = r.has_audio;
   S.hasVideo = !!r.has_video;  // video.mp4, played instead of the audio (app/video.py)
+  S.mediaSig = r.media_sig || "";  // ?sig= for its audio and video, which can't carry the header (app/session.py)
   S.log = r.log || "";
   S.detailGroups = r.detail_groups || [];
   S.details = r.details || null;
@@ -1293,30 +1350,46 @@ async function saveExport(e, a, version) {
     try { const saved = await d.save_export(j.id, fmt, version ?? null); if (saved) toast(`Saved ${saved}`); } catch (err) { toast(err.message, "error"); }
     return;
   }
-  if (!window.showSaveFilePicker) return;
+  // In a browser the export is fetched with the page's secret (a plain link can't send it), then saved
   e.preventDefault();
   closeMenus();
-  let handle;
-  try {  // ask first, while the click still counts as the user's action
-    const [description, mime] = EXPORT_TYPES[fmt];
-    handle = await window.showSaveFilePicker({ suggestedName: `${fileSlug(j.title)}${version == null ? "" : `-v${version}`}.${fmt}`, types: [{ description, accept: { [mime]: [`.${fmt}`] } }] });
-  } catch (err) {
-    if (err.name !== "AbortError") location.href = a.href;  // the picker isn't allowed here: download instead
-    return;
+  const name = `${fileSlug(j.title)}${version == null ? "" : `-v${version}`}.${fmt}`;
+  let handle = null;
+  if (window.showSaveFilePicker) {
+    try {  // ask first, while the click still counts as the user's action
+      const [description, mime] = EXPORT_TYPES[fmt];
+      handle = await window.showSaveFilePicker({ suggestedName: name, types: [{ description, accept: { [mime]: [`.${fmt}`] } }] });
+    } catch (err) {
+      if (err.name === "AbortError") return;
+      handle = null;  // the picker isn't allowed here: download instead
+    }
   }
   try {
-    const r = await fetch(a.href);
+    const r = await fetch(a.href, { headers: authHeaders() });
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
+    const blob = await r.blob();
+    if (!handle) { downloadBlob(blob, name); return; }
     const out = await handle.createWritable();
-    await out.write(await r.blob());
+    await out.write(blob);
     await out.close();
     toast(`Saved ${handle.name}`);
   } catch (err) { toast(`Could not save: ${err.message}`, "error"); }
 }
 
+function downloadBlob(blob, name) {  // a download of what the page fetched, under the export's name
+  const url = URL.createObjectURL(blob), link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}
+
 async function copyText(version) {
   try {
-    const r = await fetch(`/api/jobs/${S.job.id}/export/txt?details=0${version == null ? "" : `&version=${version}`}`);
+    const r = await fetch(`/api/jobs/${S.job.id}/export/txt?details=0${version == null ? "" : `&version=${version}`}`,
+                          { headers: authHeaders() });
     if (!r.ok) throw new Error(`${r.status} ${r.statusText}`);
     await navigator.clipboard.writeText(await r.text());
     toast(version == null ? "Transcript copied" : `Version ${version} copied`);
@@ -1699,7 +1772,8 @@ const audio = $("#audio"), video = $("#video"), videoPanel = $("#videoPanel");
 let media = audio;
 
 function showPlayer(j, withVideo = false) {
-  const el = withVideo ? video : audio, src = `/api/jobs/${j.id}/${withVideo ? "video" : "audio"}`;
+  const sig = j.media_sig ?? S.mediaSig;  // the job's own (the compare view's base), else the job page's
+  const el = withVideo ? video : audio, src = `/api/jobs/${j.id}/${withVideo ? "video" : "audio"}?sig=${sig}`;
   if (media !== el) {  // e.g. the video became ready while the audio played: go on from the same moment
     const was = media, same = was.src.includes(`/api/jobs/${j.id}/`), t = was.currentTime, playing = !was.paused;
     media = el;
@@ -1776,7 +1850,10 @@ const VIDEO_ICON = {
 };
 const videoLarge = () => { try { return localStorage.getItem("sedjem-video-large") === "1"; } catch { return false; } };
 function setVideoLarge(on) {
-  try { localStorage.setItem("sedjem-video-large", on ? "1" : "0"); } catch { /* private mode */ }
+  prefPut("sedjem-video-large", on ? "1" : "0");
+  showVideoLarge(on);
+}
+function showVideoLarge(on) {  // without saving it: as the page starts, and once its preferences are loaded
   const body = $(".job-body");
   if (body) body.classList.toggle("video-large", on);
   const b = $("#videoSize");
@@ -1802,7 +1879,7 @@ $("#videoPip").onclick = pictureInPicture;
 video.onclick = () => video.controls || playPause();  // (with its own controls, full screen, the browser does it)
 video.ondblclick = () => video.controls || fullScreen();
 document.addEventListener("fullscreenchange", () => (video.controls = document.fullscreenElement === video));
-setVideoLarge(videoLarge());
+showVideoLarge(videoLarge());
 
 // The job page's slot for the video panel or, while the video is still being made, a box of the same
 // shape with its progress. The panel is one element kept across renders, so the video plays on when the
@@ -2035,8 +2112,10 @@ function renderSettings(focus) {
 // everything known about the model when the row is opened
 function modelsPanel(items) {
   const rows = items.map(({ id, title, d, hub, m, note, icon }) => {
-    const cached = !d.installed && model(id)?.ready;  // found elsewhere, e.g. the Hugging Face cache
     const busy = DL_ACTIVE.has(d.state);
+    // Found elsewhere, e.g. the Hugging Face cache. Not while a download runs: one status can say ready as the
+    // download's last file is put in place, before the download says installed (#103).
+    const cached = !d.installed && !busy && model(id)?.ready;
     let status, sub, actions = "";
     if (busy) { status = ""; sub = "Downloading"; }
     else if (d.installed) {
@@ -2206,8 +2285,11 @@ function aboutPanel() {
           <span>By Mohammed El-sayed Ahmed. Free software under the AGPL-3.0; commercial licences are available.</span>
           <span class="links"><a href="https://github.com/MohammedEl-sayedAhmed/sedjem" target="_blank" rel="noopener noreferrer">${ICON.external} Source code</a>
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/releases" target="_blank" rel="noopener noreferrer">${ICON.external} Releases</a>
+            <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/discussions" target="_blank" rel="noopener noreferrer">${ICON.external} Discussions</a>
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">${ICON.external} Licence</a>
             <a href="https://github.com/MohammedEl-sayedAhmed/sedjem/blob/main/docs/privacy.md" target="_blank" rel="noopener noreferrer">${ICON.external} Privacy policy</a></span>
+          <span class="follow">Each stable version is announced in the Discussions, where questions and ideas are welcome too.
+            Watch → Custom → Releases on GitHub sends an email for each release, the nightly previews included.</span>
         </div>
       </div>
       <div class="set-list">
@@ -2488,14 +2570,14 @@ document.addEventListener("click", (e) => {
 $("#themeBtn").onclick = () => {
   const dark = document.documentElement.dataset.theme !== "dark";
   document.documentElement.dataset.theme = dark ? "dark" : "light";
-  try { localStorage.setItem("sedjem-theme", dark ? "dark" : "light"); } catch (e) { /* private mode */ }
+  prefPut("sedjem-theme", dark ? "dark" : "light");
 };
 $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
 $("#jobSearch").oninput = renderSidebar;
 $("#jobSort").innerHTML = Object.entries(SORTS).map(([v, [label]]) => `<option value="${v}">${label}</option>`).join("");
 $("#jobSort").value = sortKept();
 $("#jobSort").onchange = (e) => {
-  try { localStorage.setItem(SORT_KEY, e.target.value); } catch { /* private mode */ }
+  prefPut(SORT_KEY, e.target.value);
   renderSidebar();
 };
 
@@ -2580,6 +2662,7 @@ function scheduleJobs() {
 }
 
 (async function init() {
+  await loadPrefs().catch(() => {});  // before anything reads them: the theme, the order, updates.js's notes
   await refreshStatus();
   if (!S.status) { view.innerHTML = `<div class="welcome"><h1>Can't reach the app</h1><p>Start it with <code>./app.sh</code>.</p></div>`; return; }
   await refreshJobs();
@@ -2587,5 +2670,4 @@ function scheduleJobs() {
   route();
   scheduleJobs();
   scheduleStatus();
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});
 })();

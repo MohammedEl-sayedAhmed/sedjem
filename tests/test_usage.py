@@ -969,7 +969,9 @@ class AppCounts(UsageCase):
 
     def call(self, method, path, body=None):
         req = urllib.request.Request(self.base + path, method=method, data=None if body is None else json.dumps(body).encode(),
-                                     headers={"X-Sedjem": "1", "Content-Type": "application/json"})
+                                     headers={"X-Sedjem": "1",
+                                              "X-Sedjem-Token": self.app.session.secret,
+                                              "Content-Type": "application/json"})
         try:
             with urllib.request.urlopen(req, timeout=30) as r:
                 raw = r.read()
@@ -1177,26 +1179,34 @@ def export(rows, header=HEADER, quotes=False):
 def website():
     """An export of the Sedjem website app with November 2026's page views, 16 of them by 8 visitors (a visitor is a
     day's hash): Egypt 6 by 4 (E1 on two days), Saudi Arabia 4 by 2, Germany 5 by 1 and one with no country; linked
-    from linkedin.com by 3 visitors, github.com by 2 and an intranet by 1. Five download clicks, and five events the
-    pages never send; and a page view in October and one in December."""
-    def visit(user, day, page, device, referrer, country, times=1):
-        return [{**row("page_view", country, "", "", f"2026-11-{day} 10:00:00", {"page": page, "device": device, "theme":
-                                                                                 "system", "referrer": referrer},
+    from linkedin.com by 3 visitors, github.com by 2 and an intranet by 1; tagged linkedin by the 3 from linkedin.com,
+    reddit by the 2 from github.com (4 views) and email by the one from the intranet, with Germany's 5 tagged none and
+    the others from before the pages sent a tag. Five download clicks, and six events the pages never send; and a page
+    view in October and one in December."""
+    def visit(user, day, page, device, referrer, country, times=1, source=None):
+        props = {"page": page, "device": device, "theme": "system", "referrer": referrer,
+                 **({"source": source} if source else {})}
+        return [{**row("page_view", country, "", "", f"2026-11-{day} 10:00:00", props,
                        os_name="Android", os_version="", version="0.3.1"), "user_id": user}] * times
     def click(platform, place="get", page="en"):
         return {**row("download", "EG", "", "", "2026-11-05 10:01:00", {"platform": platform, "place": place, "page": page}),
                 "user_id": "E1"}
-    rows = (visit("E1", "05", "en", "phone", "none", "EG", 2) + visit("E1", "05", "ar", "phone", "linkedin.com", "EG")
-            + visit("E2", "05", "ar", "desktop", "linkedin.com", "EG") + visit("E1", "06", "en", "desktop", "linkedin.com", "EG")
-            + visit("E3", "07", "404", "tablet", "none", "EG") + visit("S1", "08", "en", "desktop", "github.com", "SA", 2)
-            + visit("S2", "08", "ar", "phone", "github.com", "SA", 2) + visit("D1", "09", "en", "desktop", "none", "DE", 5)
-            + visit("X1", "10", "en", "phone", "intranet.example.corp", ""))
+    rows = (visit("E1", "05", "en", "phone", "none", "EG", 2)
+            + visit("E1", "05", "ar", "phone", "linkedin.com", "EG", source="linkedin")
+            + visit("E2", "05", "ar", "desktop", "linkedin.com", "EG", source="linkedin")
+            + visit("E1", "06", "en", "desktop", "linkedin.com", "EG", source="linkedin")
+            + visit("E3", "07", "404", "tablet", "none", "EG")
+            + visit("S1", "08", "en", "desktop", "github.com", "SA", 2, source="reddit")
+            + visit("S2", "08", "ar", "phone", "github.com", "SA", 2, source="reddit")
+            + visit("D1", "09", "en", "desktop", "none", "DE", 5, source="none")
+            + visit("X1", "10", "en", "phone", "intranet.example.corp", "", source="email"))
     rows += [click("windows", "hero"), click("windows"), click("windows", page="ar"), click("linux"), click("source")]
     good = visit("E9", "11", "en", "phone", "none", "EG")[0]
     rows += [{**good, "string_props": json.dumps(props)} for props in (
         {"page": "fr", "device": "phone", "theme": "system", "referrer": "none"},
         {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "title": "Board meeting"},
-        {"page": "en", "device": "phone", "theme": "system", "referrer": "Bad Host!"})]
+        {"page": "en", "device": "phone", "theme": "system", "referrer": "Bad Host!"},
+        {"page": "en", "device": "phone", "theme": "system", "referrer": "none", "source": "myspace"})]
     rows += [click("mac"), {**good, "event_name": "active_month"}]
     rows += [{**good, "timestamp": "2026-10-31 23:00:00"}, {**good, "timestamp": "2026-12-01 08:00:00"}]
     return rows
@@ -1259,6 +1269,9 @@ class Totals(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-totals-"))
         self.addCleanup(shutil.rmtree, self.tmp, True)
+        copies = mock.patch.object(totals, "FULL_COPIES", {})  # the made-up November has no full copy in git history
+        copies.start()
+        self.addCleanup(copies.stop)
 
     def write(self, text, name="sedjem-release-2026-11-01.csv"):
         path = self.tmp / name
@@ -1427,8 +1440,11 @@ class Totals(unittest.TestCase):
         self.assertEqual(site["devices"], {"phone": 6, "tablet": 1, "desktop": 9})
         self.assertEqual(site["referrers"], {"none": 8, "sites": {"linkedin.com": 3, "other": 5}},
                          "github.com (4 views by 2 visitors) and the intranet (1) are folded")
+        self.assertEqual(site["sources"], {"none": 8, "tags": {"linkedin": 3, "other": 5}},
+                         "a page view from before the tag counts as none; reddit (4 views by 2 visitors) and email "
+                         "(1 by 1) are folded, since a tag needs 3 visitors, not 3 views")
         self.assertEqual(site["downloads"], {"clicks": 5, "platforms": {"windows": 3, "linux": 1, "source": 1}})
-        self.assertEqual(site["skipped"], 5)
+        self.assertEqual(site["skipped"], 6, "a tag the pages never send is left out with the rest")
         published = json.dumps(site)
         for private in ("E1", "S1", "D1", "intranet.example.corp", "github.com", '"SA"', '"DE"', "9F86D081884C7D65"):
             self.assertNotIn(private, published)
@@ -1450,7 +1466,7 @@ class Totals(unittest.TestCase):
         app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
         with mock.patch("sys.stdout", io.StringIO()) as out:
             totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
-        self.assertIn("The website in November 2026: 16 page views by 8 visitors, 3 countries, 5 download clicks; 5 "
+        self.assertIn("The website in November 2026: 16 page views by 8 visitors, 3 countries, 5 download clicks; 6 "
                       "events left out", out.getvalue())
         data = json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))
         self.assertEqual((list(data["months"]), list(data["website"])), (["2026-11"], ["2026-11"]))
@@ -1484,12 +1500,333 @@ class Totals(unittest.TestCase):
         site = totals.website_totals(totals.read(self.write(export(website()), "website.csv")), "2026-11", "2026-12-03")
         totals.write(root, totals.totals(rows, "2026-10", "2026-12-03"))
         totals.write(root, t, site)
-        self.assertEqual(build.monthly(root / "docs" / "usage.json"),
-                         {"app": {"month": "2026-11", "installs": 11, "countries": 4,
-                                  "top": [("EG", 4), ("SA", 3), ("other", 4)], "transcriptions": 17, "hours": 7.8,
-                                  "model": "cohere"},
-                          "website": {"page_views": 16, "countries": 3, "clicks": 5}})
+        read = build.monthly(root / "docs" / "usage.json")
+        self.assertEqual(read["app"], {"month": "2026-11", "weeks": 3, "last_week": "2026-W47", "installs": 11, "countries": 4,
+                                       "transcriptions": 17, "hours": 7.8, "model": "cohere"})
+        self.assertEqual(read["website"], {"page_views": 16, "visitors": 8, "countries": 3, "clicks": 5})
+        self.assertIsNone(read["so_far"])
+        self.assertEqual((read["census"]["month"], read["census"]["through"], read["census"]["visits"]["total"]), ("2026-11", None, 1),
+                         "the export's rows share one session, so one visit")
+        self.assertEqual(dict(read["census"]["groups"])["where"][0], ("countries", [("EG", 4), ("SA", 3), ("other", 4)]))
         self.assertEqual(build.ENGINES, totals.ENGINES)
+
+    def sessions(self):
+        """Website rows for visits: session A (Windows, 0.3.1, Giza, Egypt) of three events from 10:00:05 to 10:01:30, two
+        page views and a click; session B (a system that isn't plain text, a region that isn't, no version, a country
+        that isn't a code) a day later; session C of November's first minute; and what a visit never is: a page view
+        the pages never send, and one of another month."""
+        def event(name, session, sent, props, country="EG", region="Giza", os_name="Windows", version="0.3.1", user="U-SECRET"):
+            return {**row(name, country, region, "", sent, props, os_name=os_name, os_version="10", version=version),
+                    "user_id": user, "session_id": session}
+        view = {"page": "en", "device": "desktop", "theme": "dark", "referrer": "none", "source": "none"}
+        click = {"platform": "windows", "place": "hero", "page": "en"}
+        return [event("page_view", "SESSION-A-ID", "2026-11-09 10:00:05", view),
+                event("download", "SESSION-A-ID", "2026-11-09 10:01:30", click),
+                event("page_view", "SESSION-A-ID", "2026-11-09 10:00:40", view),
+                event("page_view", "SESSION-B-ID", "2026-11-10 23:59:59", view, country="EGY", region="Bad<b>",
+                      os_name="Win<script>", version="<1>", user="U-OTHER"),
+                event("page_view", "SESSION-C-ID", "2026-11-01 00:00:00", view, country="us", region="Texas",
+                      os_name="Linux", version="0.3.0", user="U-THIRD"),
+                event("page_view", "SESSION-D-ID", "2026-11-05 12:00:00", {**view, "title": "Board meeting"}),
+                event("page_view", "SESSION-E-ID", "2026-10-31 12:00:00", view),
+                event("page_view", "", "2026-11-02 08:30:00", view, user="U-NOSESSION")]
+
+    def test_the_websites_visits(self):
+        """The visits are totals only: how many, how many from each country (not folded, so one visit lists its country,
+        and a code that isn't one is other) and how many on each day of the month, 0 for a day with none, to the last day
+        covered; a visit is a session that has a page view, counted on the day and in the country of its first event;
+        sessions are grouped in memory, so no id, hour, system, device or other trace of one visit is written; a session
+        of events the pages never send, one of another month and one of clicks alone are not counted."""
+        rows = totals.read(self.write(export(self.sessions()), "visits.csv"))
+        site = totals.website_totals(rows, "2026-11", "2026-12-03")
+        self.assertEqual(site["visits"]["total"], 4)
+        self.assertEqual(site["visits"]["countries"], {"EG": 2, "US": 1, "other": 1}, "most first, none folded")
+        self.assertEqual(list(site["visits"]["days"]), [f"2026-11-{d:02d}" for d in range(1, 31)])
+        self.assertEqual({d: n for d, n in site["visits"]["days"].items() if n},
+                         {"2026-11-01": 1, "2026-11-02": 1, "2026-11-09": 1, "2026-11-10": 1})
+        self.assertEqual(sum(site["visits"]["days"].values()), site["visits"]["total"])
+        self.assertEqual(set(site["visits"]), {"total", "countries", "days"})
+        self.assertEqual(site["skipped"], 1, "the page view with a prop too many")
+        published = json.dumps(site)
+        for private in ("SESSION-", "U-SECRET", "U-OTHER", "U-THIRD", "U-NOSESSION", "user", "locale", "session", "Bad<b>",
+                        "Win<script>", "<1>", "ar-eg", "Giza", "Texas", "0.3.1", "0.3.0", ":00", "events", "seconds", "hour",
+                        "device\"", "Linux"):
+            self.assertNotIn(private, json.dumps(site["visits"]) if private in ("device\"", "Linux", "hour") else published)
+        # a month so far stops at the day of the export; a time zone counts as UTC; the first event of a session says where
+        so_far = totals.website_totals(rows, "2026-11", "2026-11-09", "2026-11-09")
+        self.assertEqual((list(so_far["visits"]["days"])[-1], so_far["visits"]["total"]), ("2026-11-09", 4),
+                         "the visit of the 10th is a session of the export's day, counted on its own day, and the total stays")
+        self.assertEqual(sum(so_far["visits"]["days"].values()), 3)
+        zone = self.sessions()[:3]
+        zone[0]["timestamp"] = "2026-11-09T23:30:00-02:00"  # the 10th, 01:30 UTC
+        zone[1]["string_props"] = json.dumps({"platform": "windows", "place": "hero", "page": "en"})
+        zone[2]["string_props"] = json.dumps({"page": "en", "device": "phone", "theme": "dark", "referrer": "none", "source": "none"})
+        site = totals.website_totals(totals.read(self.write(export(zone), "zone.csv")), "2026-11", "x")
+        self.assertEqual({d: n for d, n in site["visits"]["days"].items() if n}, {"2026-11-09": 1}, "the session starts at its first event")
+        clicks = totals.read(self.write(export(self.sessions()[1:2]), "clicks.csv"))
+        self.assertEqual(totals.website_totals(clicks, "2026-11", "x")["visits"]["total"], 0, "a click with no page view in its session")
+        self.assertEqual(totals.visits([], "2026-02")["days"].keys().__len__(), 28)
+        self.assertEqual(len(totals.visits([], "2028-02")["days"]), 29, "a leap year")
+        # without a session column every event is a visit of its own
+        plain = totals.read(self.write(export(self.sessions()[:3], header=[h for h in HEADER if h != "session_id"]), "nosession.csv"))
+        self.assertEqual(totals.website_totals(plain, "2026-11", "x")["visits"]["total"], 2, "the click has no page view of its own")
+
+    def test_the_websites_systems(self):
+        """The systems of the website's visitors are folded under 3 visitors like the countries, and an odd name is
+        other; the website's part holds no list of the days' page views."""
+        rows = totals.read(self.write(export(website()), "website.csv"))
+        site = totals.website_totals(rows, "2026-11", "2026-12-03")
+        self.assertEqual(site["systems"], {"Android": 16}, "8 visitors, all on Android")
+        self.assertNotIn("daily", site)
+        views = [{"visitor": ("2026-11-0%d" % (i % 3 + 1), f"u{n}"), "os": os_} for n, (os_, i) in
+                 enumerate([("Windows", 0), ("Windows", 1), ("macOS", 0), ("macOS", 1), ("macOS", 2), ("<x>", 0), ("<x>", 1), ("", 2)])]
+        folded = totals.fold_visitors(views, lambda r: r["os"] if totals.PLAIN.fullmatch(r["os"]) else "other")
+        self.assertEqual(folded, {"macOS": 3, "other": 5})
+
+    def test_the_month_so_far(self):
+        """--so-far totals the month of --exported up to that day, from the same exports, under its own key with the
+        month, the last day it covers and its app and website parts; a later run replaces it; the run for that month
+        (or a later one) removes it; the months, README.md and docs/13-usage-counts.md are not touched by it."""
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
+        read = lambda: json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))  # noqa: E731
+        run = lambda *args: totals.main([*args, "--root", str(root)])  # noqa: E731
+        with mock.patch("sys.stdout", io.StringIO()) as out:
+            run(*app, "--website", site, "--exported", "2026-12-03")  # November, finished
+            self.assertNotIn("so_far", read())
+            pages = [(root / p).read_text(encoding="utf-8") for p in ("README.md", "docs/13-usage-counts.md")]
+            run(*app, "--website", site, "--so-far", "--exported", "2026-12-04")
+        self.assertIn("December 2026 so far:", out.getvalue())
+        self.assertNotIn("README.md", out.getvalue().split("so far:")[-1])
+        data = read()
+        self.assertEqual(list(data["months"]), ["2026-11"], "the finished months stay as they are")
+        sf = data["so_far"]
+        self.assertEqual((sf["month"], sf["through"], sorted(sf)), ("2026-12", "2026-12-04", ["app", "month", "through", "website"]))
+        self.assertEqual((sf["app"]["month"], sf["app"]["exported"]), ("2026-12", "2026-12-04"))
+        self.assertEqual((sf["website"]["month"], sf["website"]["page_views"]), ("2026-12", 1))
+        # headline numbers only: every key it may hold, and no other
+        app_, web = sf["app"], sf["website"]
+        self.assertEqual(sorted(app_), ["exported", "installs", "month", "runs"])
+        self.assertEqual((sorted(app_["installs"]), sorted(app_["installs"]["countries"]), sorted(app_["runs"])),
+                         (["active", "countries", "new"], ["count"], ["hours", "transcriptions"]))
+        self.assertEqual(sorted(web), ["countries", "downloads", "exported", "month", "page_views", "visitors", "visits"])
+        self.assertEqual((sorted(web["countries"]), sorted(web["downloads"]), sorted(web["visits"])),
+                         (["count"], ["clicks"], ["countries", "days", "total"]))
+        self.assertTrue(all(re.fullmatch(r"[A-Z]{2}|other", k) for k in web["visits"]["countries"]))
+        self.assertTrue(all(re.fullmatch(r"2026-12-\d\d", k) for k in web["visits"]["days"]))
+        self.assertEqual([(root / p).read_text(encoding="utf-8") for p in ("README.md", "docs/13-usage-counts.md")], pages,
+                         "README.md and the docs list finished months only")
+        # a later run replaces it
+        with mock.patch("sys.stdout", io.StringIO()):
+            run(*app, "--website", site, "--so-far", "--exported", "2026-12-11")
+        sf = read()["so_far"]
+        self.assertEqual(sf["through"], "2026-12-11")
+        # the app's part alone, and the website's alone
+        with mock.patch("sys.stdout", io.StringIO()):
+            run(*app, "--so-far", "--exported", "2026-12-12")
+            self.assertEqual(sorted(read()["so_far"]), ["app", "month", "through"])
+            run("--website", site, "--so-far", "--exported", "2026-12-13")
+            self.assertEqual(sorted(read()["so_far"]), ["month", "through", "website"])
+            # a finished month before it leaves it; the finished month it is of removes it
+            run(*app, "--website", site, "--exported", "2026-12-14")
+            self.assertEqual(read()["so_far"]["through"], "2026-12-13")
+            run(*app, "--website", site, "--month", "2026-12", "--exported", "2027-01-03")
+        data = read()
+        self.assertNotIn("so_far", data)
+        self.assertEqual(list(data["months"]), ["2026-11", "2026-12"])
+        # a later month's finished run removes an older month so far too; one that can't be read is dropped
+        totals.write(root, so_far={"month": "2026-10", "through": "2026-10-31", "app": {}})
+        totals.write(root, totals.totals(totals.read(self.exports()), "2026-11", "x"))
+        self.assertNotIn("so_far", read())
+        (root / "docs" / "usage.json").write_text(json.dumps({"months": {}, "so_far": "soon"}), encoding="utf-8")
+        totals.write(root, totals.totals(totals.read(self.exports()), "2026-11", "x"))
+        self.assertNotIn("so_far", read())
+        # --month means another month than the day's; the exports must hold the month
+        for args, words in ((["--so-far", "--month", "2026-11", "--exported", "2026-12-04"], "leave out --month"),
+                            (["--so-far", "--exported", "2027-03-04"], "have nothing for 2027-03")):
+            with self.subTest(words), mock.patch("sys.stderr", io.StringIO()), self.assertRaises(SystemExit) as e:
+                run(*app, *args)
+            self.assertIn(words, str(e.exception.code))
+
+    def test_two_copies_of_the_month_so_far_differ_in_headline_numbers_only(self):
+        """Each weekly copy of the month so far stays in git history. Two copies of December, with one more install in the
+        second (from France, on Linux, with an AMD card, 0.3.3, and a week of whisper-large runs in English), differ
+        only in the headline numbers: the full totals would show that install's values, the copies don't."""
+        week = lambda **n: row("week_summary", sent="2026-12-07 10:00:00", props=summary("2026-W49", **n))  # noqa: E731
+        base = ([month(age="0", m="2026-12", sent="2026-12-02 09:00:00", has_cohere=1) for _ in range(3)]
+                + [row("install", "EG", sent="2026-12-02 09:00:00") for _ in range(3)]
+                + [week(transcriptions=4, minutes=60, cohere=4, lang_ar=4, days_used=2, starts=3) for _ in range(3)])
+        one = [month("FR", "Normandy", "fr-fr", age="0", m="2026-12", sent="2026-12-03 09:00:00", gpu="amd", ram="over 32",
+                     os_name="Linux", os_version="Fedora 41", version="0.3.3", has_cohere=0),
+               row("install", "FR", sent="2026-12-03 09:00:00"),
+               week(transcriptions=5, minutes=120, whisper_large=5, lang_en=5, days_used=1, starts=1)]
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        copies, full = [], []
+        for name, rows in (("before", base), ("after", base + one)):
+            path = self.write(export(rows), f"{name}.csv")
+            with mock.patch("sys.stdout", io.StringIO()):
+                totals.main([str(path), "--so-far", "--exported", "2026-12-09", "--root", str(root)])
+            copies.append(json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))["so_far"])
+            full.append(totals.totals(totals.read(path), "2026-12", "2026-12-09"))
+
+        def leaves(d, path=()):
+            for k, v in d.items():
+                yield from leaves(v, (*path, k)) if isinstance(v, dict) else [((*path, k), v)]
+
+        def changed(a, b):
+            a, b = dict(leaves(a)), dict(leaves(b))
+            return {p for p in a.keys() | b.keys() if a.get(p) != b.get(p)}
+
+        self.assertEqual(changed(*copies), {("app", "installs", "active"), ("app", "installs", "new"),
+                                            ("app", "installs", "countries", "count"), ("app", "runs", "transcriptions"),
+                                            ("app", "runs", "hours")})
+        self.assertEqual([(c["app"]["installs"]["active"], c["app"]["installs"]["countries"]["count"], c["app"]["runs"]["hours"])
+                          for c in copies], [(3, 1, 3.0), (4, 2, 5.0)])
+        # what the copies leave out: the full totals' difference would name the install's values
+        leaked = changed(*full)
+        for place in (("hardware", "gpu", "amd"), ("hardware", "ram", "over 32"), ("runs", "models", "whisper_large"),
+                      ("runs", "languages", "en"), ("weekly", "active_installs", "2026-W49")):
+            self.assertIn(place, leaked)
+        # a kept month so far written before this rule is cut to its headline numbers when the file is written again
+        old = {"month": "2026-12", "through": "2026-12-09", "app": full[1]}
+        (root / "docs" / "usage.json").write_text(json.dumps({"months": {}, "so_far": old}), encoding="utf-8")
+        totals.write(root)
+        self.assertEqual(json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))["so_far"], copies[1])
+
+    def test_the_repositorys_month_so_far_holds_headline_numbers_only(self):
+        """docs/usage.json as committed: its month so far, when it has one, holds headline numbers only."""
+        data = json.loads((ROOT / "docs" / "usage.json").read_text(encoding="utf-8"))
+        if "so_far" in data:
+            self.assertEqual(data["so_far"], totals.so_far_part(data["so_far"]))
+
+    def test_the_site_reads_the_month_so_far_the_script_writes(self):
+        """What --so-far writes is what the page's section reads: the month so far's headline numbers beside the newest
+        month, its visits (by country and by day) under them, and the census of the newest finished month."""
+        spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
+        with mock.patch("sys.stdout", io.StringIO()):
+            totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
+            totals.main([*app, "--website", site, "--so-far", "--exported", "2026-12-04", "--root", str(root)])
+        read = build.monthly(root / "docs" / "usage.json")
+        self.assertEqual((read["app"]["month"], read["so_far"]["month"], read["so_far"]["through"]), ("2026-11", "2026-12", "2026-12-04"))
+        self.assertEqual((read["so_far"]["website"]["page_views"], read["census"]["month"], read["census"]["through"]),
+                         (1, "2026-11", None))
+        self.assertEqual(read["so_far"]["app"], {"month": "2026-12", "weeks": 0, "last_week": "", "installs": 0, "countries": 0,
+                                                 "transcriptions": 7, "hours": 0.0, "model": None},
+                         "December's export has a week of December and no active install; no week has ended by the 4th")
+        self.assertEqual((read["visits"]["month"], read["visits"]["through"], read["visits"]["visits"]["total"]), ("2026-12", "2026-12-04", 1))
+        self.assertIsNone(read["census"]["visits"], "the map and the calendar are the month so far's")
+        self.assertEqual(dict(read["census"]["groups"])["where"][0], ("countries", [("EG", 4), ("SA", 3), ("other", 4)]))
+
+    def test_a_finished_month_with_a_full_copy_in_git_history(self):
+        """A copy of a month so far with every breakdown, from before the month so far held headline numbers only, stays
+        in git history (FULL_COPIES), and the finished month can be subtracted from it. A part of the finished month keeps
+        its breakdowns only when at least 3 installs (or visitors) came after that copy; with fewer, docs/usage.json, the
+        README and the docs' table have its headline numbers only, and the page reads them."""
+        spec = importlib.util.spec_from_file_location("site_build", ROOT / "site" / "build.py")
+        build = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(build)
+        root = self.tmp / "repo"
+        (root / "docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        app, site = [str(p) for p in self.exports()], str(self.write(export(website()), "website.csv"))
+        full = (totals.totals(totals.read(self.exports()), "2026-11", "2026-12-03"),
+                totals.website_totals(totals.read(Path(site)), "2026-11", "2026-12-03"))
+        read = lambda: json.loads((root / "docs" / "usage.json").read_text(encoding="utf-8"))  # noqa: E731
+
+        # the made-up November has 11 active installs and 8 visitors: 2 of each after a copy with 9 and 6
+        copy = {"2026-11": {"through": "2026-11-09", "app": 9, "website": 6}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
+        for part in ("app", "website"):
+            self.assertIn(f"November 2026, the {part}: headline numbers only. Git history holds a copy of the month to 9 "
+                          f"November with every breakdown, and 2 {'installs' if part == 'app' else 'visitors'} came after "
+                          "it, fewer than 3.", out.getvalue())
+        data = read()
+        nov, web = data["months"]["2026-11"], data["website"]["2026-11"]
+        self.assertEqual(nov, {**totals.headline("app", full[0]), "headline_only": True})
+        self.assertEqual(web, {**totals.headline("website", full[1]), "headline_only": True})
+        self.assertEqual((sorted(nov), sorted(web)), (["exported", "headline_only", "installs", "month", "runs"],
+                         ["countries", "downloads", "exported", "headline_only", "month", "page_views", "visitors", "visits"]))
+        readme = " ".join((root / "README.md").read_text(encoding="utf-8").split())
+        self.assertIn("In November 2026, 11 installs ran Sedjem, in 4 countries, and 5 were new. They made 17 "
+                      "transcriptions of 7.8 hours of audio. Every month's", readme)
+        docs = (root / "docs" / "13-usage-counts.md").read_text(encoding="utf-8")
+        self.assertIn("| November 2026 | 11 | 5 | 4 | 17 | 7.8 | not published |", docs)
+        self.assertIn("November 2026 has headline numbers only, for the reason given above.", " ".join(docs.split()))
+        page = build.monthly(root / "docs" / "usage.json")
+        self.assertEqual((page["app"]["installs"], page["app"]["model"], page["website"]["visitors"]), (11, None, 8))
+        self.assertEqual([key for _, shown in page["census"]["groups"] for key, _ in shown], ["wcountries"],
+                         "the map of the website's visits, and no breakdown")
+
+        # 3 of each after the copy: every breakdown; and a month without a copy keeps them all
+        copy = {"2026-11": {"through": "2026-11-09", "app": 8, "website": 5}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--exported", "2026-12-03", "--root", str(root)])
+            totals.main([*app, "--website", site, "--month", "2026-10", "--exported", "2026-12-03", "--root", str(root)])
+        self.assertNotIn("headline numbers only", out.getvalue())
+        data = read()
+        self.assertEqual((data["months"]["2026-11"], data["website"]["2026-11"]), full)
+        self.assertNotIn("headline_only", data["months"]["2026-10"])
+        docs = (root / "docs" / "13-usage-counts.md").read_text(encoding="utf-8")
+        self.assertIn("| November 2026 | 11 | 5 | 4 | 17 | 7.8 | 24% |", docs)
+        self.assertNotIn("headline numbers only", docs[docs.index(totals.START):docs.index(totals.END)])
+
+        # with that copy again (2 of each after it): a --so-far run of its month is not checked against it, as the
+        # month so far holds headline numbers only anyway
+        copy = {"2026-11": {"through": "2026-11-09", "app": 9, "website": 6}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--website", site, "--so-far", "--exported", "2026-11-20", "--root", str(root)])
+        self.assertNotIn("headline numbers only", out.getvalue())
+        self.assertEqual(read()["so_far"], totals.so_far_part(read()["so_far"]))
+        self.assertNotIn("headline_only", json.dumps(read()["so_far"]))
+        # a run of the website alone checks the website's part alone
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main(["--website", site, "--exported", "2026-12-03", "--root", str(root)])
+        self.assertIn("November 2026, the website: headline numbers only.", out.getvalue())
+        self.assertNotIn("the app:", out.getvalue())
+        data = read()
+        self.assertEqual((data["months"]["2026-11"], data["website"]["2026-11"]),
+                         (full[0], {**totals.headline("website", full[1]), "headline_only": True}))
+        # exports with fewer installs than the copy are cut, and the line says to check them
+        copy = {"2026-11": {"through": "2026-11-09", "app": 15, "website": 6}}
+        with mock.patch.object(totals, "FULL_COPIES", copy), mock.patch("sys.stdout", io.StringIO()) as out:
+            totals.main([*app, "--exported", "2026-12-03", "--root", str(root)])
+        self.assertIn("November 2026, the app: headline numbers only. Git history holds a copy of the month to 9 "
+                      "November with every breakdown, and the exports have fewer installs than it (11 against 15): "
+                      "check that they are complete.", out.getvalue())
+        self.assertTrue(read()["months"]["2026-11"]["headline_only"])
+
+    def test_the_exports_are_kept_where_git_ignores_them(self):
+        """The Aptabase exports hold daily hashes and session ids: they are kept in aptabase/, which git ignores, and
+        the script and the docs say so, not that they are deleted."""
+        ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
+        self.assertIn("\n/aptabase/\n", ignored)
+        for text in ((ROOT / "tools" / "usage_totals.py").read_text(encoding="utf-8"),
+                     (ROOT / "docs" / "13-usage-counts.md").read_text(encoding="utf-8")):
+            flat = " ".join(text.split())
+            self.assertIn("aptabase/", flat)
+            self.assertIn("never go into the repository", flat)
+            self.assertNotIn("Delete the exports", flat)
+            self.assertNotIn("deleted afterwards", flat)
+        out = io.StringIO()
+        (root := self.tmp / "repo").joinpath("docs").mkdir(parents=True)
+        for page in ("README.md", "docs/13-usage-counts.md"):
+            shutil.copy(ROOT / page, root / page)
+        with mock.patch("sys.stdout", out):
+            totals.main([*[str(p) for p in self.exports()], "--exported", "2026-12-03", "--root", str(root)])
+        self.assertIn("Keep the exports in aptabase/", out.getvalue())
 
     def test_the_script_knows_what_the_website_sends(self):
         js = (ROOT / "site" / "counts.js").read_text(encoding="utf-8")

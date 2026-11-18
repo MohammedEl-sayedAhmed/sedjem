@@ -12,7 +12,7 @@ the rules for public text, and the choices still open.
 |---|---|---|
 | Tests (`tests.yml`) | every push to main and every pull request | the quick checks, then the test suite on Linux and Windows and the setup from source on Windows |
 | Desktop build (`desktop.yml`) | pull requests that change how the app is built or started, by hand, and when Release or Nightly preview calls it | the tests again, both builds with their self-tests, the installer and its update tests; publishes only when called or for a pushed tag |
-| Release (`release.yml`) | by hand, with the version | checks the version and the commit, tags it, and has the Desktop build publish it |
+| Release (`release.yml`) | by hand, with the version | checks the version and the commit, tags it, has the Desktop build publish it, and then starts Pages on main |
 | Nightly preview (`preview.yml`) | once a day | a pre-release of main's newest tested commit ([updates](12-updates.md#nightly-preview-builds)) |
 | CodeQL (`codeql.yml`) | every push to main and pull request, and on Mondays | CodeQL's security queries on the Python, the JavaScript and the workflows; a pull request fails only on findings that main doesn't have (`codeql-ratchet`), and main's findings are written to the `security-baseline` branch ([the ratchet](#the-codeql-ratchet)) |
 | CodeQL baseline guard (`codeql-baseline-guard.yml`) | every push to the `security-baseline` branch | puts back what anyone but the CodeQL workflow pushed there, and opens an issue |
@@ -20,7 +20,7 @@ the rules for public text, and the choices still open.
 | Footprints (`footprints.yml`) | every pull request, also when its title or description is edited | fails on AI-tool attribution in the commits, the title or the description ([ADR 15](adr/0015-no-ai-tool-attribution-in-the-history.md)) |
 | Security (`security.yml`) | every push to main and pull request, and on Mondays | pip-audit on the locks, every package the workflows install, and the dependency review of a pull request |
 | Dependabot (`.github/dependabot.yml`) | on Mondays | pull requests that update the pip requirements and the actions |
-| Pages (`pages.yml`) | pushes to main that change the website or the benchmark results it shows, after each day's stats, after a release, by hand | the website ([site/build.py](../site/build.py)), built from main; it never follows a run for a fork's pull request |
+| Pages (`pages.yml`) | pushes to main that change the website or the benchmark results it shows, after each day's stats, after a release (the Release workflow starts it, also when winget failed), by hand | the website ([site/build.py](../site/build.py)), built from main; it never follows a run for a fork's pull request |
 | Repository stats (`stats.yml`) | once a day | the numbers and charts on the `stats` branch |
 
 The quick checks are one job, `checks`, of a minute or two, and the slower jobs of the Tests workflow start only
@@ -78,6 +78,9 @@ each job wrote there:
   console and its network requests.
 - The Desktop build prints the self-tests' reports at the end of each build job, and keeps the Windows installer
   for 7 days, also when a later check of it failed, so that it can be tried by hand.
+- Repository stats fails on purpose when it can't read the clones, views and referrers, after it has recorded the
+  downloads, stars and forks. GitHub keeps the traffic for 14 days only, so set the `STATS_TOKEN` secret again
+  within that time: a fine-grained token for this repository with "Administration: Read-only" permission.
 
 No test is retried automatically, since a retry would hide a test that fails now and then. When a failed job
 passes after *Re-run failed jobs*, that test goes into an issue as a flaky test, with a link to the failed run.
@@ -119,8 +122,12 @@ The Release workflow ([`.github/scripts/release.py`](../.github/scripts/release.
 - calls the Desktop build workflow with the version and the commit, since a tag made with a workflow's token
   starts no other workflow. That builds and tests both systems, installs the Windows build over itself and over
   the newest release, both the way *Update now* does, and publishes the release with its files, its notes and a
-  link to the privacy policy. Without a notes file, the draft is published as it is. The release then goes to
-  winget.
+  link to the privacy policy. Without a notes file, the draft is published as it is. Publishing also opens the
+  release's post in the Discussions' Announcements, where users follow new versions (a preview opens none), so
+  that category must keep its name. The release then goes to winget;
+- once the build has ended, also when winget failed, starts the Pages workflow on main if the release is
+  published, so that the website offers its downloads. A release published with a workflow's token starts no
+  other workflow, and Pages follows the Desktop build only when that runs alone, for a pushed tag.
 
 Publishing a stable release uses the GitHub environment `release`, which has the maintainer as its required
 reviewer ([ADR 16](adr/0016-branch-protection-with-seven-checks-and-a-linear-history.md)). Running the workflow
@@ -139,8 +146,9 @@ another commit, delete the tag first, with `git push origin --delete v0.3.2`.
 Once published, the release is what every copy of Sedjem is offered when it checks for updates. Publish a fixed
 0.3.3 as soon as possible rather than replacing 0.3.2, since copies that installed 0.3.2 wouldn't be offered a new
 build with the same number. Meanwhile, `gh release delete v0.3.2 --cleanup-tag` takes it back, and the release
-before it becomes the newest again; a copy that already has 0.3.2 keeps it until the next version. Close the
-pull request to microsoft/winget-pkgs if it is still open; once it is merged, the next version's replaces it.
+before it becomes the newest again; a copy that already has 0.3.2 keeps it until the next version. Its post in
+Announcements stays, so delete it or say there that the release was taken back. Close the pull request to
+microsoft/winget-pkgs if it is still open; once it is merged, the next version's replaces it.
 
 ## Security
 
@@ -178,8 +186,10 @@ pull request to microsoft/winget-pkgs if it is still open; once it is merged, th
   does. The scripts the nightly preview and the stats fetch are this repository's own, at the run's commit.
   [`tests/test_pipeline.py`](../tests/test_pipeline.py) checks each of these, and that no other installer runs.
 - Each workflow starts with no permissions, and each job gets only what it needs: the write permissions are in the
-  jobs that use them, and [`tests/test_pipeline.py`](../tests/test_pipeline.py) lists every one. Checkouts don't
-  keep the token.
+  jobs that use them, and [`tests/test_pipeline.py`](../tests/test_pipeline.py) lists every one. The one exception
+  is the nightly preview's build, which grants `discussions: write` that it never uses: a called workflow gets no
+  more than its caller grants, and the Desktop build's release job asks for it for a stable release's post.
+  Checkouts don't keep the token.
 - Pull requests from forks run with `pull_request`, which gives them a read-only token and no secrets. No
   workflow uses `pull_request_target`. The two secrets are used in one place each: `WINGET_TOKEN` in the winget
   job of a release, and `STATS_TOKEN` in the stats workflow.
@@ -207,11 +217,12 @@ unless it adds a finding:
 - `codeql-baseline-guard.yml` runs on every push to the branch. The CodeQL workflow's own token starts no
   workflow, so each run is someone else's push: it adds a commit that restores the files, and opens or updates an
   issue. GitHub reads a push's workflows from the pushed commit, so each baseline commit is built on main's files
-  plus `baseline.json`; a push that removes the guard file from the branch is not guarded. GitHub starts no push
-  workflow for a branch deletion: a deleted baseline is written again by the next push to main, the weekly run or
-  a run by hand on main, and until then the ratchet fails every pull request. The real control is a repository
-  ruleset on `security-baseline` that restricts updates and deletions, with GitHub Actions as its bypass actor,
-  applied in the settings.
+  plus `baseline.json`; a push that removes the guard file from the branch is not guarded. A ruleset on
+  `security-baseline`, with no bypass actor, blocks deleting the branch and pushing to it with force; the CodeQL
+  workflow and the guard only add commits on top, so it never blocks them. A ruleset that would also stop other
+  pushes needs GitHub Actions as a bypass actor, which GitHub accepts only in a repository that an organisation
+  owns, so the guard is what puts such pushes back. If the branch went missing all the same, the next push to main,
+  the weekly run or a run by hand on main writes it again, and until then the ratchet fails every pull request.
 - While the `security-baseline` branch doesn't exist, which is true until the first push to main after this
   was added, `codeql-ratchet` passes with a notice and compares nothing. Once that first baseline is written, the
   maintainer sets the repository variable `CODEQL_RATCHET_ARMED` to `true`, and a missing branch fails the check

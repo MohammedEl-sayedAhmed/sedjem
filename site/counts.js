@@ -1,12 +1,13 @@
 /* The website's anonymous counts (docs/privacy.md, "The website"). Each time a page is opened it sends one page_view
-   to Aptabase, and a click on a download sends one download: only values from the fixed lists below, and of the site
-   that linked here only its host name. With them go the browser's language, its system in one word and the version
-   the page offers. No cookie and no storage: the session number is drawn when the page is opened and kept nowhere, so
-   nothing links two visits. Nothing is sent when the browser asks for Do Not Track or Global Privacy Control, or
-   anywhere but the published site, so a local preview, a copy elsewhere or a page opened from the disk sends
-   nothing. build.py puts the key, the address, the site's host, the version and the page on this script's element,
-   and leaves the script out without a key. It is deferred, so it never holds the page up; it never throws, waits or
-   tries again, and a count that fails is lost. */
+   to Aptabase, and a click on a download sends one download: only values from the fixed lists below, of the site
+   that linked here only its host name, and of a shared link's tag (?src= or utm_source=) only a name on the list.
+   With them go the browser's language, its system in one word and the version the page offers. No cookie and no
+   storage: the session number is drawn when the page is opened and kept nowhere, so nothing links two visits.
+   Nothing is sent when the browser asks for Do Not Track or Global Privacy Control, or anywhere but the published
+   site, so a local preview, a copy elsewhere or a page opened from the disk sends nothing. build.py puts the key,
+   the address, the site's host, the version and the page on this script's element, and leaves the script out
+   without a key. It is deferred, so it never holds the page up; it never throws, waits or tries again, and a count
+   that fails is lost. */
 (function () {
   "use strict";
   var script = document.currentScript, nav = window.navigator || {};
@@ -19,7 +20,9 @@
   // What each event may hold: each prop with its values, or null for the referrer, which is a host name
   var EVENTS = {
     "page_view": {"page": ["en", "ar", "404"], "device": ["phone", "tablet", "desktop"],
-                  "theme": ["light", "dark", "system"], "referrer": null},
+                  "theme": ["light", "dark", "system"], "referrer": null,
+                  "source": ["none", "linkedin", "x", "facebook", "reddit", "youtube", "telegram", "whatsapp",
+                             "email"]},
     "download": {"platform": ["windows", "linux", "source"], "place": ["hero", "get"], "page": ["en", "ar", "404"]}
   };
   var HOST = /^[a-z0-9._:\[\]-]{1,60}$/;
@@ -63,6 +66,23 @@
     return !host || host === location.hostname.replace(/^www\./, "") ? "none" : host.slice(0, 60);
   }
 
+  // the tag of a shared link, such as ?src=linkedin or utm_source=linkedin: the first of the two that is on the list,
+  // with twitter, the name many sharing tools still write, as x; "none" when neither is. Many apps send no referrer,
+  // so a post's link carries its tag instead.
+  function source() {
+    var tags = [];
+    try {
+      var query = new URLSearchParams(location.search);
+      tags = [query.get("src"), query.get("utm_source")];
+    } catch (e) { /* none */ }
+    for (var i = 0; i < tags.length; i++) {
+      var tag = String(tags[i] || "").toLowerCase();
+      if (tag === "twitter") tag = "x";
+      if (tag !== "none" && EVENTS.page_view.source.indexOf(tag) >= 0) return tag;
+    }
+    return "none";
+  }
+
   // whether an event is one of the two, with exactly its props and each value from its list
   function checked(name, props) {
     var allowed = EVENTS.hasOwnProperty(name) ? EVENTS[name] : null;
@@ -86,7 +106,7 @@
   }
 
   function view() {
-    send("page_view", {page: page, device: device(), theme: theme(), referrer: referrer()});
+    send("page_view", {page: page, device: device(), theme: theme(), referrer: referrer(), source: source()});
   }
 
   // a page the browser prepares before it is opened counts when it is shown

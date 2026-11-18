@@ -1,15 +1,19 @@
 """The local web server: the UI in app/static and a small JSON API (Python standard library only).
 
-Safety: it listens on 127.0.0.1, answers only requests addressed to that host (no DNS rebinding),
-and every request that changes something must carry the X-Sedjem header, which other websites
-open in the same browser cannot send (no cross-site requests). Running jobs for other computers
-(app/remote.py) has a server of its own, on another port, off unless it is switched on.
+Safety: it listens on this computer only (make_server refuses any other host), answers only requests
+addressed to 127.0.0.1 (no DNS rebinding), and every request that changes something must carry the
+X-Sedjem header, which other websites open in the same browser cannot send (no cross-site requests).
+Every /api request except /api/ping and /api/login must also carry the secret that only this user's
+own window has (app/session.py), since other programs on the computer, other user accounts included,
+can connect too; the port is new at each start, and so is the secret. Running jobs for other computers (app/remote.py) has a server of its own, on another
+port, off unless it is switched on.
 """
 import json
 import os
 import posixpath
 import re
 import shutil
+import socket
 import statistics
 import subprocess
 import sys
@@ -20,17 +24,30 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, engines, hub, remote, report, updates, usage, video, youtube
+from . import assistants, compare, courses, engines, hub, remote, report, session, updates, usage, video, youtube
 from . import transcript as T
 from . import history
-from .config import FALLBACK_SPEAKER_MODEL, FROZEN, power_profile, set_power_profile
+from .config import FALLBACK_SPEAKER_MODEL, FROZEN, _read_json, power_profile, set_power_profile
 from .downloads import Downloads
 from .jobs import ACTIVE, Joined, Runner, Store, probe_seconds
 
 STATIC = Path(__file__).resolve().parent / "static"
 ID = r"(\d{8}-\d{6}-[0-9a-f]{4})"
+def _utf8(text):
+    """Whether text can be written as UTF-8 (a lone surrogate, which JSON allows, can't)."""
+    try:
+        text.encode("utf-8")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+# The page's preferences (app/static/app.js, updates.js), kept in <storage>/page.json, not in the browser: the port,
+# and with it the page's origin and its localStorage, is new at each start (app/session.py)
+PREFS = ("sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from")
+PREFS_FILE = "page.json"
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
-         ".svg": "image/svg+xml", ".png": "image/png", ".webmanifest": "application/manifest+json"}
+         ".svg": "image/svg+xml", ".png": "image/png"}
 AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
 
 
@@ -47,6 +64,9 @@ class App:
 
     def __init__(self, cfg):
         self.cfg = cfg
+        # the secret in use; make_server makes a new one once it has the port, so a second start that finds the
+        # port taken leaves the copy that is running alone (app/session.py)
+        self.session = session.Session(cfg.storage)
         self.store = Store(cfg.storage)
         # the anonymous usage counts (app/usage.py); like updates, they send only once an entry point starts them
         self.usage = usage.Usage(cfg, version=lambda: self.updates.running()["version"], facts=self.usage_facts)
@@ -59,12 +79,12 @@ class App:
         self.server = None
         self.desktop = False    # set by the desktop app
         self.on_quit = None     # the desktop app closes its window instead of just stopping the server
-        self.restarting = False  # quitting for an update, which starts the app again on the same port
         self.gpu = None         # what transcribe.py can use here; found in the background at start
         self.gpu_probing = False
         self.used = (0.0, None)  # (time, bytes) of the last count of the transcriptions' size
         self.inspected = {}      # YouTube link -> (time, what youtube.inspect found), for adding it right after
         self.settings_lock = threading.Lock()  # settings.json is read, changed and written one request at a time
+        self.prefs_lock = threading.Lock()  # and so is page.json, the page's preferences
         # Settings → Updates (app/updates.py); its background check is started by the app's entry points
         self.updates = updates.Updates(cfg, quit=self.quit, show_folder=lambda folder: show_folder(folder),
                                        port=lambda: self.server.server_address[1] if self.server else None)
@@ -72,8 +92,7 @@ class App:
 
     def quit(self, restarting=False):
         """Quit as Settings → Quit does: the desktop app closes its window, else the server stops. restarting: an
-        update starts the app again, and the new one takes over the port."""
-        self.restarting = self.restarting or restarting
+        update starts the app again, on a new port (app/session.py), so it quits the same way."""
         threading.Thread(target=self.on_quit or self.server.shutdown, daemon=True).start()
 
     def probe_gpu(self):
@@ -180,6 +199,23 @@ class App:
             size = sum(f.stat().st_size for f in self.store.root.rglob("*") if f.is_file())
             self.used = (time.time(), size)
         return size
+
+    def prefs(self):
+        """The page's preferences (PREFS), kept in <storage>/page.json."""
+        found = _read_json(self.cfg.storage / PREFS_FILE)
+        return {k: v for k, v in found.items() if k in PREFS and isinstance(v, str)}
+
+    def set_prefs(self, changes):
+        """Change some of the page's preferences ({name: text, or null to forget it}); returns them all."""
+        for k, v in changes.items():
+            if k not in PREFS:
+                raise ApiError(400, f"not a page preference: {k}")
+            if v is not None and not (isinstance(v, str) and len(v) <= 1000 and _utf8(v)):
+                raise ApiError(400, f"{k}: a text of at most 1000 characters, or null")
+        with self.prefs_lock:
+            kept = {k: v for k, v in {**self.prefs(), **changes}.items() if v is not None}
+            session.write_private(self.cfg.storage / PREFS_FILE, json.dumps(kept, indent=1))  # a temporary file of its own
+        return kept
 
     def status(self):
         jobs = self.store.list()
@@ -382,8 +418,20 @@ class Handler(BaseHTTPRequestHandler):
     def json(self, obj, status=200):
         self.reply(status, json.dumps(obj, ensure_ascii=False).encode())
 
+    def length(self):
+        """The request's Content-Length; 400 if it isn't a number, and the connection closes after the answer,
+        since the body can't be found."""
+        try:
+            n = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            n = -1
+        if n < 0:
+            self.close_connection = True
+            raise ApiError(400, "Content-Length must be a number")
+        return n
+
     def body_json(self, limit=5_000_000):
-        n = int(self.headers.get("Content-Length") or 0)
+        n = self.length()
         if n > limit:
             raise ApiError(413, "request too large")
         self._body_read = True
@@ -392,25 +440,31 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             raise ApiError(400, "invalid JSON")
 
-    def guard(self, write):
-        cfg = self.app.cfg
-        port = self.server.server_address[1]
-        if cfg.server["host"] in ("127.0.0.1", "localhost", "::1"):
-            allowed = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
-            if self.headers.get("Host") not in allowed:
-                raise ApiError(403, "requests must be addressed to 127.0.0.1")
-            origin = self.headers.get("Origin")
-            if origin and origin.removeprefix("http://") not in allowed:
+    def guard(self, method, path, params):
+        port = self.server.server_address[1]  # make_server listens on this computer only (LOOPBACK)
+        allowed = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
+        if self.headers.get("Host") not in allowed:
+            raise ApiError(403, "requests must be addressed to 127.0.0.1")
+        origin = self.headers.get("Origin")
+        if path == "/api/login":  # also posted by <storage>/open-sedjem.html, a local file (Origin: null)
+            if origin and origin != "null" and origin.removeprefix("http://") not in allowed:
                 raise ApiError(403, "cross-site request refused")
-        if write and self.headers.get("X-Sedjem") != "1":
+            return  # login() checks the secret itself
+        if origin and origin.removeprefix("http://") not in allowed:
+            raise ApiError(403, "cross-site request refused")
+        if method not in ("GET", "HEAD") and self.headers.get("X-Sedjem") != "1":
             raise ApiError(403, "missing X-Sedjem header")
+        if path.startswith("/api/") and path != "/api/ping" and not self.app.session.allows(self.headers):
+            media = re.fullmatch(rf"/api/jobs/{ID}/(?:audio|video)", path)  # a media element can't send a header
+            if not (media and method in ("GET", "HEAD") and self.app.session.signed(params.get("sig"), media.group(1))):
+                raise ApiError(401, "open Sedjem from its own window: this page has no access to it yet")
 
     def dispatch(self, method):
         self._body_read = False  # one handler serves every request on a keep-alive connection
         path, _, query = self.path.partition("?")
         params = {k: v[-1] for k, v in urllib.parse.parse_qs(query).items()}
         try:
-            self.guard(write=method not in ("GET", "HEAD"))
+            self.guard(method, path, params)
             for verb, pattern, fn in ROUTES:
                 m = re.fullmatch(pattern, path)
                 if m and verb == ("GET" if method == "HEAD" else method):
@@ -429,16 +483,20 @@ class Handler(BaseHTTPRequestHandler):
 
     def drain(self):
         """Read an unread request body so the connection stays usable."""
-        n = int(self.headers.get("Content-Length") or 0)
-        if n and not self._body_read:
-            if n > 50_000_000:  # not worth reading a big upload we refused: close the connection instead
-                self.close_connection = True
-            else:
-                try:
-                    self.rfile.read(n)
-                except OSError:
-                    self.close_connection = True
+        if self._body_read:
+            return
         self._body_read = True
+        try:
+            n = self.length()
+        except ApiError:  # the body can't be found: the connection closes
+            return
+        if n > 50_000_000:  # not worth reading a big upload we refused: close the connection instead
+            self.close_connection = True
+        elif n:
+            try:
+                self.rfile.read(n)
+            except OSError:
+                self.close_connection = True
 
     def do_GET(self):
         self.dispatch("GET")
@@ -462,12 +520,55 @@ class Handler(BaseHTTPRequestHandler):
             raise ApiError(404, "not found")
         self.reply(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"))
 
-    def service_worker(self, params):
-        self.static(params, "sw.js")
+    def index(self, _params):
+        """The page, in the theme the user chose (app/static/index.html would find it in localStorage, which is new
+        with each port), so it doesn't show the other theme while it loads its preferences. This is the one
+        preference the page shows before it has the secret: light or dark, nothing else."""
+        page = (STATIC / "index.html").read_text(encoding="utf-8")
+        theme = self.app.prefs().get("sedjem-theme")
+        if theme in ("light", "dark"):
+            page = page.replace('<html lang="en">', f'<html lang="en" data-theme="{theme}">', 1)
+        self.reply(200, page.encode(), TYPES[".html"])
 
     # ---- API ----------------------------------------------------------------------------------------
+    def ping(self, params):
+        """Whether Sedjem answers on this port, for starting it a second time. With ?nonce=, it also proves that it
+        is this user's own copy, for this port, without showing the secret (app/session.py)."""
+        nonce = str(params.get("nonce") or "")
+        if nonce and not re.fullmatch(r"[0-9a-f]{16,64}", nonce):
+            raise ApiError(400, "nonce: 16 to 64 hex digits")
+        found = {"app": "sedjem"}
+        if nonce:
+            found["proof"] = self.app.session.proof(nonce, self.server.server_address[1])
+        self.json(found)
+
+    def login(self, _params):
+        """The secret (app/session.py), posted as a form by <storage>/open-sedjem.html. The answer is a page from
+        this origin that stores it for the app's page (sessionStorage, which belongs to this tab and this port) and
+        goes on."""
+        n = self.length()
+        if n > 4096:
+            raise ApiError(413, "request too large")
+        self._body_read = True
+        raw = self.rfile.read(n).decode("utf-8", "replace")
+        if not self.headers.get("Content-Type", "").startswith("application/x-www-form-urlencoded"):
+            raise ApiError(415, "a form is expected")
+        if not self.app.session.ok(urllib.parse.parse_qs(raw).get("secret", [""])[-1]):
+            raise ApiError(401, "wrong secret")
+        self.reply(200, self.app.session.landing_page().encode(), "text/html; charset=utf-8",
+                   headers={"Referrer-Policy": "no-referrer"})
+
     def status(self, _params):
         self.json(self.app.status())
+
+    def get_prefs(self, _params):
+        self.json(self.app.prefs())
+
+    def patch_prefs(self, _params):
+        changes = self.body_json(limit=20_000)
+        if not isinstance(changes, dict):
+            raise ApiError(400, "an object of preferences is expected")
+        self.json(self.app.set_prefs(changes))
 
     def list_jobs(self, _params):
         """{"jobs": [...]}, newest first, each with its recording's group, whether it is the main transcript, and
@@ -541,7 +642,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             name = Path(p.get("name") or "recording").name
             ext = Path(name).suffix if AUDIO_EXT.match(Path(name).suffix or "") else ".bin"
-            n = int(self.headers.get("Content-Length") or 0)
+            n = self.length()
             if n <= 0:
                 raise ApiError(400, "empty upload")
             if n > cfg.max_upload:
@@ -649,6 +750,7 @@ class Handler(BaseHTTPRequestHandler):
         out["detail_groups"] = report.groups(out["details"])  # the same, as the lines the job page shows
         out["version"] = history.current(self.app.store, jid, self.app.cfg)  # None while it runs
         out["assistants"] = job_assistants(self.app.cfg, job)  # whether assistants may read it, and why not
+        out["media_sig"] = self.app.session.sign(jid)  # ?sig= for its audio and video (app/session.py)
         if job["status"] in ("failed", "interrupted", "cancelled"):
             log = folder / "log.txt"
             out["log"] = log.read_text(encoding="utf-8", errors="replace")[-4000:] if log.exists() else ""
@@ -907,6 +1009,7 @@ class Handler(BaseHTTPRequestHandler):
     def compare_jobs(self, params):
         ids = [x for x in str(params.get("ids") or "").split(",") if x]
         found = compare.view(self.app.store, ids, params.get("base"))
+        found["media_sig"] = self.app.session.sign(found["base"])  # ?sig= for the base's audio (app/session.py)
         if not params.get("base"):  # the compare view opened (it names the base when another one is chosen)
             self.app.usage.compared()
         self.json(found)
@@ -1252,10 +1355,13 @@ def clean_lines(lines):
 
 
 ROUTES = [
-    ("GET", r"/", Handler.static),
+    ("GET", r"/", Handler.index),
     ("GET", r"/static/((?:logos/)?[\w.-]+)", Handler.static),  # logos/: the brands' logo files (brands.js)
-    ("GET", r"/sw\.js", Handler.service_worker),
+    ("GET", r"/api/ping", Handler.ping),     # no secret needed (app/session.py)
+    ("POST", r"/api/login", Handler.login),  # checks the secret itself
     ("GET", r"/api/status", Handler.status),
+    ("GET", r"/api/prefs", Handler.get_prefs),
+    ("PATCH", r"/api/prefs", Handler.patch_prefs),
     ("GET", r"/api/jobs", Handler.list_jobs),
     ("POST", r"/api/jobs", Handler.create_job),
     ("GET", rf"/api/jobs/{ID}", Handler.get_job),
@@ -1311,10 +1417,17 @@ ROUTES = [
 
 class Server(ThreadingHTTPServer):
     daemon_threads = True
-    allow_reuse_address = True
+    # On Windows, SO_REUSEADDR would let another program, another account's included, bind the same port and take some
+    # of its connections, the login among them (app/session.py); there the port is the app's alone (server_bind)
+    allow_reuse_address = os.name != "nt"
     # A page opens several connections at once. With the default queue of 5, Windows refuses the ones that
     # don't fit while the server is busy (Linux makes them wait), and the page fails to load.
     request_queue_size = 64
+
+    def server_bind(self):
+        if os.name == "nt":
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
     def handle_error(self, request, client_address):
         if isinstance(sys.exc_info()[1], ConnectionError):  # the browser dropped a connection it kept open (a player)
@@ -1322,9 +1435,22 @@ class Server(ThreadingHTTPServer):
         super().handle_error(request, client_address)
 
 
+LOOPBACK = ("127.0.0.1", "localhost", "::1")  # the hosts the server may listen on: this computer's own
+
+
+class NotLocal(ValueError):
+    """[server] host names an address that other computers can reach. The app has no login, so it doesn't start."""
+
+
 def make_server(cfg, host=None, port=None):
+    host = host or cfg.server["host"]
+    if host not in LOOPBACK:
+        raise NotLocal(f'[server] host is "{host}", but Sedjem has no login, so it listens only on this computer. '
+                       f'Set host = "127.0.0.1" under [server] in {cfg.file}, or in {cfg.storage / "config.toml"} '
+                       'if it is set there.')
     app = App(cfg)
     handler = type("BoundHandler", (Handler,), {"app": app})
-    server = Server((host or cfg.server["host"], cfg.server["port"] if port is None else port), handler)
+    server = Server((host, cfg.server["port"] if port is None else port), handler)
     app.server = server
+    app.session.rotate(server.server_address[1])  # this copy has the port: a new secret (app/session.py)
     return server, app

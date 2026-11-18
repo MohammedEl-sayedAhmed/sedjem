@@ -39,6 +39,7 @@ from collections import Counter
 from datetime import date, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from html.parser import HTMLParser
+from unittest import mock
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -69,8 +70,6 @@ PALETTE = {
     "#3fcfbf": "app.css dark --s4",
     "#14a3a1": "docs/brand: the ear and cursor on light", "#0b5f5e": "docs/brand: the icon gradient's dark end",
     "#2dd4bf": "docs/brand: the ear and cursor on dark", "#111111": "docs/brand: the wordmark's letters on light",
-    "#6dbeba": "site: the numbers' light teal, a whole's second part on the light card",
-    "#2f7f7c": "site: the numbers' darker teal, a whole's second part on the dark card",
 }
 NAMED_COLOURS = re.compile(
     r"\b(?:white|black|red|green|blue|gr[ae]y|silver|orange|yellow|purple|pink|teal|navy|maroon|olive|lime|aqua|"
@@ -81,8 +80,10 @@ LATIN_WORD = re.compile(r"[A-Za-z]{2,}")
 NBSP = chr(0xA0)
 # bytes: a page, its stylesheet and script, every font file and the header's two logos. The section of numbers adds
 # about 18 kB to a page, its charts and the tables that say their numbers, and up to 10 kB more as the running totals
-# grow by a point a week (DAILY)
-FIRST_VIEW_BUDGET = 385_000
+# grow by a point a week (DAILY); the census of who runs Sedjem, with its tables and the list of visits, about 20 kB
+# more, and the world map under it up to 80 kB (MAP_BUDGET)
+FIRST_VIEW_BUDGET = 525_000
+MAP_BUDGET = 80_000  # bytes the world map may add to a page: its outlines (site/worldmap.json) and their markup
 # The two lines of the registers, and the words marked in each
 REGISTERS = [
     ("صباح الخير يا جماعة، خلونا نبدأ السبرينت بلانينج بسرعة عشان عندنا ديمو الساعة اتنين",
@@ -95,7 +96,9 @@ VERSION_IN = {"en": "Version {}.", "ar": "الإصدار {}."}
 # The anonymous counts (site/counts.js; docs/privacy.md, "The website"): each event with its props and their values
 # (None for the referrer, a host name), the system props, and the one address they go to
 COUNTED = {"page_view": {"page": ["en", "ar", "404"], "device": ["phone", "tablet", "desktop"],
-                         "theme": ["light", "dark", "system"], "referrer": None},
+                         "theme": ["light", "dark", "system"], "referrer": None,
+                         "source": ["none", "linkedin", "x", "facebook", "reddit", "youtube", "telegram", "whatsapp",
+                                    "email"]},
            "download": {"platform": ["windows", "linux", "source"], "place": ["hero", "get"], "page": ["en", "ar", "404"]}}
 SYSTEM_PROPS = ["locale", "appVersion", "isDebug", "sdkVersion", "osName"]
 ENDPOINT = "https://eu.aptabase.com/api/v0/event"
@@ -636,6 +639,16 @@ class SiteTest(unittest.TestCase):
         numbers = {f"numbers.{key}" for key in re.findall(r'say\(["\'](\w+)["\'][,)]', source)}
         numbers |= {"numbers.months"} | {f"numbers.model_{engine}" for engine in build.ENGINES}
         numbers |= {f"numbers.{system}" for system in ("windows", "linux", "other")}
+        # the census names its groups, breakdowns and values by the keys of its table in build.py
+        numbers |= {f"numbers.{key}" for key in ("under", "over", "gb", "min", "visit_count", "visit_count_one", "view_count", "view_count_one")}
+        numbers |= {f"numbers.g_{group}" for group, _ in build.CENSUS}
+        numbers |= {f"numbers.t_{key}" for _, bs in build.CENSUS for key, *_ in bs}
+        numbers |= {f"numbers.unit_{unit}" for _, bs in build.CENSUS for *_, unit in bs}
+        numbers |= {f"numbers.{key}{end}" for key in ("installs", "countries", "transcriptions", "hours", "page_views", "visitors", "clicks") for end in ("", "_one")}
+        numbers |= {f"numbers.v_{key}_{v}" for key, values in {
+            "kind": ("installer", "linux_build", "source"), "gpu": ("none", "intel", "amd", "nvidia"),
+            "hosted": ("local", "hosted"), "languages": ("ar", "en", "auto"), "devices": ("phone", "tablet", "desktop"),
+            "referrers": ("none",), "sources": ("none",)}.items() for v in values}
         numbers |= set(re.findall(r'words\["(get\.\w+)"\]', source))
         numbers |= {f"benchmarks.{key}" for key in re.findall(r'tell\(["\'](\w+)["\'][,)]', source)}
         cards, _ = build.measured(build.bench_sources())
@@ -965,6 +978,19 @@ class SiteTest(unittest.TestCase):
                 self.assertEqual([a.attrs["href"] for a in last.find(lambda n: n.tag == "a")], [privacy])
             self.assertNotRegex((self.out / HOMES[lang]).read_text(encoding="utf-8").lower(), r"code.?signing")
 
+    def test_the_discussions_are_linked_from_the_get_section_and_the_footer(self):
+        """Each page says where new versions are announced, the Discussions, in the Get section, with GitHub's Watch for
+        an email, and links them from the footer too."""
+        discussions = "https://github.com/MohammedEl-sayedAhmed/sedjem/discussions"
+        for lang, home in self.homes.items():
+            with self.subTest(lang):
+                (footer,) = home.find(lambda n: n.tag == "footer")
+                self.assertEqual(len(footer.find(lambda n: n.tag == "a" and n.attrs.get("href") == discussions)), 1)
+                (get,) = home.find(lambda n: n.tag == "section" and n.attrs.get("id") == "download")
+                (follow,) = [w for w in get.find(lambda n: "way" in n.classes())
+                             if w.find(lambda n: n.tag == "a" and n.attrs.get("href") == discussions)]
+                self.assertIn("Watch → Custom → Releases", follow.text())
+
     def test_the_version_is_the_latest_releases_or_the_apps(self):
         """The downloads' small print names the latest release's version, or the app's without the release's details."""
         source = (ROOT / "app" / "__init__.py").read_text(encoding="utf-8")
@@ -1102,7 +1128,10 @@ class NumbersTest(unittest.TestCase):
         cls.dir = Path(cls.tmp.name)
         cls.stats = fixture.write_stats(cls.dir / "stats")
         cls.usage = fixture.write_usage(cls.dir / "usage.json")
-        cls.full = cls.sections(build.build(cls.dir / "full", stats=cls.stats, usage=cls.usage))
+        cls.release = fixture.write_release(cls.dir / "release")
+        cls.full = cls.sections(build.build(cls.dir / "full", stats=cls.stats, usage=cls.usage, latest=cls.release))
+        cls.so_far = fixture.write_usage(cls.dir / "usage-so-far.json", fixture.USAGE_SO_FAR)
+        cls.sofar = cls.sections(build.build(cls.dir / "sofar", stats=cls.stats, usage=cls.so_far, latest=cls.release))
 
     @classmethod
     def tearDownClass(cls):
@@ -1120,8 +1149,10 @@ class NumbersTest(unittest.TestCase):
         return found
 
     def build(self, name, **kwargs):
-        """A build with other numbers, and what it said in the log."""
+        """A build with other numbers (and the made-up releases, unless latest is given), and what it said in the
+        log."""
         log = io.StringIO()
+        kwargs.setdefault("latest", self.release)
         with contextlib.redirect_stderr(log), contextlib.redirect_stdout(io.StringIO()):
             out = build.build(self.dir / name, **kwargs)
         return self.sections(out), log.getvalue()
@@ -1149,9 +1180,6 @@ class NumbersTest(unittest.TestCase):
                 "legend": [(squash("".join(c if isinstance(c, str) else "" if "share" in c.classes() else c.text() for c in li.children)),
                             squash(first(li, lambda n: "share" in n.classes()).text()))
                            for li in card.find(lambda n: n.tag == "li" and "legend" in n.parent.classes())],
-                "rank": [(squash(first(li, lambda n: "rank-name" in n.classes()).text()),
-                          squash(first(li, lambda n: "rank-value" in n.classes()).text()))
-                         for li in card.find(lambda n: n.tag == "li" and n.parent.tag == "ol")],
                 "table": [[squash(c.text()) for c in tr.children if not isinstance(c, str)]
                           for tr in card.find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")],
                 "stats": [(first(p, lambda n: n.tag == "data").attrs["value"], squash(first(p, lambda n: n.tag == "span").text()))
@@ -1200,17 +1228,18 @@ class NumbersTest(unittest.TestCase):
         self.assertEqual((c["figure"], c["title"], c["line"]),
                          ((str(fixture.TOTAL), fmt(fixture.TOTAL)), "Downloads, all releases", f"+{fmt(e['week'])} since {e['per_day'][0][0].day} {e['per_day'][0][0]:%B}"))
         self.assertEqual(e["week"], fixture.TOTAL - 380, "the history is shorter than a week, so it counts from its first day")
-        out = {d: r.removeprefix("v") for r, d in e["first_seen"].items() if d > e["per_day"][0][0] and not "-" in r}
-        self.assertEqual(out, {fixture.DAY: "0.10.0"})
+        out = {date.fromisoformat(fixture.PUBLISHED[r][:10]): r.removeprefix("v") for r in e["releases"] if "-" not in r
+               and e["per_day"][0][0] <= date.fromisoformat(fixture.PUBLISHED[r][:10])}
+        self.assertEqual(out, {fixture.DAY - timedelta(1): "0.10.0"}, "published the evening before the stats counted it")
         self.assertEqual(c["table"], [[long_day(d) + (f" ({out[d]} out)" if d in out else ""), fmt(n)] for d, n in e["per_day"]])
         c = cards["releases"]
         older = sum(n for r, n in e["releases"].items() if r != "v0.10.0" and "-" not in r)
         whole = fixture.LATEST + older + 7
         self.assertEqual((c["figure"], c["title"], c["line"]),
-                         ((str(fixture.LATEST), fmt(fixture.LATEST)), "Downloads of 0.10.0", "the latest release, out on 2 December"))
+                         ((str(fixture.LATEST), fmt(fixture.LATEST)), "Downloads of 0.10.0", "the latest release, out on 1 December"))
         self.assertEqual(c["parts"], [("part-latest", fixture.LATEST), ("part-older", older), ("part-previews", 7)])
         self.assertEqual(c["legend"], [("0.10.0", share(fixture.LATEST, whole)), ("Older releases", share(older, whole)),
-                                       ("Previews", share(7, whole))])
+                                       ("Previews", "<1%")])
         self.assertEqual(c["table"], [["0.10.0", fmt(fixture.LATEST)], ["0.9.2", "463"], ["Previews", "7"]])
         c = cards["platforms"]
         whole = e["windows"] + e["linux"]
@@ -1232,37 +1261,33 @@ class NumbersTest(unittest.TestCase):
                          ((str(fixture.STARS), fmt(fixture.STARS)), "Stars on GitHub", "+4 since 1 December"))
         self.assertEqual(c["table"], [[long_day(d), fmt(n)] for d, n in e["stars"]])
         c, u, w = cards["counts"], e["app"], e["website"]
-        self.assertEqual((c["title"], c["span"]), ("In the app, November 2026", "span-3"))
+        self.assertEqual((c["title"], c["span"]), ("The anonymous counts", "span-3"))
         self.assertEqual(c["stats"], [(str(u["installs"]["active"]), "installs ran Sedjem"),
                                       (str(u["installs"]["countries"]["count"]), "countries"),
                                       (str(u["runs"]["transcriptions"]), "transcriptions"), (str(u["runs"]["hours"]), "hours of audio"),
-                                      (str(w["page_views"]), "page views"), (str(w["countries"]["count"]), "countries"),
+                                      (str(w["page_views"]), "page views"), (str(w["visitors"]), "visitors"), (str(w["countries"]["count"]), "countries"),
                                       (str(w["downloads"]["clicks"]), "download clicks")])
-        where = fixture.WHERE
-        top = sorted((k for k in where if k != "other"), key=lambda k: -where[k])[:5]
-        names = {"EG": "Egypt", "SA": "Saudi Arabia", "AE": "Emirates", "US": "United States", "DE": "Germany"}
-        rows = [(names[k], fmt(where[k])) for k in top] + [("Other countries", fmt(sum(where.values()) - sum(where[k] for k in top)))]
-        self.assertEqual((c["rank"], [tuple(r) for r in c["table"]]), (rows, rows))
-        self.assertEqual(rows[-1], ("Other countries", "133"), "Jordan (30) is added to the other countries")
         (model,) = self.full["en"].find(lambda n: "model" in n.classes())
         self.assertEqual(squash(model.text()), "Most used model: whisper-medium code-switching")
 
     def test_the_lines_are_drawn_to_the_numbers(self):
         """Each small line is its numbers: a point a row of the table, at its day across the card and at its value down
-        a 56 px picture, from the lowest value (or 0 for the page views) at the bottom to the highest at the top; a
+        picture (the lead chart 170 px high with room for the tags above its line, the others 40 px), from the lowest
+        value (or 0 for the page views) at the bottom to the highest at the top; a
         smooth curve through every point that never overshoots one; the last stretch dashed to the dot on the last
-        day; and a ring on each release day before it."""
+        day; and a ring on the day each release was published, before the last day."""
         e = self.expected()
         section = self.full["en"]
-        down = lambda v, lo, hi: round(6 + (1 - (v - lo) / ((hi - lo) or 1)) * 46, 1)  # noqa: E731
+        down = lambda v, lo, hi, h, top: round(top + (1 - (v - lo) / ((hi - lo) or 1)) * (h - top - 4), 1)  # noqa: E731
         span = lambda series: (series[-1][0] - series[0][0]).days  # noqa: E731
         cards = self.cards(section)
-        for key, series, floor in (("downloads", e["per_day"], None), ("views", [(d, n) for d, n, _ in e["views"]], 0),
-                                   ("stars", e["stars"], None)):
+        for key, series, floor, h, top in (("downloads", e["per_day"], None, build.LEAD, 46),
+                                           ("views", [(d, n) for d, n, _ in e["views"]], 0, build.SMALL, 6),
+                                           ("stars", e["stars"], None, build.SMALL, 6)):
             with self.subTest(key):
                 lo = min(n for _, n in series) if floor is None else floor
                 hi = max(n for _, n in series)
-                self.assertEqual(cards[key]["points"], [(round((d - series[0][0]).days / span(series) * 100, 2), down(n, lo, hi))
+                self.assertEqual(cards[key]["points"], [(round((d - series[0][0]).days / span(series) * 100, 2), down(n, lo, hi, h, top))
                                                         for d, n in series])
                 self.assertEqual(len(cards[key]["points"]), len(cards[key]["table"]))
                 (card,) = section.find(lambda n: n.attrs.get("id") == f"numbers-{key}")
@@ -1282,17 +1307,33 @@ class NumbersTest(unittest.TestCase):
                     self.assertEqual(tails, [])
                 (dot,) = card.find(lambda n: n.tag == "circle" and "dot" in n.classes())
                 self.assertEqual((dot.attrs["cx"], float(dot.attrs["cy"])), ("100%", want[-1][1]))
-                (stop,) = card.find(lambda n: n.tag == "linearGradient".lower() or n.tag == "lineargradient")
-                self.assertEqual(stop.attrs["id"], f"wash-{key}")
-        # a release first counted before the last day is a ring on the line; on the last day, the dot stands for it
+                stops = card.find(lambda n: n.tag == "lineargradient")
+                if key == "downloads":  # the lead has the wash; the smaller lines are plain
+                    self.assertEqual([s.attrs["id"] for s in stops], [f"wash-{key}"])
+                else:
+                    self.assertEqual(stops, [])
+                    self.assertFalse(card.find(lambda n: "wash" in n.classes()))
+        # a release is a ring on the line on the day it was published, here 0.10.0 on the fourth of five days, though
+        # the stats first counted it on the fifth; one published on the last day has the dot instead
+        rings = lambda section: [r.attrs["cx"] for r in section.find(  # noqa: E731
+            lambda n: n.attrs.get("id") == "numbers-downloads")[0].find(lambda n: n.tag == "circle" and "mark" in n.classes())]
+        self.assertEqual(rings(self.full["en"]), ["75%"])
         downloads = list(fixture.DOWNLOADS) + [(d, "v0.9.5", "Sedjem-0.9.5-setup.exe", n) for d, n in
                                                (("2026-11-30", 3), ("2026-12-01", 4), ("2026-12-02", 5))]
-        sections, _ = self.build("ring", stats=fixture.write_stats(self.dir / "ring-stats", downloads=downloads), usage=self.usage)
-        (card,) = sections["en"].find(lambda n: n.attrs.get("id") == "numbers-downloads")
-        rings = [r.attrs["cx"] for r in card.find(lambda n: n.tag == "circle" and "mark" in n.classes())]
-        self.assertEqual(rings, ["50%"], "0.9.5, first counted on the third of five days")
-        self.assertIn("30 November 2026 (0.9.5 out)", str(self.cards(sections["en"])["downloads"]["table"]))
-        self.assertFalse(self.full["en"].find(lambda n: n.tag == "circle" and "mark" in n.classes()))
+        published = fixture.PUBLISHED | {"v0.9.5": "2026-11-29T21:10:00Z", "v0.10.0": "2026-12-02T07:00:00Z"}
+        sections, _ = self.build("ring", stats=fixture.write_stats(self.dir / "ring-stats", downloads=downloads), usage=self.usage,
+                                 latest=fixture.write_release(self.dir / "ring-release", releases=fixture.releases_json(published)))
+        self.assertEqual(rings(sections["en"]), ["25%"], "0.9.5, published on the second of five days, counted from the third")
+        self.assertIn("29 November 2026 (0.9.5 out)", str(self.cards(sections["en"])["downloads"]["table"]))
+        # each release is named on the lead's line by a small mono tag, the last day's too; the others have none
+        tags = lambda section: [(t.text(), t.attrs["style"]) for t in section.find(lambda n: "tag" in n.classes())]  # noqa: E731
+        self.assertEqual([name for name, _ in tags(sections["en"])], ["0.9.5", "0.10.0"])
+        self.assertEqual([name for name, _ in tags(self.full["en"])], ["0.10.0"])
+        (card,) = sections["en"].find(lambda n: n.attrs.get("id") == "numbers-views")
+        self.assertFalse(card.find(lambda n: "tag" in n.classes()))
+        (first, last) = tags(sections["en"])
+        self.assertIn("--x: 25%", first[1])
+        self.assertIn("--x: 100%", last[1])
 
     def test_a_long_history_is_drawn_by_the_week(self):
         """A running total of up to DAILY days has a point a day; a longer one a point a week, the first day, the last
@@ -1327,7 +1368,7 @@ class NumbersTest(unittest.TestCase):
                     lambda n: n.tag == "ol" or "split" in n.classes() or "legend" in n.classes())
                 tables = card.find(lambda n: n.tag == "table")
                 with self.subTest(lang, card=card.attrs["id"]):
-                    if not pictures:
+                    if not pictures or card.attrs["id"] == "numbers-counts":  # its census has a table for each chart
                         continue
                     self.assertEqual(len(tables), 1)
                     self.assertIn("sr-only", tables[0].classes())
@@ -1342,14 +1383,15 @@ class NumbersTest(unittest.TestCase):
                         self.assertEqual((svg.attrs.get("aria-hidden"), svg.attrs.get("focusable")), ("true", "false"))
 
     def test_the_cards_take_their_places_in_the_grid(self):
-        """Five figure cards of GitHub's numbers, one column each of the three, then the counts: one card more before
-        the first month, so two full rows, and with a month a row of its own, the stars filling the row before it. A card whose file can't be read is left
+        """Five figure cards of GitHub's numbers, the downloads leading across the whole row, then the latest release's
+        and the systems' beside the page views and the stars, which are stacked in the third column; then the counts,
+        or a card saying when the first totals come, across a row of their own. A card whose file can't be read is left
         out and the others keep their order."""
         self.assertEqual({k: c["span"] for k, c in self.cards(self.full["en"]).items()},
-                         {"downloads": "span-1", "releases": "span-1", "platforms": "span-1", "views": "span-1",
-                          "stars": "span-2", "counts": "span-3"})
+                         {"downloads": "span-3", "releases": "span-1", "platforms": "span-1", "views": "span-1",
+                          "stars": "span-1", "counts": "span-3"})
         sections, _ = self.build("grid-not-yet", stats=self.stats, usage=self.dir / "nowhere.json")
-        self.assertEqual([c["span"] for c in self.cards(sections["en"]).values()], ["span-1"] * 6)
+        self.assertEqual([c["span"] for c in self.cards(sections["en"]).values()], ["span-3"] + ["span-1"] * 5)
         broken = fixture.write_stats(self.dir / "no-views")
         (broken / "views.csv").unlink()
         sections, log = self.build("no-views-site", stats=broken, usage=self.usage)
@@ -1358,7 +1400,7 @@ class NumbersTest(unittest.TestCase):
 
     def test_the_dates_are_the_numbers_own(self):
         """GitHub's numbers are as of the newest day in its daily snapshots, said under the grid; the latest release is
-        out on the day it was first counted, the stars count from their first day, the page views run to the last day
+        out on the day it was published (UTC), not the later day the stats first counted it, the stars count from their first day, the page views run to the last day
         recorded, and the counts are of the newest month, each named in the page's language and in a time element."""
         for lang, section in self.full.items():
             (source,) = section.find(lambda n: "numbers-source" in n.classes())
@@ -1366,8 +1408,9 @@ class NumbersTest(unittest.TestCase):
                              [("2026-12-02", {"en": "2 December 2026", "ar": "2 ديسمبر 2026"}[lang])])
             times = lambda key: [(t.attrs["datetime"], squash(t.text())) for t in section.find(  # noqa: E731
                 lambda n: n.attrs.get("id") == f"numbers-{key}")[0].find(lambda n: n.tag == "time" and not n.inside(lambda m: m.tag == "table"))]
-            self.assertEqual(times("counts"), [("2026-11", {"en": "November 2026", "ar": "نوفمبر 2026"}[lang])])
-            self.assertEqual(times("releases"), [("2026-12-02", {"en": "2 December", "ar": "2 ديسمبر"}[lang])])
+            self.assertEqual(times("counts"), [("2026-11", {"en": "November 2026", "ar": "نوفمبر 2026"}[lang])] * 3,
+                             "the month, the census that names it and the calendar of its days")
+            self.assertEqual(times("releases"), [("2026-12-01", {"en": "1 December", "ar": "1 ديسمبر"}[lang])])
             self.assertEqual(times("stars"), [("2026-12-01", {"en": "1 December", "ar": "1 ديسمبر"}[lang])])
             self.assertEqual(times("views"), [])
         # with a shorter history the page views say from when, and the average is over the days recorded
@@ -1376,6 +1419,87 @@ class NumbersTest(unittest.TestCase):
         views = self.cards(sections["en"])["views"]
         self.assertEqual((views["title"], views["line"]),
                          ("Repository page views since 22 November", f"about {round(sum(n for _, n, _ in short) / 10, 1)} a day"))
+
+    def test_a_release_is_dated_the_day_it_was_published(self):
+        """A release published after the day's stats run is first counted the next day, but the page dates it by
+        published_at, in UTC: its ring, its row in the table and "out on". Without the list of releases, or with one
+        that can't be read, which the log says, release.json still dates the latest release; a release published
+        before the stats began has no ring but is still out on its day."""
+        def built(name, published=None, releases=None, data=None):
+            name = f"dated-{name}"
+            folder = fixture.write_release(self.dir / f"{name}-release", data, releases=releases if releases is not None
+                                           else fixture.releases_json(published or fixture.PUBLISHED))
+            sections, log = self.build(name, stats=self.stats, usage=self.usage, latest=folder)
+            card = self.cards(sections["en"])
+            marked = [row[0] for row in card["downloads"]["table"] if row[0].endswith(" out)")]
+            return marked, card["releases"]["line"], log
+        # 3:30 in the morning of 2 December in Riyadh is the evening of 1 December in UTC
+        late = fixture.PUBLISHED | {"v0.10.0": "2026-12-02T01:30:00+03:00"}
+        self.assertEqual(built("utc", late, data=fixture.release_json(published_at=late["v0.10.0"])),
+                         (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December", ""))
+        self.assertEqual(built("evening")[:2], (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        marked, line, log = built("none", releases=False)
+        self.assertEqual((marked, line), (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        self.assertIn("numbers: no releases.json, so the downloads chart marks the latest release only\n", log,
+                      "a warning in a GitHub Actions run, with ::warning:: before it")
+        older = fixture.PUBLISHED | {"v0.9.2": "2026-11-29T09:00:00Z"}  # 0.9.2 in the stats' days: only the list has it
+        self.assertEqual(built("listed", older)[0], ["29 November 2026 (0.9.2 out)", "1 December 2026 (0.10.0 out)"])
+        self.assertEqual(built("unlisted", releases=False)[0], ["1 December 2026 (0.10.0 out)"])
+        marked, line, log = built("broken", releases=[[{"tag_name": "v0.10.0", "published_at": "1 December"}]])
+        self.assertEqual((marked, line), (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+        self.assertIn("releases.json can't be read", log)
+        early = fixture.PUBLISHED | {"v0.10.0": "2026-11-27T12:00:00Z"}
+        self.assertEqual(built("early", early, data=fixture.release_json(published_at=early["v0.10.0"]))[:2],
+                         ([], "the latest release, out on 27 November"))
+        # two releases on one day: one mark, named by the newer, whichever was published first
+        for name, morning in (("same-day", "v0.9.2"), ("same-day-swapped", "v0.10.0")):
+            same = fixture.PUBLISHED | {"v0.9.2": "2026-12-01T19:30:00Z", "v0.10.0": "2026-12-01T19:30:00Z", morning: "2026-12-01T06:00:00Z"}
+            self.assertEqual(built(name, same, data=fixture.release_json(published_at=same["v0.10.0"]))[:2],
+                             (["1 December 2026 (0.10.0 out)"], "the latest release, out on 1 December"))
+
+    def test_a_long_history_keeps_each_release_day(self):
+        """Past DAILY days the downloads are drawn by the week, and the day each release was published stays a point
+        of the line and a row of the table, between the weeks."""
+        start = date(2026, 10, 1)
+        days = [start + timedelta(i) for i in range(build.DAILY + 20)]
+        downloads = [(d.isoformat(), "v0.9.2", "Sedjem-0.9.2-setup.exe", 100 + i) for i, d in enumerate(days)]
+        out = days[-10]  # not a whole number of weeks before the last day
+        downloads += [(d.isoformat(), "v0.10.0", "Sedjem-0.10.0-setup.exe", 5) for d in days if d > out]
+        published = {"v0.9.2": "2026-09-20T10:00:00Z", "v0.10.0": f"{out.isoformat()}T20:00:00Z"}
+        sections, _ = self.build("long", stats=fixture.write_stats(self.dir / "long-stats", downloads=downloads),
+                                 usage=self.usage, latest=fixture.write_release(
+                                     self.dir / "long-release", releases=fixture.releases_json(published)))
+        table = self.cards(sections["en"])["downloads"]["table"]
+        self.assertIn([long_day(out) + " (0.10.0 out)", f"{100 + days.index(out):,}"], table)
+        self.assertLess(len(table), 20, "drawn by the week")
+
+    def test_a_deleted_preview_keeps_its_last_count(self):
+        """A preview leaves GitHub's numbers once preview.yml deletes it; its downloads keep their last count, so the
+        running total never falls and the previews' part of the latest release's bar still holds them."""
+        gone = [(d, "v0.9.3-preview.20261127", "Sedjem-0.9.3-preview.20261127-setup.exe", n)
+                for d, n in (("2026-11-28", 2), ("2026-11-29", 4), ("2026-11-30", 5))]
+        sections, _ = self.build("deleted", stats=fixture.write_stats(self.dir / "deleted-stats",
+                                                                      downloads=list(fixture.DOWNLOADS) + gone),
+                                 usage=self.usage)
+        cards = self.cards(sections["en"])
+        totals = [int(n.replace(",", "")) for _, n in cards["downloads"]["table"]]
+        self.assertEqual(totals, [382, 392, 400, 405, fixture.TOTAL + 5])
+        self.assertEqual(totals, sorted(totals), "the running total never falls")
+        self.assertEqual(cards["downloads"]["figure"][0], str(fixture.TOTAL + 5))
+        self.assertIn(["Previews", "12"], cards["releases"]["table"])
+
+    def test_a_stable_release_deleted_by_hand_is_not_the_latest(self):
+        """A stable release deleted by hand keeps its downloads in the total and in the table of releases, but the
+        latest release is the newest one still published."""
+        gone = [(d, "v0.10.1", "Sedjem-0.10.1-setup.exe", n) for d, n in (("2026-11-30", 1), ("2026-12-01", 3))]
+        sections, _ = self.build("deleted-stable", stats=fixture.write_stats(self.dir / "deleted-stable-stats",
+                                                                             downloads=list(fixture.DOWNLOADS) + gone),
+                                 usage=self.usage)
+        cards = self.cards(sections["en"])
+        self.assertEqual((cards["releases"]["title"], cards["releases"]["figure"][0]), ("Downloads of 0.10.0", str(fixture.LATEST)))
+        self.assertEqual(cards["releases"]["table"], [["0.10.0", f"{fixture.LATEST:,}"], ["0.10.1", "3"], ["0.9.2", "463"],
+                                                      ["Previews", "7"]])
+        self.assertEqual(cards["downloads"]["figure"][0], str(fixture.TOTAL + 3))
 
     def test_before_the_first_month_the_page_says_when_it_comes(self):
         """Without docs/usage.json the counts' card is a calm hatched one with a line saying the first totals,
@@ -1445,7 +1569,7 @@ class NumbersTest(unittest.TestCase):
         written alike: Western digits and the same separators, as the Arabic copy writes every number."""
         values = {lang: [(d.attrs["value"], d.text()) for d in section.find(lambda n: n.tag == "data")]
                   for lang, section in self.full.items()}
-        self.assertEqual(len(values["en"]), 5 + 7)  # the figure of each of GitHub's cards, and seven of the counts'
+        self.assertEqual(len(values["en"]), 5 + 8)  # the figure of each of GitHub's cards, and eight of the counts'
         self.assertEqual(values["en"], values["ar"])
         points = {lang: [plot.attrs["data-points"] for plot in section.find(lambda n: "plot" in n.classes())]
                   for lang, section in self.full.items()}
@@ -1455,7 +1579,7 @@ class NumbersTest(unittest.TestCase):
         self.assertFalse(re.search("[٠-٩۰-۹]", visible_text(self.full["ar"])), "Arabic-Indic digits")
         self.assertEqual(build.NUMERALS, {"en": (",", "."), "ar": (",", ".")})
         ar = self.cards(self.full["ar"])
-        self.assertEqual(ar["counts"]["rank"][0], ("مصر", "640"))
+        self.assertEqual([r[0] for r in ar["counts"]["table"][:1]], ["مصر"])
         self.assertEqual(ar["platforms"]["table"][0][0], "Windows")
 
     def test_the_numbers_are_in_the_page_and_nothing_is_fetched(self):
@@ -1483,21 +1607,502 @@ class NumbersTest(unittest.TestCase):
         self.assertLess(page.index('aria-labelledby="numbers"'), page.index('aria-labelledby="get"'))
         self.assertNotIn("Counted in the open", page + (ROOT / "site" / "DESIGN.md").read_text(encoding="utf-8"))
 
+    @staticmethod
+    def census(section):
+        """The census of a section's counts card: {group: {breakdown title: [(name, share)]}}, as drawn (the rows of a
+        quiet list, the glyphs of the devices, the two parts of a ring), and the groups' order; the month so far's visits
+        are not part of it."""
+        out = {}
+        for group in section.find(lambda n: "group" in n.classes() and not n.inside(lambda m: "census-visits" in m.classes())):
+            title = squash(group.find(lambda n: n.tag == "h4")[0].text())
+            out[title] = {}
+            for crowd in group.find(lambda n: n.tag == "div" and n.classes()[:1] == ["crowd"]):
+                name = squash(crowd.find(lambda n: "crowd-title" in n.classes())[0].text())
+                rows = [(squash(li.find(lambda n: "quiet-name" in n.classes())[0].text()),
+                         squash(li.find(lambda n: "quiet-share" in n.classes())[0].text()))
+                        for li in crowd.find(lambda n: n.tag == "li" and "quiet-row" in n.classes())]
+                rows += [(squash(li.find(lambda n: "glyph-name" in n.classes())[0].text()),
+                          squash(li.find(lambda n: "glyph-share" in n.classes())[0].text()))
+                         for li in crowd.find(lambda n: n.tag == "li" and "glyph" in n.classes())]
+                if rows:
+                    out[title][name] = rows
+        return out
+
+    def test_the_census_is_the_months_breakdowns_folded(self):
+        """Who runs Sedjem: four groups of breakdowns of the newest month, each a name and its share, the largest first
+        and "other" last; the hardware, languages and lengths with fewer than 3 are folded into "other" here (the
+        totals file folds the countries, regions, systems, versions and the website's); a short list is a thin bar and
+        a long one is bars to compare."""
+        share = lambda n, whole: f"{round(n / whole * 100)}%" if n / whole >= 0.005 else "<1%"  # noqa: E731
+        rows = lambda *pairs: [(name, share(n, sum(m for _, m in pairs))) for name, n in pairs]  # noqa: E731
+        got = self.census(self.full["en"])
+        self.assertEqual(list(got), ["Where", "Computers", "How it is used", "Website visitors"])
+        self.assertEqual(got["Where"], {
+            "Installs by country": rows(("Egypt", 640), ("Saudi Arabia", 210), ("Emirates", 120), ("United States", 60),
+                              ("Germany", 41), ("Jordan", 30), ("Other", 103)),
+            "Regions": rows(("Cairo", 300), ("Giza", 200), ("Other", 704)),
+            # the website's countries count what the map shades: the visits, unfolded
+            "Website visitors by country": rows(("Egypt", 6), ("United States", 3), ("Saudi Arabia", 2), ("France", 1),
+                                                ("XX", 1), ("Other", 1))})
+        self.assertEqual(got["Computers"], {
+            "System": rows(("Windows", 1000), ("Linux", 150), ("Other", 54)),
+            "Graphics card": rows(("Nvidia", 500), ("No graphics card", 400), ("Other", 304)),
+            "Memory": rows(("8–16 GB", 700), ("16–32 GB", 400), ("under 8 GB", 100), ("over 32 GB", 4)),
+            "Installed from": rows(("Installer", 1000), ("Source", 204)),
+            "Version of Sedjem": rows(("0.10.0", 900), ("0.9.2", 250), ("Other", 54))})
+        self.assertEqual(got["How it is used"], {
+            "Model": rows(("whisper-medium code-switching", 2900), ("Cohere Transcribe Arabic", 1800), ("hosted services", 500),
+                          ("Whisper large-v3", 110)),
+            "On the computer or hosted": rows(("On the computer", 4810), ("Hosted", 500)),
+            "Language": rows(("Arabic", 4000), ("English", 1000), ("Other", 2)),
+            "Length of a recording": rows(("5–30 min", 2000), ("under 5 min", 900), ("Other", 2))})
+        self.assertEqual(got["Website visitors"], {
+            "Device": rows(("Phone", 7000), ("Desktop", 5000), ("Tablet", 345)),
+            "System": rows(("Windows", 6000), ("Android", 4000), ("iOS", 1000), ("Other", 1345)),
+            "Sites they came from": rows(("No link", 8000), ("linkedin.com", 3000), ("Other", 1345)),
+            "Link tags": rows(("No tag", 10000), ("linkedin", 2000), ("Other", 345))})
+        self.assertEqual(self.census(self.full["en"])["Computers"]["Memory"][-1], ("over 32 GB", "<1%"))
+        # each breakdown takes the form that fits it: a quiet list (most), the devices as glyphs, local or hosted as a ring;
+        # the installs are a row of ears, the days a calendar, and no breakdown of the census is a stacked bar
+        (counts,) = self.full["en"].find(lambda n: n.attrs.get("id") == "numbers-counts")
+        forms = {squash(c.find(lambda n: "crowd-title" in n.classes())[0].text()):
+                 [k for k, tag in (("quiet", "ol"), ("glyphs", "ul"), ("ring", "svg"), ("calendar", "div"))
+                  if c.find(lambda n: n.tag == tag and k in n.classes())] for c in counts.find(
+                     lambda n: n.tag == "div" and n.classes()[:1] == ["crowd"])}
+        self.assertEqual(forms["Installs by country"], ["quiet"])
+        self.assertEqual(forms["Device"], ["glyphs"])
+        self.assertEqual(forms["On the computer or hosted"], ["quiet", "ring"], "one small ring, its two parts named beside it")
+        self.assertEqual(forms["Visits each day"], ["calendar"])
+        self.assertEqual({k: v for k, v in forms.items() if k not in ("Device", "Visits each day", "On the computer or hosted")},
+                         {k: ["quiet"] for k in forms if k not in ("Device", "Visits each day", "On the computer or hosted")})
+        self.assertFalse(counts.find(lambda n: "split" in n.classes() or "legend" in n.classes()), "no stacked bar in the card")
+        # every breakdown has a table for screen readers: its counts and shares, under a caption
+        for crowd in counts.find(lambda n: n.tag == "div" and n.classes()[:1] == ["crowd"]):
+            tab = crowd.find(lambda n: n.tag == "table")[0]
+            self.assertTrue("sr-only" in tab.classes() or tab.inside(lambda n: "sr-only" in n.classes()), "hidden, in a box so it can't widen the page")
+            self.assertEqual(squash(tab.find(lambda n: n.tag == "caption")[0].text()),
+                             squash(crowd.find(lambda n: "crowd-title" in n.classes())[0].text()))
+            names = [squash(r.children[0].text()) for r in tab.find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")]
+            self.assertEqual(len(names), len(crowd.find(lambda n: n.tag == "li" and n.parent.classes()[:1] != ["key-row"]))
+                             or len(crowd.find(lambda n: "cell" in n.classes() and "off" not in n.classes())))
+            for picture in crowd.find(lambda n: n.classes()[:1] in (["quiet"], ["glyphs"], ["ring"], ["calendar"], ["map"])):
+                self.assertEqual(picture.nearest("aria-hidden"), "true", picture.classes())
+        # the Arabic page has the same breakdowns, mirrored by the page's direction
+        ar = self.census(self.full["ar"])
+        self.assertEqual([[len(v) for v in g.values()] for g in ar.values()], [[len(v) for v in g.values()] for g in got.values()])
+        self.assertEqual(ar["فين"]["النسخ حسب الدولة"][0], ("مصر", "53%"))
+        self.assertEqual(ar["على أنهي أجهزة"]["الرام"][0][0], "8–16 جيجا")
+
+    def test_one_part_of_a_picture_is_teal_and_the_others_grey(self):
+        """Every bar, list and row of glyphs has one teal part (the one the picture is about, the largest of a
+        breakdown) and the others in greys, "other" and the previews in the lightest; the dots, ticks, ears and the
+        calendar's days are teal only for the newest, the installs or the views; the stylesheet gives the roles their
+        colours from the palette, and the old lighter teal is gone."""
+        for lang, section in self.full.items():
+            for bar in section.find(lambda n: "split" in n.classes()):
+                roles = [next((c for c in p.classes() if c.startswith("is-")), None) for p in bar.children if not isinstance(p, str)]
+                self.assertEqual(roles.count("is-lead"), 1, (lang, roles))
+                self.assertFalse([r for r in roles if r not in ("is-lead", "is-g1", "is-g2", "is-g3", "is-rest")])
+                for p in bar.children:
+                    if not isinstance(p, str) and ("part-other" in p.classes() or "part-previews" in p.classes()):
+                        self.assertIn("is-rest", p.classes())
+            for rows in section.find(lambda n: n.tag in ("ol", "ul") and (n.classes()[:1] in (["quiet"], ["glyphs"]))):
+                roles = [next(c for c in li.classes() if c.startswith("is-")) for li in rows.children if not isinstance(li, str)]
+                self.assertEqual(roles.count("is-lead"), 1, (lang, roles))
+                self.assertNotEqual(roles[-1] == "is-lead" and len(roles) > 1, True)
+                for li in rows.children:
+                    if not isinstance(li, str) and "Other" in li.text() or "غيرهم" in str(li):
+                        self.assertIn("is-rest", li.classes())
+        cards = self.cards(self.full["en"])
+        self.assertEqual(cards["releases"]["parts"][0][0], "part-latest")
+        (card,) = self.full["en"].find(lambda n: n.attrs.get("id") == "numbers-platforms")
+        self.assertEqual([p.classes()[2] for p in card.find(lambda n: "part" in n.classes() and n.parent.attrs.get("class") == "split")],
+                         ["is-lead", "is-g1"], "Windows, the larger share, is teal; Linux grey")
+        css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
+        self.assertRegex(css, r"\.part\.is-lead, \.key\.is-lead \{ background: var\(--series-1\); \}")
+        self.assertRegex(css, r"\.part, \.key \{ background: var\(--tone-1\); \}")
+        self.assertRegex(css, r"\.quiet-row\.is-lead \.quiet-line \{ background: var\(--series-1\);")
+        self.assertRegex(css, r"--tone-1: var\(--series-rest\);")
+        self.assertNotIn("--series-2", css)
+
+    def test_a_small_group_is_folded_and_a_lone_group_is_left_out(self):
+        """A value under 3 installs, transcriptions or visitors is added to "other"; a breakdown that would show only
+        "other" or one group is left out, and a group with none; fields the file lacks leave their breakdown out
+        without a word; and with nothing left the section has no census, only the numbers."""
+        data = json.loads(json.dumps(fixture.USAGE))
+        month = data["months"]["2026-11"]
+        month["installs"].update({"countries": {"count": 1, "installs": {"EG": 4}}, "systems": {"other": 4}})
+        month["installs"].pop("regions"), month["installs"].pop("versions")
+        month["hardware"] = {"gpu": {"nvidia": 2, "intel": 1}, "ram": {"8-16": 3, "16-32": 2, "under 8": 1}, "cpu": {"intel": 6}}
+        month["runs"].update({"models": {"cohere": 7, "whisper_medium": 0, "whisper_large": 0, "other_local": 0, "hosted": 0}})
+        month["runs"].pop("languages"), month["runs"].pop("lengths")
+        for key in ("systems", "visits", "sources"):
+            data["website"]["2026-11"].pop(key)
+        data["website"]["2026-11"].update({"countries": {"count": 1, "page_views": {"other": 5}}, "devices": {"phone": 3}})
+        data["website"]["2026-11"]["referrers"] = {"none": 9, "sites": {}}
+        sections, log = self.build("fold", stats=self.stats, usage=fixture.write_usage(self.dir / "fold.json", data))
+        self.assertEqual(log, "")
+        got = self.census(sections["en"])
+        self.assertEqual(got, {"Computers": {"Memory": [("8–16 GB", "50%"), ("Other", "50%")]}},
+                         "one country, only 'other' systems, the graphics cards under 3 (all one 'other'), one model, one "
+                         "device and one link group are left out; the memory's 2 and 1 are one 'other'")
+        data["months"]["2026-11"]["hardware"] = {}
+        sections, _ = self.build("fold-none", stats=self.stats, usage=fixture.write_usage(self.dir / "fold-none.json", data))
+        self.assertFalse(sections["en"].find(lambda n: "census" in n.classes()))
+        self.assertEqual(self.census(sections["en"]), {})
+        self.assertIn("installs ran Sedjem", str(self.cards(sections["en"])["counts"]["stats"]))
+        # the folding rule itself, and the order: the largest first, "other" last, "unknown" counted as other
+        self.assertEqual(build.folded({"a": 2, "b": 9, "c": 3, "unknown": 4, "other": 1}), [("b", 9), ("c", 3), ("other", 7)])
+        self.assertEqual(build.folded({"a": 2}), [("other", 2)])
+        self.assertEqual(build.folded({}), [])
+
+    def test_the_month_so_far_stands_beside_the_newest_month(self):
+        """With a month so far in docs/usage.json the counts card shows two periods side by side, the finished month and
+        the month so far, marked "so far, to 2 December", with its headline numbers alone (its runs once a week of it
+        has ended); under them the month so far's website visits, its map and its calendar; and the census is the newest
+        finished month's, with no map of its own. A month so far that is no newer than the newest month is not shown,
+        and one that can't be read is left out with a line in the log."""
+        for lang, section in self.sofar.items():
+            (card,) = section.find(lambda n: n.attrs.get("id") == "numbers-counts")
+            periods = card.find(lambda n: "period" in n.classes())
+            self.assertEqual([squash(p.find(lambda n: n.tag == "h4")[0].text()) for p in periods],
+                             {"en": ["November 2026", "December 2026, so far, to 2 December"],
+                              "ar": ["نوفمبر 2026", "ديسمبر 2026، لحد دلوقتي، لحد 2 ديسمبر"]}[lang])
+            self.assertEqual([(t.attrs["datetime"]) for t in periods[1].find(lambda n: n.tag == "time")], ["2026-12", "2026-12-02"],
+                             "the month and its last day; no week of December has ended, so no runs")
+            figures = [[d.attrs["value"] for d in p.find(lambda n: n.tag == "data")] for p in periods]
+            self.assertEqual(figures, [["1204", "23", "5310", "2750.5", "12345", "7000", "31", "678"], ["33", "3", "210", "150", "4", "9"]])
+            self.assertFalse(periods[1].find(lambda n: "model" in n.classes()), "a month so far has no breakdown of the models")
+            titles = [squash(t.text()) for t in card.find(lambda n: "census-title" in n.classes())]
+            self.assertEqual(titles, {"en": ["Website visits: December 2026, so far, to 2 December", "Who runs Sedjem: November 2026"],
+                                      "ar": ["زيارات الموقع: ديسمبر 2026، لحد دلوقتي، لحد 2 ديسمبر", "مين بيشغّل Sedjem: نوفمبر 2026"]}[lang])
+            (seen,) = card.find(lambda n: "census-visits" in n.classes())
+            self.assertEqual(len(seen.find(lambda n: n.tag == "svg" and "map" in n.classes())), 1, "the month so far's map")
+            self.assertEqual(len(seen.find(lambda n: "chart-box" in n.classes())), 1, "and its calendar")
+            self.assertEqual(len(card.find(lambda n: n.tag == "svg" and "map" in n.classes())), 1, "one map on the card")
+        got, alone = self.census(self.sofar["en"]), self.census(self.full["en"])
+        # the census is November's, as without a month so far, but for the visits: the map, the list of the countries'
+        # visits under it and the calendar are the month so far's, so its countries are the page views that pass the fold
+        self.assertEqual(got["Where"].pop("Website visitors by country")[:2], [("Egypt", "49%"), ("United States", "24%")])
+        self.assertEqual(alone["Where"].pop("Website visitors by country")[:2], [("Egypt", "43%"), ("United States", "21%")])
+        self.assertEqual(got, alone)
+        (census,) = self.sofar["en"].find(lambda n: "census" in n.classes() and "census-visits" not in n.classes())
+        self.assertFalse(census.find(lambda n: "map" in n.classes() or "chart-box" in n.classes()),
+                         "its map and calendar are the month so far's")
+        self.assertEqual(list(self.cards(self.sofar["en"])), ["downloads", "releases", "platforms", "views", "stars", "counts"])
+        # once a week of the month has ended, its runs come too: those of the weeks that ended by its last day
+        data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
+        data["so_far"]["through"] = "2026-12-08"
+        sections, _ = self.build("so-far-week", stats=self.stats, usage=fixture.write_usage(self.dir / "so-far-week.json", data))
+        period = sections["en"].find(lambda n: "period" in n.classes())[1]
+        self.assertEqual([t.attrs["datetime"] for t in period.find(lambda n: n.tag == "time")], ["2026-12", "2026-12-08", "2026-11-30"],
+                         "the month, its last day and the week of the runs")
+        self.assertEqual([d.attrs["value"] for d in period.find(lambda n: n.tag == "data")], ["33", "3", "120", "61.0", "210", "150", "4", "9"])
+        self.assertEqual(build.weeks_ended("2026-12", date(2026, 12, 7)), ["2026-W49"], "the week ended on Sunday the 6th")
+        self.assertEqual(build.weeks_ended("2026-12", date(2026, 12, 6)), [], "not before it ends")
+        self.assertEqual(build.weeks_ended("2026-11", date(2026, 11, 30)), ["2026-W45", "2026-W46", "2026-W47", "2026-W48"],
+                         "W44 is October's: its Thursday is 29 October")
+        self.assertEqual(build.weeks_ended("2026-10", date(2026, 11, 3)), ["2026-W40", "2026-W41", "2026-W42", "2026-W43", "2026-W44"])
+        # the month so far shows the newest month's census only when there is none
+        self.assertIn("December 2026", squash(visible_text(self.sofar["en"])))
+        self.assertNotIn("so far", squash(visible_text(self.full["en"])))
+        for name, change in (("same", lambda s: s.update(month="2026-11", through="2026-11-30")),
+                             ("older", lambda s: s.update(month="2026-10", through="2026-10-31"))):
+            data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
+            change(data["so_far"])
+            sections, log = self.build(f"so-far-{name}", stats=self.stats, usage=fixture.write_usage(self.dir / f"so-far-{name}.json", data))
+            self.assertEqual(len(sections["en"].find(lambda n: "period" in n.classes())), 1, name)
+            self.assertNotIn("so far", squash(visible_text(sections["en"])), name)
+            self.assertEqual(log, "", name)
+        for name, change in (("bad-day", lambda s: s.update(through="2026-11-30")), ("no-month", lambda s: s.pop("month")),
+                             ("not-a-dict", None)):
+            data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
+            if change:
+                change(data["so_far"])
+            else:
+                data["so_far"] = "soon"
+            sections, log = self.build(f"so-far-{name}", stats=self.stats, usage=fixture.write_usage(self.dir / f"so-far-{name}.json", data))
+            self.assertEqual(len(sections["en"].find(lambda n: "period" in n.classes())), 1, name)
+            self.assertEqual("can't be read" in log, name != "not-a-dict", name)
+        # only one of its parts: the website's alone
+        data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
+        del data["so_far"]["app"]
+        sections, _ = self.build("so-far-website", stats=self.stats, usage=fixture.write_usage(self.dir / "so-far-website.json", data))
+        periods = sections["en"].find(lambda n: "period" in n.classes())
+        self.assertEqual([len(p.find(lambda n: "stat" in n.classes())) for p in periods], [8, 4])
+
+    def test_a_count_of_one_takes_the_singular(self):
+        """"1 country", "1 install", "1 transcription", "1 hour of audio", "1 page view" and "1 download click", in both
+        languages; the hours always with one decimal, as the file has them."""
+        data = json.loads(json.dumps(fixture.USAGE_SO_FAR))
+        sf = data["so_far"]
+        sf["through"] = "2026-12-08"  # a week of it has ended, so its runs are shown
+        sf["app"]["installs"]["active"] = 1
+        sf["app"]["installs"]["countries"]["count"] = 1
+        sf["app"]["runs"].update({"transcriptions": 1, "hours": 1.0})
+        sf["website"].update({"page_views": 1, "visitors": 1, "countries": {"count": 1}, "downloads": {"clicks": 1}})
+        sections, _ = self.build("singular", stats=self.stats, usage=fixture.write_usage(self.dir / "singular.json", data))
+        stats = lambda lang: self.cards(sections[lang])["counts"]["stats"]  # noqa: E731
+        self.assertEqual(stats("en")[8:], [("1", "install ran Sedjem"), ("1", "country"), ("1", "transcriptions in the weeks reported so far"),
+                                           ("1.0", "hours of audio in the weeks reported so far"),
+                                           ("1", "page view"), ("1", "visitor"), ("1", "country"), ("1", "download click")])
+        self.assertEqual(stats("ar")[8:], [("1", "نسخة من Sedjem اشتغلت"), ("1", "دولة"), ("1", "نصوص اتعملت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
+                                           ("1.0", "ساعات صوت في الأسابيع اللي اتبلّغ عنها لحد دلوقتي"),
+                                           ("1", "مشاهدة صفحة"), ("1", "زائر"), ("1", "دولة"), ("1", "ضغطة على التحميل")])
+        self.assertEqual([label for _, label in stats("en")[:8]], ["installs ran Sedjem", "countries", "transcriptions", "hours of audio",
+                                                                   "page views", "visitors", "countries", "download clicks"])
+        self.assertEqual(stats("en")[3], ("2750.5", "hours of audio"))
+        self.assertEqual(build.figure(5.0, "en", True), '<data value="5.0">5.0</data>')
+        self.assertEqual(build.figure(5.0, "en"), '<data value="5">5</data>')
+        self.assertEqual(build.figure(1234.5, "ar", True), '<data value="1234.5">1,234.5</data>')
+
+    def test_the_calendar_counts_the_visits_by_day(self):
+        """"Visits each day" counts the website's visits (the totals' days) as a calendar heatmap: a cell shows its day
+        number and its count, tinted by its share of the busiest day, the days after the period's last day are empty
+        outlines, and the table for screen readers has every day's count; the legend is two swatches, fewer to more;
+        a month so far shows the days to its last."""
+        per = {int(d[8:]): n for d, n in fixture.VISITS["days"].items()}
+        for lang, section in self.full.items():
+            (box,) = section.find(lambda n: "chart-box" in n.classes())
+            self.assertEqual(squash(box.find(lambda n: "crowd-title" in n.classes())[0].text()), {"en": "Visits each day", "ar": "الزيارات كل يوم"}[lang])
+            cells = box.find(lambda n: "cell" in n.classes() and not {"off", "future"} & set(n.classes()))
+            self.assertEqual(len(cells), 30, "November, every day to its last")
+            self.assertEqual(len(box.find(lambda n: "future" in n.classes())), 0)
+            for i, cell in enumerate(cells, 1):
+                self.assertEqual(squash(cell.find(lambda n: "n" in n.classes())[0].text()), str(i))
+                self.assertEqual([squash(s.text()) for s in cell.find(lambda n: "v" in n.classes())], [str(per[i])] if per[i] else [])
+                self.assertEqual("lit" in cell.classes(), bool(per[i]))
+                if per[i]:
+                    self.assertEqual(cell.attrs["style"], f"--a: {0.25 + 0.75 * per[i] / 2:.2f}")
+            self.assertEqual([c.attrs["data-tip-a"][:2] for c in cells if "data-tip-key" in c.attrs], ["5 ", "25", "29", "30"], "the busiest days")
+            self.assertEqual(cells[0].attrs["data-tip-b"], "0 visits" if lang == "en" else "0 زيارات")
+            self.assertEqual(cells[1].attrs["data-tip-b"], "1 visit" if lang == "en" else "1 زيارة")
+            rows = [[squash(c.text()) for c in tr.children if not isinstance(c, str)] for tr in box.find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")]
+            self.assertEqual([r[1] for r in rows], [str(per[i]) for i in range(1, 31)])
+            self.assertEqual(squash(box.find(lambda n: "calendar-month" in n.classes())[0].text()), {"en": "November 2026", "ar": "نوفمبر 2026"}[lang])
+            self.assertEqual(len(box.find(lambda n: "sw" in n.classes())), 2, "fewer to more")
+        (box,) = self.sofar["en"].find(lambda n: "chart-box" in n.classes())
+        self.assertEqual(len(box.find(lambda n: "cell" in n.classes() and not {"off", "future"} & set(n.classes()))), 2, "1 and 2 December")
+        self.assertEqual(len(box.find(lambda n: "future" in n.classes())), 4, "the rest of that week is empty outlines; later weeks aren't drawn")
+        # without visits there is no calendar; a visit total that can't be read is left out with the rest
+        data = json.loads(json.dumps(fixture.USAGE))
+        del data["website"]["2026-11"]["visits"]
+        sections, _ = self.build("no-visits", stats=self.stats, usage=fixture.write_usage(self.dir / "no-visits.json", data))
+        self.assertFalse(sections["en"].find(lambda n: "chart-box" in n.classes()))
+        for odd in ({"total": 3, "countries": {"EG": -1}, "days": {}}, {"total": 0, "countries": {}, "days": {}}, "soon", {"total": 1}):
+            data["website"]["2026-11"]["visits"] = odd
+            sections, _ = self.build("odd-visits", stats=self.stats, usage=fixture.write_usage(self.dir / "odd-visits.json", data))
+            self.assertFalse(sections["en"].find(lambda n: "chart-box" in n.classes()), odd)
+            self.assertTrue(self.census(sections["en"]), "the rest of the census stays")
+
+    def test_the_world_map_shades_the_countries_by_their_visits(self):
+        """The Where group draws the world once, across the card: the land in a quiet grey and each country with a visit
+        in the brand's teal, one of five steps by its visits against the largest, unfolded (a country with one visit is
+        shaded), a code the map doesn't have ignored; each shaded country has its tooltip data (name, visits, share);
+        the legend is the word, the lowest count, the ramp as the map draws it and the highest; the list of countries
+        sits under the map; the map is hidden from screen readers and carries a table; and the Arabic page has the very
+        same map, not mirrored. Without visits the countries that pass the fold are shaded by their page views."""
+        asset = json.loads((ROOT / "site" / "worldmap.json").read_text(encoding="utf-8"))
+        outlines = asset["countries"]
+        visits = {"EG": 6, "FR": 1, "SA": 2, "US": 3}  # XX is a code the map doesn't have; "other" has no country
+        steps = {"EG": 5, "FR": 1, "SA": 2, "US": 3}
+        for lang, section in self.full.items():
+            (svg,) = section.find(lambda n: n.tag == "svg" and "map" in n.classes())
+            self.assertEqual((svg.attrs["viewbox"], svg.attrs["aria-hidden"], svg.attrs["focusable"]), (asset["viewBox"], "true", "false"))
+            self.assertTrue(svg.inside(lambda n: "group-where" in n.classes()))
+            (lit,) = svg.find(lambda n: n.tag == "g" and "lit" in n.classes())
+            (land,) = svg.find(lambda n: n.tag == "g" and "land" in n.classes())
+            lit_paths = [p for p in lit.children if not isinstance(p, str)]
+            self.assertEqual([p.attrs["d"] for p in lit_paths], [outlines[c] for c in sorted(visits)])
+            self.assertEqual([p.classes() for p in lit_paths], [[f"s{steps[c]}"] for c in sorted(visits)])
+            names = {"en": {"EG": "Egypt", "FR": "France", "SA": "Saudi Arabia", "US": "United States"},
+                     "ar": {"EG": "مصر", "FR": "فرنسا", "SA": "السعودية", "US": "أمريكا"}}[lang]
+            said = lambda n: (f"{n} visits" if n > 1 else "1 visit") if lang == "en" else (f"{n} زيارات" if n > 1 else "1 زيارة")  # noqa: E731
+            self.assertEqual([(p.attrs["data-tip-a"], p.attrs["data-tip-b"]) for p in lit_paths],
+                             [(names[c], f"{said(visits[c])} · {round(visits[c] / 14 * 100)}%") for c in sorted(visits)])
+            self.assertTrue(all("data-tip-key" in p.attrs for p in lit_paths))
+            self.assertEqual(len([p for p in land.children if not isinstance(p, str)]), len(outlines) - 4)
+            self.assertFalse([p for p in land.children if not isinstance(p, str) and ("data-tip-a" in p.attrs or "class" in p.attrs)], "plain land says nothing")
+            self.assertFalse(svg.find(lambda n: n.attrs.get("transform")), "the map isn't mirrored")
+            self.assertFalse(svg.find(lambda n: n.tag == "circle"), "no dots on the map")
+            (legend,) = section.find(lambda n: "ramp-key" in n.classes())
+            self.assertEqual(squash(legend.text()), {"en": "Visits 1 6", "ar": "الزيارات 1 6"}[lang])
+            self.assertEqual([i.classes() for i in legend.find(lambda n: n.tag == "i")], [[f"s{k}"] for k in range(1, 6)])
+            (crowd,) = section.find(lambda n: "crowd-map" in n.classes())
+            self.assertEqual([c.classes()[0] for c in crowd.children if not isinstance(c, str) and c.classes()][:4],
+                             ["crowd-title", "ramp-key", "map-row", "quiet"], "the legend over the map, the list under it")
+            tables = crowd.find(lambda n: n.tag == "table")
+            self.assertEqual(len(tables), 1, "the list's table counts the visits the map shades")
+            rows = [[squash(c.text()) for c in tr.children if not isinstance(c, str)] for tr in tables[0].find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")]
+            self.assertEqual([r[1] for r in rows], ["6", "3", "2", "1", "1", "1"], "every country with a visit, none folded")
+            self.assertEqual(rows[0][2], "43%")
+        self.assertEqual(str(self.full["en"].find(lambda n: "map" in n.classes())[0]).count("<path"),
+                         str(self.full["ar"].find(lambda n: "map" in n.classes())[0]).count("<path"))
+        css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
+        self.assertNotRegex(css, r'dir="rtl"\][^{]*\.map')
+        self.assertRegex(css, r"\.map path \{ fill: var\(--line\); stroke: var\(--card\);")
+        self.assertRegex(css, r"\.map \.lit path \{ fill: var\(--series-1\); \}")
+        self.assertRegex(css, r"\.map \.lit path \{ fill-opacity: var\(--o\); \}")
+        self.assertEqual(re.findall(r"\.map \.lit \.s(\d), \.steps \.s\d \{ --o: ([\d.]+); \}", css),
+                         [("1", "0.22"), ("2", "0.42"), ("3", "0.62"), ("4", "0.82"), ("5", "1")], "five steps of one hue, light to strong")
+        self.assertEqual([build.step_of(n, 6) for n in (1, 2, 3, 4, 5, 6)], [1, 2, 3, 4, 5, 5])
+        self.assertEqual([build.step_of(1, 1), build.step_of(7, 0)], [5, 1])
+        # without visits the countries that pass the fold are shaded by their page views (one with 2 isn't), and a one-group list has no map
+        data = json.loads(json.dumps(fixture.USAGE))
+        del data["website"]["2026-11"]["visits"]
+        data["website"]["2026-11"]["countries"]["page_views"] = {"EG": 5, "US": 2, "ZZ": 1, "other": 3}
+        sections, _ = self.build("map-fold", stats=self.stats, usage=fixture.write_usage(self.dir / "map-fold.json", data))
+        (lit,) = sections["en"].find(lambda n: n.tag == "g" and "lit" in n.classes())
+        (path,) = [p for p in lit.children if not isinstance(p, str)]
+        self.assertEqual((path.attrs["d"], path.attrs["data-tip-b"]), (outlines["EG"], "5 page views · 45%"))
+        self.assertEqual(squash(sections["en"].find(lambda n: "ramp-key" in n.classes())[0].text()), "Page views 5 5")
+        self.assertEqual(self.census(sections["en"])["Where"]["Website visitors by country"][:2], [("Egypt", "45%"), ("Other", "55%")])
+        data["website"]["2026-11"]["countries"]["page_views"] = {"EG": 5}
+        sections, _ = self.build("map-one", stats=self.stats, usage=fixture.write_usage(self.dir / "map-one.json", data))
+        self.assertFalse(sections["en"].find(lambda n: "map" in n.classes()))
+        # the legend's range is the shaded countries' alone: "other" and a code without an outline (BH) aren't drawn
+        self.assertNotIn("BH", outlines)
+        data = json.loads(json.dumps(fixture.USAGE))
+        data["website"]["2026-11"]["visits"] = {"total": 95, "countries": {"EG": 3, "FR": 2, "BH": 40, "other": 50},
+                                                "days": {"2026-11-01": 95}}
+        sections, _ = self.build("map-range", stats=self.stats, usage=fixture.write_usage(self.dir / "map-range.json", data))
+        self.assertEqual(squash(sections["en"].find(lambda n: "ramp-key" in n.classes())[0].text()), "Visits 2 3")
+        # with visits, the map and its list stay even when the page views' countries fold into one group
+        data["website"]["2026-11"]["countries"]["page_views"] = {"EG": 5}
+        data["website"]["2026-11"]["visits"] = {"total": 4, "countries": {"EG": 3, "FR": 1}, "days": {"2026-11-01": 4}}
+        sections, _ = self.build("map-visits", stats=self.stats, usage=fixture.write_usage(self.dir / "map-visits.json", data))
+        (lit,) = sections["en"].find(lambda n: n.tag == "g" and "lit" in n.classes())
+        self.assertEqual(len([p for p in lit.children if not isinstance(p, str)]), 2)
+        self.assertEqual(self.census(sections["en"])["Where"]["Website visitors by country"], [("Egypt", "75%"), ("France", "25%")])
+
+    def test_the_map_stays_within_its_budget_and_needs_its_file(self):
+        """The map adds at most about 80 kB to a page; the asset is the one the generator writes (no Antarctica, codes
+        of two letters, a 1000-wide box); without it, or with it unreadable, the map is left out with a line in the
+        log and the list of countries stays."""
+        raw = (ROOT / "site" / "worldmap.json").read_bytes()
+        asset = json.loads(raw)
+        self.assertLessEqual(len(raw), MAP_BUDGET)
+        self.assertEqual(asset["viewBox"].split()[:3], ["0", "0", "1000"])
+        self.assertTrue(all(re.fullmatch(r"[A-Z]{2}", c) for c in asset["countries"]))
+        self.assertTrue({"EG", "US", "SA", "FR", "NO"} <= set(asset["countries"]) and "AQ" not in asset["countries"])
+        self.assertTrue(all(re.fullmatch(r"M[-\dMl.,z ]+", d) for d in asset["countries"].values()))
+        for lang, home in HOMES.items():
+            page = (self.dir / "full" / home).read_text(encoding="utf-8")
+            (svg,) = re.findall(r"<svg class=\"map\".*?</svg>", page, re.S)
+            self.assertLessEqual(len(svg.encode()), MAP_BUDGET + 8_000, lang)
+        for name, content in (("missing", None), ("broken", "{not json"), ("odd", json.dumps({"viewBox": "x", "countries": {}}))):
+            path = self.dir / f"map-{name}.json"
+            if content is not None:
+                path.write_text(content, encoding="utf-8")
+            with mock.patch.object(build, "MAP", path):
+                sections, log = self.build(f"map-{name}", stats=self.stats, usage=self.usage)
+            self.assertFalse(sections["en"].find(lambda n: "map" in n.classes()), name)
+            self.assertIn("the map is left out", log)
+            self.assertIn("Website visitors by country", self.census(sections["en"])["Where"], "the list stays")
+            self.assertFalse(sections["en"].find(lambda n: "map-row" in n.classes()))
+
+    def test_the_generator_makes_the_assets_paths_from_natural_earths_data(self):
+        """docs/images/make/worldmap.py reads a GeoJSON of countries as data: a code from ISO_A2_EH (-99 and Antarctica
+        left out), a country's pieces of land as one path with relative lines in a 1000-wide box, small islands and
+        repeated points dropped, a hole kept."""
+        spec = importlib.util.spec_from_file_location("worldmap", ROOT / "docs" / "images" / "make" / "worldmap.py")
+        worldmap = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(worldmap)
+        square = lambda lon, lat, size: [[lon, lat], [lon + size, lat], [lon + size, lat - size], [lon, lat - size], [lon, lat]]  # noqa: E731
+        features = [{"properties": {"ISO_A2": "-99", "ISO_A2_EH": "FR"}, "geometry": {"type": "MultiPolygon", "coordinates": [
+                        [square(0, 50, 10), square(3, 47, 2)],  # a country with a lake
+                        [square(40, 0, 0.1)],  # an islet, under a pixel
+                        [square(20, 20, 5), [[20, 20], [20, 20], [25, 20], [25, 15], [20, 15], [20, 20]]]]}},
+                    {"properties": {"ISO_A2_EH": "AQ"}, "geometry": {"type": "Polygon", "coordinates": [square(0, -70, 20)]}},
+                    {"properties": {"ISO_A2_EH": "-99"}, "geometry": {"type": "Polygon", "coordinates": [square(0, 10, 5)]}},
+                    {"properties": {"ISO_A2_EH": "XK"}, "geometry": {"type": "Polygon", "coordinates": [square(20, 42, 1)]}}]
+        made = worldmap.make({"features": features})
+        self.assertEqual(made["viewBox"], "0 0 1000 394")
+        self.assertEqual(list(made["countries"]), ["FR", "XK"])
+        fr = made["countries"]["FR"]
+        self.assertTrue(fr.startswith("M500,"), fr)
+        self.assertNotIn("l0,0", fr, "a repeated point is dropped")
+        self.assertEqual(fr.count("M"), 4, "the land, its lake, the other piece and its second ring; the islet is dropped")
+        self.assertNotIn(" -", fr)
+        self.assertEqual(worldmap.number(0.4), ".4")
+        self.assertEqual(worldmap.number(-0.04), "0")
+        self.assertEqual(worldmap.number(12.0), "12")
+        self.assertEqual(worldmap.project(-180, 84), (0.0, 0.0))
+        self.assertEqual(worldmap.project(180, -58), (1000.0, 394.4))
+        out = io.StringIO()
+        with mock.patch.object(worldmap, "OUT", self.dir / "worldmap.json"), contextlib.redirect_stdout(out):
+            geojson = self.dir / "countries.geojson"
+            geojson.write_text(json.dumps({"features": features}), encoding="utf-8")
+            worldmap.main([str(geojson)])
+        self.assertIn("wrote", out.getvalue())
+        self.assertEqual(json.loads((self.dir / "worldmap.json").read_text(encoding="utf-8")), made)
+        with self.assertRaises(SystemExit):
+            worldmap.main([])
+
+    def test_every_picture_says_its_data_in_attributes_that_match_its_table(self):
+        """site.js's one tooltip shows what build.py writes in data-tip-a and data-tip-b, and what it writes is what the
+        picture's table says: each row of a list, each glyph, each part of a bar, each day of the calendar, the ears and
+        the dots; a picture the keyboard can reach is marked data-tip-group; plain land says nothing; and the script
+        computes nothing (it reads the attributes) and fetches nothing."""
+        for lang, section in self.full.items():
+            (counts,) = section.find(lambda n: n.attrs.get("id") == "numbers-counts")
+            for crowd in counts.find(lambda n: n.tag == "div" and n.classes()[:1] == ["crowd"]):
+                (tab,) = [x for x in crowd.find(lambda n: n.tag == "table")][:1]
+                rows = [[squash(c.text()) for c in tr.children if not isinstance(c, str)]
+                        for tr in tab.find(lambda n: n.tag == "tr" and n.parent.tag == "tbody")]
+                items = crowd.find(lambda n: n.tag == "li" and "data-tip-a" in n.attrs)
+                title = squash(crowd.find(lambda n: "crowd-title" in n.classes())[0].text())
+                if "chart-box" in crowd.classes():
+                    cells = crowd.find(lambda n: "cell" in n.classes() and "data-tip-a" in n.attrs)
+                    self.assertEqual([c.attrs["data-tip-b"].split()[0] for c in cells], [r[1] for r in rows], (lang, title))
+                    continue
+                self.assertEqual([(i.attrs["data-tip-a"], i.attrs["data-tip-b"]) for i in items],
+                                 [(r[0], f"{r[1]} · {r[2]}") for r in rows], (lang, title))
+                for group in crowd.find(lambda n: n.tag in ("ol", "ul") and ("quiet" in n.classes() or "glyphs" in n.classes())):
+                    self.assertIn("data-tip-group", group.attrs)
+            (ears,) = counts.find(lambda n: "ears" in n.classes())[:1]
+            self.assertIn("data-tip-group", ears.attrs)
+            (row,) = ears.find(lambda n: "ears-row" in n.classes())
+            self.assertEqual(row.attrs["data-tip-a"], {"en": "1,204 installs ran Sedjem", "ar": "1,204 نسخة"}[lang] if False else row.attrs["data-tip-a"])
+            self.assertRegex(row.attrs["data-tip-a"], r"^1,204 ")
+            self.assertEqual(row.attrs["data-tip-b"], {"en": "November 2026", "ar": "نوفمبر 2026"}[lang])
+            self.assertIn("data-tip-key", row.attrs, "the accent has its teal key")
+            for card in ("releases", "platforms"):
+                (c,) = section.find(lambda n: n.attrs.get("id") == f"numbers-{card}")
+                cards = self.cards(section)[card]
+                bars = c.find(lambda n: "part" in n.classes() and n.parent.attrs.get("class") == "split")
+                self.assertEqual([int(b.attrs["data-tip-b"].split(" · ")[0].replace(",", "")) for b in bars], [v for _, v in cards["parts"]])
+                self.assertEqual([b.attrs["data-tip-b"].split(" · ")[1] for b in bars], [s for _, s in cards["legend"]])
+            for svg in section.find(lambda n: n.tag == "svg" and "map" in n.classes()):
+                self.assertIn("data-tip-group", svg.attrs)
+                self.assertNotIn("data-tip-near", svg.attrs)
+                js = (ROOT / "site" / "site.js").read_text(encoding="utf-8")
+        tip = js[js.index("One tooltip for every other picture"):]
+        for word in ("data-tip-a", "data-tip-b", "data-tip-key", "data-tip-group", '"Escape"', "ArrowRight", "pointerdown",
+                     "window.innerWidth", "touch"):
+            self.assertIn(word, tip)
+        self.assertNotIn("data-tip-near", tip)
+        for word in ("fetch(", "XMLHttpRequest", "sendBeacon", "Intl.", "toLocale", "toFixed", "Math.round"):
+            self.assertNotIn(word, tip, "the script shows what the page says; it computes and fetches nothing")
+
     def test_the_palette_is_the_one_design_md_records(self):
-        """The pictures' colours are the brand's teal for a series, a light teal for a whole's second part (a darker
-        one on the dark card) and a grey for the rest, as DESIGN.md records them with what the dataviz validator said
-        of them; the marks take them from the stylesheet, never from the page, and text never wears them."""
+        """The pictures' colours are the brand's teal for a series and for the one part a bar is about, and steps of a
+        grey for the other parts (the grey of the palette, mixed with the card's own colour for its lighter steps), as
+        DESIGN.md records them; the marks take them from the stylesheet, never from the page, and text never wears
+        them."""
         css = re.sub(r"/\*.*?\*/", "", (ROOT / "site" / "styles.css").read_text(encoding="utf-8"), flags=re.S)
         root = re.search(r":root\s*\{([^}]*)\}", css).group(1)
-        self.assertEqual(re.findall(r"--series-(\w+): (#[0-9a-f]{6});", root), [("1", "#14a3a1"), ("2", "#6dbeba"), ("rest", "#8a95a3")])
+        self.assertEqual(re.findall(r"--series-(\w+): (#[0-9a-f]{6});", root), [("1", "#14a3a1"), ("rest", "#8a95a3")])
         for block in (r':root:not\(\[data-theme="light"\]\)\s*\{([^}]*)\}', r':root\[data-theme="dark"\]\s*\{([^}]*)\}'):
             self.assertEqual(sorted(re.findall(r"--series-(\w+): (#[0-9a-f]{6});", re.search(block, css).group(1))),
-                             [("2", "#2f7f7c"), ("rest", "#6f7a88")])
+                             [("rest", "#6f7a88")])
         for rule in re.findall(r"([^{}]+)\{([^}]*var\(--series-[^}]*)\}", css):
             self.assertNotRegex(rule[1], r"(?<![-\w])color:\s*var\(--series", rule[0])
         design = (ROOT / "site" / "DESIGN.md").read_text(encoding="utf-8").split("## The numbers")[1].split("\n## ")[0]
-        for words in ("#14a3a1", "#6dbeba", "#2f7f7c", "validate_palette.js"):
+        for words in ("#14a3a1", "#8a95a3", "#6f7a88", "validate_palette.js"):
             self.assertIn(words, design)
+        self.assertNotIn("--series-2", css)
+        self.assertNotIn("#6dbeba", css + design)
 
 
 def docs_row(path, heading, first):

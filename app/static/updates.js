@@ -7,13 +7,15 @@
    renderSettings, openSettings, refreshStatus) when they run. */
 "use strict";
 
-// data: what GET /api/updates (or a POST) answered last; the rest is what this page is doing with it
+// data: what GET /api/updates (or a POST) answered last; changes: how many times a change (a POST) was sent or
+// answered; open: how many changes are on their way; newest: of the changes whose answers the page showed, the
+// value of changes when the newest one was sent; again: changes overlapped, so the state is loaded again when none
+// is on its way; the rest is what this page is doing with it
 const UPD = { data: null, error: "", loading: null, checking: false, installing: false, asked: false, seen: null,
-  started: false, timer: null, restart: null, sig: "" };
-const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (localStorage)
+  started: false, timer: null, restart: null, sig: "", changes: 0, open: 0, newest: 0, again: false };
+const UPD_NOTICED = "sedjem-update-noticed";  // the version or commit the notice was shown for (a page preference)
 const UPD_FROM = "sedjem-update-from";  // what ran before Update now, to say "Updated to …" once it is back
 const UPD_BUSY = new Set(["downloading", "verifying", "installing"]);
-const UPD_RESTART_LIMIT = 120000;  // how long the page waits for Sedjem to come back
 const UPD_KIND = { source: "Runs from the source code", windows: "Installed with the Windows installer",
   linux: "The Linux build, unpacked from its archive", other: "Another kind of install" };
 
@@ -21,7 +23,7 @@ function updGet(key) {
   try { return localStorage.getItem(key); } catch { return null; }
 }
 function updPut(key, value) {
-  try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode */ }
+  prefPut(key, value);  // kept in the data folder too, so the new copy after Update now sees it (app.js)
 }
 const updShort = (sha) => String(sha || "").slice(0, 7);
 const updHref = (url) => (/^https:\/\//i.test(String(url || "")) ? String(url) : "");  // a link only to an https address
@@ -108,7 +110,7 @@ async function updAnswer(on) {
   if (b.getAttribute("aria-disabled") === "true") return;
   b.setAttribute("aria-disabled", "true");
   try {
-    if (on !== null) updSetData(await api.post("/api/updates/settings", { enabled: on }));
+    if (on !== null) await updPost("settings", { enabled: on });
     if (usage) await usageSave(usage.checked, false);
   } catch (e) { toast(e.message, "error"); b.removeAttribute("aria-disabled"); return; }
   UPD.asked = true;
@@ -146,11 +148,20 @@ function updHideNotice() {
 // The state, as the server has it
 // ---------------------------------------------------------------------------------------------
 // GET /api/updates: when Settings → Updates opens, when something new is out, and every second while an update
-// is being installed. A server gone in the middle of an install is restarting.
+// is being installed. A server gone in the middle of an install is restarting. When a change was sent or answered
+// while the GET was on its way, the server may have read the state before the change, and that answer would put
+// back what the change's own answer replaced (Skip this version after a click on Don't skip). So it asks again.
 function loadUpdates() {
   if (!UPD.loading) UPD.loading = (async () => {
-    try { updSetData(await api.get("/api/updates")); UPD.error = ""; }
-    catch (e) {
+    try {
+      let changes, d;
+      do {
+        changes = UPD.changes;
+        d = await api.get("/api/updates");
+      } while (changes !== UPD.changes);
+      updSetData(d);
+      UPD.error = "";
+    } catch (e) {
       UPD.error = e.message;
       if (UPD_BUSY.has(UPD.data?.install?.state)) updWaitForRestart();
     }
@@ -158,6 +169,30 @@ function loadUpdates() {
     updRedraw();
   })();
   return UPD.loading;
+}
+
+// A change: POST /api/updates/<path>. Its answer is the state after the change, and the page shows it. UPD.changes
+// moves when a change is sent and when it is answered, so that a GET on its way at either time asks again.
+// Changes can overlap (two quick clicks on the switch). Their answers can then come back in another order than
+// they were sent, and an answer can come from the state between the two changes. So an answer never replaces the
+// answer of a change sent after it, and when overlapping changes are all answered, the page loads the state again.
+async function updPost(path, body) {
+  const sent = ++UPD.changes;
+  UPD.open++;
+  try {
+    const d = await api.post(`/api/updates/${path}`, body);
+    if (sent > UPD.newest) {
+      UPD.newest = sent;
+      updSetData(d);
+    }
+  } finally {
+    if (UPD.changes !== sent) UPD.again = true;  // another change was sent or answered while this one was on its way
+    UPD.changes++;
+    if (!--UPD.open && UPD.again) {
+      UPD.again = false;
+      await loadUpdates();
+    }
+  }
 }
 
 // A new answer from the server: kept, and followed (the progress polled, the restart waited for). What happens
@@ -433,7 +468,7 @@ function bindUpdates() {
 
 // The switch and the channel, saved at once; the pill follows
 async function updSettings(change) {
-  try { updSetData(await api.post("/api/updates/settings", change)); toast("Saved"); }
+  try { await updPost("settings", change); toast("Saved"); }
   catch (e) { toast(e.message, "error"); }
   updRedraw(true);
   refreshStatus();
@@ -444,7 +479,7 @@ async function updCheck() {
   if (UPD.checking) return;
   UPD.checking = true;
   updRedraw(true);
-  try { updSetData(await api.post("/api/updates/check")); }
+  try { await updPost("check"); }
   catch (e) { toast(e.message, "error"); }
   UPD.checking = false;
   updRedraw(true);
@@ -452,7 +487,7 @@ async function updCheck() {
 }
 
 async function updSkip(skip) {
-  try { updSetData(await api.post("/api/updates/skip", { skip })); }
+  try { await updPost("skip", { skip }); }
   catch (e) { toast(e.message, "error"); return; }
   updRedraw(true);
   toast(skip ? "Skipped. Sedjem tells you again when something newer is out" : "No longer skipped");
@@ -483,7 +518,7 @@ async function updInstall(ask) {
   if (ask && !confirm(updConfirm(a))) return;
   if (restarts) updPut(UPD_FROM, JSON.stringify({ version: d.running?.version, commit: d.running?.commit, at: Date.now() }));
   UPD.installing = true;
-  try { updSetData(await api.post("/api/updates/install")); }
+  try { await updPost("install"); }
   catch (e) { updPut(UPD_FROM, null); toast(e.message, "error"); }
   finally { UPD.installing = false; }
   updRedraw(true);
@@ -515,50 +550,44 @@ async function updCopy(text) {
 // ---------------------------------------------------------------------------------------------
 // Restarting
 // ---------------------------------------------------------------------------------------------
-// Sedjem restarting after Update now: the page waits for it, over everything, and reloads once it answers
-// again. An answer counts when Sedjem went away first, or when it no longer says it is restarting (the new one
-// came up between two checks). After two minutes the page says so and offers to reload.
+// Sedjem restarting after Update now. When the restart works, it comes back on a new port with a new secret
+// (app/session.py), so this page can't follow it: the new copy opens a window of its own, and this one says so,
+// over everything. Meanwhile the page keeps asking this copy. If the new one stopped at once, this one keeps running
+// and says that the update failed, and the page shows that instead. Once this copy is gone, it stops asking.
 async function updWaitForRestart() {
   if (UPD.restart) return;
-  const r = (UPD.restart = { start: Date.now(), gone: false });
+  UPD.restart = { start: Date.now() };
   clearTimeout(UPD.timer);
   updHideNotice();
   const dlg = updRestartDialog();
   if (!dlg.open) dlg.showModal();
-  while (Date.now() - r.start < UPD_RESTART_LIMIT) {
+  for (;;) {
     await new Promise((done) => setTimeout(done, 1000));
-    if (await updBack(r)) { location.reload(); return; }
+    let d;
+    try { d = await api.get("/api/updates"); } catch { return; }  // this copy has quit: the new one has its own window
+    if (d.install?.state !== "restarting") {  // it didn't restart after all
+      UPD.restart = null;
+      dlg.close();
+      updSetData(d);
+      updRedraw();
+      return;
+    }
   }
-  r.over = true;
-  const source = UPD.data?.running?.kind === "source";
-  $("#updRestartTitle").textContent = "Sedjem didn't come back";
-  $("#updRestartText").textContent = `It hasn't answered for two minutes. ${source ? "Start it again with ./app.sh in the project folder" : "Open Sedjem again"}, then reload this page.`;
-  $("#updRestartBar").hidden = true;
-  $("#updReload").hidden = false;
-  $("#updReload").focus();
-}
-
-async function updBack(r) {
-  try { await api.get("/api/status"); } catch { r.gone = true; return false; }
-  if (r.gone) return true;
-  try { return (await api.get("/api/updates")).install?.state !== "restarting"; } catch { r.gone = true; return false; }
 }
 
 function updRestartDialog() {
   let dlg = $("#updRestart");
   if (dlg) return dlg;
   const installer = updAvailable(UPD.data)?.action === "installer";
+  const again = UPD.data?.running?.kind === "source" ? "start it again with <code>./app.sh</code> in the project folder" : "open Sedjem again";
   document.body.insertAdjacentHTML("beforeend", `<dialog id="updRestart" class="upd-restart" aria-labelledby="updRestartTitle" aria-describedby="updRestartText">
     <img src="/static/icon.svg" alt="" width="52" height="52">
     <h2 id="updRestartTitle">Sedjem is restarting…</h2>
-    <p id="updRestartText">${installer ? "The installer is updating it; it opens again when it's done." : "This page reloads when it's back."}</p>
-    <div class="progress indeterminate" id="updRestartBar"><i></i></div>
-    <button type="button" class="btn btn-primary" id="updReload" hidden>Reload</button></dialog>`);
+    <p id="updRestartText">${installer ? "The installer is updating it. " : ""}It opens again in a new window when it's ready, and this one can be closed. If no new window opens, ${again}.</p></dialog>`);
   dlg = $("#updRestart");
-  // it stays until Sedjem is back (the browser may still close it on a second Escape: it opens again)
-  dlg.addEventListener("cancel", (e) => UPD.restart?.over || e.preventDefault());
-  dlg.addEventListener("close", () => UPD.restart && !UPD.restart.over && dlg.showModal());
-  $("#updReload").onclick = () => location.reload();
+  // it stays: this page has no access to the new copy (the browser may still close it on a second Escape: it opens again)
+  dlg.addEventListener("cancel", (e) => e.preventDefault());
+  dlg.addEventListener("close", () => UPD.restart && dlg.showModal());
   return dlg;
 }
 

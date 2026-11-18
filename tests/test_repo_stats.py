@@ -1,13 +1,15 @@
 """Tests for the repository statistics (.github/scripts/repo_stats.py): the daily history grows past
 GitHub's 14 days, a day reported again replaces the old numbers, snapshots keep one set of rows a day,
-the checksum list isn't counted as a download, the badges and summary show the totals, and a run without
-access to the traffic keeps the old traffic files and says so. The star history is rebuilt from the
-stargazers and forks, which are read a hundred to a request. The charts are valid SVG whose marks sit where
-their numbers say (the running total of app downloads, the releases, the stars and forks, the clones and
-views per day), light and dark differ only in their colours, and a sparse or empty history still draws.
-The workflow never clones the repository (a clone would count itself) and the script needs only the standard
-library; the README's badges and charts read the files the script writes. Offline: the GitHub calls are
-replaced.
+the checksum list isn't counted as a download, a deleted release keeps its last count, the badges and summary
+show the totals, and a run without
+access to the traffic keeps the old traffic files, says so, records the rest and then fails (also when
+nothing changed), while a run with it passes, and so does a preview into a folder. The star history is
+rebuilt from the stargazers and forks, which are read a hundred to a request. The charts are valid SVG whose
+marks sit where their numbers say (the running total of app downloads, the releases, the stars and forks,
+the clones and views per day), light and dark differ only in their colours, and a sparse or empty history
+still draws. The workflow never clones the repository (a clone would count itself) and the script needs
+only the standard library; the README's badges and charts read the files the script writes. Offline: the
+GitHub calls are replaced.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import ast
@@ -80,6 +82,29 @@ class Update(unittest.TestCase):
         self.assertIn("| Downloads of the app, all releases | 11 |", new["README.md"])
         self.assertIn("| v0.1.0 | SHA256SUMS.txt | 7 |", new["README.md"], "still listed, just not counted")
 
+    def test_a_deleted_release_keeps_its_last_count(self):
+        # a preview counted on two days, then deleted (as preview.yml does once a newer one comes out): GitHub's
+        # numbers lose it, but the badge, the summary and the chart keep its last count, so they never fall
+        new = {}
+        for today, downloads in (("2026-11-06", (("v0.1.0", "Sedjem-setup.exe", 60), ("v0.2.0-preview.1", "Sedjem-p1-setup.exe", 3))),
+                                 ("2026-11-07", (("v0.1.0", "Sedjem-setup.exe", 61), ("v0.2.0-preview.1", "Sedjem-p1-setup.exe", 4),
+                                                 ("v0.2.0-preview.1", "SHA256SUMS.txt", 2))),
+                                 ("2026-11-08", (("v0.1.0", "Sedjem-setup.exe", 62), ("v0.2.0-preview.2", "Sedjem-p2-setup.exe", 0)))):
+            new = stats.update(new, fetched(downloads=downloads), REPO, today)
+        self.assertEqual(json.loads(new["badges/downloads.json"])["message"], "66", "62 + 0, and the deleted preview's 4")
+        self.assertIn("| Downloads of the app, all releases | 66 |", new["README.md"])
+        self.assertIn("| 1 deleted release | the app's files | 4 |", new["README.md"], "one row; the checksums not counted")
+        self.assertNotIn("v0.2.0-preview.1", new["README.md"])
+        self.assertNotIn("v0.2.0-preview.1,", new["downloads.csv"].split("2026-11-08", 1)[1], "the snapshot is GitHub's")
+        points, _ = Plot(chart(new), "downloads").series("downloads")
+        self.assertEqual(points, [("2026-11-06", 63), ("2026-11-07", 65), ("2026-11-08", 66)])
+        # more deleted previews still make one row
+        for today, downloads in (("2026-11-09", (("v0.1.0", "Sedjem-setup.exe", 63), ("v0.2.0-preview.3", "Sedjem-p3-setup.exe", 1))),
+                                 ("2026-11-10", (("v0.1.0", "Sedjem-setup.exe", 63),))):
+            new = stats.update(new, fetched(downloads=downloads), REPO, today)
+        self.assertIn("| 3 deleted releases | the app's files | 5 |", new["README.md"], "4 + 0 + 1, still one row")
+        self.assertEqual(json.loads(new["badges/downloads.json"])["message"], "68")
+
     def test_drafts_are_left_out(self):
         f = fetched()
         f["releases"].append({"tag_name": "v0.2.0", "draft": True, "assets": [{"name": "x.exe", "download_count": 3}]})
@@ -143,7 +168,7 @@ class Fetch(unittest.TestCase):
         self.assertEqual(calls[2], ("stats-token", f"/repos/{REPO}/traffic/clones"), "the stats token is tried first")
         self.assertIn(("actions-token", f"/repos/{REPO}/traffic/clones"), calls)
 
-    def test_no_traffic_access_at_all_warns_and_records_the_rest(self):
+    def test_no_traffic_access_at_all_records_the_rest(self):
         def call(token, path, method="GET", body=None, raw=False, accept=None):
             if "/traffic/" in path:
                 raise stats.GitHubError(403, "no")
@@ -151,8 +176,11 @@ class Fetch(unittest.TestCase):
 
         with mock.patch.object(stats, "call", call), mock.patch("builtins.print") as out:
             got = stats.fetch(REPO, "actions-token", None)
+        out.assert_not_called()  # main() reports it once, at the end
         self.assertIsNone(got["clones"])
-        self.assertIn("STATS_TOKEN", out.call_args[0][0])
+        self.assertIsNone(got["views"])
+        self.assertIsNone(got["referrers"])
+        self.assertEqual(got["releases"], [])
 
     def test_stars_and_forks_are_read_with_their_days_a_hundred_to_a_request(self):
         calls = []
@@ -418,6 +446,69 @@ class StepSummary(unittest.TestCase):
             self.assertNotIn('="charts/', text, "the job summary has no branch to resolve a relative path against")
 
 
+class Run(unittest.TestCase):
+    class Today(stats.datetime):
+        """A fixed day, so that two runs in a test are on the same day."""
+        @classmethod
+        def now(cls, tz=None):
+            return stats.datetime(2026, 11, 8, 12, tzinfo=tz)
+
+    def run_main(self, got, old=None, argv=()):
+        """main() on a stats branch that holds `old`, with fetch() returning `got`: (the SystemExit, or None, the
+        commit mock, the printed lines)."""
+        with mock.patch.dict(os.environ, {"GITHUB_TOKEN": "t"}), mock.patch.object(stats, "datetime", self.Today), \
+                mock.patch.object(stats, "read_branch", return_value=("abc1234", dict(old or {}))), \
+                mock.patch.object(stats, "fetch", return_value=got), \
+                mock.patch.object(stats, "commit", return_value="def5678") as commit, \
+                mock.patch("builtins.print") as out:
+            os.environ.pop("GITHUB_STEP_SUMMARY", None)  # CI's own job summary is left alone
+            try:
+                stats.main(["--repo", REPO, *argv])
+                exit_ = None
+            except SystemExit as e:
+                exit_ = e
+        return exit_, commit, [" ".join(map(str, c.args)) for c in out.call_args_list]
+
+    def assert_fails_for_the_traffic(self, exit_, printed):
+        self.assertIsNotNone(exit_)
+        self.assertEqual(exit_.code, 1)
+        (error,) = [line for line in printed if line.startswith("::error::")]
+        for words in ("STATS_TOKEN", "Administration: Read-only", "14 days"):
+            self.assertIn(words, error)
+        self.assertNotIn("\n", error, "one annotation")
+
+    def test_without_the_traffic_the_rest_is_saved_and_then_the_run_fails(self):
+        exit_, commit, printed = self.run_main(fetched(traffic=False, stargazers=[], forks=[]))
+        commit.assert_called_once()
+        self.assertIn("downloads.csv", commit.call_args[0][4], "the downloads are saved before the run fails")
+        self.assert_fails_for_the_traffic(exit_, printed)
+
+    def test_without_the_traffic_a_run_with_nothing_new_fails_too(self):
+        got = fetched(traffic=False, stargazers=[], forks=[])
+        _, first, _ = self.run_main(got)
+        exit_, commit, printed = self.run_main(got, old=first.call_args[0][4])
+        commit.assert_not_called()
+        self.assertIn("nothing changed", printed)
+        self.assert_fails_for_the_traffic(exit_, printed)
+
+    def test_with_the_traffic_the_run_passes(self):
+        exit_, commit, printed = self.run_main(fetched(clones=[day("2026-10-01", 3, 2)], stargazers=[], forks=[]))
+        commit.assert_called_once()
+        self.assertIsNone(exit_)
+        self.assertFalse([line for line in printed if line.startswith("::")], printed)
+
+    def test_a_preview_without_the_traffic_writes_the_files_and_ends_normally(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "out"
+            exit_, commit, printed = self.run_main(fetched(traffic=False, stargazers=[], forks=[]),
+                                                   argv=["--out", str(out)])
+            self.assertTrue((out / "downloads.csv").is_file())
+        commit.assert_not_called()
+        self.assertIsNone(exit_)
+        self.assertFalse([line for line in printed if line.startswith("::")], printed)
+        self.assertTrue([line for line in printed if "could not be read with this token" in line], printed)
+
+
 class Wiring(unittest.TestCase):
     def test_the_workflow_never_clones_and_runs_this_script(self):
         flow = (ROOT / ".github" / "workflows" / "stats.yml").read_text(encoding="utf-8")
@@ -437,10 +528,11 @@ class Wiring(unittest.TestCase):
 
     def test_the_readme_badges_read_the_files_the_script_writes(self):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
-        for name in ("downloads", "clones"):
-            path = f"badges/{name}.json"
-            self.assertIn(path, stats.FILES)
-            self.assertIn(f"%2F{stats.BRANCH}%2F{path.replace('/', '%2F')}", readme, f"the {name} badge")
+        path = "badges/downloads.json"
+        self.assertIn(path, stats.FILES)
+        self.assertIn(f"%2F{stats.BRANCH}%2F{path.replace('/', '%2F')}", readme, "the downloads badge")
+        # clones, which build machines make most of, have no badge in the README
+        self.assertNotIn("badges%2Fclones.json", readme)
         self.assertIn(f"/tree/{stats.BRANCH}#readme", readme, "the badges link to the summary")
 
     def test_the_readme_charts_are_files_the_script_writes(self):

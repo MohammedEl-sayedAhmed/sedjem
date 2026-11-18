@@ -26,8 +26,9 @@ Update now runs only when the user asks, one at a time:
            process quits
   linux    the release's archive is downloaded, checked, and unpacked beside the running build as
            Sedjem-<version>/, which opens in the file manager
-Only this repository's release files are downloaded, over HTTPS (the tests' stand-in for the API, on
-127.0.0.1, is the one exception).
+The windows and linux updates download only this repository's release files, over HTTPS (the tests' stand-in for the
+API, on 127.0.0.1, is the one exception). A source update reaches the checkout's origin, and for changed requirement
+files uv or pip reach the package index they are set to use (PyPI unless changed).
 """
 import hashlib
 import importlib.metadata
@@ -1036,9 +1037,10 @@ class Updates:
                 raise InstallError(f"Installing the packages in {f} failed: {said[-1] if said else p.returncode}")
 
     def restart(self):
-        """Start this program again with the same command line and port, then quit this one. The new process waits
-        until this one has let the port go (restarted()), and writes what it prints to <storage>/sedjem.log. If it
-        ends at once (the new code can't even be loaded), this one keeps running and says so."""
+        """Start this program again with the same command line, then quit this one. The new process waits until this
+        one has let its port go (restarted()), takes a new one (app/session.py, unless --port or [server] port names
+        one), and writes what it prints to <storage>/sedjem.log. If it ends at once (the new code can't even be
+        loaded), this one keeps running and says so."""
         env = {**os.environ, RESTART_ENV: f"{os.getpid()}:{self.port() or 0}"}
         log_path = self.cfg.storage / "sedjem.log"
         try:

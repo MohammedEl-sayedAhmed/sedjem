@@ -354,7 +354,7 @@ class Api(unittest.TestCase):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
     def call(self, method, path, body=None, headers=None):
-        h = {"X-Sedjem": "1", **(headers or {})}
+        h = {"X-Sedjem": "1", "X-Sedjem-Token": self.app.session.secret, **(headers or {})}
         data = None
         if body is not None:
             data, h["Content-Type"] = json.dumps(body).encode(), "application/json"

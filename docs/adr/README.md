@@ -34,6 +34,7 @@ requests they cite; each is dated by the commit that brought its decision in.
 | 0014 | [Everything the builds install is pinned by hash](0014-everything-the-builds-install-is-pinned-by-hash.md) | Accepted | Every Python package from a lock with its SHA-256, dependencies' dependencies included; pip never upgraded; every program a run downloads checked first, as clipman pins its actions. |
 | 0015 | [No AI-tool attribution in the history](0015-no-ai-tool-attribution-in-the-history.md) | Accepted | Commits, titles and descriptions carry no co-author trailer, "Generated with" note or robot emoji for an AI tool; the check `footprints` fails a pull request that has one. |
 | 0016 | [Branch protection with seven checks and a linear history](0016-branch-protection-with-seven-checks-and-a-linear-history.md) | Accepted | Seven required checks and an up-to-date branch, squash merges only, merged branches deleted, and the maintainer's approval for a stable release; replaces ADR 13. |
+| 0017 | [The month so far, weekly, with headline numbers only](0017-the-month-so-far-weekly-with-headline-numbers-only.md) | Accepted | The month so far is published weekly with headline numbers only; a finished month with a full copy in git history keeps its breakdowns only when at least three installs or visitors came after that copy. |
 
 ## Adding a record
 
