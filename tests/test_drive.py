@@ -312,6 +312,12 @@ class RealExtractor(unittest.TestCase):
         self.stopped(sized, "larger than the 0 GB limit")
         self.stopped(unsized, "larger than the 0 GB limit")
 
+    def test_a_size_that_understates_the_file_is_not_trusted(self):
+        """An answer that says 1 000 bytes and sends 300 000: the limit holds on the bytes that come."""
+        self.cfg.max_upload = 100_000
+        fid = self.google.file(drive_id(31), "Understated.mp4", b"u" * 300_000, stated=1000)
+        self.stopped(fid, "larger than the 0 GB limit")
+
     def test_too_little_free_space_the_part_is_deleted(self):
         asked = []
 

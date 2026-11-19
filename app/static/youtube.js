@@ -173,7 +173,7 @@ async function ytStart(params) {
   try {
     const r = await api.post("/api/link", { ...params, url: YT.checked, entries: picked.map((e) => e.id),
       ...(drive ? {} : { captions: YT.captions, stream: ytStream() }) });
-    Object.assign(YT, { url: "", checked: "", found: null, picked: new Set(), adding: false });
+    Object.assign(YT, { url: "", checked: "", tried: "", found: null, picked: new Set(), adding: false });
     S.form.confirm = false;  // the upload is confirmed again for the next one
     toast(r.jobs.length === 1 ? "Added: it downloads first, then it is transcribed" : `${r.jobs.length} videos added: they download and are transcribed in turn`);
     await refreshJobs();

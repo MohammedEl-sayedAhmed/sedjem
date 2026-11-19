@@ -247,8 +247,9 @@ on. The download stops, and what came of it is deleted, when the file is too lar
 - When Drive gives the file's size as the download starts (it did for the files tried), the download stops at once
   if the file is larger than the upload limit (`max_upload_gb`, 4 GB at first), or if the disk would have less than
   1 GB left after the file and the sound made from it (taken as a fifth of the file's size).
-- When Drive gives no size, the download stops once more than the upload limit has come, or when a check of the free
-  space, at the start and then every 32 MB, finds less than 1 GB beyond room for the sound made from what came.
+- In every case, as the bytes come, the download stops once more than the upload limit has come (a size Drive gave
+  can be wrong), or when a check of the free space every 32 MB (from the start when Drive gives no size) finds less
+  than 1 GB beyond room for the sound made from what came.
 
 The download takes the file only from Drive's own hosts, also after a redirect: an answer from another site stops it
 before anything of that answer is written.

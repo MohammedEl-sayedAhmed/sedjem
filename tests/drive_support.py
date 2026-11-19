@@ -133,13 +133,16 @@ class GoogleServers:
         self.private = set()   # ids Drive won't show to someone who isn't signed in
         self.requests = []
 
-    def file(self, fid, name, data, scan=False, host="drive.usercontent.google.com", sized=True, moved=None):
+    def file(self, fid, name, data, scan=False, host="drive.usercontent.google.com", sized=True, moved=None,
+             stated=None):
         """scan: the first answer to the download is the page saying the file is too large to scan for viruses.
         host: where the download is sent on to, as yt-dlp reads the link (another host than Google's is refused by
         app/drive.py). sized: whether the file's answer says its size (Content-Length). moved: a host that the
         download itself is redirected to when it asks for the file, as an HTTP handler that follows redirects
-        answers: the answer's address is that host's, and that host is in requests."""
-        self.files[fid] = {"name": name, "data": data, "scan": scan, "host": host, "sized": sized, "moved": moved}
+        answers: the answer's address is that host's, and that host is in requests. stated: a Content-Length to say
+        instead of the true one (an answer that understates its size)."""
+        self.files[fid] = {"name": name, "data": data, "scan": scan, "host": host, "sized": sized, "moved": moved,
+                           "stated": stated}
         return fid
 
     def ydl(self, real):
@@ -214,5 +217,6 @@ class GoogleServers:
             if r:
                 start, end = int(r.group(1)), int(r.group(2) or len(f["data"]) - 1)
                 data, status = f["data"][start:end + 1], 206
-            return reply(data, status, {"Content-Type": "application/octet-stream"}, at=at, sized=f["sized"])
+            stated = {"Content-Length": str(f["stated"])} if f["stated"] is not None else {}
+            return reply(data, status, {"Content-Type": "application/octet-stream", **stated}, at=at, sized=f["sized"])
         return reply("Not found", 404, reason="Not Found")

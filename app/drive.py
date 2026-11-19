@@ -224,11 +224,12 @@ def download(cfg, job, folder, on_progress, cancelled):
     one). Returns the field the job records: "source_name", the file's name. on_progress(done, total) counts bytes;
     cancelled() is checked while it runs.
 
-    It stops, and deletes what came, as soon as the file is too large. When Drive gives the file's size as the
-    download starts: at once, if the file is over the upload limit (cfg.max_upload) or would leave less than MARGIN
-    free beside the sound made from it. When Drive gives no size: once more than the upload limit has come, or when
-    the free space, checked each CHECK_EVERY bytes, is less than MARGIN beside the sound made from what came. It
-    also stops, keeping nothing, when the download's answer comes from another site than Drive's (_only_from_drive)."""
+    It stops, and deletes what came, as soon as the file is too large. When Drive gives the file's size, at the first
+    block: if that size is over the upload limit (cfg.max_upload), or would leave less than MARGIN free beside the
+    sound made from it. Whether or not Drive gave a size, as the bytes come: once more than the upload limit has come
+    (a size Drive gave can be wrong), or when the free space, checked each CHECK_EVERY bytes (from the start when
+    there is no size), is less than MARGIN beside the sound made from what came. It also stops, keeping nothing,
+    when the download's answer comes from another site than Drive's (_only_from_drive)."""
     folder = Path(folder)
     fid = str(job.get("drive_id") or "")
     if not DRIVE_ID.fullmatch(fid):
@@ -251,16 +252,16 @@ def download(cfg, job, folder, on_progress, cancelled):
                 return
             done = d.get("downloaded_bytes") or 0
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or None
-            if total and not state["sized"]:  # Drive says how large it is: checked once, as the download starts
+            if total and not state["sized"]:  # Drive says how large it is: the whole file, as the download starts
                 state["sized"] = True
                 _room(cfg, folder, total, total - done)
-            elif not total:  # it doesn't say: the limit, and the free space as the file comes
-                if done > cfg.max_upload:
-                    _room(cfg, folder, done, 0)
-                if done >= state["next"]:
-                    state["next"] = done + CHECK_EVERY
-                    if free_space(folder) < done * SOUND_SHARE + MARGIN:
-                        raise DriveError(NO_ROOM)
+                state["next"] = done + CHECK_EVERY
+            if done > cfg.max_upload:  # what has come, whatever size Drive said
+                _room(cfg, folder, done, 0)
+            if done >= state["next"]:  # and the free space as it comes
+                state["next"] = done + CHECK_EVERY
+                if free_space(folder) < done * SOUND_SHARE + MARGIN:
+                    raise DriveError(NO_ROOM)
             on_progress(done, total)
 
         ydl.add_progress_hook(hook)

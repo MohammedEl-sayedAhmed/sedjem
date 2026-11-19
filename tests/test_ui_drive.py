@@ -12,8 +12,9 @@ from unittest import mock
 
 from ui_support import UiTestCase  # (puts the project on the path)
 from drive_support import FakeDrive, drive_id
+from youtube_support import FakeYouTube
 
-from app import drive, engines
+from app import drive, engines, youtube
 
 ALONE = "20261020-090000-a004"
 NEW_FILE, FOLDER = drive_id(20), drive_id(2, "d")
@@ -34,7 +35,11 @@ class DriveLinks(UiTestCase):
         def hosted(cfg, model, job_dir, job, on_progress, cancelled):
             cls.ran.append(job["drive_id"])
             return {"lines": [{"start": 0.0, "end": 1.5, "speaker": "1", "text": f"Words of {job['title']}"}], "meta": {}}
-        cls.patches = [mock.patch.object(drive, "_ydl", fake.ydl), mock.patch.object(engines, "run_hosted", hosted)]
+        cls.youtube = FakeYouTube()
+        cls.youtube.video("vidafterdr1", "After a Drive file", seconds=2)
+        cls.patches = [mock.patch.object(drive, "_ydl", fake.ydl), mock.patch.object(engines, "run_hosted", hosted),
+                       mock.patch.object(youtube, "_ydl", cls.youtube.ydl),
+                       mock.patch.object(youtube, "runtime", lambda cfg: {"name": "Deno", "version": "2.9.5", "downloaded": True})]
         for p in cls.patches:
             p.start()
         try:
@@ -92,6 +97,17 @@ class DriveLinks(UiTestCase):
         self.assertEqual(self.texts("#transcript .line .text"), ["Words of Guest lecture on sampling"])
         self.assertEqual(self.page.get_attribute(".meta .yt-link", "href"), drive.file_url(NEW_FILE))
         self.assertEqual(self.page.locator(".course-bar").count(), 0, "a file on its own has no course")
+
+        self.open()  # (the same page: the form as the Drive file left it)
+        self.page.click("[data-src=link]")
+        self.page.wait_for_selector("#ytUrl")
+        self.assertEqual(self.page.input_value("#ytUrl"), "")
+        self.assertEqual(self.page.locator(".yt-video").count(), 1, "the next link may be YouTube's: its choice is back")
+        self.page.fill("#ytUrl", "https://youtu.be/vidafterdr1")
+        self.page.click("#ytForm button[type=submit]")
+        self.page.wait_for_selector(".yt-caps")
+        self.assertIn("After a Drive file", self.page.inner_text(".yt-chosen"))
+        self.assertTrue(self.page.is_visible(".yt-video"), "a YouTube video's choice, after a Drive file was added")
 
     def test_a_drive_folder_is_refused_with_the_reason(self):
         self.open()

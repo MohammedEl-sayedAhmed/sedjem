@@ -111,9 +111,10 @@ only programs the user runs can reach it.
   downloader opens it through the app's own check, which refuses an answer from another site before its body is read.
   Left: yt-dlp follows redirects as a browser would, so a site that Google's servers redirect to gets the request
   (the file's address, no account or cookie of the user's); only its answer is refused.
-- A download is stopped as soon as it is larger than the upload limit, and what came is deleted. When Drive gives the
-  size, the free space is checked as the download starts; when it doesn't, at the start and every 32 MB, with the
-  same 1 GB margin. The file is then read as an uploaded file is, by the same code. Left: a write error's message can
+- A download is stopped, and what came is deleted, when Drive's stated size is over the upload limit (checked at the
+  first block), and in any case once more bytes than the limit have come, since a stated size can be wrong. The free
+  space is checked against the stated size at the first block, and as the bytes come every 32 MB (from the start
+  when there is no size), with the same 1 GB margin. The file is then read as an uploaded file is, by the same code. Left: a write error's message can
   name the file's path on the computer in the job's error, as it can for YouTube.
 - Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file that isn't shared with
   anyone who has the link can't be read.
