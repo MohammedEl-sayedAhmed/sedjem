@@ -74,6 +74,7 @@ flowchart TB
   server -->|"reads and writes"| data
   server -->|"model downloads, update checks and downloads,<br/>YouTube link checks, usage counts (HTTPS)"| internet
   runner -->|"hosted uploads and YouTube<br/>(HTTPS)"| internet
+  ui -->|"YouTube's player, only to play<br/>a streamed video (HTTPS)"| internet
   runner -->|"sends jobs (HTTPS)"| other
   other -->|"sends jobs (HTTPS)"| remote
   remote -->|"queues their jobs"| runner

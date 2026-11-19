@@ -41,6 +41,54 @@
 .pill.cc { background: var(--ok-soft); color: var(--ok); height: 22px; padding: 0 7px; font-size: 11.5px; gap: 4px; }
 .pill.cc svg { width: 13px; height: 13px; }
 
+/* ---------- the video: downloaded, or streamed from YouTube ---------- */
+.yt-video { margin: 16px 0 0; padding: 0; border: 0; min-width: 0; }
+.yt-video legend { padding: 0; }
+.yt-video-opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.yt-video-opt {
+  display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; cursor: pointer;
+  border: 1.5px solid var(--border); border-radius: var(--radius-sm); background: var(--surface);
+  transition: border-color .15s, box-shadow .15s;
+}
+.yt-video-opt:hover { border-color: var(--border-strong); }
+.yt-video-opt:has(input:checked) {
+  border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.yt-video-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.yt-video-opt input { width: 16px; height: 16px; margin: 2px 0 0; flex: none; accent-color: var(--accent); }
+.yt-video-opt input:focus, .yt-video-opt input:focus-visible { outline: none; box-shadow: none; }  /* shown on the option */
+.yt-video-title { display: block; font-size: 14px; font-weight: 580; }
+.yt-video-opt .hint { display: block; margin-top: 2px; line-height: 1.45; }
+.yt-video[disabled] .yt-video-opt { cursor: default; opacity: .6; }
+
+/* ---------- a streamed video's page: YouTube's player in the video panel, with a bar below it ---------- */
+.video-frame iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+.video-panel.yt video, .video-panel.yt .video-play, .video-panel.yt #videoPip, .video-panel.yt #videoFull { display: none; }
+/* before it first plays, nothing is loaded from YouTube: a button in its place */
+.yt-start { display: none; }
+.video-panel.yt .video-frame:not(:has(iframe)) .yt-start {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; width: 100%; padding: 0; border: 0; color: #fff; font: inherit; font-size: 13.5px; cursor: pointer;
+  background: radial-gradient(circle at 50% 45%, #2a2f36, #000 75%);
+}
+.yt-start svg {
+  width: 52px; height: 52px; padding: 13px 11px 13px 15px; border-radius: 50%; background: rgba(255, 255, 255, .16);
+  transition: background .15s, transform .15s;
+}
+.yt-start:hover svg { background: var(--accent); transform: scale(1.05); }
+.yt-start:focus-visible { outline: 2px solid var(--accent); outline-offset: -4px; }
+.video-source { display: none; }
+.video-panel.yt .video-tools {
+  position: static; align-items: center; opacity: 1; padding: 2px 4px 2px 12px; border-radius: 0;
+  background: var(--surface); border-top: 1px solid var(--border);
+}
+.video-panel.yt .video-source {
+  display: inline-flex; align-items: center; gap: 6px; margin-right: auto; font-size: 12.5px; color: var(--muted);
+}
+.video-source svg { width: 15px; height: 15px; color: var(--accent); }
+.video-panel.yt .video-tools .icon-btn { color: var(--muted); }
+.video-panel.yt .video-tools .icon-btn:hover { background: var(--surface-2); color: var(--text); }
+
 /* ---------- a lecture's page ---------- */
 .meta .yt-link { display: inline-flex; align-items: center; gap: 5px; color: var(--accent); text-decoration: none; font-weight: 560; }
 .meta .yt-link:hover { text-decoration: underline; text-underline-offset: 3px; }
@@ -82,6 +130,7 @@
 .lec-state.bad { background: var(--danger); border-color: var(--danger); }
 
 @media (max-width: 560px) {
+  .yt-video-opts { grid-template-columns: minmax(0, 1fr); }
   .src-kind { margin-left: 0; width: 100%; }
   .src-kind button { flex: 1; justify-content: center; }
   .yt-list label { grid-template-columns: auto minmax(0, 1fr) auto; }
@@ -93,4 +142,5 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .lec-state.busy { animation: none; }
+  .yt-video-opt, .yt-start svg { transition: none; }
 }

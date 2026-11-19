@@ -11,8 +11,9 @@ the audio by hardlink like a re-run, and no model runs. A recording's main trans
 job.json (app/compare.py).
 
 A job made from a YouTube link (source_url, app/youtube.py) is downloaded first, one at a time in the
-order the jobs were added (a playlist's in playlist order): video.mp4, or only the sound as source.<ext>,
-and captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
+order the jobs were added (a playlist's in playlist order): video.mp4, or only the sound as source.<ext> (also
+when it was added with streaming, "stream": true, and its page plays the video from YouTube), and
+captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
 recording, and a job with captions takes them as its transcript instead of going to a model. A finished
 YouTube job writes its files to the courses folder (app/courses.py).
 
@@ -624,7 +625,8 @@ class Runner:
         old = self.store.get(jid)
         folder = self.store.dir(jid)
         shown = old.get("video") if (folder / video.NAME).exists() else None
-        youtube_fields = {k: old[k] for k in ("source_url", "youtube_id", "course") if old.get(k)}  # still the lecture
+        youtube_fields = {k: old[k] for k in ("source_url", "youtube_id", "course", "stream")
+                          if old.get(k)}  # still the lecture
         new = self.new_job(title=old["title"], source_name=old.get("source_name"), model_id=model_id,
                            options=options, rerun_of=jid, source=old.get("source"),  # the same recording
                            fingerprint=old.get("fingerprint"), **({"video": shown} if shown else {}), **youtube_fields,
@@ -655,7 +657,8 @@ class Runner:
                 **{k: old.get(k) for k in ("model", "model_title", "kind", "options", "source", "audio_s", "fingerprint")},
                 "status": "done", "stage": None, "speaker_names": state["speaker_names"], "rerun_of": jid,
                 "started": at, "finished": at, "branch": {"name": name, "from": {"id": jid, "version": n}},
-                **{k: old[k] for k in ("source_url", "youtube_id", "course", "captions") if old.get(k)},  # still the lecture
+                **{k: old[k] for k in ("source_url", "youtube_id", "course", "captions", "stream")
+                   if old.get(k)},  # still the lecture
                 **({"video": shown} if shown else {})}
         for _ in range(50):  # an id that is taken is drawn again, as in new_job
             new = self.store.new_id()

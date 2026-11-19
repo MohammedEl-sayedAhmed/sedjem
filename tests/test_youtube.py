@@ -270,6 +270,23 @@ class InspectAndDownload(unittest.TestCase):
         self.assertIsNone(youtube.download(self.cfg, job, self.tmp, lambda *a: None, lambda: False)["captions"])
         self.assertFalse((self.tmp / "captions.vtt").exists())
 
+    def test_streaming_downloads_only_the_sound(self):
+        job = {"source_url": youtube.watch_url("vid00000001"), "title": "Intro", "stream": True}
+        got = youtube.download(self.cfg, job, self.tmp, lambda *a: None, lambda: False)
+        self.assertEqual(got, {"video": None, "captions": {"lang": "en", "name": "EN"}, "download_note": None,
+                               "source_name": "Intro.m4a"}, "chosen, so no note says why there is no video")
+        self.assertEqual(self.fake.downloads, [("vid00000001", "140")], "the best AAC sound, and no video stream")
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir() if p.is_file()), ["captions.vtt", "source.m4a"],
+                         "nothing joined: no video.mp4")
+        with av.open(str(self.tmp / "source.m4a")) as c:
+            self.assertEqual([s.type for s in c.streams], ["audio"])
+
+    def test_streaming_without_aac_takes_any_sound(self):
+        job = {"source_url": youtube.watch_url("vid00000003"), "title": "Only VP9", "stream": True}
+        got = youtube.download(self.cfg, job, self.tmp, lambda *a: None, lambda: False)
+        self.assertEqual((got["video"], got["download_note"], got["source_name"]), (None, None, "Only VP9.webm"))
+        self.assertEqual(self.fake.downloads, [("vid00000003", "251")])
+
     def test_no_h264_means_only_the_sound(self):
         job = {"source_url": youtube.watch_url("vid00000003"), "title": "Only VP9"}
         got = youtube.download(self.cfg, job, self.tmp, lambda *a: None, lambda: False)
@@ -580,6 +597,40 @@ class Api(unittest.TestCase):
                                                                              "available": True, "url": "https://evil.example/"}]})
         status, r = self.add(forged)
         self.assertEqual((status, r["error"]), (400, "a video has an id YouTube doesn't use"))
+
+    def test_6_streaming(self):
+        """A link added with streaming: each job keeps "stream", downloads only the sound and has no video; a
+        playlist's lectures all take the choice, and a re-run keeps it. Without it, a job has no "stream"."""
+        self.fake.downloads.clear()
+        status, r = self.add("https://www.youtube.com/playlist?list=PLcourse", stream=True,
+                             entries=["vid00000001", "vid00000003"])
+        self.assertEqual(status, 201, r)
+        self.assertEqual([j["stream"] for j in r["jobs"]], [True, True], "every lecture alike")
+        done = [self.wait(j["id"]) for j in r["jobs"]]
+        self.assertEqual([d["job"]["status"] for d in done], ["done", "done"], [d["job"].get("error") for d in done])
+        for d in done:
+            folder = self.cfg.storage / "jobs" / d["job"]["id"]
+            self.assertEqual((d["job"]["stream"], d["job"]["video"], d["has_video"], d["job"].get("download_note")),
+                             (True, None, False, None))
+            self.assertTrue((folder / "audio.flac").exists())
+            self.assertFalse((folder / "video.mp4").exists())
+            self.assertEqual(d["job"]["youtube_id"], d["job"]["source_url"].rsplit("=", 1)[-1], "the page's player needs it")
+        self.assertEqual(self.fake.downloads, [("vid00000001", "140"), ("vid00000003", "140")], "the sound alone")
+        status, again = self.call("POST", f"/api/jobs/{done[0]['job']['id']}/rerun",
+                                  {"model": "elevenlabs", "confirm_upload": True})
+        self.assertEqual((status, again.get("stream")), (201, True), "a re-run plays from YouTube too")
+        self.wait(again["id"])
+        status, r = self.add("https://youtu.be/vid00000002", stream=False)
+        job = self.wait(r["jobs"][0]["id"])["job"]
+        self.assertNotIn("stream", job)
+        self.assertEqual(job["video"], {"width": 160, "height": 90}, "downloaded as before")
+
+    def test_7_the_page_frames_only_youtubes_player(self):
+        for path in ("/", "/static/index.html"):
+            with urllib.request.urlopen(self.base + path, timeout=30) as r:
+                self.assertEqual(r.headers["Content-Security-Policy"], "frame-src https://www.youtube-nocookie.com", path)
+        with urllib.request.urlopen(self.base + "/static/app.js", timeout=30) as r:
+            self.assertIsNone(r.headers["Content-Security-Policy"])
 
 
 if __name__ == "__main__":

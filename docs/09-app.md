@@ -101,7 +101,8 @@ in Chrome, Edge and the desktop app, the files in a folder you pick. *Export cou
 opens it with the course ticked. Arabic lines are laid out right to left automatically. There are
 light and dark themes, the layout works in a narrow window, and the page loads nothing from outside
 (no CDN, web fonts or analytics scripts; the app's anonymous usage counts are sent by its server, as
-[privacy](#privacy) says).
+[privacy](#privacy) says). The one exception is YouTube's player, which the page loads only to play a
+video added with *Stream it from YouTube* ([YouTube videos](#streaming-from-youtube)).
 
 Each transcription keeps a record of how it was made: the recording (name, format, codec, sample
 rate, channels, bit rate, size, length, and when it was made), the model (its engine and file, or
@@ -152,6 +153,26 @@ pixels high and the best AAC sound, and joins them into one MP4 file with PyAV w
 so the video can play next to its transcript. No ffmpeg program is needed. When YouTube has no such pair,
 the app takes a single MP4 file that has both. When a video has no H.264 version at all, only its sound is
 downloaded and its page says so.
+
+### Streaming from YouTube
+
+Under *The video*, the form offers two choices, and remembers the last one picked:
+
+- *Download the video* (the first choice until another is picked): as above, so the video plays without
+  internet.
+- *Stream it from YouTube*: only the best AAC sound of each video is downloaded, with no video stream and
+  no joining step, so a long course takes much less space and time. Each lecture of a playlist takes
+  the same choice.
+
+The page of a streamed video shows *Play from YouTube* where the video would be. Nothing is loaded from
+YouTube until it plays: then the page loads YouTube's player from `www.youtube-nocookie.com`, and the
+player loads the video from Google's servers. The page drives the player through messages, without
+loading YouTube's own script, so the transcript follows it as it follows a downloaded video: a line's
+time goes there, and *Follow playback* keeps the current line in view. When the player doesn't answer
+within about 8 seconds, as without internet, or YouTube doesn't let other sites play that video, the
+page says "YouTube's player couldn't load, so the sound plays from this computer" and plays the
+downloaded sound instead, from the same moment. Transcriptions made before this choice, and those that
+downloaded the video, play as before.
 
 ### Captions made by people
 
@@ -703,6 +724,11 @@ the speaker step with a stand-in model process).
   read, and only YouTube's own pages are read. The videos and their transcripts stay on the computer;
   with a hosted model, the sound of each video without captions is uploaded after the same
   confirmation as a recording.
+- A video added with *Stream it from YouTube* has only its sound on the computer. Only when you play it
+  on its page does the page load YouTube's player from `www.youtube-nocookie.com`, and the player load
+  the video from Google's servers, which see the computer's IP address and which video plays; YouTube
+  may keep data in the browser, as on its own site. The page reads only the messages of that player,
+  and its Content-Security-Policy lets it show no other site in a frame.
 - With hosted models, the recording is uploaded only when you pick one and also tick "Upload this
   recording to …". The server checks this again, including for re-runs. Keys go only to their own
   service.
@@ -757,7 +783,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/downloads.py` | model downloads, resumable and checked against the pinned size and SHA-256 |
 | `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from the speaker model |
 | `app/hub.py` | models added from Hugging Face: links, the API, GGUF headers, conversion, `models.json` |
-| `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams, joining them into `video.mp4` with PyAV, captions made by people as transcripts |
+| `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams (only the sound, for a video streamed from YouTube), joining them into `video.mp4` with PyAV, captions made by people as transcripts |
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
@@ -782,7 +808,7 @@ says only whether Sedjem answers.
 
 | Call | What |
 |---|---|
-| `GET /api/prefs`, `PATCH /api/prefs` | the page's preferences (theme, the library's order, the video size, the update notices), kept in `page.json` in the data folder; PATCH takes `{name: text, or null to forget it}` |
+| `GET /api/prefs`, `PATCH /api/prefs` | the page's preferences (theme, the library's order, the video size, the YouTube form's choice to download or stream the video, the update notices), kept in `page.json` in the data folder; PATCH takes `{name: text, or null to forget it}` |
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
 | `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
 | `POST /api/settings` with `{"default_model": …}` | the model a new transcription starts with, as in *Settings → Models*: one of the `id`s that `GET /api/status` lists under `models`, or `null` for `[defaults] model`. `GET /api/status` gives the one in use as `defaults.model`, and a job that names no model gets it |
@@ -798,7 +824,7 @@ says only whether Sedjem answers.
 | `POST /api/export` with `{"ids": […], "format": …}` | many transcripts at once, in the order given: a zip with a file for each; with `"combined": true`, one file (`txt`, `md` or `json`); with `"as": "files"`, the files as JSON (`path` and `text`). Transcriptions without a transcript are left out |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
 | `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
-| `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, …}` | one transcription per video (all of them without `entries`), queued in playlist order |
+| `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, "stream": false, …}` | one transcription per video (all of them without `entries`), queued in playlist order; with `"stream": true`, each downloads only the sound, and its job has `"stream": true` so that its page plays the video from YouTube |
 | `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
 | `POST /api/jobs` with `run_on` and `confirm_send`, `GET /api/remote` and the rest of `/api/remote/` | a transcription on a paired computer, and the pairing ([running jobs on another computer](15-remote-runs.md#for-scripts)) |
 | `GET /api/updates`, `POST /api/updates/check`, `/settings`, `/skip`, `/install` | *Settings → Updates*: the state, *Check now*, the switch and channel, *Skip this version*, *Update now* ([updates](12-updates.md)) |
