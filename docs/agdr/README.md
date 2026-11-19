@@ -45,8 +45,8 @@ from [PR #39](https://github.com/MohammedEl-sayedAhmed/sedjem/pull/39), running 
 ([ADR 14](../adr/0014-everything-the-builds-install-is-pinned-by-hash.md)), each stamped with the time it was
 decided. Records 15 and 16 were written with the CodeQL ratchet and the Scorecard workflow they record, record
 17 with the Release workflow's job that starts the website's build, record 18 with the release days and the kept
-counts of the downloads chart, record 19 with the secret between the server and its window, and record 20 with the
-choice to stream a YouTube video instead of downloading it.
+counts of the downloads chart, record 19 with the secret between the server and its window, record 20 with the
+choice to stream a YouTube video instead of downloading it, and record 21 with Google Drive links.
 
 ## Index
 
@@ -72,3 +72,4 @@ choice to stream a YouTube video instead of downloading it.
 | AgDR-0018 | [Release days from the list of releases, and a deleted release keeps its last count](AgDR-0018-release-days-from-the-list-of-releases.md) | executed | The site dates each release by GitHub's published_at, read from a list the Pages workflow downloads; the site, the badge and the stats charts keep a deleted preview's last count, so the total never falls. |
 | AgDR-0019 | [A secret between the local server and its own window](AgDR-0019-a-secret-between-the-server-and-its-window.md) | executed | Every /api request needs a secret made new at each start, on a new free port, and kept in a file only the user can read, sent as a header from the tab's sessionStorage (media get a per-job signature); the desktop window gets it from its bridge and a browser window from a local page that posts it, with the app's own browser profile; the page's preferences move to the data folder, and a second start trusts a port only after a proof, so other accounts on the computer can't use the API or wait on its port. |
 | AgDR-0020 | [Streamed YouTube videos play in YouTube's player, driven by postMessage](AgDR-0020-youtube-player-driven-by-postmessage.md) | executed | A video added with "Stream it from YouTube" downloads only its sound; its page loads youtube-nocookie.com's player in a frame only when it plays, drives it with the player's messages from the page's own code (no IFrame API script) through an object that looks like a media element, reads only that frame's messages, allows no other frame, and plays the downloaded sound when the player doesn't load. |
+| AgDR-0021 | [Google Drive files through yt-dlp's Drive extractor, with allowlists of their own, and folders later](AgDR-0021-google-drive-links-through-yt-dlp.md) | executed | A shared Drive file goes in the Link field and is read with yt-dlp's GoogleDrive extractor only, through YouTube's helpers but with Drive's own lists of link hosts and download hosts, so neither the generic nor the folder extractor runs; the file is downloaded as itself and then treated as an upload, and a folder's link is refused with a message until yt-dlp reads folders again (its issue #10484). |

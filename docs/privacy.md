@@ -51,6 +51,14 @@ here.
   computer's IP address and which video plays, and YouTube may keep data in the browser, as it does on its own site.
   Until you play it, the page asks nothing of YouTube, and it can show no other site in its page. Videos you chose to
   download play from the computer, with no connection.
+- Google Drive, which is Google's ([privacy policy](https://policies.google.com/privacy)), when you check or add a
+  link to a Drive file, through yt-dlp: Sedjem asks Drive's playback service
+  (`content-workspacevideo-pa.googleapis.com`) for its name and length, and Drive's download
+  (`drive.usercontent.google.com`, which may send it on to a `*.googleusercontent.com` host) for the file itself,
+  answering the page Drive shows before a file too large to scan for viruses. Google sees the computer's IP address
+  and which file is asked for. Sedjem doesn't sign in, so it sends no account or cookie of yours, and it reads only
+  files shared with anyone who has the link. A link to a Drive folder is refused before anything is asked of Google;
+  folders are planned.
 - Aptabase ([privacy policy](https://aptabase.com/legal/privacy)), for anonymous usage counts, at `eu.aptabase.com`
   (a copy built with a key from Aptabase's US region uses `us.aptabase.com`). A few times a month Sedjem sends
   anonymous counts, so that the project knows how many installs use it and what they use: the version, the system

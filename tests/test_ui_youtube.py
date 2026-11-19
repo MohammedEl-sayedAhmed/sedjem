@@ -114,11 +114,12 @@ class YouTubeLinks(UiTestCase):
 
     def test_a_playlist_is_checked_and_added(self):
         self.open()
-        self.page.click("[data-src=youtube]")
+        self.page.click("[data-src=link]")
         self.page.fill("#ytUrl", "https://vimeo.com/1")
         self.page.click("#ytForm button[type=submit]")
         self.page.wait_for_selector(".yt-error")
-        self.assertEqual(self.page.inner_text(".yt-error"), "paste the link of a YouTube video or playlist")
+        self.assertEqual(self.page.inner_text(".yt-error"),
+                         "paste the link of a YouTube video or playlist, or of a Google Drive file")
         self.assertEqual(len([e for e in self.errors if e.startswith(REFUSED)]), 1)
         self.errors = [e for e in self.errors if not e.startswith(REFUSED)]
         self.page.fill("#ytUrl", "https://www.youtube.com/playlist?list=PLnewcourse")
@@ -159,7 +160,7 @@ class YouTubeLinks(UiTestCase):
         type(self).runtime = None
         try:
             self.open()
-            self.page.click("[data-src=youtube]")
+            self.page.click("[data-src=link]")
             self.page.wait_for_selector(".yt-note")
             self.assertIn("YouTube asks for a JavaScript runtime, and none was found", self.page.inner_text(".yt-note"))
             if self.app.cfg.download_items().get("deno"):
@@ -168,14 +169,14 @@ class YouTubeLinks(UiTestCase):
             type(self).runtime = DENO
         self.page.reload()
         self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
-        self.page.click("[data-src=youtube]")
+        self.page.click("[data-src=link]")
         self.assertFalse(self.page.is_visible(".yt-note"))
 
     def test_narrow_and_dark(self):
         self.page.set_viewport_size({"width": 390, "height": 800})
         self.open()
         self.page.evaluate("document.documentElement.dataset.theme = 'dark'")
-        self.page.click("[data-src=youtube]")
+        self.page.click("[data-src=link]")
         self.page.fill("#ytUrl", "https://www.youtube.com/playlist?list=PLnewcourse")
         self.page.click("#ytForm button[type=submit]")
         self.page.wait_for_selector(".yt-list")

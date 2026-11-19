@@ -1,5 +1,5 @@
-/* Sedjem: YouTube links (youtube.js): the link and its videos on the new transcription page, a course in the
-   sidebar, and the course bar on a lecture's page. Colours come from app.css, so both themes follow. */
+/* Sedjem: links (youtube.js, drive.js): the link and its videos or file on the new transcription page, a course in
+   the sidebar, and the course bar on a lecture's page. Colours come from app.css, so both themes follow. */
 
 /* ---------- where the recording comes from ---------- */
 .step-head.src-head { flex-wrap: wrap; row-gap: 10px; }
@@ -10,7 +10,8 @@
 /* ---------- the link and what it holds ---------- */
 .yt-form { display: flex; gap: 8px; }
 .yt-form input { flex: 1; min-width: 0; }
-.yt-error { margin-top: 10px; color: var(--danger); font-size: 13.5px; overflow-wrap: anywhere; }
+.yt-error { margin-top: 8px; color: var(--danger); font-size: 13.5px; overflow-wrap: anywhere; }
+.yt-rules { margin-top: 2px; }
 .yt-note {
   display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; font-size: 13px;
   border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--text); line-height: 1.45;

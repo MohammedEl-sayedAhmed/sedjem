@@ -581,13 +581,16 @@ class Usage:
         hosted, download), or "cancelled" for a job the user cancelled. A model run counts as a transcription, with
         its audio length and processing time, its model or service, its speaker labels and where the number of
         speakers came from, its language and device; taking a YouTube video's captions made by people counts only
-        as a YouTube job."""
+        as a YouTube job. A failed Google Drive download counts as a failure, but not as a failed (YouTube)
+        download."""
         if not isinstance(job, dict):
             return
         if stage == "cancelled":
             self.count(cancelled=1)
             return
         if job.get("status") == "failed":
+            if stage == "download" and job.get("drive_id"):
+                stage = None
             self.count(failed=1, **({FAILURES[stage]: 1} if stage in FAILURES else {}))
             return
         if job.get("status") != "done":

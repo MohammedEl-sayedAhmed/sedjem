@@ -140,11 +140,12 @@ details*. Transcriptions made before this was added sort by the date they were a
 
 ## YouTube videos and courses
 
-On the new transcription page, *YouTube link* next to the file picker takes a link to a video or a
-playlist. *Check* reads it and shows the title, the uploader, the number of videos, their total length,
-and which of them have captions made by people. A playlist lists its videos in order, and any of them can
-be left out; private, deleted and live videos are listed but can't be picked. The model and the options
-are chosen as for a file, and *Start* adds one transcription per video, named after the video.
+On the new transcription page, *Link* next to the file picker takes a link to a video or a playlist, or to a
+Google Drive file ([below](#google-drive-files)). For YouTube, *Check* reads it and shows
+the title, the uploader, the number of videos, their total length, and which of them have captions made by
+people. A playlist lists its videos in order, and any of them can be left out; private, deleted and live videos
+are listed but can't be picked. The model and the options are chosen as for a file, and *Start* adds one
+transcription per video, named after the video.
 
 Each video is downloaded first, one at a time in playlist order, and is then prepared and transcribed
 like any recording. The downloading stage shows its progress and can be cancelled, and a download that
@@ -228,6 +229,44 @@ it too. Without a runtime yt-dlp still gets many videos, but YouTube may hold so
 
 Downloading from YouTube is meant for personal use, and keeping to YouTube's terms of service and the
 rights of the people who made the videos is up to you.
+
+## Google Drive files
+
+The same *Link* field takes a Google Drive file shared with anyone who has the link. *Check* reads it in the same way
+and shows its name and length; *Start* adds a transcription named after the file without its extension. The links
+Drive gives to share a file all work: `drive.google.com/file/d/…/view`, the older `…/open?id=…` and `…/uc?id=…`. A
+Google Docs file is refused, and so is any link that isn't Drive's. A file is refused as not audio or video only when
+its name ends in the extension of another kind of file, such as a document, an image or an archive, and Drive gives
+no sign that it plays (no length, no copy made to play it). A name such as "Week 1.2" has no extension and is taken
+whole; a file that turns out not to be audio or video fails when its sound is read, as an upload would.
+
+The file is downloaded first, as it is on Drive: the file itself, never a copy that Drive made to play it. Before a
+large file, Drive shows a page saying it can't scan the file for viruses; the download answers that page and goes
+on. The download stops, and what came of it is deleted, when the file is too large:
+
+- When Drive gives the file's size as the download starts (it did for the files tried), the download stops at once
+  if the file is larger than the upload limit (`max_upload_gb`, 4 GB at first), or if the disk would have less than
+  1 GB left after the file and the sound made from it (taken as a fifth of the file's size).
+- In every case, as the bytes come, the download stops once more than the upload limit has come (a size Drive gave
+  can be wrong), or when a check of the free space every 32 MB (from the start when Drive gives no size) finds less
+  than 1 GB beyond room for the sound made from what came.
+
+The download takes the file only from Drive's own hosts, also after a redirect: an answer from another site stops it
+before anything of that answer is written.
+
+From then on the file is treated as an uploaded file of its type: its sound is converted, a video gets the copy that
+plays beside its transcript, and the downloaded file is deleted unless `keep_original` is set. Drive files have no
+streaming choice and no captions, so every file goes to the chosen model. A Drive file sits with the single
+transcriptions, like an uploaded file, and has no files in the courses folder; its page links to the file on Drive.
+
+Sedjem doesn't sign in to Google. A file that isn't shared with anyone who has the link, or that was removed, says
+"This file isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet." A file whose owner
+turned downloading off is refused too. A download that fails says why on its page and can be tried again, as a
+YouTube download can.
+
+Drive folders are planned. For now a folder's link is refused with "Google Drive folders can't be read yet. Add the
+files one by one, each with its own link.", because yt-dlp can't read Drive folders at the moment
+([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
 
 ## Version history
 
@@ -725,6 +764,11 @@ the speaker step with a stand-in model process).
   read, and only YouTube's own pages are read. The videos and their transcripts stay on the computer;
   with a hosted model, the sound of each video without captions is uploaded after the same
   confirmation as a recording.
+- Checking or adding a Google Drive link asks Google Drive, through yt-dlp, for that file's details and
+  download, and nothing else. A link is rebuilt from the file id before it is read, a folder's link is
+  refused before anything is asked, nothing signs in to Google, and a file is downloaded only from Drive's
+  own hosts. The files and their transcripts stay on the computer; with a hosted model, each file's sound is
+  uploaded after the same confirmation as a recording.
 - A video added with *Stream it from YouTube* has only its sound on the computer. Only when you play it
   on its page does the page load YouTube's player from `www.youtube-nocookie.com`, and the player load
   the video from Google's servers, which see the computer's IP address and which video plays; YouTube
@@ -785,6 +829,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from the speaker model |
 | `app/hub.py` | models added from Hugging Face: links, the API, GGUF headers, conversion, `models.json` |
 | `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams (only the sound, for a video streamed from YouTube), joining them into `video.mp4` with PyAV, captions made by people as transcripts |
+| `app/drive.py` | Google Drive links with yt-dlp's Drive extractor: reading a file's link, downloading the file itself; a folder's link is refused for now |
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
@@ -824,8 +869,8 @@ says only whether Sedjem answers.
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
 | `POST /api/export` with `{"ids": […], "format": …}` | many transcripts at once, in the order given: a zip with a file for each; with `"combined": true`, one file (`txt`, `md` or `json`); with `"as": "files"`, the files as JSON (`path` and `text`). Transcriptions without a transcript are left out |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
-| `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
-| `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, "stream": false, …}` | one transcription per video (all of them without `entries`), queued in playlist order; with `"stream": true`, each downloads only the sound, and its job has `"stream": true` so that its page plays the video from YouTube |
+| `POST /api/link/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people; or a Google Drive file: its name and length (`"site"` says which; a Drive folder's link is refused for now). `POST /api/youtube/inspect`, its name before Drive links, does the same |
+| `POST /api/link` with `{"url": …, "model": …, "entries": […], "captions": true, "stream": false, …}` | one transcription per video (all of them without `entries`), queued in playlist order, or one for a Drive file; with `"stream": true`, each YouTube video downloads only the sound, and its job has `"stream": true` so that its page plays the video from YouTube. A Drive job has `drive_id`, and ignores `captions` and `stream`. `POST /api/youtube` does the same |
 | `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
 | `POST /api/jobs` with `run_on` and `confirm_send`, `GET /api/remote` and the rest of `/api/remote/` | a transcription on a paired computer, and the pairing ([running jobs on another computer](15-remote-runs.md#for-scripts)) |
 | `GET /api/updates`, `POST /api/updates/check`, `/settings`, `/skip`, `/install` | *Settings → Updates*: the state, *Check now*, the switch and channel, *Skip this version*, *Update now* ([updates](12-updates.md)) |

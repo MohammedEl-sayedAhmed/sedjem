@@ -410,8 +410,9 @@ function formDefaults() {
   if (f.language == null) f.language = d.language || "ar";
 }
 
-// The length the model will transcribe: the recording's, or the picked YouTube videos' without captions.
-const formSeconds = () => (S.form.source === "youtube" ? ytSeconds() : S.form.seconds);
+// The length the model will transcribe: the recording's, or that of a link's picked videos or files (without
+// the YouTube videos whose captions are used).
+const formSeconds = () => (S.form.source === "link" ? ytSeconds() : S.form.seconds);
 
 function estimateText(m, seconds, short = false) {
   if (!m) return "";
@@ -474,7 +475,7 @@ function modelCard(m) {
 }
 
 // The model picked on the form: one of this computer's, or one a paired computer listed (remote.js)
-const formModel = () => (S.form.source !== "youtube" && rmChoice() ? rmModel(rmChoice(), S.form.model) : model(S.form.model));
+const formModel = () => (S.form.source !== "link" && rmChoice() ? rmModel(rmChoice(), S.form.model) : model(S.form.model));
 
 function renderNew() {
   stopJobPoll();
@@ -484,21 +485,22 @@ function renderNew() {
   const src = f.file ? { name: f.file.name, size: f.file.size } : f.path;
   const custom = !SPEAKER_CHOICES.some(([v]) => v === f.speakers);
   const hosted = m && m.kind === "hosted";
-  const yt = f.source === "youtube", picked = yt ? ytPicked().length : 0;
-  const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); YouTube links run here
+  const yt = f.source === "link", picked = yt ? ytPicked().length : 0;  // a link: youtube.js and drive.js
+  const onDrive = yt && YT.found?.site === "drive";
+  const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); links run here
   const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : src && !S.uploading) && m && m.ready && (!hosted || f.confirm)
     && (!rc || rc.consented || f.confirm);
   const startLabel = yt ? (YT.adding ? "Adding…" : picked > 1 ? `Start ${picked} transcriptions` : "Start transcription")
     : S.uploading ? "Uploading…" : "Start transcription";
   view.innerHTML = `
   <h1>New transcription</h1>
-  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a YouTube video or course. Local models keep everything on this computer.</p>
+  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a link to a YouTube video or playlist or a Google Drive file. Local models keep everything on this computer.</p>
 
   <div class="card">
-    <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Video or playlist" : "Recording"}
+    <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Link" : "Recording"}
       <div class="segmented src-kind" role="group" aria-label="Where the recording comes from">
         <button type="button" data-src="file" aria-pressed="${!yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.upload} A file</button>
-        <button type="button" data-src="youtube" aria-pressed="${yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${YT_ICON.video} YouTube link</button></div></div>
+        <button type="button" data-src="link" aria-pressed="${yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.link} Link</button></div></div>
     ${yt ? ytCard() : src ? `
       <div class="chosen">
         <div class="ico">${ICON.wave}</div>
@@ -540,7 +542,7 @@ function renderNew() {
         <div class="segmented" id="lang">${LANGUAGES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
         <p class="hint">${languageHint(m, f.language)}</p>
       </div>
-      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">Each transcription is named after its video; you can rename it later.</p></div>` : `<div class="field">
+      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">${onDrive ? "The transcription is named after the file" : "Each transcription is named after its video"}; you can rename it later.</p></div>` : `<div class="field">
         <label for="titleInput">Title</label>
         <input type="text" id="titleInput" dir="${mixDir(f.title)}" data-mixdir value="${esc(f.title)}" placeholder="${esc(src ? src.name.replace(/\.[^.]+$/, "") : "Meeting title")}">
       </div>`}
@@ -555,7 +557,7 @@ function renderNew() {
   ${hosted && m.ready ? `<div class="card consent">
     ${ICON.cloud}
     <div>
-      <p><b>This model uploads ${yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
+      <p><b>This model uploads ${onDrive ? "the sound of the file" : yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
       <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : "this recording"} to ${esc(m.service)}</label>
     </div>
   </div>` : ""}
@@ -572,7 +574,7 @@ function renderNew() {
 
 function renderModelGrid() {
   const grid = $("#modelGrid");
-  if (!grid || (S.form.source !== "youtube" && rmChoice())) return;  // a paired computer's models are its own
+  if (!grid || (S.form.source !== "link" && rmChoice())) return;  // a paired computer's models are its own
   grid.innerHTML = S.status.models.map(modelCard).join("");
   bindModelCards();
 }
@@ -657,7 +659,7 @@ function bindNew() {
     if (f.source === b.dataset.src || (!f.source && b.dataset.src === "file")) return;
     f.source = b.dataset.src;
     renderNew();
-    if (f.source === "youtube") $("#ytUrl")?.focus();
+    if (f.source === "link") $("#ytUrl")?.focus();
   }));
   bindYoutube();
   const pr = $("#promptInput");
@@ -672,7 +674,7 @@ async function start() {
   const f = S.form, m = formModel();
   const params = { model: m.id, speakers: f.speakers, language: f.language, prompt: m.prompt ? f.prompt : "",
     title: f.title.trim(), confirm_upload: m.kind === "hosted" && f.confirm ? "1" : "0" };
-  if (f.source === "youtube") return ytStart(params);  // youtube.js
+  if (f.source === "link") return ytStart(params);  // youtube.js
   if (m.kind === "remote") Object.assign(params, { run_on: m.computer.id, confirm_send: f.confirm ? "1" : "0" });
   try {
     let job;
@@ -705,7 +707,7 @@ async function start() {
 // ---------------------------------------------------------------------------------------------
 // Job view
 // ---------------------------------------------------------------------------------------------
-const STAGES = {
+const STAGES = {  // (a download from Google Drive says so instead of YouTube: stageInfo)
   "waiting-download": "Waiting to download from YouTube",
   downloading: "Downloading from YouTube",
   waiting: "Waiting to prepare the audio",
@@ -725,12 +727,13 @@ function stageInfo(j) {
   const m = model(j.model);
   if (j.status === "queued") return { label: j.kind === "local" ? "Waiting for the previous local job" : "Waiting to start", pct: null };
   if (j.status === "preparing") {
-    if (j.stage === "downloading") {  // bytes, from YouTube (app/youtube.py)
+    const from = (label) => (j.drive_id ? label.replace("YouTube", "Google Drive") : label);  // (app/drive.py)
+    if (j.stage === "downloading") {  // bytes, from YouTube (app/youtube.py) or Google Drive
       const pct = j.total ? Math.min(100, (j.done || 0) / j.total * 100) : null;
-      return { label: STAGES.downloading, pct, detail: j.total ? `${bytes(j.done || 0)} of ${bytes(j.total)}` : j.done ? bytes(j.done) : "" };
+      return { label: from(STAGES.downloading), pct, detail: j.total ? `${bytes(j.done || 0)} of ${bytes(j.total)}` : j.done ? bytes(j.done) : "" };
     }
     const pct = j.stage === "converting" && j.total ? (j.done || 0) / j.total * 100 : null;
-    return { label: STAGES[j.stage] || "Preparing", pct, detail: pct != null ? `${Math.round(pct)}%` : "" };
+    return { label: from(STAGES[j.stage] || "Preparing"), pct, detail: pct != null ? `${Math.round(pct)}%` : "" };
   }
   let label = STAGES[j.stage] || "Working", pct = null, detail = "";
   if (j.stage === "transcribing" && j.total) {
@@ -776,6 +779,7 @@ function renderJob() {
   const meta = [
     `<span>${kindIcon(j)} ${esc(j.model_title || j.model)}</span>`,
     ytHref(j.source_url) ? `<a class="yt-link" href="${esc(ytHref(j.source_url))}" target="_blank" rel="noopener noreferrer" title="${esc(j.source_url)}">${YT_ICON.video} On YouTube</a>` : "",
+    driveHref(j.source_url) ? `<a class="yt-link" href="${esc(driveHref(j.source_url))}" target="_blank" rel="noopener noreferrer" title="${esc(j.source_url)}">${DRIVE_ICON.file} On Google Drive</a>` : "",
     j.audio_s ? `<span>${ICON.clock} ${clock(j.audio_s)}</span>` : "",
     stats.ids.length ? `<span>${ICON.users} ${stats.ids.length} speaker${stats.ids.length === 1 ? "" : "s"}</span>` : "",
     j.seconds ? `<span>${ICON.cpu} took ${human(j.seconds)}${j.rtf ? ` (${Number(j.rtf).toFixed(2)}× real time)` : ""}</span>` : "",
@@ -792,7 +796,7 @@ function renderJob() {
     statusCard = `<div class="card progress-card" id="progressCard">
       <div class="row"><span class="stage" id="stageLabel">${esc(si.label)}</span><span class="hint" id="stageDetail" style="margin:0">${esc(si.detail || "")}</span><span class="times" id="stageTimes">${etaText(j)}</span></div>
       <div class="progress${si.pct == null ? " indeterminate" : ""}" id="stageBar"><i style="width:${(si.pct || 0).toFixed(1)}%"></i></div>
-      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The ${j.stream ? "sound is downloaded first (the video plays from YouTube)" : "video is downloaded first (up to 720p, to play beside the transcript)"}, then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
+      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The ${j.drive_id ? "file is downloaded first" : j.stream ? "sound is downloaded first (the video plays from YouTube)" : "video is downloaded first (up to 720p, to play beside the transcript)"}, then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
         : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open."
         : j.kind === "remote" ? rmNote(j) : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
       <div style="margin-top:12px"><button class="btn btn-sm btn-danger" id="cancelBtn">${ICON.stop} Cancel</button></div>

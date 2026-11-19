@@ -1,6 +1,7 @@
 /* Sedjem: YouTube links (the server side is app/youtube.py and app/courses.py). On the new transcription
-   page a link to a video or a playlist is checked, its videos are shown with the ones that have captions made
-   by people, and Start adds one transcription per video, with the video downloaded or streamed from YouTube.
+   page, the Link tab checks a link to a video or a playlist, shows its videos with the ones that have captions
+   made by people, and Start adds one transcription per video, with the video downloaded or streamed from YouTube.
+   The same tab takes a Google Drive file, which drive.js shows.
    A playlist is a course: the sidebar shows it once with its lectures, and a lecture's page has the link, the
    lectures before and after it, and its course folder. A streamed video's page plays it in YouTube's own
    player (YouTubeMedia). Loaded before app.js: it only defines things, and uses app.js's helpers (S, api, $,
@@ -19,9 +20,12 @@ const YT_LANG = { ar: "Arabic", en: "English" };
 const ytHref = (url) => (/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(String(url || "")) ? url : "");
 const ytLang = (code) => YT_LANG[String(code || "").split("-")[0].toLowerCase()] || code;
 
-// The link being checked or added. found: what POST /api/youtube/inspect answered; picked: the ids of the
-// videos to transcribe; captions: use the captions people made, where a video has them.
-const YT = { url: "", checked: "", busy: false, adding: false, found: null, error: "", picked: new Set(), captions: true };
+// The link being checked or added. found: what POST /api/link/inspect answered (found.site is "youtube" or
+// "drive"); tried: the link last checked, found or not; picked: the ids of the videos or files to transcribe;
+// captions: use the captions people made, where a YouTube video has them.
+const YT = { url: "", checked: "", tried: "", busy: false, adding: false, found: null, error: "", picked: new Set(), captions: true };
+// Whether the link found, or the one last checked, is Google Drive's: then YouTube's own choices aren't shown.
+const ytOnDrive = () => (YT.found ? YT.found.site === "drive" : driveLink(YT.tried));
 
 // Download each video, or only its sound and stream the video from YouTube: a page preference (app.js's PREFS),
 // "download" until the user picks.
@@ -33,21 +37,25 @@ const YT_VIDEO = [["download", "Download the video", "It plays without internet.
 // The icon for how a transcript was made: on this computer, on a paired one, by a hosted service, or from YouTube's captions.
 const kindIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.kind === "remote" ? ICON.network : ICON.laptop);
 // The small icon in the list: none for a local recording, as before.
-const listIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.kind === "remote" ? ICON.network : j.youtube_id ? YT_ICON.video : "");
+const listIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.kind === "remote" ? ICON.network
+  : j.youtube_id ? YT_ICON.video : j.drive_id ? DRIVE_ICON.file : "");
 
 // ---------------------------------------------------------------------------------------------
 // The new transcription page
 // ---------------------------------------------------------------------------------------------
 function ytCard() {
-  const y = YT;
+  const y = YT, drive = ytOnDrive();
   const form = `<form class="yt-form" id="ytForm">
-      <input type="text" inputmode="url" id="ytUrl" value="${esc(y.url)}" placeholder="https://www.youtube.com/playlist?list=…" spellcheck="false" autocomplete="off" aria-label="YouTube link" ${y.busy || y.adding ? "disabled" : ""}>
+      <input type="text" inputmode="url" id="ytUrl" value="${esc(y.url)}" placeholder="A YouTube or Google Drive link" spellcheck="false" autocomplete="off" aria-label="Link" aria-describedby="ytIntro" ${y.busy || y.adding ? "disabled" : ""}>
       <button class="btn" type="submit" ${y.busy || y.adding ? "disabled" : ""}>${y.busy ? "Checking…" : "Check"}</button></form>`;
-  const intro = `<p class="hint">A link to a video or a playlist. Each video is downloaded and transcribed in turn; a playlist becomes a course, with its transcripts saved as files you can read or paste into a chat assistant. Download only what YouTube's terms allow you to.</p>`;
-  return `${y.found ? ytFound(y.found) : form + intro}
-    ${ytVideoChoice()}
-    <div id="ytNote">${ytNote()}</div>
-    ${y.error ? `<div class="yt-error" role="alert">${esc(y.error)}</div>` : ""}`;
+  // a refused link's reason, right under the field; then what to paste, and the rules apart
+  const error = y.error ? `<div class="yt-error" role="alert">${esc(y.error)}</div>` : "";
+  const intro = `<p class="hint" id="ytIntro">A YouTube video or playlist, or a Google Drive file shared with anyone who has the link.</p>
+    <p class="hint yt-rules">Download only what YouTube's terms and the file's owner allow you to.</p>`;
+  // a Drive file has no streaming choice and needs no JavaScript runtime: those are YouTube's
+  return `${y.found ? (drive ? driveFound(y.found) : ytFound(y.found)) : form + error + intro}
+    ${drive ? "" : ytVideoChoice()}
+    <div id="ytNote">${drive ? "" : ytNote()}</div>`;
 }
 
 // No JavaScript runtime: YouTube may hold back some videos. Deno can be downloaded like a model.
@@ -70,7 +78,7 @@ function ytVideoChoice() {
 
 function ytRefreshNote() {
   const el = $("#ytNote");
-  if (el) el.innerHTML = ytNote();
+  if (el) el.innerHTML = ytOnDrive() ? "" : ytNote();
 }
 
 function ytFound(f) {
@@ -127,7 +135,7 @@ function bindYoutube() {
     form.onsubmit = (e) => { e.preventDefault(); ytCheck(); };
   }
   const change = $("#ytChange");
-  if (change) change.onclick = () => { Object.assign(YT, { found: null, error: "", picked: new Set() }); renderNew(); $("#ytUrl")?.focus(); };
+  if (change) change.onclick = () => { Object.assign(YT, { found: null, error: "", tried: "", picked: new Set() }); renderNew(); $("#ytUrl")?.focus(); };
   const caps = $("#ytCaptions");
   if (caps) caps.onchange = () => { YT.captions = caps.checked; renderNew(); };
   $$("input[name=ytVideo]").forEach((r) => (r.onchange = () => {
@@ -147,25 +155,25 @@ function bindYoutube() {
 async function ytCheck() {
   const url = YT.url.trim();
   if (!url || YT.busy) return;
-  Object.assign(YT, { busy: true, error: "", found: null });
+  Object.assign(YT, { busy: true, error: "", found: null, tried: url });
   renderNew();
   try {
-    const found = await api.post("/api/youtube/inspect", { url });
+    const found = await api.post("/api/link/inspect", { url });
     Object.assign(YT, { found, checked: url, picked: new Set(found.entries.filter((e) => e.available).map((e) => e.id)) });
   } catch (e) { YT.error = e.message; }
   YT.busy = false;
   if (S.route.name === "new") renderNew();
 }
 
-// Start: one transcription per picked video, in playlist order. Opens the first.
+// Start: one transcription per picked video, in playlist order, or one for a Drive file. Opens the first.
 async function ytStart(params) {
-  const picked = ytPicked();
+  const picked = ytPicked(), drive = YT.found?.site === "drive";  // (a Drive file: no captions or streaming)
   YT.adding = true;
   renderNew();
   try {
-    const r = await api.post("/api/youtube", { ...params, url: YT.checked, captions: YT.captions, stream: ytStream(),
-      entries: picked.map((e) => e.id) });
-    Object.assign(YT, { url: "", checked: "", found: null, picked: new Set(), adding: false });
+    const r = await api.post("/api/link", { ...params, url: YT.checked, entries: picked.map((e) => e.id),
+      ...(drive ? {} : { captions: YT.captions, stream: ytStream() }) });
+    Object.assign(YT, { url: "", checked: "", tried: "", found: null, picked: new Set(), adding: false });
     S.form.confirm = false;  // the upload is confirmed again for the next one
     toast(r.jobs.length === 1 ? "Added: it downloads first, then it is transcribed" : `${r.jobs.length} videos added: they download and are transcribed in turn`);
     await refreshJobs();
@@ -237,7 +245,8 @@ function bindCourses() {
 }
 
 // The job page of a YouTube video: its course, the lectures before and after it, the folder of its files, and
-// a lecture's button that hides its whole course from assistants (assistants.js).
+// a lecture's button that hides its whole course from assistants (assistants.js). A Drive file is like an uploaded
+// file, and has none.
 function courseBar(j) {
   if (!j.youtube_id) return "";
   const folder = `<button type="button" class="btn btn-sm" id="openCourse">${ICON.folder} ${j.course ? "Open course folder" : "Open folder"}</button>`;
