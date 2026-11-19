@@ -119,7 +119,7 @@ class YouTubeLinks(UiTestCase):
         self.page.click("#ytForm button[type=submit]")
         self.page.wait_for_selector(".yt-error")
         self.assertEqual(self.page.inner_text(".yt-error"),
-                         "paste the link of a YouTube video or playlist, or of a Google Drive file or folder")
+                         "paste the link of a YouTube video or playlist, or of a Google Drive file")
         self.assertEqual(len([e for e in self.errors if e.startswith(REFUSED)]), 1)
         self.errors = [e for e in self.errors if not e.startswith(REFUSED)]
         self.page.fill("#ytUrl", "https://www.youtube.com/playlist?list=PLnewcourse")

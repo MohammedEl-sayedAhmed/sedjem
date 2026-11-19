@@ -53,7 +53,7 @@ PAGE_POLICY = {"Content-Security-Policy": "frame-src https://www.youtube-nocooki
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".svg": "image/svg+xml", ".png": "image/png"}
 AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
-NOT_A_LINK = "paste the link of a YouTube video or playlist, or of a Google Drive file or folder"
+NOT_A_LINK = "paste the link of a YouTube video or playlist, or of a Google Drive file"
 
 
 class ApiError(Exception):

@@ -59,8 +59,14 @@ module and the lists.
   "Google Drive folders can't be read yet. Add the files one by one, each with its own link.", before yt-dlp sees it;
   the form shows it as it shows any link's error.
 - A job from Drive has `source_url` and `drive_id`, and no course. Its download is the `source` format alone, saved
-  as `source.<ext>`, stopped once it is larger than the upload limit or the free disk space allows. From there the
-  job is an uploaded file: no streaming, no captions, no files in the courses folder.
+  as `source.<ext>`. It stops, and what came is deleted, once the file is larger than the upload limit, or would
+  leave less than 1 GB free beside the sound made from it: checked as it starts when Drive gives the size, and at
+  the start and every 32 MB when it doesn't. The download's own answer must come from Drive's hosts too, after any
+  redirect; yt-dlp's downloader opens it through a check of the app's, so another site's answer is refused before
+  anything of it is written (the request itself has reached that site by then). From there the job is an uploaded
+  file: no streaming, no captions, no files in the courses folder.
+- A file is refused as not audio or video only when its name ends in the extension of another kind of file and
+  Drive gives no sign that it plays; a name such as "Week 1.2" has no extension.
 - A file that isn't shared, or was removed, is refused with "This file isn't shared with anyone who has the link.
   Sedjem can't sign in to Google Drive yet."
 - No usage count is added, and the YouTube counts leave Drive jobs out.

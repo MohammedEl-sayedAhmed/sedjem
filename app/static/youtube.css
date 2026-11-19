@@ -10,7 +10,8 @@
 /* ---------- the link and what it holds ---------- */
 .yt-form { display: flex; gap: 8px; }
 .yt-form input { flex: 1; min-width: 0; }
-.yt-error { margin-top: 10px; color: var(--danger); font-size: 13.5px; overflow-wrap: anywhere; }
+.yt-error { margin-top: 8px; color: var(--danger); font-size: 13.5px; overflow-wrap: anywhere; }
+.yt-rules { margin-top: 2px; }
 .yt-note {
   display: flex; gap: 10px; align-items: flex-start; margin-top: 12px; padding: 10px 12px; font-size: 13px;
   border-radius: var(--radius-sm); background: var(--warn-soft); color: var(--text); line-height: 1.45;

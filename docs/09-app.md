@@ -235,17 +235,28 @@ rights of the people who made the videos is up to you.
 The same *Link* field takes a Google Drive file shared with anyone who has the link. *Check* reads it in the same way
 and shows its name and length; *Start* adds a transcription named after the file without its extension. The links
 Drive gives to share a file all work: `drive.google.com/file/d/…/view`, the older `…/open?id=…` and `…/uc?id=…`. A
-Google Docs file is refused, and so is a file whose name says it isn't audio or video, and any link that isn't
-Drive's.
+Google Docs file is refused, and so is any link that isn't Drive's. A file is refused as not audio or video only when
+its name ends in the extension of another kind of file, such as a document, an image or an archive, and Drive gives
+no sign that it plays (no length, no copy made to play it). A name such as "Week 1.2" has no extension and is taken
+whole; a file that turns out not to be audio or video fails when its sound is read, as an upload would.
 
 The file is downloaded first, as it is on Drive: the file itself, never a copy that Drive made to play it. Before a
 large file, Drive shows a page saying it can't scan the file for viruses; the download answers that page and goes
-on. The download stops if the file turns out to be larger than the upload limit (`max_upload_gb`, 4 GB at first) or
-too large for the free disk space. From then on the file is treated as an uploaded file of its type: its sound is
-converted, a video gets the copy that plays beside its transcript, and the downloaded file is deleted unless
-`keep_original` is set. Drive files have no streaming choice and no captions, so every file goes to the chosen
-model. A Drive file sits with the single transcriptions, like an uploaded file, and has no files in the courses
-folder; its page links to the file on Drive.
+on. The download stops, and what came of it is deleted, when the file is too large:
+
+- When Drive gives the file's size as the download starts (it did for the files tried), the download stops at once
+  if the file is larger than the upload limit (`max_upload_gb`, 4 GB at first), or if the disk would have less than
+  1 GB left after the file and the sound made from it (taken as a fifth of the file's size).
+- When Drive gives no size, the download stops once more than the upload limit has come, or when a check of the free
+  space, at the start and then every 32 MB, finds less than 1 GB beyond room for the sound made from what came.
+
+The download takes the file only from Drive's own hosts, also after a redirect: an answer from another site stops it
+before anything of that answer is written.
+
+From then on the file is treated as an uploaded file of its type: its sound is converted, a video gets the copy that
+plays beside its transcript, and the downloaded file is deleted unless `keep_original` is set. Drive files have no
+streaming choice and no captions, so every file goes to the chosen model. A Drive file sits with the single
+transcriptions, like an uploaded file, and has no files in the courses folder; its page links to the file on Drive.
 
 Sedjem doesn't sign in to Google. A file that isn't shared with anyone who has the link, or that was removed, says
 "This file isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet." A file whose owner

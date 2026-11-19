@@ -106,11 +106,15 @@ only programs the user runs can reach it.
   and its folder one doesn't run either. A folder's link is refused before yt-dlp sees it; folders are planned. Drive
   is a new outside host: its playback service and its download hosts are listed in the privacy policy.
 - A file is downloaded only as itself (yt-dlp's `source` format) and only from `drive.google.com`,
-  `docs.google.com`, `drive.usercontent.google.com` or a `*.googleusercontent.com` host; an address elsewhere is
-  refused before anything is fetched from it. yt-dlp's own requests while it reads a link follow Google's redirects,
-  as a browser would.
-- A download is stopped as soon as it is larger than the upload limit or the free disk space allows, and what came
-  is deleted. The file is then read as an uploaded file is, by the same code.
+  `docs.google.com`, `drive.usercontent.google.com` or a `*.googleusercontent.com` host. The address yt-dlp read the
+  link from is checked, after the redirects of that reading, and so is the answer to the download itself: yt-dlp's
+  downloader opens it through the app's own check, which refuses an answer from another site before its body is read.
+  Left: yt-dlp follows redirects as a browser would, so a site that Google's servers redirect to gets the request
+  (the file's address, no account or cookie of the user's); only its answer is refused.
+- A download is stopped as soon as it is larger than the upload limit, and what came is deleted. When Drive gives the
+  size, the free space is checked as the download starts; when it doesn't, at the start and every 32 MB, with the
+  same 1 GB margin. The file is then read as an uploaded file is, by the same code. Left: a write error's message can
+  name the file's path on the computer in the job's error, as it can for YouTube.
 - Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file that isn't shared with
   anyone who has the link can't be read.
 - The tests run yt-dlp's own Drive extractor, the virus-scan page included, against a stand-in for Google's

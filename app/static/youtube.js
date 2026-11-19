@@ -21,9 +21,11 @@ const ytHref = (url) => (/^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.tes
 const ytLang = (code) => YT_LANG[String(code || "").split("-")[0].toLowerCase()] || code;
 
 // The link being checked or added. found: what POST /api/link/inspect answered (found.site is "youtube" or
-// "drive"); picked: the ids of the videos or files to transcribe; captions: use the captions people made, where a
-// YouTube video has them.
-const YT = { url: "", checked: "", busy: false, adding: false, found: null, error: "", picked: new Set(), captions: true };
+// "drive"); tried: the link last checked, found or not; picked: the ids of the videos or files to transcribe;
+// captions: use the captions people made, where a YouTube video has them.
+const YT = { url: "", checked: "", tried: "", busy: false, adding: false, found: null, error: "", picked: new Set(), captions: true };
+// Whether the link found, or the one last checked, is Google Drive's: then YouTube's own choices aren't shown.
+const ytOnDrive = () => (YT.found ? YT.found.site === "drive" : driveLink(YT.tried));
 
 // Download each video, or only its sound and stream the video from YouTube: a page preference (app.js's PREFS),
 // "download" until the user picks.
@@ -42,16 +44,18 @@ const listIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "
 // The new transcription page
 // ---------------------------------------------------------------------------------------------
 function ytCard() {
-  const y = YT, drive = y.found?.site === "drive";
+  const y = YT, drive = ytOnDrive();
   const form = `<form class="yt-form" id="ytForm">
       <input type="text" inputmode="url" id="ytUrl" value="${esc(y.url)}" placeholder="A YouTube or Google Drive link" spellcheck="false" autocomplete="off" aria-label="Link" aria-describedby="ytIntro" ${y.busy || y.adding ? "disabled" : ""}>
       <button class="btn" type="submit" ${y.busy || y.adding ? "disabled" : ""}>${y.busy ? "Checking…" : "Check"}</button></form>`;
-  const intro = `<p class="hint" id="ytIntro">A YouTube video or playlist, or a Google Drive file shared with anyone who has the link. Each video or file is downloaded and transcribed in turn; a playlist becomes a course, with its transcripts saved as files you can read or paste into a chat assistant. Download only what YouTube's terms and the file's owner allow you to.</p>`;
+  // a refused link's reason, right under the field; then what to paste, and the rules apart
+  const error = y.error ? `<div class="yt-error" role="alert">${esc(y.error)}</div>` : "";
+  const intro = `<p class="hint" id="ytIntro">A YouTube video or playlist, or a Google Drive file shared with anyone who has the link.</p>
+    <p class="hint yt-rules">Download only what YouTube's terms and the file's owner allow you to.</p>`;
   // a Drive file has no streaming choice and needs no JavaScript runtime: those are YouTube's
-  return `${y.found ? (drive ? driveFound(y.found) : ytFound(y.found)) : form + intro}
+  return `${y.found ? (drive ? driveFound(y.found) : ytFound(y.found)) : form + error + intro}
     ${drive ? "" : ytVideoChoice()}
-    <div id="ytNote">${drive ? "" : ytNote()}</div>
-    ${y.error ? `<div class="yt-error" role="alert">${esc(y.error)}</div>` : ""}`;
+    <div id="ytNote">${drive ? "" : ytNote()}</div>`;
 }
 
 // No JavaScript runtime: YouTube may hold back some videos. Deno can be downloaded like a model.
@@ -74,7 +78,7 @@ function ytVideoChoice() {
 
 function ytRefreshNote() {
   const el = $("#ytNote");
-  if (el) el.innerHTML = YT.found?.site === "drive" ? "" : ytNote();
+  if (el) el.innerHTML = ytOnDrive() ? "" : ytNote();
 }
 
 function ytFound(f) {
@@ -131,7 +135,7 @@ function bindYoutube() {
     form.onsubmit = (e) => { e.preventDefault(); ytCheck(); };
   }
   const change = $("#ytChange");
-  if (change) change.onclick = () => { Object.assign(YT, { found: null, error: "", picked: new Set() }); renderNew(); $("#ytUrl")?.focus(); };
+  if (change) change.onclick = () => { Object.assign(YT, { found: null, error: "", tried: "", picked: new Set() }); renderNew(); $("#ytUrl")?.focus(); };
   const caps = $("#ytCaptions");
   if (caps) caps.onchange = () => { YT.captions = caps.checked; renderNew(); };
   $$("input[name=ytVideo]").forEach((r) => (r.onchange = () => {
@@ -151,7 +155,7 @@ function bindYoutube() {
 async function ytCheck() {
   const url = YT.url.trim();
   if (!url || YT.busy) return;
-  Object.assign(YT, { busy: true, error: "", found: null });
+  Object.assign(YT, { busy: true, error: "", found: null, tried: url });
   renderNew();
   try {
     const found = await api.post("/api/link/inspect", { url });

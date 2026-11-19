@@ -13,7 +13,8 @@ fails on Drive as it is now (yt-dlp issue 10484), so folders wait until it works
 
 yt-dlp is used as for YouTube links (app/youtube.py's _ydl and _extract), with lists of Drive's own: the links it
 takes (HOSTS), its GoogleDrive extractor and no other, so its generic one never runs (EXTRACTORS), and the hosts a
-file may come from (DOWNLOAD_HOSTS and DOWNLOAD_DOMAINS). Nothing signs in to Google, so a file that isn't shared
+file may come from (DOWNLOAD_HOSTS and DOWNLOAD_DOMAINS), checked on the address yt-dlp read the link from and again
+on the answer to the download itself, after any redirect. Nothing signs in to Google, so a file that isn't shared
 with anyone who has the link is refused, and so is one that was removed (PRIVATE).
 """
 import re
@@ -35,11 +36,16 @@ FOLDERS_LATER = "Google Drive folders can't be read yet. Add the files one by on
 PRIVATE = "This file isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet."
 NO_DOWNLOAD = "Google Drive doesn't offer this file for download; its owner may have turned downloading off"
 NOT_MEDIA = "this file isn't audio or video"
-MEDIA = {  # the extensions of audio and video files
-    "3ga", "aac", "ac3", "aif", "aifc", "aiff", "amr", "caf", "flac", "m4a", "m4b", "mka", "mp3", "oga", "ogg", "opus",
-    "wav", "wave", "weba", "wma",
-    "3g2", "3gp", "asf", "avi", "dv", "flv", "m2ts", "m4v", "mkv", "mov", "mp4", "mpe", "mpeg", "mpg", "mts", "mxf",
-    "ogv", "ts", "vob", "webm", "wmv"}
+ELSEWHERE = "Google Drive sent the download to another site ({}), so nothing of it was kept"
+NO_ROOM = "not enough free disk space for this file"
+OTHER_FILES = {  # the extensions of files that are clearly not audio or video: documents, images, archives, programs
+    "pdf", "doc", "docx", "odt", "rtf", "txt", "md", "xls", "xlsx", "ods", "csv", "ppt", "pptx", "odp", "key", "pages",
+    "numbers", "epub", "mobi", "html", "htm", "xml", "json", "srt", "vtt", "ass", "jpg", "jpeg", "png", "gif", "bmp",
+    "webp", "heic", "svg", "tif", "tiff", "psd", "ai", "eps", "zip", "rar", "7z", "gz", "tar", "exe", "msi", "dmg",
+    "apk", "iso", "py", "js", "ipynb"}
+MARGIN = 1e9                # bytes kept free on the disk, beyond the file and the sound made from it
+SOUND_SHARE = 0.2           # the sound made from a file takes up to this share of its size again
+CHECK_EVERY = 32 * 1024 ** 2  # without a size from Drive, the free space is checked each time this much has come
 
 
 class DriveError(Exception):
@@ -107,9 +113,19 @@ def download_allowed(url):
 
 
 def extension(name):
-    """The extension of a file's name in lower case, without the dot ("" when it has none)."""
+    """The extension of a file's name in lower case, without the dot ("" when it has none). It has a letter: in
+    "Week 1.2" or "Meeting 2026.11.19" the end is part of the name, not an extension."""
     m = re.search(r"\.([A-Za-z0-9]{1,5})$", str(name or ""))
-    return m.group(1).lower() if m else ""
+    return m.group(1).lower() if m and re.search(r"[A-Za-z]", m.group(1)) else ""
+
+
+def clearly_not_media(name, info):
+    """Whether a file is clearly not audio or video: its name ends in the extension of another kind of file (a
+    document, an image, an archive), and Drive gives no sign that it plays, neither a length nor a copy made to play
+    it. Anything else is taken, and a file that turns out not to be audio or video fails when its sound is read."""
+    plays = isinstance(info.get("duration"), (int, float)) and info["duration"] > 0 \
+        or any(f.get("format_id") != "source" for f in info.get("formats") or [])
+    return extension(name) in OTHER_FILES and not plays
 
 
 def clean_error(e):
@@ -149,12 +165,13 @@ def inspect(cfg, url):
     if "entries" in info or not DRIVE_ID.fullmatch(fid) or file_url(fid) != check_url(url):
         raise DriveError(SITE.elsewhere)
     name = str(info.get("title") or fid)
-    if extension(name) and extension(name) not in MEDIA:
+    if clearly_not_media(name, info):
         raise DriveError(NOT_MEDIA)
     if not pick_source(info.get("formats")):
         raise DriveError(NO_DOWNLOAD)
     duration = info.get("duration") if isinstance(info.get("duration"), (int, float)) else None
-    entry = {"id": fid, "name": name, "title": re.sub(r"\.[A-Za-z0-9]{1,5}$", "", name).strip() or name, "index": 1,
+    title = (name[:-len(extension(name)) - 1].strip() if extension(name) else name) or name
+    entry = {"id": fid, "name": name, "title": title, "index": 1,
              "duration": duration, "url": file_url(fid), "available": True, "live": False, "captions": None, "use": None}
     return {"site": "drive", "kind": "file", "id": fid, "title": entry["title"], "name": name, "url": entry["url"],
             "count": 1, "duration": duration, "entries": [entry]}
@@ -169,21 +186,45 @@ def pick_source(formats):
                  and str(f.get("protocol") or "https") in ("https", "http")), None)
 
 
+def free_space(folder):
+    return shutil.disk_usage(folder).free
+
+
 def _room(cfg, folder, total, left):
     """DriveError when a file of `total` bytes is over the upload limit, or the disk hasn't space for the `left` bytes
-    still to come and the audio made from them, as for an upload (app/server.py)."""
+    still to come, the sound made from them and MARGIN, as for an upload (app/server.py)."""
     if total > cfg.max_upload:
         raise DriveError(f"the file is larger than the {cfg.max_upload // 1024 ** 3} GB limit")
-    if shutil.disk_usage(folder).free < left * 1.2 + 1e9:
-        raise DriveError("not enough free disk space for this file")
+    if free_space(folder) < left * (1 + SOUND_SHARE) + MARGIN:
+        raise DriveError(NO_ROOM)
+
+
+def _only_from_drive(ydl):
+    """Make the download refuse an answer that doesn't come from Drive's hosts. yt-dlp's downloader opens the
+    address through ydl.urlopen, which follows redirects; the answer's address is the one after them, and it is
+    checked before anything of its body is read. (The other site has had the request by then: only what it sends
+    back is refused.)"""
+    urlopen = ydl.urlopen
+
+    def checked(request, *args, **kwargs):
+        answer = urlopen(request, *args, **kwargs)
+        if not download_allowed(answer.url):
+            answer.close()
+            raise DriveError(ELSEWHERE.format(urllib.parse.urlsplit(answer.url).hostname or "an unknown site"))
+        return answer
+    ydl.urlopen = checked
 
 
 def download(cfg, job, folder, on_progress, cancelled):
     """Download a job's file into its folder as source.<ext>, with the extension of its name on Drive (bin without
-    one). Returns the field the job records: "source_name", the file's name. It stops, and keeps nothing, as soon as
-    the file turns out to be over the upload limit (cfg.max_upload) or too large for the free disk space; Drive says
-    how large a file is only when its download starts. on_progress(done, total) counts bytes; cancelled() is checked
-    while it runs."""
+    one). Returns the field the job records: "source_name", the file's name. on_progress(done, total) counts bytes;
+    cancelled() is checked while it runs.
+
+    It stops, and deletes what came, as soon as the file is too large. When Drive gives the file's size as the
+    download starts: at once, if the file is over the upload limit (cfg.max_upload) or would leave less than MARGIN
+    free beside the sound made from it. When Drive gives no size: once more than the upload limit has come, or when
+    the free space, checked each CHECK_EVERY bytes, is less than MARGIN beside the sound made from what came. It
+    also stops, keeping nothing, when the download's answer comes from another site than Drive's (_only_from_drive)."""
     folder = Path(folder)
     fid = str(job.get("drive_id") or "")
     if not DRIVE_ID.fullmatch(fid):
@@ -197,7 +238,7 @@ def download(cfg, job, folder, on_progress, cancelled):
             raise DriveError(NO_DOWNLOAD)
         name = str(info.get("title") or job.get("source_name") or fid)
         path = folder / f"source.{extension(name) or 'bin'}"
-        checked = []
+        state = {"sized": False, "next": 0}
 
         def hook(d):
             if cancelled():
@@ -206,19 +247,25 @@ def download(cfg, job, folder, on_progress, cancelled):
                 return
             done = d.get("downloaded_bytes") or 0
             total = d.get("total_bytes") or d.get("total_bytes_estimate") or None
-            if total and not checked:  # Drive says how large it is: once, as the download starts
-                checked.append(total)
+            if total and not state["sized"]:  # Drive says how large it is: checked once, as the download starts
+                state["sized"] = True
                 _room(cfg, folder, total, total - done)
-            if done > cfg.max_upload:  # (when it didn't say)
-                _room(cfg, folder, done, 0)
+            elif not total:  # it doesn't say: the limit, and the free space as the file comes
+                if done > cfg.max_upload:
+                    _room(cfg, folder, done, 0)
+                if done >= state["next"]:
+                    state["next"] = done + CHECK_EVERY
+                    if free_space(folder) < done * SOUND_SHARE + MARGIN:
+                        raise DriveError(NO_ROOM)
             on_progress(done, total)
 
         ydl.add_progress_hook(hook)
+        _only_from_drive(ydl)
         try:
             ydl.dl(str(path), {**source, "id": fid, "title": name})
         except Cancelled:
             raise
-        except DriveError:  # too large: what came so far isn't kept
+        except DriveError:  # too large, or from elsewhere: what came so far isn't kept
             for part in folder.glob(f"{path.name}.*"):
                 part.unlink(missing_ok=True)
             raise

@@ -80,6 +80,19 @@ class Links(unittest.TestCase):
                 with self.assertRaises(Exception, msg=url):
                     ydl.extract_info(url, download=False, process=False)
 
+    def test_names_and_extensions(self):
+        for name, ext in (("Lecture.mp4", "mp4"), ("clip.3gp", "3gp"), ("Talk.M4A", "m4a"), ("notes.pdf", "pdf"),
+                          ("Week 1.2", ""), ("Meeting 2026.11.19", ""), ("Lecture 1. Intro", ""), ("readme", "")):
+            self.assertEqual(drive.extension(name), ext, name)
+        plays = {"duration": 12.5, "formats": [{"format_id": "source"}]}
+        copy = {"duration": None, "formats": [{"format_id": "18"}, {"format_id": "source"}]}
+        silent = {"duration": None, "formats": [{"format_id": "source"}]}
+        self.assertTrue(drive.clearly_not_media("notes.pdf", silent))
+        self.assertTrue(drive.clearly_not_media("photo.JPG", silent))
+        for name, info in (("notes.pdf", plays), ("notes.pdf", copy), ("Week 1.2", silent), ("Meeting 2026.11.19", silent),
+                           ("talk.xyz", silent), ("recording", silent), ("Lecture.mp4", silent)):
+            self.assertFalse(drive.clearly_not_media(name, info), (name, info))
+
     def test_errors_read_well(self):
         for message in (f"ERROR: [GoogleDrive] {FILE}: Unable to download JSON metadata: HTTP Error 403: Forbidden "
                         "(caused by <HTTPError 403: Forbidden>)",
@@ -132,6 +145,18 @@ class InspectAndDownload(unittest.TestCase):
         self.assertEqual(drive.inspect(self.cfg, f"https://drive.google.com/open?id={self.sound}")["title"], "03 Loops")
         with self.assertRaisesRegex(drive.DriveError, "isn't audio or video"):
             drive.inspect(self.cfg, drive.file_url(self.pdf))
+
+    def test_a_name_without_an_extension(self):
+        """A name such as "Week 1.2" has no extension: it is taken whole, and the file is saved as source.bin; only a
+        file whose name is clearly another kind of file, and that Drive doesn't play, is refused."""
+        week = self.fake.file(drive_id(13), "Week 1.2", seconds=2)
+        dated = self.fake.file(drive_id(14), "Meeting 2026.11.19", kind=AUDIO)
+        named = self.fake.file(drive_id(15), "Recording.pdf", kind=AUDIO)  # misnamed, but Drive knows its length
+        for fid, title in ((week, "Week 1.2"), (dated, "Meeting 2026.11.19"), (named, "Recording")):
+            self.assertEqual(drive.inspect(self.cfg, drive.file_url(fid))["title"], title, fid)
+        got = drive.download(self.cfg, {"drive_id": week, "source_url": drive.file_url(week)}, self.dir, lambda *a: None,
+                             lambda: False)
+        self.assertEqual((got["source_name"], [p.name for p in self.dir.iterdir()]), ("Week 1.2", ["source.bin"]))
 
     def test_a_folder_never_reaches_yt_dlp(self):
         with mock.patch.object(drive, "_ydl", side_effect=AssertionError("yt-dlp was asked")):
@@ -247,6 +272,67 @@ class RealExtractor(unittest.TestCase):
         self.assertNotIn("evil.example", self.hosts(), "nothing was fetched from there")
         self.assertEqual(list(self.tmp.glob("source.*")), [])
 
+    def test_a_download_redirected_elsewhere_is_stopped(self):
+        """The link was read from Drive's hosts, but the download's own request is sent on to another site: its
+        answer is refused before anything of it is written. The request reached that site (yt-dlp follows the
+        redirect); only what it sends is refused."""
+        fid = self.google.file(drive_id(25), "Talk.mp4", b"x" * 5000, moved="evil.example")
+        self.assertEqual(drive.inspect(self.cfg, drive.file_url(fid))["title"], "Talk")
+        with self.assertRaises(drive.DriveError) as e:
+            drive.download(self.cfg, {"drive_id": fid, "source_url": drive.file_url(fid)}, self.tmp, lambda *a: None,
+                           lambda: False)
+        self.assertEqual(str(e.exception), "Google Drive sent the download to another site (evil.example), so nothing "
+                                           "of it was kept")
+        self.assertEqual(list(self.tmp.glob("source.*")), [])
+        self.assertIn("evil.example", self.hosts(), "(what the check can't prevent: the request itself)")
+
+    def stopped(self, fid, error, **patches):
+        """The download of fid stops with `error`, after a part of it was written, and leaves no file behind."""
+        deleted, unlink = [], Path.unlink
+
+        def spy(path, missing_ok=False):
+            if path.parent == self.tmp and path.is_file():
+                deleted.append((path.name, path.stat().st_size))
+            return unlink(path, missing_ok=missing_ok)
+        with mock.patch.object(drive, "free_space", patches.get("free_space", drive.free_space)), \
+                mock.patch.object(Path, "unlink", spy):
+            with self.assertRaisesRegex(drive.DriveError, error):
+                drive.download(self.cfg, {"drive_id": fid, "source_url": drive.file_url(fid)}, self.tmp,
+                               lambda *a: None, lambda: False)
+        self.assertEqual(sorted(p.name for p in self.tmp.iterdir()), [], "nothing is left")
+        self.assertTrue(any(name.endswith(".part") and size for name, size in deleted), f"a part was deleted: {deleted}")
+
+    def test_over_the_limit_the_part_is_deleted(self):
+        self.cfg.max_upload = 100_000
+        sized = self.google.file(drive_id(26), "Big.mp4", b"y" * 300_000)
+        unsized = self.google.file(drive_id(27), "Big unsized.mp4", b"y" * 300_000, sized=False)
+        self.stopped(sized, "larger than the 0 GB limit")
+        self.stopped(unsized, "larger than the 0 GB limit")
+
+    def test_too_little_free_space_the_part_is_deleted(self):
+        asked = []
+
+        def full(folder):
+            asked.append(folder)
+            return 5e8  # less than the margin
+        sized = self.google.file(drive_id(28), "Sized.mp4", b"z" * 300_000)
+        unsized = self.google.file(drive_id(29), "Unsized.mp4", b"z" * 300_000, sized=False)
+        self.stopped(sized, "not enough free disk space", free_space=full)
+        self.stopped(unsized, "not enough free disk space", free_space=full)
+        self.assertEqual(len(asked), 2, "once for each: the sized one as it starts, the other at its first check")
+
+    def test_without_a_size_the_free_space_is_checked_as_it_comes(self):
+        free = iter([5e9, 5e9, 5e8])  # enough at first, then less than the margin
+        asked = []
+
+        def shrinking(folder):
+            asked.append(folder)
+            return next(free)
+        fid = self.google.file(drive_id(30), "Long.mp4", b"w" * 300_000, sized=False)
+        with mock.patch.object(drive, "CHECK_EVERY", 100_000):
+            self.stopped(fid, "not enough free disk space", free_space=shrinking)
+        self.assertEqual(len(asked), 3, "at the start, then each 100 000 bytes")
+
     def test_a_file_that_isnt_shared(self):
         fid = self.google.file(drive_id(23), "Private.mp4", b"x")
         self.google.private.add(fid)
@@ -266,7 +352,7 @@ class Api(unittest.TestCase):
         cls.cfg.save_key("elevenlabs", "test-key")
         cls.fake = fake = FakeDrive()
         cls.video = fake.file(drive_id(50), "Week 1 lecture.mp4", seconds=2)
-        cls.sound = fake.file(drive_id(51), "Interview.m4a", kind=AUDIO, seconds=2)
+        cls.sound = fake.file(drive_id(51), "Interview 2026.11.19", kind=AUDIO, seconds=2)
         cls.later = fake.file(drive_id(52), "Unshared later.mp4", seconds=2)
         cls.ran = []
 
@@ -345,11 +431,12 @@ class Api(unittest.TestCase):
         self.assertEqual((status, again["drive_id"]), (201, self.video), "still the same file")
         self.wait(again["id"])
 
-    def test_2_a_sound_file(self):
+    def test_2_a_sound_file_whose_name_has_no_extension(self):
         status, r = self.add(f"https://drive.google.com/open?id={self.sound}")
         self.assertEqual(status, 201, r)
+        self.assertEqual(r["jobs"][0]["title"], "Interview 2026.11.19", "the whole name: it has no extension")
         done = self.wait(r["jobs"][0]["id"])
-        self.assertEqual((done["job"]["status"], done["has_video"]), ("done", False))
+        self.assertEqual((done["job"]["status"], done["has_video"]), ("done", False), done["job"].get("error"))
 
     def test_3_a_file_that_stops_being_shared_and_is_tried_again(self):
         self.assertEqual(self.call("POST", "/api/link/inspect", {"url": drive.file_url(self.later)})[0], 200)

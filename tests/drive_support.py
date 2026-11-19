@@ -78,15 +78,20 @@ class FakeYDL:
                             "(caused by <HTTPError 403: Forbidden>)")
         f = self.fake.files[fid]
         host = self.fake.elsewhere.get(fid, "drive.usercontent.google.com")
-        formats = [{"format_id": "18", "ext": "mp4", "url": f"https://rr1---sn-test.c.drive.google.com/videoplayback?id={fid}"}]
+        plays = f["kind"] is not None  # Drive knows the length of audio and video, and makes a copy to play a video
+        formats = [{"format_id": "18", "ext": "mp4", "url": f"https://rr1---sn-test.c.drive.google.com/videoplayback?id={fid}"}
+                   ] if f["kind"] == VIDEO else []
         if fid not in self.fake.no_download:
             formats.append({"format_id": "source", "ext": f["name"].rsplit(".", 1)[-1], "quality": 1,
                             "url": f"https://{host}/download?id={fid}&export=download&confirm=t"})
-        return {"id": fid, "title": f["name"], "duration": f["seconds"], "formats": formats, "subtitles": {},
-                "extractor_key": "GoogleDrive", "webpage_url": url}
+        return {"id": fid, "title": f["name"], "duration": f["seconds"] if plays else None, "formats": formats,
+                "subtitles": {}, "extractor_key": "GoogleDrive", "webpage_url": url}
 
     def add_progress_hook(self, fn):
         self.hooks.append(fn)
+
+    def urlopen(self, request):  # (app/drive.py wraps it; the stand-in's dl doesn't use it)
+        raise AssertionError("nothing is fetched")
 
     def dl(self, name, fmt):
         f = self.fake.files[fmt["id"]]
@@ -120,18 +125,21 @@ download this file?</p>
 
 
 class GoogleServers:
-    """What Google's servers answer for Drive files, to the real yt-dlp: files by id ({name, data, scan, host}), ids
-    that aren't shared, and every request made, as (method, url)."""
+    """What Google's servers answer for Drive files, to the real yt-dlp: files by id ({name, data, scan, host, sized,
+    moved}), ids that aren't shared, and every request made, as (method, url)."""
 
     def __init__(self):
         self.files = {}
         self.private = set()   # ids Drive won't show to someone who isn't signed in
         self.requests = []
 
-    def file(self, fid, name, data, scan=False, host="drive.usercontent.google.com"):
+    def file(self, fid, name, data, scan=False, host="drive.usercontent.google.com", sized=True, moved=None):
         """scan: the first answer to the download is the page saying the file is too large to scan for viruses.
-        host: where the download is sent on to (another host than Google's is refused by app/drive.py)."""
-        self.files[fid] = {"name": name, "data": data, "scan": scan, "host": host}
+        host: where the download is sent on to, as yt-dlp reads the link (another host than Google's is refused by
+        app/drive.py). sized: whether the file's answer says its size (Content-Length). moved: a host that the
+        download itself is redirected to when it asks for the file, as an HTTP handler that follows redirects
+        answers: the answer's address is that host's, and that host is in requests."""
+        self.files[fid] = {"name": name, "data": data, "scan": scan, "host": host, "sized": sized, "moved": moved}
         return fid
 
     def ydl(self, real):
@@ -168,9 +176,10 @@ class GoogleServers:
         p = urllib.parse.urlsplit(url)
         q = urllib.parse.parse_qs(p.query)
 
-        def reply(body, status=200, headers=None, at=url, reason="OK"):
+        def reply(body, status=200, headers=None, at=url, reason="OK", sized=True):
             body = body.encode() if isinstance(body, str) else body
-            r = Response(io.BytesIO(body), at, {"Content-Length": str(len(body)), **(headers or {})}, status, reason)
+            size = {"Content-Length": str(len(body))} if sized else {}
+            r = Response(io.BytesIO(body), at, {**size, **(headers or {})}, status, reason)
             if status >= 400:
                 raise HTTPError(r)
             return r
@@ -197,10 +206,13 @@ class GoogleServers:
         m = re.fullmatch(r"/download/[\w-]+/(.+)", p.path)
         if m:  # the file itself, where the download was sent on to
             f = next(x for x in self.files.values() if x["name"] == urllib.parse.unquote(m.group(1)))
-            data, status = f["data"], 200
+            data, status, at = f["data"], 200, url
+            if f["moved"]:  # a 302 that the handler followed: the answer comes from the other host
+                at = f"https://{f['moved']}{p.path}"
+                self.requests.append((method, at))
             r = re.fullmatch(r"bytes=(\d+)-(\d*)", request.headers.get("Range", ""))
             if r:
                 start, end = int(r.group(1)), int(r.group(2) or len(f["data"]) - 1)
                 data, status = f["data"][start:end + 1], 206
-            return reply(data, status, {"Content-Type": "application/octet-stream"})
+            return reply(data, status, {"Content-Type": "application/octet-stream"}, at=at, sized=f["sized"])
         return reply("Not found", 404, reason="Not Found")

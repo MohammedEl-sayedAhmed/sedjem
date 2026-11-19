@@ -65,10 +65,13 @@ class DriveLinks(UiTestCase):
         self.assertEqual(self.page.inner_text("[data-src=link]"), "Link")
         self.page.click("[data-src=link]")
         self.assertEqual(self.page.get_attribute("#ytUrl", "placeholder"), "A YouTube or Google Drive link")
-        self.assertIn("Google Drive file shared with anyone who has the link", self.page.inner_text("#ytIntro"))
+        self.assertEqual(self.page.inner_text("#ytIntro"),
+                         "A YouTube video or playlist, or a Google Drive file shared with anyone who has the link.")
+        self.assertEqual(self.page.inner_text(".yt-rules"),
+                         "Download only what YouTube's terms and the file's owner allow you to.")
         self.check(f"https://drive.google.com/file/d/{NEW_FILE}/view?usp=sharing")
-        self.assertIn("Guest lecture on sampling", self.page.inner_text(".yt-chosen .name"))
-        self.assertIn("Google Drive file · Guest lecture on sampling.mp4", self.page.inner_text(".yt-chosen .sub"))
+        self.assertEqual(self.page.inner_text(".yt-chosen .name"), "Guest lecture on sampling.mp4", "the name, once")
+        self.assertEqual(self.page.inner_text(".yt-chosen .sub"), "Google Drive file · 2 s")
         self.assertIn("downloaded, then transcribed like a file on this computer", self.page.inner_text(".yt-caps"))
         self.assertEqual(self.page.locator(".yt-video").count(), 0, "no streaming choice: that is YouTube's")
         self.assertIn("named after the file", self.page.inner_text(".card:has(#lang)"))
@@ -92,10 +95,14 @@ class DriveLinks(UiTestCase):
 
     def test_a_drive_folder_is_refused_with_the_reason(self):
         self.open()
+        self.page.click("[data-src=link]")
+        self.assertEqual(self.page.locator(".yt-video").count(), 1, "before a link is checked: YouTube's choice")
         self.check(FOLDER_LINK, ".yt-error")
-        self.assertEqual(self.page.inner_text(".yt-error"),
-                         "Google Drive folders can't be read yet. Add the files one by one, each with its own link.")
+        self.assertEqual(self.page.inner_text("#ytForm + .yt-error"),
+                         "Google Drive folders can't be read yet. Add the files one by one, each with its own link.",
+                         "right under the field")
         self.assertEqual(self.page.get_attribute(".yt-error", "role"), "alert")
+        self.assertEqual(self.page.locator(".yt-video").count(), 0, "a Drive link: no YouTube choice")
         self.assertEqual(self.page.input_value("#ytUrl"), FOLDER_LINK, "the link stays, to be changed")
         self.assertTrue(self.page.is_disabled("#startBtn"))
         self.assertEqual(len([e for e in self.errors if e.startswith(REFUSED)]), 1)
