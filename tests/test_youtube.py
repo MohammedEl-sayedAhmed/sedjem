@@ -619,7 +619,14 @@ class Api(unittest.TestCase):
         status, again = self.call("POST", f"/api/jobs/{done[0]['job']['id']}/rerun",
                                   {"model": "elevenlabs", "confirm_upload": True})
         self.assertEqual((status, again.get("stream")), (201, True), "a re-run plays from YouTube too")
-        self.wait(again["id"])
+        self.assertTrue(self.wait(again["id"])["job"]["stream"])
+        first = done[0]["job"]["id"]
+        self.settled(lambda: self.call("GET", f"/api/jobs/{first}/versions")[1].get("versions"))
+        status, branch = self.call("POST", f"/api/jobs/{first}/branch", {"version": 0, "name": "Checked"})
+        self.assertEqual(status, 201, branch)
+        got = self.call("GET", f"/api/jobs/{branch['id']}")[1]
+        self.assertEqual((got["job"]["stream"], got["job"]["youtube_id"], got["has_video"]), (True, "vid00000001", False),
+                         "a branch plays from YouTube too")
         status, r = self.add("https://youtu.be/vid00000002", stream=False)
         job = self.wait(r["jobs"][0]["id"])["job"]
         self.assertNotIn("stream", job)
@@ -631,6 +638,41 @@ class Api(unittest.TestCase):
                 self.assertEqual(r.headers["Content-Security-Policy"], "frame-src https://www.youtube-nocookie.com", path)
         with urllib.request.urlopen(self.base + "/static/app.js", timeout=30) as r:
             self.assertIsNone(r.headers["Content-Security-Policy"])
+
+    def test_8_a_download_that_didnt_finish_is_downloaded_again(self):
+        """yt-dlp's part of a download that stopped (a failure, a cancel, the app closed) is not taken as the
+        recording: trying again downloads it, instead of reading the part."""
+        self.assertEqual(self.call("POST", "/api/youtube/inspect", {"url": "https://youtu.be/vid00000005"})[0], 200)
+        self.fake.fail["vid00000005"] = "ERROR: [youtube] vid00000005: The connection dropped"
+        status, r = self.add("https://youtu.be/vid00000005", stream=True, captions=False)
+        self.assertEqual(status, 201, r)
+        jid = r["jobs"][0]["id"]
+        self.assertEqual(self.wait(jid)["job"]["status"], "failed")
+        folder = self.cfg.storage / "jobs" / jid
+        (folder / "source.m4a.part").write_bytes(b"\0" * 1000)  # what yt-dlp had written so far
+        (folder / "source.m4a.ytdl").write_text("{}")
+        del self.fake.fail["vid00000005"]
+        self.fake.downloads.clear()
+        status, again = self.call("POST", f"/api/jobs/{jid}/rerun", {"model": "elevenlabs", "confirm_upload": True})
+        self.assertEqual(status, 201, again)
+        job = self.wait(jid)["job"]
+        self.assertEqual((job["status"], job.get("error")), ("done", None))
+        self.assertEqual(self.fake.downloads, [("vid00000005", "140")], "downloaded again")
+
+
+class SourceFile(unittest.TestCase):
+    def test_parts_of_a_download_dont_count(self):
+        from app import jobs
+        with tempfile.TemporaryDirectory(prefix="sedjem-src-") as tmp:
+            folder = Path(tmp)
+            for name in ("source.m4a.part", "source.m4a.ytdl", "source.webm.part-Frag3", "source.webm.part-Frag3.part"):
+                (folder / name).write_bytes(b"x")
+            self.assertIsNone(jobs.source_file(folder), "a download that didn't finish")
+            (folder / "source.m4a").write_bytes(b"x")
+            self.assertEqual(jobs.source_file(folder), folder / "source.m4a")
+        with tempfile.TemporaryDirectory(prefix="sedjem-src-") as tmp:
+            (Path(tmp) / "source.part").write_bytes(b"x")  # an uploaded file that was named x.part
+            self.assertEqual(jobs.source_file(tmp), Path(tmp) / "source.part")
 
 
 if __name__ == "__main__":

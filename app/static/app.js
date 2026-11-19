@@ -808,7 +808,10 @@ function renderJob() {
     </div>`;
   }
 
-  if (view.contains(videoPanel)) movePanel(document.body);  // kept while the page is drawn again (placeVideo)
+  // The panel stays while the page is drawn again (placeVideo). Where the browser can move it without reloading
+  // YouTube's player in it, it is set aside first; elsewhere the player loads again once, and goes on.
+  const kept = view.contains(videoPanel);
+  if (kept && document.body.moveBefore) movePanel(document.body);
   view.innerHTML = `
   <div class="job-head">
     <div class="title-row">
@@ -856,7 +859,7 @@ function renderJob() {
       ${detailsPanel()}
     </div>
   </div>` : ""}`;
-  placeVideo();
+  placeVideo(kept);
   bindJob();
   updateMatches();
   if (canPlay()) showPlayer(j, S.hasVideo ? "video" : streamed() ? "youtube" : "audio"); else hidePlayer();
@@ -1826,6 +1829,20 @@ ytMedia.addEventListener("fail", () => {
   }
   showPlayer(j, "audio");
 });
+
+// "Try again" on that note: YouTube's player goes back in its place and loads at once, from where the sound was (and
+// playing, if the sound was). If it fails again, the note comes back. As above, the page isn't drawn again.
+function ytRetry() {
+  const j = S.job, body = $(".job-body");
+  if (!j || !body || !YT_FAILED.delete(j.id) || !streamed()) return;
+  $("#ytFallback")?.remove();
+  body.classList.add("has-video");
+  body.querySelector(".side-col")?.insertAdjacentHTML("afterbegin", videoSlot());
+  placeVideo(false);
+  showPlayer(j, "youtube");
+  ytMedia.start();
+}
+document.addEventListener("click", (e) => e.target.closest?.("#ytRetry") && ytRetry());
 function hidePlayer() {
   if (!media.paused) media.pause();
   $("#player").hidden = true;
@@ -1933,7 +1950,8 @@ function videoSlot() {
 }
 const videoPrepPct = (p) => (p.done != null && p.total ? Math.min(100, p.done / p.total * 100) : 0);
 const videoPrepText = (p) => `${p.done == null ? "Waiting to start" : `${Math.round(videoPrepPct(p))}%`} · the transcript doesn't wait for it`;
-function placeVideo() {
+// kept: the panel was on this page before it was drawn again (renderJob), so its player stays.
+function placeVideo(kept = false) {
   const slot = $("#videoSlot");
   if (!slot) {
     if (videoPanel.parentNode === document.body) videoPanel.remove();  // set aside by renderJob, and not shown now
@@ -1943,7 +1961,7 @@ function placeVideo() {
   // A player left from another page is closed first, so it doesn't load again for nothing when the panel goes in;
   // this page's own, back after the page was left, loads again only when it is played
   if (ytMedia.job && (!yt || ytMedia.job !== S.job?.id)) ytMedia.removeAttribute("src");
-  else if (ytMedia.frame && !videoPanel.isConnected) ytMedia.unload();
+  else if (ytMedia.frame && !kept) ytMedia.unload();
   videoPanel.style.setProperty("--ar", slot.dataset.ar);
   videoPanel.classList.toggle("yt", yt);
   movePanel(slot.parentNode, slot);

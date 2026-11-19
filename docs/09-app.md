@@ -171,7 +171,8 @@ loading YouTube's own script, so the transcript follows it as it follows a downl
 time goes there, and *Follow playback* keeps the current line in view. When the player doesn't answer
 within about 8 seconds, as without internet, or YouTube doesn't let other sites play that video, the
 page says "YouTube's player couldn't load, so the sound plays from this computer" and plays the
-downloaded sound instead, from the same moment. Transcriptions made before this choice, and those that
+downloaded sound instead, from the same moment. *Try again* there loads YouTube's player once more, and
+*Open on YouTube* opens the video in the browser. Transcriptions made before this choice, and those that
 downloaded the video, play as before.
 
 ### Captions made by people

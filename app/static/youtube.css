@@ -106,6 +106,12 @@
 .course-bar span.btn[aria-disabled="true"] { opacity: .45; cursor: default; }
 .yt-notice { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; background: var(--warn-soft); border-color: transparent; }
 .yt-notice svg { width: 18px; height: 18px; color: var(--warn); flex: none; margin-top: 1px; }
+/* a streamed video's player that failed: the note, and the ways on */
+.yt-fallback { flex-wrap: wrap; align-items: center; row-gap: 8px; }
+.yt-fallback-text { flex: 1 1 260px; }
+.yt-fallback-actions { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.yt-fallback-actions .btn { text-decoration: none; }
+.yt-fallback-actions svg { width: 15px; height: 15px; margin: 0; color: currentColor; }
 
 /* ---------- a course in the sidebar ---------- */
 .job-item.course .t { color: inherit; text-decoration: none; }

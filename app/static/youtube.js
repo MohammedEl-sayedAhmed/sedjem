@@ -28,7 +28,7 @@ const YT = { url: "", checked: "", busy: false, adding: false, found: null, erro
 const YT_VIDEO_KEY = "sedjem-youtube-video";
 const ytStream = () => { try { return localStorage.getItem(YT_VIDEO_KEY) === "stream"; } catch { return false; } };
 const YT_VIDEO = [["download", "Download the video", "It plays without internet."],
-  ["stream", "Stream it from YouTube", "Only the sound is downloaded; the video plays from YouTube when it plays."]];
+  ["stream", "Stream it from YouTube", "Only the sound is downloaded. The video plays from YouTube."]];
 
 // The icon for how a transcript was made: on this computer, on a paired one, by a hosted service, or from YouTube's captions.
 const kindIcon = (j) => (j.kind === "captions" ? YT_ICON.captions : j.kind === "hosted" ? ICON.cloud : j.kind === "remote" ? ICON.network : ICON.laptop);
@@ -64,8 +64,8 @@ function ytVideoChoice() {
   const on = ytStream() ? "stream" : "download";
   return `<fieldset class="yt-video"${YT.adding ? " disabled" : ""}><legend class="field-label">The video</legend>
     <div class="yt-video-opts">${YT_VIDEO.map(([v, title, hint]) => `<label class="yt-video-opt">
-      <input type="radio" name="ytVideo" value="${v}" ${on === v ? "checked" : ""}>
-      <span><span class="yt-video-title">${title}</span><span class="hint">${hint}</span></span></label>`).join("")}</div></fieldset>`;
+      <input type="radio" name="ytVideo" value="${v}" aria-describedby="ytVideoHint-${v}" ${on === v ? "checked" : ""}>
+      <span><span class="yt-video-title">${title}</span><span class="hint" id="ytVideoHint-${v}">${hint}</span></span></label>`).join("")}</div></fieldset>`;
 }
 
 function ytRefreshNote() {
@@ -288,8 +288,15 @@ let ytFrames = 0;
 const ytStreamed = (r) => (r.job?.stream && !r.has_video && YT_ID.test(String(r.job.youtube_id || "")) ? r.job.youtube_id : "");
 const ytEmbed = (id) => (YT_ID.test(String(id || ""))
   ? `${YT_ORIGIN}/embed/${id}?enablejsapi=1&playsinline=1&rel=0&origin=${encodeURIComponent(location.origin)}` : "");
-const ytFallbackNote = (j) => (j.stream && YT_FAILED.has(j.id)
-  ? `<div class="card yt-notice" id="ytFallback">${ICON.info}<span>${YT_FALLBACK}.</span></div>` : "");
+// The note on a page whose player failed, with a way on: try YouTube's player again (app.js), or open the video on
+// YouTube in the browser.
+function ytFallbackNote(j) {
+  if (!j.stream || !YT_FAILED.has(j.id)) return "";
+  const href = ytHref(j.source_url);
+  return `<div class="card yt-notice yt-fallback" id="ytFallback" role="status">${ICON.info}<span class="yt-fallback-text">${YT_FALLBACK}.</span>
+    <span class="yt-fallback-actions"><button type="button" class="btn btn-sm" id="ytRetry">Try again</button>
+    ${href ? `<a class="btn btn-sm" href="${esc(href)}" target="_blank" rel="noopener noreferrer">${YT_ICON.video} Open on YouTube</a>` : ""}</span></div>`;
+}
 
 class YouTubeMedia extends EventTarget {
   constructor(box) {
@@ -303,8 +310,9 @@ class YouTubeMedia extends EventTarget {
     window.addEventListener("message", (e) => this.message(e));
   }
 
-  clear() {  // nothing loaded: paused at 0
-    Object.assign(this, { url: "", id: 0, ready: false, state: -1, stopped: true, base: 0, at: 0, seek: null, rate: 1, length: NaN });
+  clear() {  // nothing loaded: paused at 0, at the speed chosen (as a media element takes its defaultPlaybackRate)
+    Object.assign(this, { url: "", id: 0, ready: false, state: -1, stopped: true, base: 0, at: 0, seek: null,
+                          rate: this.defaultPlaybackRate, length: NaN });
   }
 
   // ---- as a media element ----
@@ -354,6 +362,8 @@ class YouTubeMedia extends EventTarget {
   open(url, job, seconds) {
     this.removeAttribute("src");
     Object.assign(this, { url, job, length: seconds > 0 ? seconds : NaN });
+    this.emit("loadedmetadata");  // the bar shows the new video's length, and its time from 0
+    this.emit("timeupdate");
   }
   start() {  // the player's frame, in the panel
     if (this.frame || !this.url) return;

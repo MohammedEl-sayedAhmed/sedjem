@@ -20,8 +20,9 @@ from youtube_support import FakeYouTube, vtt
 from app import youtube
 
 EMBED = "https://www.youtube-nocookie.com/embed/**"
-STREAMED, ERRED, SILENT, DOWNLOADED, OLDER = ("20261101-100000-e001", "20261101-100000-e002", "20261101-100000-e003",
-                                              "20261101-100000-e004", "20261101-100000-e005")
+STREAMED, ERRED, SILENT, DOWNLOADED, OLDER, NEXT = (
+    "20261101-100000-e001", "20261101-100000-e002", "20261101-100000-e003", "20261101-100000-e004",
+    "20261101-100000-e005", "20261101-100000-e006")
 VIDEO = lambda vid, **more: {"youtube_id": vid, "source_url": f"https://www.youtube.com/watch?v={vid}", **more}
 DENO = {"name": "Deno", "version": "2.9.5", "downloaded": True}
 
@@ -78,7 +79,8 @@ class StreamedVideo(UiTestCase):
             {"jid": ERRED, "title": "Not embeddable", **VIDEO("vidstream02", stream=True)},
             {"jid": SILENT, "title": "Offline lecture", **VIDEO("vidstream03", stream=True)},
             {"jid": DOWNLOADED, "title": "Downloaded lecture", "video": (320, 180), **VIDEO("viddownl001")},
-            {"jid": OLDER, "title": "Older lecture", **VIDEO("vidolder001")})
+            {"jid": OLDER, "title": "Older lecture", **VIDEO("vidolder001")},
+            {"jid": NEXT, "title": "Next streamed lecture", "seconds": 15.0, **VIDEO("vidstream04", stream=True)})
 
     @classmethod
     def setUpClass(cls):
@@ -120,7 +122,8 @@ class StreamedVideo(UiTestCase):
 
     def frame(self):
         self.page.wait_for_function("() => ytMedia.ready")
-        return next(f for f in self.page.frames if f.url.startswith("https://www.youtube-nocookie.com/embed/"))
+        return next(f for f in self.page.frames
+                    if f.url.startswith("https://www.youtube-nocookie.com/embed/") and not f.is_detached())
 
     def wait_for_command(self, frame, *command):
         want = json.dumps(json.dumps(list(command), separators=(",", ":")))  # as JSON.stringify writes it
@@ -186,16 +189,29 @@ class StreamedVideo(UiTestCase):
         self.assertEqual(self.page.locator("#view #videoPanel iframe").count(), 1)
         self.assertEqual(self.page.locator("#ytFallback").count(), 0)
 
-        # the page drawn again keeps the same player, loaded once (where the browser can move it: moveBefore)
-        self.page.evaluate("() => { window.__loads = 0; window.__frame = ytMedia.frame;"
-                           " ytMedia.frame.addEventListener('load', () => window.__loads++); renderJob(); }")
-        self.page.wait_for_timeout(500)
-        kept = self.page.evaluate("() => ({ same: document.querySelector('#view #videoPanel iframe') === window.__frame,"
-                                  " loads: window.__loads, moves: !!Element.prototype.moveBefore })")
-        self.assertTrue(kept["same"])
-        if kept["moves"]:
-            self.assertEqual(kept["loads"], 0, "not loaded again")
-        self.assertEqual(len(self.asked), 1 if kept["moves"] else 2)
+        # the page drawn again keeps the same player: where the browser can move it (moveBefore), not loaded again
+        if self.page.evaluate("() => !!Element.prototype.moveBefore"):
+            self.page.evaluate("() => { window.__loads = 0; window.__frame = ytMedia.frame;"
+                               " ytMedia.frame.addEventListener('load', () => window.__loads++); renderJob(); }")
+            self.page.wait_for_timeout(500)
+            kept = self.page.evaluate("() => ({ same: document.querySelector('#view #videoPanel iframe') === window.__frame,"
+                                      " loads: window.__loads })")
+            self.assertEqual(kept, {"same": True, "loads": 0}, "not loaded again")
+            self.assertEqual(len(self.asked), 1)
+        # in a browser that can't (WebKitGTK may not), it loads once more and plays on from where it was
+        self.page.click("#playBtn")
+        self.page.wait_for_function("() => !ytMedia.paused && ytMedia.state === 1")
+        asked = len(self.asked)
+        self.page.evaluate("() => { Element.prototype.moveBefore = undefined; window.__frame = ytMedia.frame;"
+                           " window.__again = false; ytMedia.frame.addEventListener('load', () => (window.__again = true));"
+                           " window.__at = ytMedia.currentTime; renderJob(); }")
+        self.page.wait_for_function("() => window.__again && ytMedia.ready && !ytMedia.paused")
+        self.assertTrue(self.page.evaluate("() => document.querySelector('#view #videoPanel iframe') === window.__frame"))
+        frame = self.frame()
+        self.wait_for_command(frame, "playVideo")
+        at = self.page.evaluate("() => window.__at")
+        self.assertTrue(any(c[0] == "seekTo" and c[1] >= at for c in self.commands(frame)), self.commands(frame))
+        self.assertEqual(len(self.asked), asked + 1, "loaded once more")
 
         # left and opened again, it waits to be played, from where it was
         self.open("#/new")
@@ -210,21 +226,55 @@ class StreamedVideo(UiTestCase):
         self.assertEqual([c for c in self.commands(frame) if c[0] != "addEventListener"],
                          [["setPlaybackRate", 1.5], ["seekTo", at, True], ["playVideo"]], "the bar's speed, too")
 
-    def test_without_an_answer_the_sound_plays(self):
+    def test_the_next_lecture_keeps_the_speed_and_starts_at_0(self):
+        self.player()
+        self.job_page(STREAMED)
+        self.page.locator("#rate").select_option("1.5")
+        self.page.click(".line[data-i='4'] .ts")  # 0:15
+        frame = self.frame()
+        self.wait_for_command(frame, "setPlaybackRate", 1.5)
+        frame.evaluate("() => setTime(16, 2)")  # paused at 0:16
+        self.page.wait_for_function("() => document.getElementById('curTime').textContent === '0:16'")
+        self.job_page(NEXT)  # in the same page, as from the sidebar or the course bar
+        bar = self.page.evaluate("() => ({ rate: document.getElementById('rate').value, speed: ytMedia.playbackRate,"
+                                 " time: document.getElementById('curTime').textContent, seek: document.getElementById('seek').value,"
+                                 " length: document.getElementById('durTime').textContent, at: ytMedia.currentTime })")
+        self.assertEqual(bar, {"rate": "1.5", "speed": 1.5, "time": "0:00", "seek": "0", "length": "0:15", "at": 0})
+        self.page.click("#ytStart")
+        frame = self.frame()
+        self.assertIn("/embed/vidstream04?", frame.url)
+        self.wait_for_command(frame, "setPlaybackRate", 1.5)
+        self.wait_for_command(frame, "playVideo")
+        self.assertFalse(any(c[0] == "seekTo" for c in self.commands(frame)), "from the start")
+
+    def test_without_an_answer_the_sound_plays_and_it_can_try_again(self):
         self.player(SILENT_PLAYER)
         self.job_page(SILENT)
         self.page.click(".line[data-i='2'] .ts")  # the player loads, and never answers
         self.page.wait_for_selector("#view #videoPanel iframe")
         self.page.wait_for_selector("#ytFallback", timeout=15_000)  # about 8 s
-        self.assertEqual(self.page.inner_text("#ytFallback"), FALLBACK)
+        self.assertEqual(self.page.locator("#ytFallback .yt-fallback-text").inner_text(), FALLBACK)
         self.assertEqual(self.page.locator("#view #videoPanel, iframe").count(), 0)
         self.assertEqual(self.page.locator(".job-body.has-video").count(), 0)
         self.assertEqual(self.page.evaluate("() => audio.getAttribute('src').split('?sig=')[0]"), f"/api/jobs/{SILENT}/audio")
         self.page.wait_for_function("() => !audio.paused && audio.currentTime >= 8", timeout=5000)
         self.assertEqual(self.current(), [2], "from the line that was clicked")
         self.page.evaluate("() => renderJob()")  # drawn again, it still plays the sound, and says why
-        self.assertEqual(self.page.inner_text("#ytFallback"), FALLBACK)
+        self.assertEqual(self.page.locator("#ytFallback .yt-fallback-text").inner_text(), FALLBACK)
         self.assertEqual(self.page.locator("iframe").count(), 0)
+        link = self.page.locator("#ytFallback a")
+        self.assertEqual((link.inner_text().strip(), link.get_attribute("href"), link.get_attribute("target"),
+                          link.get_attribute("rel")),
+                         ("Open on YouTube", "https://www.youtube.com/watch?v=vidstream03", "_blank", "noopener noreferrer"))
+
+        self.player(PLAYER)  # now YouTube answers (the route added last is used first)
+        self.page.click("#ytRetry")
+        frame = self.frame()
+        self.wait_for_command(frame, "playVideo")  # the sound was playing, so the video plays on from there
+        self.assertTrue(any(c[0] == "seekTo" and c[1] >= 8 for c in self.commands(frame)), self.commands(frame))
+        self.assertEqual(self.page.locator("#ytFallback").count(), 0)
+        self.assertTrue(self.page.is_visible("#view .job-body.has-video #videoPanel.yt iframe"))
+        self.assertTrue(self.page.evaluate("() => media === ytMedia && audio.paused && !audio.getAttribute('src')"))
 
     def test_an_error_from_the_player_plays_the_sound(self):
         self.player(REFUSING_PLAYER)
@@ -267,12 +317,29 @@ class StreamedVideo(UiTestCase):
         self.assertLessEqual(self.page.evaluate("() => document.documentElement.scrollWidth - innerWidth"), 0)
         bar = self.page.evaluate("() => getComputedStyle(document.querySelector('#videoPanel .video-tools')).backgroundColor")
         self.assertEqual(bar, "rgb(22, 26, 32)", "the dark theme's surface")
+        player = self.page.locator("#player").bounding_box()
+        for y in (0, 600):  # as the page opens, and kept in view while the transcript scrolls
+            self.page.evaluate(f"() => document.getElementById('main').scrollTo(0, {y})")
+            self.page.wait_for_timeout(150)
+            if y == 0:  # the panel starts below the title and the buttons: the page scrolls it into view
+                self.page.locator("#videoSource").scroll_into_view_if_needed()
+            tools = self.page.locator("#videoPanel .video-tools").bounding_box()
+            self.assertLessEqual(tools["y"] + tools["height"], player["y"], f"the tools row clear of the bar ({y})")
+            x, ty = tools["x"] + 30, tools["y"] + tools["height"] / 2
+            self.assertTrue(self.page.evaluate("([x, y]) => !!document.elementFromPoint(x, y).closest('.video-tools')",
+                                               [x, ty]), f"nothing drawn over it ({y})")
 
     def test_the_choice_on_the_form_is_remembered_and_used(self):
         self.player()
         self.open()
         self.page.click("[data-src=youtube]")
         self.assertTrue(self.page.is_checked("input[name=ytVideo][value=download]"), "as before until the user picks")
+        group = self.page.get_by_role("group", name="The video")
+        self.assertEqual(group.get_by_role("radio").count(), 2, "a fieldset named by its legend")
+        for v, hint in (("download", "It plays without internet."),
+                        ("stream", "Only the sound is downloaded. The video plays from YouTube.")):
+            described = self.page.get_attribute(f"input[name=ytVideo][value={v}]", "aria-describedby")
+            self.assertEqual(self.page.inner_text(f"#{described}"), hint)
         self.assertNotIn("sedjem-youtube-video", self.prefs())
         self.page.click("label.yt-video-opt:has-text('Stream it from YouTube')")
         self.assertTrue(self.page.is_checked("input[name=ytVideo][value=stream]"))

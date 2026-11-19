@@ -230,6 +230,17 @@ def convert(source, dest, on_progress, cancelled, limits=None):
     replace_file(tmp, dest)
 
 
+# What yt-dlp leaves of a download that didn't finish: source.<ext>.part (or .ytdl), and the parts of one made of
+# fragments. An upload is source.<ext> alone, so an uploaded file named x.part still counts.
+PARTIAL = re.compile(r"source\.[^.]+\.(?:part|ytdl)\b.*")
+
+
+def source_file(folder):
+    """The recording put in a job's folder, source.<ext> (an upload or a download), or None. A download that
+    didn't finish doesn't count, so the job downloads again (yt-dlp resumes the part) instead of reading it."""
+    return next((p for p in sorted(Path(folder).glob("source.*")) if not PARTIAL.fullmatch(p.name)), None)
+
+
 def link_or_copy(src, dst):
     try:
         os.link(src, dst)  # same file on disk, no extra space
@@ -278,7 +289,7 @@ class Runner:
     def submit(self, jid):
         job, folder = self.store.get(jid), self.store.dir(jid)
         if job and job.get("source_url") and not any((folder / n).exists() for n in ("audio.flac", "video.mp4")) \
-                and next(folder.glob("source.*"), None) is None:  # a YouTube job not downloaded yet
+                and source_file(folder) is None:  # a YouTube job not downloaded yet
             self.store.update(jid, status="preparing", stage="waiting-download", error=None)
             self.queues["download"].put(jid)
             return
@@ -339,7 +350,7 @@ class Runner:
         if job.get("source_path"):
             found = Path(job["source_path"])
         else:
-            found = next(folder.glob("source.*"), None) or folder / video.NAME
+            found = source_file(folder) or folder / video.NAME
         return found if found.is_file() else None
 
     def drop_upload(self, job, source):

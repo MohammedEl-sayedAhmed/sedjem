@@ -62,10 +62,13 @@ player only when it first plays, and the frame policy.
   player's reports, as YouTube's own API does, and leaves out a reported time from before a seek it asked for.
 - No `onReady` within 8 seconds, or any `onError`, removes the frame. The page then says "YouTube's player couldn't
   load, so the sound plays from this computer" and plays the downloaded sound from the same moment, with its
-  existing `?sig=` address.
+  existing `?sig=` address. Its *Try again* loads the player once more, from where the sound was, and *Open on
+  YouTube* opens the video's page in the browser.
 - The page moves the video panel with `Element.moveBefore` where the browser has it, so drawing the page again
-  doesn't reload the player; elsewhere the player loads again and goes on from where it was. A player left on
+  doesn't reload the player; elsewhere the player loads again once and goes on from where it was. A player left on
   another page is closed before the panel goes in, so it doesn't load again for nothing.
+- Like a media element given a new source, the player keeps the speed chosen in the bar and starts the next
+  video's time at 0.
 - The page is served with `Content-Security-Policy: frame-src https://www.youtube-nocookie.com`, so it can show no
   other site in a frame.
 
