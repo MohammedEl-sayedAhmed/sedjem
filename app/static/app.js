@@ -2601,6 +2601,7 @@ $("#themeBtn").onclick = () => {
   prefPut("sedjem-theme", dark ? "dark" : "light");
 };
 $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
+$("#exportManyBtn").innerHTML = `${ICON.download} Export…`;
 $("#exportManyBtn").onclick = () => openExportMany();  // many transcripts at once (exports.js)
 $("#jobSearch").oninput = renderSidebar;
 $("#jobSort").innerHTML = Object.entries(SORTS).map(([v, [label]]) => `<option value="${v}">${label}</option>`).join("");

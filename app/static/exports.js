@@ -7,8 +7,8 @@ const EXP_FORMATS = [["txt", "Text"], ["md", "Markdown"], ["srt", "SRT subtitles
 const EXP_COMBINED = new Set(["txt", "md", "json"]);  // subtitles keep a file each
 const expCanFolder = () => !!desktopApi()?.export_folder || typeof window.showDirectoryPicker === "function";
 
-// What the dialog lists: each course with its lectures in playlist order (youtube.js), then the other transcriptions
-// in the sidebar's order, each with its model, since a recording can have several
+// What the dialog lists: each course with its lectures in playlist order (youtube.js), then the other transcriptions,
+// newest first, each with its model, since a recording can have several
 function expGroups() {
   const done = S.jobs.filter((j) => j.status === "done");
   const courses = courseGroups(done).map((g) => ({ id: g.id, course: g.course.title || "Course", jobs: g.lectures }));
@@ -26,7 +26,7 @@ function openExportMany(courseId) {
   if (!$("#expForm")) {
     dlg.insertAdjacentHTML("beforeend", `<form class="dlg-foot exp-foot" id="expForm">
       <label class="exp-format">Format <select id="expFormat">${EXP_FORMATS.map(([v, l]) => `<option value="${v}">${l}</option>`).join("")}</select></label>
-      <label class="exp-combined"><input type="checkbox" id="expCombined"> One combined file</label>
+      <label class="exp-combined"><input type="checkbox" id="expCombined"> One combined file<span id="expWhy"></span></label>
       <span class="exp-grow"></span>
       <button type="button" class="btn" id="expCancel">Cancel</button>
       <button type="button" class="btn" id="expFolder">${ICON.folder} Into a folder…</button>
@@ -90,6 +90,7 @@ function drawExpList() {
     const g = groups.find((x) => x.id === b.dataset.expCourse);
     g.jobs.forEach((j) => (b.checked ? EXP.picked.add(j.id) : EXP.picked.delete(j.id)));
     drawExpList();
+    $(`#expList [data-exp-course="${CSS.escape(g.id)}"]`)?.focus();  // the list is new: the focus stays on the course's box
   }));
   expSync();
 }
@@ -106,7 +107,7 @@ function expSync() {
   if (all) { state(groups.flatMap((g) => g.jobs), all); all.disabled = !groups.length; }
   const n = expIds().length, combine = EXP_COMBINED.has(EXP.format);
   $("#expCombined").disabled = !combine;
-  $("#expCombined").closest("label").title = combine ? "" : "Subtitles keep a file each";
+  $("#expWhy").textContent = combine ? "" : " (not for subtitles)";
   const one = EXP.combined && combine;
   $("#expGoText").textContent = !n ? "Export" : one ? `Export ${n} in one file` : `Export ${n} as a zip`;
   $("#expGo").disabled = !n || EXP.busy;

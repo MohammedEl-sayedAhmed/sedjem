@@ -80,7 +80,9 @@ class ExportMany(UiTestCase):
     def test_a_course_box_the_search_and_one_combined_file(self):
         self.page.add_init_script(PICKER)  # after NO_PICKER, so this one counts
         self.open_dialog()
-        self.page.check("#expList [data-exp-course]")
+        self.page.focus("#expList [data-exp-course]")
+        self.page.keyboard.press("Space")  # by keyboard: the focus stays on the course's box after the list is new
+        self.assertTrue(self.page.evaluate("() => document.activeElement.matches('[data-exp-course]')"))
         expect(self.go()).to_have_text("Export 3 as a zip")
         self.page.uncheck(f"#expList [data-exp='{LEC2}']")
         self.assertTrue(self.page.eval_on_selector("#expList [data-exp-course]", "b => b.indeterminate"))
@@ -91,6 +93,7 @@ class ExportMany(UiTestCase):
         expect(self.go()).to_have_text("Export 3 as a zip")  # what the search hid stays ticked
         self.page.select_option("#expFormat", "srt")
         expect(self.page.locator("#expCombined")).to_be_disabled()  # subtitles keep a file each
+        expect(self.page.locator("#expWhy")).to_have_text(" (not for subtitles)")
         self.page.select_option("#expFormat", "json")
         self.page.check("#expCombined")
         expect(self.go()).to_have_text("Export 3 in one file")

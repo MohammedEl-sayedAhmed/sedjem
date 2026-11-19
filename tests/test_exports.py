@@ -83,6 +83,14 @@ class Files(unittest.TestCase):
         self.assertIn("\n---\n", md)
         self.assertEqual(exports.combined(jobs, "txt").count(exports.RULE), 1)
 
+    def test_names_windows_reserves_and_long_courses(self):
+        storage = self.app.cfg.storage
+        make(storage, "20261020-100000-f001", "CON")
+        make(storage, "20261020-100000-f002", "nul", course={**COURSE, "id": "PLaux", "title": "Aux", "count": 120, "index": 7})
+        jobs = exports.chosen(self.store, ["20261020-100000-f001", "20261020-100000-f002"])
+        self.assertEqual([p for p, _ in exports.files(jobs, "txt", slug)], ["CON_.txt", "Aux_/007-nul_.txt"])
+        self.assertEqual(exports.name(jobs[1:], slug), "Aux_")
+
     def test_the_name_of_a_zip(self):
         self.assertEqual(exports.name(self.chosen("lec1", "lec2"), slug), "Python-for-beginners")
         self.assertEqual(exports.name(self.chosen("lec1", "other"), slug), "sedjem-transcripts")

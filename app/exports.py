@@ -2,8 +2,9 @@
 as files for a folder, or as one combined file with them all in the order chosen.
 
 Every file is named after its transcript's title, as a single export is (app/server.py, slug). A course's lectures
-go in a folder named after the course, numbered in playlist order; a name used twice gets -2, -3. The text of each
-file is what the transcript's own Export gives: its current version, with the details.
+go in a folder named after the course, numbered in playlist order; a name used twice gets -2, -3, and a name Windows
+reserves (CON, NUL, AUX…) gets _, as course folders do (app/courses.py). The text of each file is what the
+transcript's own Export gives: its current version, with the details.
 """
 import io
 import zipfile
@@ -11,6 +12,7 @@ from pathlib import Path
 
 from . import report
 from . import transcript as T
+from .courses import RESERVED
 
 COMBINED = ("txt", "md", "json")  # subtitles have one timeline for each file, so they aren't put in one
 RULE = "\n" + "-" * 60 + "\n\n"  # between the transcripts of a combined text file
@@ -35,14 +37,20 @@ def rendered(job, data, fmt):
     return T.EXPORTS[fmt][0](job, lines, report.details(job, lines, edited))
 
 
+def safe(name):
+    """A name Windows reserves, with _ after it."""
+    return f"{name}_" if RESERVED.match(name) else name
+
+
 def files(jobs, fmt, slug):
     """[(path, text)]: one file for each transcript, its path relative to the zip or the folder, with / between
-    folders."""
+    folders. Lecture numbers have as many digits as the course's count, at least two, so they sort in order."""
     out, used = [], set()
     for job, data in jobs:
-        course, name = job.get("course") or {}, slug(job.get("title"))
+        course, name = job.get("course") or {}, safe(slug(job.get("title")))
         if course.get("title") and course.get("index") is not None:
-            stem = f"{slug(course['title'])}/{str(course['index']).zfill(2)}-{name}"
+            width = max(2, len(str(course.get("count") or "")))
+            stem = f"{safe(slug(course['title']))}/{str(course['index']).zfill(width)}-{name}"
         else:
             stem = name
         path, n = f"{stem}.{fmt}", 2
@@ -78,7 +86,7 @@ def name(jobs, slug):
     lecture of the same course, else sedjem-transcripts."""
     courses = {(job.get("course") or {}).get("id") for job, _ in jobs}
     title = (jobs[0][0].get("course") or {}).get("title") if len(courses) == 1 and None not in courses else None
-    return slug(title) if title else "sedjem-transcripts"
+    return safe(slug(title)) if title else "sedjem-transcripts"
 
 
 def write(folder, found):
