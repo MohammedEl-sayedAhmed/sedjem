@@ -63,8 +63,7 @@ def parse(url):
     site, a host that only looks like Drive's, a user name, password or odd port in the address, a Google Docs file,
     Drive's own pages."""
     url = str(url or "").strip()
-    if url and not re.match(r"(?i)[a-z][a-z0-9+.-]*://", url):
-        url = "https://" + url
+    url = youtube.with_scheme(url)
     try:
         p = urllib.parse.urlsplit(url)
         port = p.port

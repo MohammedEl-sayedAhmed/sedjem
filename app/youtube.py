@@ -58,14 +58,22 @@ def watch_url(video_id):
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
+def with_scheme(url):
+    """A pasted link with https:// before it when it has no scheme of its own (letters, digits, + . -, then ://).
+    Read without a regular expression, so a long pasted text costs no more than its length."""
+    head, sep, _ = url.partition("://")
+    ok = bool(sep) and head[:1].isascii() and head[:1].isalpha() and all(c.isascii() and (c.isalnum() or c in "+.-")
+                                                                          for c in head)
+    return url if ok or not url else "https://" + url
+
+
 def check_url(url):
     """A YouTube link rebuilt from its parts, so nothing else of it reaches yt-dlp: the video's
     https://www.youtube.com/watch?v=<id> (with &list=<id> when it names a playlist too), or the playlist's
     https://www.youtube.com/playlist?list=<id>. Raises YouTubeError for anything else: another site, a host
     that only looks like YouTube's, a user name, password or odd port in the address, a channel."""
     url = str(url or "").strip()
-    if url and not re.match(r"(?i)[a-z][a-z0-9+.-]*://", url):
-        url = "https://" + url
+    url = with_scheme(url)
     try:
         p = urllib.parse.urlsplit(url)
         port = p.port
@@ -103,8 +111,7 @@ def link_host(url):
     """The host of a pasted link, in lower case ("" when it has none), read as check_url reads it: a link without
     its scheme is taken as https://."""
     url = str(url or "").strip()
-    if url and not re.match(r"(?i)[a-z][a-z0-9+.-]*://", url):
-        url = "https://" + url
+    url = with_scheme(url)
     try:
         return (urllib.parse.urlsplit(url).hostname or "").lower()
     except ValueError:
