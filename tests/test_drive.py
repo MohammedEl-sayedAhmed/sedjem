@@ -98,6 +98,9 @@ class Links(unittest.TestCase):
                         "(caused by <HTTPError 403: Forbidden>)",
                         f"ERROR: [GoogleDrive] {FILE}: Unable to download JSON metadata: HTTP Error 404: Not Found"):
             self.assertEqual(drive.clean_error(Exception(message)), drive.PRIVATE)
+        self.assertEqual(drive.clean_error(Exception(  # as real Drive answered a popular file, 19 Nov 2026
+            f"ERROR: [GoogleDrive] {FILE}: Unable to download JSON metadata: HTTP Error 429: Too Many Requests "
+            "(caused by <HTTPError 429: Too Many Requests>)")), drive.BUSY)
         self.assertEqual(drive.clean_error(Exception("ERROR: [GoogleDrive] x123456: The read operation timed out")),
                          "The read operation timed out")
 

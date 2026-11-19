@@ -34,6 +34,7 @@ DRIVE_ID = re.compile(r"[A-Za-z0-9_-]{28,100}")  # a file's or a folder's id (yt
 NOT_DRIVE = "paste the link of a Google Drive file"
 FOLDERS_LATER = "Google Drive folders can't be read yet. Add the files one by one, each with its own link."
 PRIVATE = "This file isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet."
+BUSY = "Google Drive is limiting this file for now, as it does when many people open it. Try again later."
 NO_DOWNLOAD = "Google Drive doesn't offer this file for download; its owner may have turned downloading off"
 NOT_MEDIA = "this file isn't audio or video"
 ELSEWHERE = "Google Drive sent the download to another site ({}), so nothing of it was kept"
@@ -130,10 +131,13 @@ def clearly_not_media(name, info):
 
 def clean_error(e):
     """yt-dlp's message in words (app/youtube.py's plain_error). Drive answers a file it won't show to someone who
-    isn't signed in as it answers one that doesn't exist: either is PRIVATE."""
+    isn't signed in as it answers one that doesn't exist: either is PRIVATE. Too many requests (429) is Drive's limit
+    on a file many people have opened lately: BUSY."""
     msg = youtube.plain_error(e)
     if re.search(r"HTTP Error 40[0134]\b|accounts\.google\.com", msg):
         return PRIVATE
+    if re.search(r"HTTP Error 429\b|Too Many Requests", msg):
+        return BUSY
     return msg
 
 
