@@ -35,9 +35,14 @@ The app's page and its API are served by a local server, which asks for no passw
   assistants, release notes) could carry script into the page. Every such text is escaped or set as plain text, and
   links built from data are `https://` only. A one-off review of every place the page builds HTML, with injected
   script tried in eleven views, found none that runs; the repository has no test for this yet.
+- A video added with streaming plays in YouTube's player, a frame from `www.youtube-nocookie.com` that the page loads
+  only when the video is played ([AgDR 20](agdr/AgDR-0020-youtube-player-driven-by-postmessage.md)). The frame's
+  address is built from a video ID that the page checks first, the page reads only messages from that frame with
+  YouTube's origin, and its Content-Security-Policy allows no other frame. The frame is another origin, so it can't
+  read the page, its secret or the API.
 - Left: requests that only read (GET) need no header, so another site could play a recording in a media element if it
-  guessed the job's ID; it can't read the bytes. The page also has no Content-Security-Policy as a second layer.
-  Both are in [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125).
+  guessed the job's ID; it can't read the bytes. The page's Content-Security-Policy limits only frames, so it is not
+  yet a second layer against script. Both are in [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125).
 
 ## The model worker
 

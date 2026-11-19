@@ -6,9 +6,11 @@ people made for each (yt-dlp's "subtitles"; YouTube's automatic captions are nev
 one video for a job: the best H.264 video stream up to 720 pixels high and the best AAC sound, joined into
 video.mp4 with PyAV (the streams copied, the index at the start so a browser can play it while it loads).
 Without such a pair it takes a single MP4 that has both, and without any H.264 version only the sound
-(source.<ext>), so the video can still be transcribed. No ffmpeg program is needed. When the video has
-captions made by people in its own language (Arabic or English), they are saved as captions.vtt and the job
-uses them as its transcript instead of a speech model (caption_lines).
+(source.<ext>), so the video can still be transcribed. A job added with streaming ("stream": true) takes only
+the sound, the best AAC stream: its page plays the video from YouTube's embedded player (app/static/youtube.js).
+No ffmpeg program is needed. When the video has captions made by people in its own language (Arabic or
+English), they are saved as captions.vtt and the job uses them as its transcript instead of a speech model
+(caption_lines).
 
 YouTube hides the addresses of its streams behind a JavaScript challenge. yt-dlp solves it with the
 yt-dlp-ejs scripts in a JavaScript runtime: the Deno that Settings can download (pinned like the models),
@@ -360,7 +362,9 @@ def download(cfg, job, folder, on_progress, cancelled):
     """Download a job's video into its folder. Returns the fields the job records: "video" ({"width",
     "height"} of video.mp4, or None when only the sound could be had), "captions" ({"lang", "name"} when
     captions.vtt is to be the transcript), "source_name" and "download_note" (why there is no video).
-    on_progress(done, total) counts bytes; cancelled() is checked while it runs."""
+    A job with "stream" takes only the sound (source.<ext>, the best AAC stream, else the best in any codec),
+    with no note, since that was chosen; if YouTube offers no sound on its own, the video is downloaded as
+    usual. on_progress(done, total) counts bytes; cancelled() is checked while it runs."""
     folder = Path(folder)
     with _ydl(cfg) as ydl:
         info = _extract(ydl, job["source_url"])
@@ -370,7 +374,9 @@ def download(cfg, job, folder, on_progress, cancelled):
             raise YouTubeError("this is a live stream; it can be transcribed once it has ended")
         video, audio, both, sound = pick_formats(info.get("formats"))
         note = None
-        if video and audio:
+        if job.get("stream") and (audio or sound):  # the video plays from YouTube: only the sound is kept
+            plan = [("sound", audio or sound)]
+        elif video and audio:
             plan = [("video", video), ("audio", audio)]
         elif both:
             plan = [("both", both)]

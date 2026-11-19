@@ -44,8 +44,11 @@ def _utf8(text):
 
 # The page's preferences (app/static/app.js, updates.js), kept in <storage>/page.json, not in the browser: the port,
 # and with it the page's origin and its localStorage, is new at each start (app/session.py)
-PREFS = ("sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from")
+PREFS = ("sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from",
+         "sedjem-youtube-video")
 PREFS_FILE = "page.json"
+# The page may frame nothing but YouTube's player, which plays a video added with streaming (app/static/youtube.js)
+PAGE_POLICY = {"Content-Security-Policy": "frame-src https://www.youtube-nocookie.com"}
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".svg": "image/svg+xml", ".png": "image/png"}
 AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
@@ -276,8 +279,8 @@ def summary(job):
     branch, else None; recorded: when the recording was made (sysinfo.recording), or for a job made before that was
     kept, or not prepared yet, when it was added."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
-            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course", "branch",
-            "remote")
+            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "stream", "course",
+            "branch", "remote")
     source = job.get("source") if isinstance(job.get("source"), dict) else {}
     return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True,
             "recorded": source.get("recorded") or job.get("created")}
@@ -528,7 +531,8 @@ class Handler(BaseHTTPRequestHandler):
         f = (STATIC / name).resolve()
         if STATIC not in f.parents or not f.is_file():
             raise ApiError(404, "not found")
-        self.reply(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"))
+        self.reply(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"),
+                   headers=PAGE_POLICY if f.suffix == ".html" else None)
 
     def index(self, _params):
         """The page, in the theme the user chose (app/static/index.html would find it in localStorage, which is new
@@ -538,7 +542,7 @@ class Handler(BaseHTTPRequestHandler):
         theme = self.app.prefs().get("sedjem-theme")
         if theme in ("light", "dark"):
             page = page.replace('<html lang="en">', f'<html lang="en" data-theme="{theme}">', 1)
-        self.reply(200, page.encode(), TYPES[".html"])
+        self.reply(200, page.encode(), TYPES[".html"], headers=PAGE_POLICY)
 
     # ---- API ----------------------------------------------------------------------------------------
     def ping(self, params):
@@ -701,8 +705,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def youtube_add(self, _params):
         """{url, model, speakers, language, prompt, confirm_upload, captions (use captions made by people,
-        default true), entries (the video ids to transcribe; default all)}: one job per video, queued in
-        playlist order, with the playlist as their course. Answers {"jobs": [...]}."""
+        default true), stream (download only the sound, and play the video from YouTube; default false),
+        entries (the video ids to transcribe; default all)}: one job per video, queued in playlist order, with
+        the playlist as their course. Answers {"jobs": [...]}."""
         cfg, runner, store = self.app.cfg, self.app.runner, self.app.store
         p = self.body_json()
         model = self.ready_model(p)
@@ -732,9 +737,12 @@ class Handler(BaseHTTPRequestHandler):
             if not any((j.get("course") or {}).get("id") == course["id"] for j in store.list()):
                 self.app.usage.count(courses_created=1)  # a playlist added for the first time
             course["folder"] = courses.folder_name(store, course)
+        stream = str(p.get("stream", False)).lower() in ("1", "true")  # every video of a playlist alike
         jobs = []
         for e in entries:
             extra = {"course": {**course, "index": e["index"]}} if course else {}
+            if stream:
+                extra["stream"] = True
             jobs.append(runner.new_job(title=e["title"], source_name=f"{e['title']}.mp4", model_id=model["id"],
                                        options=options, source_url=youtube.watch_url(e["id"]), youtube_id=e["id"],
                                        use_captions=str(p.get("captions", True)).lower() not in ("0", "false"), **extra))

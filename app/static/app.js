@@ -170,11 +170,12 @@ const api = {
   },
 };
 
-// The page's preferences: the theme, the library's order, the large video, and updates.js's notes. The port, and with
-// it this page's origin and its localStorage, is new at each start (app/session.py), so the server keeps them in the
-// data folder (/api/prefs). loadPrefs copies them into localStorage, where the code reads them; prefPut saves a
-// change in both.
-const PREFS = ["sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from"];
+// The page's preferences: the theme, the library's order, the large video, the YouTube form's choice to download or
+// stream the video (youtube.js), and updates.js's notes. The port, and with it this page's origin and its
+// localStorage, is new at each start (app/session.py), so the server keeps them in the data folder (/api/prefs).
+// loadPrefs copies them into localStorage, where the code reads them; prefPut saves a change in both.
+const PREFS = ["sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from",
+  "sedjem-youtube-video"];
 function prefPut(key, value) {
   try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode */ }
   api.patch("/api/prefs", { [key]: value ?? null }).catch(() => {});
@@ -195,13 +196,16 @@ async function loadPrefs() {
 // ---------------------------------------------------------------------------------------------
 const S = {
   status: null, jobs: [], route: { name: "new" },
-  job: null, lines: [], edited: false, partial: false, hasAudio: false, hasVideo: false, log: "",
+  job: null, lines: [], edited: false, partial: false, hasAudio: false, hasVideo: false, ytVideo: "", log: "",
   editing: false, dirty: false, search: "", matchIndex: -1, follow: true,
   form: { file: null, path: null, seconds: null, model: null, speakers: null, language: null, prompt: "", title: "", confirm: false, source: "file" },
   uploading: null, uploadXhr: null, lastUserScroll: 0, currentLine: -1, jobPoll: null, lineSig: "",
 };
 const ACTIVE = new Set(["preparing", "queued", "running"]);
 const canPlay = () => S.hasAudio || S.hasVideo;
+// The job page plays its video from YouTube: added with streaming, no video.mp4, its sound ready (for when the player
+// can't load), and the player hasn't failed on this page (youtube.js)
+const streamed = () => !!S.ytVideo && S.hasAudio && !YT_FAILED.has(S.job?.id);
 const model = (id) => (S.status?.models || []).find((m) => m.id === id);
 const spkColor = (sid) => (sid ? `var(--s${((parseInt(sid, 10) - 1) % 8 + 8) % 8 + 1})` : "var(--faint)");
 const spkName = (sid) => (sid == null ? "" : shownNames()[sid] || `Speaker ${sid}`);
@@ -788,7 +792,7 @@ function renderJob() {
     statusCard = `<div class="card progress-card" id="progressCard">
       <div class="row"><span class="stage" id="stageLabel">${esc(si.label)}</span><span class="hint" id="stageDetail" style="margin:0">${esc(si.detail || "")}</span><span class="times" id="stageTimes">${etaText(j)}</span></div>
       <div class="progress${si.pct == null ? " indeterminate" : ""}" id="stageBar"><i style="width:${(si.pct || 0).toFixed(1)}%"></i></div>
-      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The video is downloaded first (up to 720p, to play beside the transcript), then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
+      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The ${j.stream ? "sound is downloaded first (the video plays from YouTube)" : "video is downloaded first (up to 720p, to play beside the transcript)"}, then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
         : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open."
         : j.kind === "remote" ? rmNote(j) : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
       <div style="margin-top:12px"><button class="btn btn-sm btn-danger" id="cancelBtn">${ICON.stop} Cancel</button></div>
@@ -804,6 +808,10 @@ function renderJob() {
     </div>`;
   }
 
+  // The panel stays while the page is drawn again (placeVideo). Where the browser can move it without reloading
+  // YouTube's player in it, it is set aside first; elsewhere the player loads again once, and goes on.
+  const kept = view.contains(videoPanel);
+  if (kept && document.body.moveBefore) movePanel(document.body);
   view.innerHTML = `
   <div class="job-head">
     <div class="title-row">
@@ -829,6 +837,7 @@ function renderJob() {
   </div>
   ${statusCard}
   ${j.download_note ? `<div class="card yt-notice">${ICON.info}<span>${esc(j.download_note)}.</span></div>` : ""}
+  ${ytFallbackNote(j)}
   ${j.remote_note ? `<div class="card yt-notice rm-notice">${ICON.info}<span>${esc(j.remote_note)}.</span></div>` : ""}
   ${hasLines || !active || slot ? `
   <div class="job-body${slot ? " has-video" : ""}">
@@ -850,10 +859,10 @@ function renderJob() {
       ${detailsPanel()}
     </div>
   </div>` : ""}`;
-  placeVideo();
+  placeVideo(kept);
   bindJob();
   updateMatches();
-  if (canPlay()) showPlayer(j, S.hasVideo); else hidePlayer();
+  if (canPlay()) showPlayer(j, S.hasVideo ? "video" : streamed() ? "youtube" : "audio"); else hidePlayer();
 }
 
 function speakerRow(sid, stats) {
@@ -1283,6 +1292,7 @@ function applyJob(r) {
   S.partial = r.partial;
   S.hasAudio = r.has_audio;
   S.hasVideo = !!r.has_video;  // video.mp4, played instead of the audio (app/video.py)
+  S.ytVideo = ytStreamed(r);  // else the YouTube video it streams, when it was added with streaming (youtube.js)
   S.mediaSig = r.media_sig || "";  // ?sig= for its audio and video, which can't carry the header (app/session.py)
   S.log = r.log || "";
   S.detailGroups = r.detail_groups || [];
@@ -1768,31 +1778,71 @@ async function restoreVersion(n) {
 
 // ---------------------------------------------------------------------------------------------
 // Player: the bar at the bottom plays the job's video when the recording has one (shown in the job
-// page's video panel), else the hidden <audio>. Everything that follows playback uses `media`.
+// page's video panel), or a streamed video in YouTube's player in that panel (youtube.js), else the hidden
+// <audio>. Everything that follows playback uses `media`.
 // ---------------------------------------------------------------------------------------------
 const audio = $("#audio"), video = $("#video"), videoPanel = $("#videoPanel");
+const ytMedia = new YouTubeMedia(videoPanel.querySelector(".video-frame"));
 let media = audio;
 
-function showPlayer(j, withVideo = false) {
+// kind: "audio", "video" (video.mp4) or "youtube" (a streamed video, played by YouTube's player)
+function showPlayer(j, kind = "audio") {
   const sig = j.media_sig ?? S.mediaSig;  // the job's own (the compare view's base), else the job page's
-  const el = withVideo ? video : audio, src = `/api/jobs/${j.id}/${withVideo ? "video" : "audio"}?sig=${sig}`;
-  if (media !== el) {  // e.g. the video became ready while the audio played: go on from the same moment
-    const was = media, same = was.src.includes(`/api/jobs/${j.id}/`), t = was.currentTime, playing = !was.paused;
+  const el = { video, youtube: ytMedia }[kind] || audio;
+  const src = el === ytMedia ? ytEmbed(j.youtube_id) : `/api/jobs/${j.id}/${el === video ? "video" : "audio"}?sig=${sig}`;
+  const loaded = el === ytMedia ? ytMedia.src === src && ytMedia.job === j.id : el.src.endsWith(src);
+  const load = () => (el === ytMedia ? ytMedia.open(src, j.id, j.audio_s) : (el.src = src));
+  if (media !== el) {  // e.g. the video became ready while the audio played, or YouTube's failed: go on from the same moment
+    const was = media, t = was.currentTime, playing = !was.paused;
+    const same = was === ytMedia ? ytMedia.job === j.id : was.src.includes(`/api/jobs/${j.id}/`);
     media = el;
     was.pause();
     was.removeAttribute("src");
     was.load();
-    if (!el.src.endsWith(src)) el.src = src;
+    if (!loaded) load();
     el.playbackRate = el.defaultPlaybackRate = parseFloat($("#rate").value);
     if (same && t) el.currentTime = t;
     if (same && playing) el.play().catch(() => {});
     S.currentLine = -1;
     setPlayIcon();
     $("#durTime").textContent = clock(isFinite(el.duration) ? el.duration : 0);
-  } else if (!el.src.endsWith(src)) { el.src = src; S.currentLine = -1; }
+  } else if (!loaded) { load(); S.currentLine = -1; }
   $("#nowTitle").textContent = j.title || "";
   $("#player").hidden = false;
 }
+
+// YouTube's player didn't load (no internet, or a video that YouTube doesn't let other sites play): the job page
+// says so and plays the downloaded sound instead, from the same moment. The page isn't drawn again, so edits in
+// progress stay. A player that fails while its page isn't shown is only closed: the page tries again next time.
+ytMedia.addEventListener("fail", () => {
+  const j = S.job;
+  if (S.route.name !== "job" || !j || j.id !== ytMedia.job) {
+    if (media === ytMedia) ytMedia.removeAttribute("src");
+    return;
+  }
+  YT_FAILED.add(j.id);
+  if (view.contains(videoPanel)) videoPanel.remove();
+  const body = $(".job-body");
+  if (body) {
+    body.classList.remove("has-video", "video-large");
+    if (!$("#ytFallback")) body.insertAdjacentHTML("beforebegin", ytFallbackNote(j));
+  }
+  showPlayer(j, "audio");
+});
+
+// "Try again" on that note: YouTube's player goes back in its place and loads at once, from where the sound was (and
+// playing, if the sound was). If it fails again, the note comes back. As above, the page isn't drawn again.
+function ytRetry() {
+  const j = S.job, body = $(".job-body");
+  if (!j || !body || !YT_FAILED.delete(j.id) || !streamed()) return;
+  $("#ytFallback")?.remove();
+  body.classList.add("has-video");
+  body.querySelector(".side-col")?.insertAdjacentHTML("afterbegin", videoSlot());
+  placeVideo(false);
+  showPlayer(j, "youtube");
+  ytMedia.start();
+}
+document.addEventListener("click", (e) => e.target.closest?.("#ytRetry") && ytRetry());
 function hidePlayer() {
   if (!media.paused) media.pause();
   $("#player").hidden = true;
@@ -1827,7 +1877,7 @@ function syncCurrentLine(force = false) {
 }
 
 // the same handlers on both elements; only the one in use is heard
-const onMedia = (type, fn) => [audio, video].forEach((el) => el.addEventListener(type, (e) => el === media && fn(e)));
+const onMedia = (type, fn) => [audio, video, ytMedia].forEach((el) => el.addEventListener(type, (e) => el === media && fn(e)));
 onMedia("timeupdate", () => {
   $("#curTime").textContent = clock(media.currentTime);
   if (isFinite(media.duration) && document.activeElement !== $("#seek")) $("#seek").value = Math.round(media.currentTime / media.duration * 1000);
@@ -1885,11 +1935,13 @@ showVideoLarge(videoLarge());
 
 // The job page's slot for the video panel or, while the video is still being made, a box of the same
 // shape with its progress. The panel is one element kept across renders, so the video plays on when the
-// page is drawn again (placeVideo moves it into the new slot).
+// page is drawn again (placeVideo moves it into the new slot). A streamed video's panel holds YouTube's
+// player instead, with a bar below it that says so (the class "yt").
 function videoSlot() {
   const v = S.job?.video, prep = S.job?.video_prep;
   const ar = (v && v.width && v.height ? v.width / v.height : 16 / 9).toFixed(4);
   if (S.hasVideo) return `<div id="videoSlot" data-ar="${ar}"></div>`;
+  if (streamed()) return `<div id="videoSlot" data-ar="${(16 / 9).toFixed(4)}" data-kind="youtube"></div>`;
   if (!prep) return "";
   const busy = prep.done == null || !prep.total;
   return `<div class="video-panel video-prep" style="--ar:${ar}">
@@ -1898,14 +1950,35 @@ function videoSlot() {
 }
 const videoPrepPct = (p) => (p.done != null && p.total ? Math.min(100, p.done / p.total * 100) : 0);
 const videoPrepText = (p) => `${p.done == null ? "Waiting to start" : `${Math.round(videoPrepPct(p))}%`} · the transcript doesn't wait for it`;
-function placeVideo() {
+// kept: the panel was on this page before it was drawn again (renderJob), so its player stays.
+function placeVideo(kept = false) {
   const slot = $("#videoSlot");
-  if (!slot) return;
+  if (!slot) {
+    if (videoPanel.parentNode === document.body) videoPanel.remove();  // set aside by renderJob, and not shown now
+    return;
+  }
+  const yt = slot.dataset.kind === "youtube";
+  // A player left from another page is closed first, so it doesn't load again for nothing when the panel goes in;
+  // this page's own, back after the page was left, loads again only when it is played
+  if (ytMedia.job && (!yt || ytMedia.job !== S.job?.id)) ytMedia.removeAttribute("src");
+  else if (ytMedia.frame && !kept) ytMedia.unload();
   videoPanel.style.setProperty("--ar", slot.dataset.ar);
-  slot.replaceWith(videoPanel);
+  videoPanel.classList.toggle("yt", yt);
+  movePanel(slot.parentNode, slot);
+  slot.remove();
   videoPanel.hidden = false;
   $(".job-body").classList.toggle("video-large", videoLarge());
 }
+// Moves the panel where the browser can do it without reloading YouTube's player in it (Element.moveBefore);
+// elsewhere the player loads again and goes on from where it was (youtube.js).
+function movePanel(parent, before = null) {
+  if (parent.moveBefore && videoPanel.isConnected && parent.isConnected) {
+    try { parent.moveBefore(videoPanel, before); return; } catch { /* moved as before, below */ }
+  }
+  parent.insertBefore(videoPanel, before);
+}
+$("#videoSource").insertAdjacentHTML("afterbegin", YT_ICON.video);
+$("#ytStart").onclick = () => media === ytMedia && media.play();  // loads YouTube's player (youtube.js)
 function updateVideoPrep() {
   const prep = S.job?.video_prep, text = $("#videoPrepText"), bar = $("#videoPrepBar");
   if (!prep || !text) return;
