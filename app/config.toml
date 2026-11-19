@@ -19,7 +19,7 @@ max_upload_gb = 4
 courses = "courses"         # transcripts of YouTube videos and playlists as Markdown and SRT files (git-ignored)
 
 [defaults]
-model = "whisper-medium"
+model = "whisper-medium"    # Settings → Models can choose another, kept in app_data/settings.json
 speakers = "auto"           # "none", "auto" (estimate the number) or a number
 language = "ar"             # "ar", "en" or "auto"
 

@@ -31,13 +31,19 @@ The app's page and its API are served by a local server, which asks for no passw
   up. On Windows the port is opened for the app alone, so no other account can bind it too.
 - A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
   they are for, and only the user's own window can send them.
-- Text from outside (YouTube titles and captions, the hosted services' transcripts, paired computers, Hugging Face,
-  assistants, release notes) could carry script into the page. Every such text is escaped or set as plain text, and
-  links built from data are `https://` only. A one-off review of every place the page builds HTML, with injected
-  script tried in eleven views, found none that runs; the repository has no test for this yet.
+- Text from outside (YouTube titles and captions, Google Drive file names, the hosted services'
+  transcripts, paired computers, Hugging Face, assistants, release notes) could carry script into the page. Every
+  such text is escaped or set as plain text, and links built from data are `https://` only. A one-off review of
+  every place the page builds HTML, with injected script tried in eleven views, found none that runs; the
+  repository has no test for this yet.
+- A video added with streaming plays in YouTube's player, a frame from `www.youtube-nocookie.com` that the page loads
+  only when the video is played ([AgDR 20](agdr/AgDR-0020-youtube-player-driven-by-postmessage.md)). The frame's
+  address is built from a video ID that the page checks first, the page reads only messages from that frame with
+  YouTube's origin, and its Content-Security-Policy allows no other frame. The frame is another origin, so it can't
+  read the page, its secret or the API.
 - Left: requests that only read (GET) need no header, so another site could play a recording in a media element if it
-  guessed the job's ID; it can't read the bytes. The page also has no Content-Security-Policy as a second layer.
-  Both are in [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125).
+  guessed the job's ID; it can't read the bytes. The page's Content-Security-Policy limits only frames, so it is not
+  yet a second layer against script. Both are in [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125).
 
 ## The model worker
 
@@ -92,6 +98,28 @@ only programs the user runs can reach it.
   with its permission model. Left: without either, it can run in QuickJS, which has no sandbox; and a Whisper model
   added from Hugging Face can be converted from a `pytorch_model.bin`, which can hold code. Both are in
   [#126](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/126).
+
+## Google Drive links
+
+- Only links to Drive files on `drive.google.com` and `docs.google.com` are accepted, rebuilt from the file id
+  before yt-dlp sees them, and only yt-dlp's GoogleDrive extractor runs, so its generic one never reads another page
+  and its folder one doesn't run either. A folder's link is refused before yt-dlp sees it; folders are planned. Drive
+  is a new outside host: its playback service and its download hosts are listed in the privacy policy.
+- A file is downloaded only as itself (yt-dlp's `source` format) and only from `drive.google.com`,
+  `docs.google.com`, `drive.usercontent.google.com` or a `*.googleusercontent.com` host. The address yt-dlp read the
+  link from is checked, after the redirects of that reading, and so is the answer to the download itself: yt-dlp's
+  downloader opens it through the app's own check, which refuses an answer from another site before its body is read.
+  Left: yt-dlp follows redirects as a browser would, so a site that Google's servers redirect to gets the request
+  (the file's address, no account or cookie of the user's); only its answer is refused.
+- A download is stopped, and what came is deleted, when Drive's stated size is over the upload limit (checked at the
+  first block), and in any case once more bytes than the limit have come, since a stated size can be wrong. The free
+  space is checked against the stated size at the first block, and as the bytes come every 32 MB (from the start
+  when there is no size), with the same 1 GB margin. The file is then read as an uploaded file is, by the same code. Left: a write error's message can
+  name the file's path on the computer in the job's error, as it can for YouTube.
+- Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file that isn't shared with
+  anyone who has the link can't be read.
+- The tests run yt-dlp's own Drive extractor, the virus-scan page included, against a stand-in for Google's
+  servers ([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
 
 ## Updates and models
 

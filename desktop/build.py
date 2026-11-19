@@ -139,7 +139,8 @@ def main():
         "--collect-all", "faster_whisper", "--collect-all", "ctranslate2", "--collect-all", "sherpa_onnx",
         "--collect-all", "transcribe_cpp", "--collect-all", "transcribe_cpp_native", "--collect-all", "av",
         "--collect-all", "webview",
-        # YouTube links: yt-dlp (its own PyInstaller hook adds its modules) and the challenge scripts it runs
+        # YouTube and Google Drive links: yt-dlp (its own PyInstaller hook adds its modules) and the challenge
+        # scripts it runs for YouTube
         "--hidden-import", "yt_dlp", "--collect-data", "yt_dlp_ejs",
         # not used; keeps the build smaller
         "--exclude-module", "tkinter", "--exclude-module", "matplotlib", "--exclude-module", "IPython",

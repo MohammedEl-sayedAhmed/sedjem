@@ -37,7 +37,8 @@ recording on your machine unless you choose a hosted service.
 
 ## What it does
 
-- Transcribes recordings, videos and YouTube links with three local models chosen for Egyptian Arabic–English.
+- Transcribes recordings, videos, YouTube links and shared Google Drive files (folders are planned) with three local
+  models chosen for Egyptian Arabic–English.
 - Labels each speaker by voice, and plays the audio in step with the text.
 - Combines two models' transcripts line by line, and keeps every version (below).
 - Exports text, SRT, WebVTT, Markdown or JSON, and lets assistants such as Claude read your transcripts over MCP.
@@ -49,11 +50,12 @@ recording on your machine unless you choose a hosted service.
   <br><sub>The line being heard is marked, and each line reads in its own direction.</sub>
 </p>
 
-Sedjem goes online only for the model downloads, YouTube for the links you add, the hosted services you choose,
-GitHub to check for updates when allowed, and Aptabase for the usage counts below. The counts are anonymous and
-on by default; the switch in *Settings → About* or `DO_NOT_TRACK=1` turns them off. See [usage counts](docs/13-usage-counts.md)
-and the [privacy policy](docs/privacy.md). Downloading from YouTube is for personal use, within YouTube's terms.
-Every setting is in [the app notes](docs/09-app.md), and the assistants in [their own notes](docs/11-assistants.md).
+Sedjem goes online only for the model downloads, YouTube and Google Drive for the links you add, the hosted services
+you choose, GitHub to check for updates when allowed, and Aptabase for the usage counts below. The counts are
+anonymous and on by default; the switch in *Settings → About* or `DO_NOT_TRACK=1` turns them off. See
+[usage counts](docs/13-usage-counts.md) and the [privacy policy](docs/privacy.md). Downloading from YouTube is for
+personal use, within YouTube's terms. Every setting is in [the app notes](docs/09-app.md), and the assistants in
+[their own notes](docs/11-assistants.md).
 
 ## Install
 

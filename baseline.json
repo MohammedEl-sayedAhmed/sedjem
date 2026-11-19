@@ -1,7 +1,7 @@
 {
- "commit": "7ba71d134b1cfdc2643731ff2520e34f958ebf05",
- "updated": "2026-11-18",
- "total": 27,
+ "commit": "2815583fcebfd2fe18d597e67e5358dafbda38ba",
+ "updated": "2026-11-19",
+ "total": 26,
  "findings": {
   "actions/cache-poisoning/poisonable-step:36a450a6d0392741:1": 1,
   "actions/cache-poisoning/poisonable-step:a92d657e6d51b430:1": 1,
@@ -27,7 +27,6 @@
   "py/path-injection:b9803039b3478065:1": 1,
   "py/path-injection:df0a12ac2d6665ef:1": 1,
   "py/path-injection:eb0ba503eff7f846:1": 1,
-  "py/polynomial-redos:da6e137abf79d69c:1": 1,
   "py/redos:d7ec0c5404b59441:1": 1
  }
 }

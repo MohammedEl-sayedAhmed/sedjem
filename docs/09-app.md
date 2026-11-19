@@ -19,9 +19,11 @@ Local models that aren't on the computer yet can be downloaded from the app, fro
 or from *Settings → Models*. Downloads resume after a dropped connection and are checked against a
 pinned checksum.
 
-*Settings* has eight tabs. *Models* lists the models on the computer, with their downloads and
-removal, and under *Speaker labels* the speaker models, with the choice of the one that labels the
-speakers ([speaker models](#speaker-models)). *Add models* has two views: *Recommended* and *From
+*Settings* has eight tabs. *Models* has the *Default model*, the one a new transcription starts with,
+kept across restarts; the models on the computer, with their downloads and removal; and under *Speaker
+labels* the speaker models, with the choice of the one that labels the speakers
+([speaker models](#speaker-models)). A default model that isn't ready yet, with no key or not downloaded,
+can still be chosen: until it is, a new transcription starts with the first ready model. *Add models* has two views: *Recommended* and *From
 Hugging Face*. *Hosted services* holds the API keys, *Speed* the graphics card, power mode and
 processor threads, *Assistants* what assistants connected over MCP may see, how to connect them and
 what they asked ([assistants](11-assistants.md)), *Other computers* the pairing with another computer of yours that
@@ -92,10 +94,15 @@ goes on without it, and the job's log and the Video line under *More details* sa
 including mp3 and m4a files with an album cover, get no video.
 
 Exports are plain text, SRT and WebVTT subtitles, Markdown and JSON, with your names and edits
-applied, or you can copy the text. Arabic lines are laid out right to left automatically. There are
+applied, or you can copy the text. *Export…* at the foot of the sidebar exports many at once: tick
+transcriptions, a whole course or all of them, pick one format, and get a zip with a file for each (a
+course's lectures numbered in a folder of their own), one combined file in text, Markdown or JSON, or,
+in Chrome, Edge and the desktop app, the files in a folder you pick. *Export course* on a lecture's page
+opens it with the course ticked. Arabic lines are laid out right to left automatically. There are
 light and dark themes, the layout works in a narrow window, and the page loads nothing from outside
 (no CDN, web fonts or analytics scripts; the app's anonymous usage counts are sent by its server, as
-[privacy](#privacy) says).
+[privacy](#privacy) says). The one exception is YouTube's player, which the page loads only to play a
+video added with *Stream it from YouTube* ([YouTube videos](#streaming-from-youtube)).
 
 Each transcription keeps a record of how it was made: the recording (name, format, codec, sample
 rate, channels, bit rate, size, length, and when it was made), the model (its engine and file, or
@@ -133,11 +140,12 @@ details*. Transcriptions made before this was added sort by the date they were a
 
 ## YouTube videos and courses
 
-On the new transcription page, *YouTube link* next to the file picker takes a link to a video or a
-playlist. *Check* reads it and shows the title, the uploader, the number of videos, their total length,
-and which of them have captions made by people. A playlist lists its videos in order, and any of them can
-be left out; private, deleted and live videos are listed but can't be picked. The model and the options
-are chosen as for a file, and *Start* adds one transcription per video, named after the video.
+On the new transcription page, *Link* next to the file picker takes a link to a video or a playlist, or to a
+Google Drive file ([below](#google-drive-files)). For YouTube, *Check* reads it and shows
+the title, the uploader, the number of videos, their total length, and which of them have captions made by
+people. A playlist lists its videos in order, and any of them can be left out; private, deleted and live videos
+are listed but can't be picked. The model and the options are chosen as for a file, and *Start* adds one
+transcription per video, named after the video.
 
 Each video is downloaded first, one at a time in playlist order, and is then prepared and transcribed
 like any recording. The downloading stage shows its progress and can be cancelled, and a download that
@@ -146,6 +154,27 @@ pixels high and the best AAC sound, and joins them into one MP4 file with PyAV w
 so the video can play next to its transcript. No ffmpeg program is needed. When YouTube has no such pair,
 the app takes a single MP4 file that has both. When a video has no H.264 version at all, only its sound is
 downloaded and its page says so.
+
+### Streaming from YouTube
+
+Under *The video*, the form offers two choices, and remembers the last one picked:
+
+- *Download the video* (the first choice until another is picked): as above, so the video plays without
+  internet.
+- *Stream it from YouTube*: only the best AAC sound of each video is downloaded, with no video stream and
+  no joining step, so a long course takes much less space and time. Each lecture of a playlist takes
+  the same choice.
+
+The page of a streamed video shows *Play from YouTube* where the video would be. Nothing is loaded from
+YouTube until it plays: then the page loads YouTube's player from `www.youtube-nocookie.com`, and the
+player loads the video from Google's servers. The page drives the player through messages, without
+loading YouTube's own script, so the transcript follows it as it follows a downloaded video: a line's
+time goes there, and *Follow playback* keeps the current line in view. When the player doesn't answer
+within about 8 seconds, as without internet, or YouTube doesn't let other sites play that video, the
+page says "YouTube's player couldn't load, so the sound plays from this computer" and plays the
+downloaded sound instead, from the same moment. *Try again* there loads YouTube's player once more, and
+*Open on YouTube* opens the video in the browser. Transcriptions made before this choice, and those that
+downloaded the video, play as before.
 
 ### Captions made by people
 
@@ -200,6 +229,44 @@ it too. Without a runtime yt-dlp still gets many videos, but YouTube may hold so
 
 Downloading from YouTube is meant for personal use, and keeping to YouTube's terms of service and the
 rights of the people who made the videos is up to you.
+
+## Google Drive files
+
+The same *Link* field takes a Google Drive file shared with anyone who has the link. *Check* reads it in the same way
+and shows its name and length; *Start* adds a transcription named after the file without its extension. The links
+Drive gives to share a file all work: `drive.google.com/file/d/…/view`, the older `…/open?id=…` and `…/uc?id=…`. A
+Google Docs file is refused, and so is any link that isn't Drive's. A file is refused as not audio or video only when
+its name ends in the extension of another kind of file, such as a document, an image or an archive, and Drive gives
+no sign that it plays (no length, no copy made to play it). A name such as "Week 1.2" has no extension and is taken
+whole; a file that turns out not to be audio or video fails when its sound is read, as an upload would.
+
+The file is downloaded first, as it is on Drive: the file itself, never a copy that Drive made to play it. Before a
+large file, Drive shows a page saying it can't scan the file for viruses; the download answers that page and goes
+on. The download stops, and what came of it is deleted, when the file is too large:
+
+- When Drive gives the file's size as the download starts (it did for the files tried), the download stops at once
+  if the file is larger than the upload limit (`max_upload_gb`, 4 GB at first), or if the disk would have less than
+  1 GB left after the file and the sound made from it (taken as a fifth of the file's size).
+- In every case, as the bytes come, the download stops once more than the upload limit has come (a size Drive gave
+  can be wrong), or when a check of the free space every 32 MB (from the start when Drive gives no size) finds less
+  than 1 GB beyond room for the sound made from what came.
+
+The download takes the file only from Drive's own hosts, also after a redirect: an answer from another site stops it
+before anything of that answer is written.
+
+From then on the file is treated as an uploaded file of its type: its sound is converted, a video gets the copy that
+plays beside its transcript, and the downloaded file is deleted unless `keep_original` is set. Drive files have no
+streaming choice and no captions, so every file goes to the chosen model. A Drive file sits with the single
+transcriptions, like an uploaded file, and has no files in the courses folder; its page links to the file on Drive.
+
+Sedjem doesn't sign in to Google. A file that isn't shared with anyone who has the link, or that was removed, says
+"This file isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet." A file whose owner
+turned downloading off is refused too. A download that fails says why on its page and can be tried again, as a
+YouTube download can.
+
+Drive folders are planned. For now a folder's link is refused with "Google Drive folders can't be read yet. Add the
+files one by one, each with its own link.", because yt-dlp can't read Drive folders at the moment
+([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
 
 ## Version history
 
@@ -358,7 +425,8 @@ All model settings live in [`app/config.toml`](../app/config.toml). Each `[[mode
 
 The other sections are `[server]` (host and port; the host is 127.0.0.1, `localhost` or `::1`, since the app
 has no login, and it doesn't start with any other; port 0 takes a new free one at each start), `[storage]` (the data
-folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language)
+folder, whether to keep the original, the upload limit), `[defaults]` (model, speakers, language; the
+*Default model* in *Settings → Models* wins over the model here)
 and `[local]` (Python, CPU threads, the speaker models and the one chosen, `performance_while_running`).
 Personal overrides go in `app_data/config.toml` with the same layout, so `app/config.toml` can stay as
 shipped. A `[[models]]` entry there with the same `id` changes only the fields it lists, and
@@ -696,6 +764,16 @@ the speaker step with a stand-in model process).
   read, and only YouTube's own pages are read. The videos and their transcripts stay on the computer;
   with a hosted model, the sound of each video without captions is uploaded after the same
   confirmation as a recording.
+- Checking or adding a Google Drive link asks Google Drive, through yt-dlp, for that file's details and
+  download, and nothing else. A link is rebuilt from the file id before it is read, a folder's link is
+  refused before anything is asked, nothing signs in to Google, and a file is downloaded only from Drive's
+  own hosts. The files and their transcripts stay on the computer; with a hosted model, each file's sound is
+  uploaded after the same confirmation as a recording.
+- A video added with *Stream it from YouTube* has only its sound on the computer. Only when you play it
+  on its page does the page load YouTube's player from `www.youtube-nocookie.com`, and the player load
+  the video from Google's servers, which see the computer's IP address and which video plays; YouTube
+  may keep data in the browser, as on its own site. The page reads only the messages of that player,
+  and its Content-Security-Policy lets it show no other site in a frame.
 - With hosted models, the recording is uploaded only when you pick one and also tick "Upload this
   recording to …". The server checks this again, including for re-runs. Keys go only to their own
   service.
@@ -750,7 +828,8 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/downloads.py` | model downloads, resumable and checked against the pinned size and SHA-256 |
 | `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from the speaker model |
 | `app/hub.py` | models added from Hugging Face: links, the API, GGUF headers, conversion, `models.json` |
-| `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams, joining them into `video.mp4` with PyAV, captions made by people as transcripts |
+| `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams (only the sound, for a video streamed from YouTube), joining them into `video.mp4` with PyAV, captions made by people as transcripts |
+| `app/drive.py` | Google Drive links with yt-dlp's Drive extractor: reading a file's link, downloading the file itself; a folder's link is refused for now |
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
@@ -775,9 +854,10 @@ says only whether Sedjem answers.
 
 | Call | What |
 |---|---|
-| `GET /api/prefs`, `PATCH /api/prefs` | the page's preferences (theme, the library's order, the video size, the update notices), kept in `page.json` in the data folder; PATCH takes `{name: text, or null to forget it}` |
+| `GET /api/prefs`, `PATCH /api/prefs` | the page's preferences (theme, the library's order, the video size, the YouTube form's choice to download or stream the video, the update notices), kept in `page.json` in the data folder; PATCH takes `{name: text, or null to forget it}` |
 | `GET /api/status` | models (ready, or what's missing), defaults, power profile, free space, and in `usage` the state of the usage counts ([usage counts](13-usage-counts.md)) |
 | `POST /api/settings` with `{"usage_counts": …}` | the usage counts on (`true`) or off (`false`) |
+| `POST /api/settings` with `{"default_model": …}` | the model a new transcription starts with, as in *Settings → Models*: one of the `id`s that `GET /api/status` lists under `models`, or `null` for `[defaults] model`. `GET /api/status` gives the one in use as `defaults.model`, and a job that names no model gets it |
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
 | `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&modified=&confirm_upload=` | the body is the file; `modified` is the file's modified time in milliseconds, kept as the recording's date when its tags have none |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
@@ -787,9 +867,10 @@ says only whether Sedjem answers.
 | `POST /api/jobs/<id>/branch` with `{"version": …, "name": …}` | a branch: a new transcript of the recording that starts as that version |
 | `POST /api/jobs/<id>/main` with `{"main": true}` | the recording's main transcript (`false` unmarks it) |
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
+| `POST /api/export` with `{"ids": […], "format": …}` | many transcripts at once, in the order given: a zip with a file for each; with `"combined": true`, one file (`txt`, `md` or `json`); with `"as": "files"`, the files as JSON (`path` and `text`). Transcriptions without a transcript are left out |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
-| `POST /api/youtube/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people |
-| `POST /api/youtube` with `{"url": …, "model": …, "entries": […], "captions": true, …}` | one transcription per video (all of them without `entries`), queued in playlist order |
+| `POST /api/link/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people; or a Google Drive file: its name and length (`"site"` says which; a Drive folder's link is refused for now). `POST /api/youtube/inspect`, its name before Drive links, does the same |
+| `POST /api/link` with `{"url": …, "model": …, "entries": […], "captions": true, "stream": false, …}` | one transcription per video (all of them without `entries`), queued in playlist order, or one for a Drive file; with `"stream": true`, each YouTube video downloads only the sound, and its job has `"stream": true` so that its page plays the video from YouTube. A Drive job has `drive_id`, and ignores `captions` and `stream`. `POST /api/youtube` does the same |
 | `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
 | `POST /api/jobs` with `run_on` and `confirm_send`, `GET /api/remote` and the rest of `/api/remote/` | a transcription on a paired computer, and the pairing ([running jobs on another computer](15-remote-runs.md#for-scripts)) |
 | `GET /api/updates`, `POST /api/updates/check`, `/settings`, `/skip`, `/install` | *Settings → Updates*: the state, *Check now*, the switch and channel, *Skip this version*, *Update now* ([updates](12-updates.md)) |

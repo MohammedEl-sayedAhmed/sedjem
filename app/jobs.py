@@ -11,10 +11,12 @@ the audio by hardlink like a re-run, and no model runs. A recording's main trans
 job.json (app/compare.py).
 
 A job made from a YouTube link (source_url, app/youtube.py) is downloaded first, one at a time in the
-order the jobs were added (a playlist's in playlist order): video.mp4, or only the sound as source.<ext>,
-and captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
-recording, and a job with captions takes them as its transcript instead of going to a model. A finished
-YouTube job writes its files to the courses folder (app/courses.py).
+order the jobs were added (a playlist's in playlist order): video.mp4, or only the sound as source.<ext> (also
+when it was added with streaming, "stream": true, and its page plays the video from YouTube), and
+captions.vtt when the video has captions made by people. Prepare then reads video.mp4 like any
+recording, and a job with captions takes them as its transcript instead of going to a model. A job made from a
+Google Drive link (source_url and drive_id, app/drive.py) downloads its file as source.<ext> in the same queue, and
+from then on is an uploaded file. A finished YouTube job writes its files to the courses folder (app/courses.py).
 
 A job sent to a paired computer (app/remote.py) has "remote": {"id", "name"} and kind "remote": it is prepared here,
 then a queue of its own sends audio.flac there and brings the transcript back. Jobs that other computers send here are
@@ -36,7 +38,7 @@ import soundfile as sf
 
 import sysinfo
 
-from . import courses, engines, report, video, youtube
+from . import courses, drive, engines, report, video, youtube
 from .config import power_profile, replace_file, set_power_profile
 
 ACTIVE = ("preparing", "queued", "running")
@@ -229,6 +231,17 @@ def convert(source, dest, on_progress, cancelled, limits=None):
     replace_file(tmp, dest)
 
 
+# What yt-dlp leaves of a download that didn't finish: source.<ext>.part (or .ytdl), and the parts of one made of
+# fragments. An upload is source.<ext> alone, so an uploaded file named x.part still counts.
+PARTIAL = re.compile(r"source\.[^.]+\.(?:part|ytdl)\b.*")
+
+
+def source_file(folder):
+    """The recording put in a job's folder, source.<ext> (an upload or a download), or None. A download that
+    didn't finish doesn't count, so the job downloads again (yt-dlp resumes the part) instead of reading it."""
+    return next((p for p in sorted(Path(folder).glob("source.*")) if not PARTIAL.fullmatch(p.name)), None)
+
+
 def link_or_copy(src, dst):
     try:
         os.link(src, dst)  # same file on disk, no extra space
@@ -277,7 +290,7 @@ class Runner:
     def submit(self, jid):
         job, folder = self.store.get(jid), self.store.dir(jid)
         if job and job.get("source_url") and not any((folder / n).exists() for n in ("audio.flac", "video.mp4")) \
-                and next(folder.glob("source.*"), None) is None:  # a YouTube job not downloaded yet
+                and source_file(folder) is None:  # a YouTube or Drive job not downloaded yet
             self.store.update(jid, status="preparing", stage="waiting-download", error=None)
             self.queues["download"].put(jid)
             return
@@ -338,7 +351,7 @@ class Runner:
         if job.get("source_path"):
             found = Path(job["source_path"])
         else:
-            found = next(folder.glob("source.*"), None) or folder / video.NAME
+            found = source_file(folder) or folder / video.NAME
         return found if found.is_file() else None
 
     def drop_upload(self, job, source):
@@ -348,7 +361,8 @@ class Runner:
                 and (not self.cfg.keep_original or job.get("served")):
             source.unlink(missing_ok=True)
     def download(self, jid, _):
-        """Download a YouTube job's video (app/youtube.py), then hand it to prepare."""
+        """Download a YouTube job's video (app/youtube.py), or a Drive job's file (app/drive.py), then hand it to
+        prepare."""
         job = self.store.get(jid)
         if not job or job["status"] == "cancelled" or jid in self.cancelled:
             return
@@ -360,12 +374,13 @@ class Runner:
                 last[0] = time.time()
                 self.store.update(jid, done=done, total=total)
 
+        site, name = (drive, "Google Drive") if job.get("drive_id") else (youtube, "YouTube")
         try:
-            got = youtube.download(self.cfg, job, self.store.dir(jid), progress, lambda: jid in self.cancelled)
+            got = site.download(self.cfg, job, self.store.dir(jid), progress, lambda: jid in self.cancelled)
         except engines.Cancelled:
             return
-        except youtube.YouTubeError as e:
-            self.store.update(jid, status="failed", stage=None, done=None, total=None, error=f"YouTube: {e}",
+        except (youtube.YouTubeError, drive.DriveError) as e:
+            self.store.update(jid, status="failed", stage=None, done=None, total=None, error=f"{name}: {e}",
                               finished=now())
             self.ended(jid, stage="download")
             return
@@ -624,10 +639,11 @@ class Runner:
         old = self.store.get(jid)
         folder = self.store.dir(jid)
         shown = old.get("video") if (folder / video.NAME).exists() else None
-        youtube_fields = {k: old[k] for k in ("source_url", "youtube_id", "course") if old.get(k)}  # still the lecture
+        link_fields = {k: old[k] for k in ("source_url", "youtube_id", "drive_id", "course", "stream")
+                       if old.get(k)}  # still the lecture
         new = self.new_job(title=old["title"], source_name=old.get("source_name"), model_id=model_id,
                            options=options, rerun_of=jid, source=old.get("source"),  # the same recording
-                           fingerprint=old.get("fingerprint"), **({"video": shown} if shown else {}), **youtube_fields,
+                           fingerprint=old.get("fingerprint"), **({"video": shown} if shown else {}), **link_fields,
                            **extra)
         for name in ("audio.flac", video.NAME):
             if name == "audio.flac" or shown:
@@ -655,7 +671,8 @@ class Runner:
                 **{k: old.get(k) for k in ("model", "model_title", "kind", "options", "source", "audio_s", "fingerprint")},
                 "status": "done", "stage": None, "speaker_names": state["speaker_names"], "rerun_of": jid,
                 "started": at, "finished": at, "branch": {"name": name, "from": {"id": jid, "version": n}},
-                **{k: old[k] for k in ("source_url", "youtube_id", "course", "captions") if old.get(k)},  # still the lecture
+                **{k: old[k] for k in ("source_url", "youtube_id", "drive_id", "course", "captions", "stream")
+                   if old.get(k)},  # still the lecture
                 **({"video": shown} if shown else {})}
         for _ in range(50):  # an id that is taken is drawn again, as in new_job
             new = self.store.new_id()

@@ -556,7 +556,8 @@ class Policies(unittest.TestCase):
             with self.subTest(name):
                 self.assertIn(name, policy)
                 self.assertIn(f"]({url})", policy)
-        for part in ("eu.aptabase.com", "api.github.com", "googlevideo.com", "(13-usage-counts.md)", "no account",
+        for part in ("eu.aptabase.com", "api.github.com", "googlevideo.com", "www.youtube-nocookie.com",
+                     "(13-usage-counts.md)", "no account",
                      "/USAGECOUNTS=0", "DO_NOT_TRACK=1", "https://github.com/MohammedEl-sayedAhmed/sedjem/issues"):
             self.assertIn(part, policy)
         # a hosted service added to the app needs its row in the privacy policy

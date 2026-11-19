@@ -170,11 +170,12 @@ const api = {
   },
 };
 
-// The page's preferences: the theme, the library's order, the large video, and updates.js's notes. The port, and with
-// it this page's origin and its localStorage, is new at each start (app/session.py), so the server keeps them in the
-// data folder (/api/prefs). loadPrefs copies them into localStorage, where the code reads them; prefPut saves a
-// change in both.
-const PREFS = ["sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from"];
+// The page's preferences: the theme, the library's order, the large video, the YouTube form's choice to download or
+// stream the video (youtube.js), and updates.js's notes. The port, and with it this page's origin and its
+// localStorage, is new at each start (app/session.py), so the server keeps them in the data folder (/api/prefs).
+// loadPrefs copies them into localStorage, where the code reads them; prefPut saves a change in both.
+const PREFS = ["sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from",
+  "sedjem-youtube-video"];
 function prefPut(key, value) {
   try { if (value == null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* private mode */ }
   api.patch("/api/prefs", { [key]: value ?? null }).catch(() => {});
@@ -195,13 +196,16 @@ async function loadPrefs() {
 // ---------------------------------------------------------------------------------------------
 const S = {
   status: null, jobs: [], route: { name: "new" },
-  job: null, lines: [], edited: false, partial: false, hasAudio: false, hasVideo: false, log: "",
+  job: null, lines: [], edited: false, partial: false, hasAudio: false, hasVideo: false, ytVideo: "", log: "",
   editing: false, dirty: false, search: "", matchIndex: -1, follow: true,
   form: { file: null, path: null, seconds: null, model: null, speakers: null, language: null, prompt: "", title: "", confirm: false, source: "file" },
   uploading: null, uploadXhr: null, lastUserScroll: 0, currentLine: -1, jobPoll: null, lineSig: "",
 };
 const ACTIVE = new Set(["preparing", "queued", "running"]);
 const canPlay = () => S.hasAudio || S.hasVideo;
+// The job page plays its video from YouTube: added with streaming, no video.mp4, its sound ready (for when the player
+// can't load), and the player hasn't failed on this page (youtube.js)
+const streamed = () => !!S.ytVideo && S.hasAudio && !YT_FAILED.has(S.job?.id);
 const model = (id) => (S.status?.models || []).find((m) => m.id === id);
 const spkColor = (sid) => (sid ? `var(--s${((parseInt(sid, 10) - 1) % 8 + 8) % 8 + 1})` : "var(--faint)");
 const spkName = (sid) => (sid == null ? "" : shownNames()[sid] || `Speaker ${sid}`);
@@ -268,10 +272,11 @@ async function cancelDownload(id) {
 }
 function refreshDownloadViews() {
   if (S.route.name === "new") { renderModelGrid(); ytRefreshNote(); }
-  // A redraw rebuilds Settings and would wipe what is being typed there (a key, a link); the progress
-  // shows at the next status check after the field is left.
+  // A redraw rebuilds Settings and would wipe what is being typed there (a key, a link), or close a list being
+  // chosen from (the default model; while a list drawn in the app's style is open, an option in it has the focus).
+  // The progress shows at the next status check after the field is left.
   const typing = document.activeElement?.closest("#settings")
-    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea");
+    && document.activeElement.matches("input:not([type=checkbox], [type=radio], [type=range]), textarea, select, select *");
   if ($("#settings").open && !typing) renderSettings();
 }
 
@@ -389,6 +394,7 @@ function renderSidebar() {
   bindCourses();
   refreshGroupBar();
   refreshRerunMenu();
+  expRefresh();  // the Export dialog's list, if it is open (exports.js)
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -404,8 +410,9 @@ function formDefaults() {
   if (f.language == null) f.language = d.language || "ar";
 }
 
-// The length the model will transcribe: the recording's, or the picked YouTube videos' without captions.
-const formSeconds = () => (S.form.source === "youtube" ? ytSeconds() : S.form.seconds);
+// The length the model will transcribe: the recording's, or that of a link's picked videos or files (without
+// the YouTube videos whose captions are used).
+const formSeconds = () => (S.form.source === "link" ? ytSeconds() : S.form.seconds);
 
 function estimateText(m, seconds, short = false) {
   if (!m) return "";
@@ -468,7 +475,7 @@ function modelCard(m) {
 }
 
 // The model picked on the form: one of this computer's, or one a paired computer listed (remote.js)
-const formModel = () => (S.form.source !== "youtube" && rmChoice() ? rmModel(rmChoice(), S.form.model) : model(S.form.model));
+const formModel = () => (S.form.source !== "link" && rmChoice() ? rmModel(rmChoice(), S.form.model) : model(S.form.model));
 
 function renderNew() {
   stopJobPoll();
@@ -478,21 +485,22 @@ function renderNew() {
   const src = f.file ? { name: f.file.name, size: f.file.size } : f.path;
   const custom = !SPEAKER_CHOICES.some(([v]) => v === f.speakers);
   const hosted = m && m.kind === "hosted";
-  const yt = f.source === "youtube", picked = yt ? ytPicked().length : 0;
-  const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); YouTube links run here
+  const yt = f.source === "link", picked = yt ? ytPicked().length : 0;  // a link: youtube.js and drive.js
+  const onDrive = yt && YT.found?.site === "drive";
+  const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); links run here
   const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : src && !S.uploading) && m && m.ready && (!hosted || f.confirm)
     && (!rc || rc.consented || f.confirm);
   const startLabel = yt ? (YT.adding ? "Adding…" : picked > 1 ? `Start ${picked} transcriptions` : "Start transcription")
     : S.uploading ? "Uploading…" : "Start transcription";
   view.innerHTML = `
   <h1>New transcription</h1>
-  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a YouTube video or course. Local models keep everything on this computer.</p>
+  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a link to a YouTube video or playlist or a Google Drive file. Local models keep everything on this computer.</p>
 
   <div class="card">
-    <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Video or playlist" : "Recording"}
+    <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Link" : "Recording"}
       <div class="segmented src-kind" role="group" aria-label="Where the recording comes from">
         <button type="button" data-src="file" aria-pressed="${!yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.upload} A file</button>
-        <button type="button" data-src="youtube" aria-pressed="${yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${YT_ICON.video} YouTube link</button></div></div>
+        <button type="button" data-src="link" aria-pressed="${yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.link} Link</button></div></div>
     ${yt ? ytCard() : src ? `
       <div class="chosen">
         <div class="ico">${ICON.wave}</div>
@@ -534,7 +542,7 @@ function renderNew() {
         <div class="segmented" id="lang">${LANGUAGES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
         <p class="hint">${languageHint(m, f.language)}</p>
       </div>
-      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">Each transcription is named after its video; you can rename it later.</p></div>` : `<div class="field">
+      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">${onDrive ? "The transcription is named after the file" : "Each transcription is named after its video"}; you can rename it later.</p></div>` : `<div class="field">
         <label for="titleInput">Title</label>
         <input type="text" id="titleInput" dir="${mixDir(f.title)}" data-mixdir value="${esc(f.title)}" placeholder="${esc(src ? src.name.replace(/\.[^.]+$/, "") : "Meeting title")}">
       </div>`}
@@ -549,7 +557,7 @@ function renderNew() {
   ${hosted && m.ready ? `<div class="card consent">
     ${ICON.cloud}
     <div>
-      <p><b>This model uploads ${yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
+      <p><b>This model uploads ${onDrive ? "the sound of the file" : yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
       <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : "this recording"} to ${esc(m.service)}</label>
     </div>
   </div>` : ""}
@@ -566,7 +574,7 @@ function renderNew() {
 
 function renderModelGrid() {
   const grid = $("#modelGrid");
-  if (!grid || (S.form.source !== "youtube" && rmChoice())) return;  // a paired computer's models are its own
+  if (!grid || (S.form.source !== "link" && rmChoice())) return;  // a paired computer's models are its own
   grid.innerHTML = S.status.models.map(modelCard).join("");
   bindModelCards();
 }
@@ -651,7 +659,7 @@ function bindNew() {
     if (f.source === b.dataset.src || (!f.source && b.dataset.src === "file")) return;
     f.source = b.dataset.src;
     renderNew();
-    if (f.source === "youtube") $("#ytUrl")?.focus();
+    if (f.source === "link") $("#ytUrl")?.focus();
   }));
   bindYoutube();
   const pr = $("#promptInput");
@@ -666,7 +674,7 @@ async function start() {
   const f = S.form, m = formModel();
   const params = { model: m.id, speakers: f.speakers, language: f.language, prompt: m.prompt ? f.prompt : "",
     title: f.title.trim(), confirm_upload: m.kind === "hosted" && f.confirm ? "1" : "0" };
-  if (f.source === "youtube") return ytStart(params);  // youtube.js
+  if (f.source === "link") return ytStart(params);  // youtube.js
   if (m.kind === "remote") Object.assign(params, { run_on: m.computer.id, confirm_send: f.confirm ? "1" : "0" });
   try {
     let job;
@@ -699,7 +707,7 @@ async function start() {
 // ---------------------------------------------------------------------------------------------
 // Job view
 // ---------------------------------------------------------------------------------------------
-const STAGES = {
+const STAGES = {  // (a download from Google Drive says so instead of YouTube: stageInfo)
   "waiting-download": "Waiting to download from YouTube",
   downloading: "Downloading from YouTube",
   waiting: "Waiting to prepare the audio",
@@ -719,12 +727,13 @@ function stageInfo(j) {
   const m = model(j.model);
   if (j.status === "queued") return { label: j.kind === "local" ? "Waiting for the previous local job" : "Waiting to start", pct: null };
   if (j.status === "preparing") {
-    if (j.stage === "downloading") {  // bytes, from YouTube (app/youtube.py)
+    const from = (label) => (j.drive_id ? label.replace("YouTube", "Google Drive") : label);  // (app/drive.py)
+    if (j.stage === "downloading") {  // bytes, from YouTube (app/youtube.py) or Google Drive
       const pct = j.total ? Math.min(100, (j.done || 0) / j.total * 100) : null;
-      return { label: STAGES.downloading, pct, detail: j.total ? `${bytes(j.done || 0)} of ${bytes(j.total)}` : j.done ? bytes(j.done) : "" };
+      return { label: from(STAGES.downloading), pct, detail: j.total ? `${bytes(j.done || 0)} of ${bytes(j.total)}` : j.done ? bytes(j.done) : "" };
     }
     const pct = j.stage === "converting" && j.total ? (j.done || 0) / j.total * 100 : null;
-    return { label: STAGES[j.stage] || "Preparing", pct, detail: pct != null ? `${Math.round(pct)}%` : "" };
+    return { label: from(STAGES[j.stage] || "Preparing"), pct, detail: pct != null ? `${Math.round(pct)}%` : "" };
   }
   let label = STAGES[j.stage] || "Working", pct = null, detail = "";
   if (j.stage === "transcribing" && j.total) {
@@ -770,6 +779,7 @@ function renderJob() {
   const meta = [
     `<span>${kindIcon(j)} ${esc(j.model_title || j.model)}</span>`,
     ytHref(j.source_url) ? `<a class="yt-link" href="${esc(ytHref(j.source_url))}" target="_blank" rel="noopener noreferrer" title="${esc(j.source_url)}">${YT_ICON.video} On YouTube</a>` : "",
+    driveHref(j.source_url) ? `<a class="yt-link" href="${esc(driveHref(j.source_url))}" target="_blank" rel="noopener noreferrer" title="${esc(j.source_url)}">${DRIVE_ICON.file} On Google Drive</a>` : "",
     j.audio_s ? `<span>${ICON.clock} ${clock(j.audio_s)}</span>` : "",
     stats.ids.length ? `<span>${ICON.users} ${stats.ids.length} speaker${stats.ids.length === 1 ? "" : "s"}</span>` : "",
     j.seconds ? `<span>${ICON.cpu} took ${human(j.seconds)}${j.rtf ? ` (${Number(j.rtf).toFixed(2)}× real time)` : ""}</span>` : "",
@@ -786,7 +796,7 @@ function renderJob() {
     statusCard = `<div class="card progress-card" id="progressCard">
       <div class="row"><span class="stage" id="stageLabel">${esc(si.label)}</span><span class="hint" id="stageDetail" style="margin:0">${esc(si.detail || "")}</span><span class="times" id="stageTimes">${etaText(j)}</span></div>
       <div class="progress${si.pct == null ? " indeterminate" : ""}" id="stageBar"><i style="width:${(si.pct || 0).toFixed(1)}%"></i></div>
-      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The video is downloaded first (up to 720p, to play beside the transcript), then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
+      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The ${j.drive_id ? "file is downloaded first" : j.stream ? "sound is downloaded first (the video plays from YouTube)" : "video is downloaded first (up to 720p, to play beside the transcript)"}, then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
         : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open."
         : j.kind === "remote" ? rmNote(j) : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
       <div style="margin-top:12px"><button class="btn btn-sm btn-danger" id="cancelBtn">${ICON.stop} Cancel</button></div>
@@ -802,6 +812,10 @@ function renderJob() {
     </div>`;
   }
 
+  // The panel stays while the page is drawn again (placeVideo). Where the browser can move it without reloading
+  // YouTube's player in it, it is set aside first; elsewhere the player loads again once, and goes on.
+  const kept = view.contains(videoPanel);
+  if (kept && document.body.moveBefore) movePanel(document.body);
   view.innerHTML = `
   <div class="job-head">
     <div class="title-row">
@@ -827,6 +841,7 @@ function renderJob() {
   </div>
   ${statusCard}
   ${j.download_note ? `<div class="card yt-notice">${ICON.info}<span>${esc(j.download_note)}.</span></div>` : ""}
+  ${ytFallbackNote(j)}
   ${j.remote_note ? `<div class="card yt-notice rm-notice">${ICON.info}<span>${esc(j.remote_note)}.</span></div>` : ""}
   ${hasLines || !active || slot ? `
   <div class="job-body${slot ? " has-video" : ""}">
@@ -848,10 +863,10 @@ function renderJob() {
       ${detailsPanel()}
     </div>
   </div>` : ""}`;
-  placeVideo();
+  placeVideo(kept);
   bindJob();
   updateMatches();
-  if (canPlay()) showPlayer(j, S.hasVideo); else hidePlayer();
+  if (canPlay()) showPlayer(j, S.hasVideo ? "video" : streamed() ? "youtube" : "audio"); else hidePlayer();
 }
 
 function speakerRow(sid, stats) {
@@ -1281,6 +1296,7 @@ function applyJob(r) {
   S.partial = r.partial;
   S.hasAudio = r.has_audio;
   S.hasVideo = !!r.has_video;  // video.mp4, played instead of the audio (app/video.py)
+  S.ytVideo = ytStreamed(r);  // else the YouTube video it streams, when it was added with streaming (youtube.js)
   S.mediaSig = r.media_sig || "";  // ?sig= for its audio and video, which can't carry the header (app/session.py)
   S.log = r.log || "";
   S.detailGroups = r.detail_groups || [];
@@ -1766,31 +1782,71 @@ async function restoreVersion(n) {
 
 // ---------------------------------------------------------------------------------------------
 // Player: the bar at the bottom plays the job's video when the recording has one (shown in the job
-// page's video panel), else the hidden <audio>. Everything that follows playback uses `media`.
+// page's video panel), or a streamed video in YouTube's player in that panel (youtube.js), else the hidden
+// <audio>. Everything that follows playback uses `media`.
 // ---------------------------------------------------------------------------------------------
 const audio = $("#audio"), video = $("#video"), videoPanel = $("#videoPanel");
+const ytMedia = new YouTubeMedia(videoPanel.querySelector(".video-frame"));
 let media = audio;
 
-function showPlayer(j, withVideo = false) {
+// kind: "audio", "video" (video.mp4) or "youtube" (a streamed video, played by YouTube's player)
+function showPlayer(j, kind = "audio") {
   const sig = j.media_sig ?? S.mediaSig;  // the job's own (the compare view's base), else the job page's
-  const el = withVideo ? video : audio, src = `/api/jobs/${j.id}/${withVideo ? "video" : "audio"}?sig=${sig}`;
-  if (media !== el) {  // e.g. the video became ready while the audio played: go on from the same moment
-    const was = media, same = was.src.includes(`/api/jobs/${j.id}/`), t = was.currentTime, playing = !was.paused;
+  const el = { video, youtube: ytMedia }[kind] || audio;
+  const src = el === ytMedia ? ytEmbed(j.youtube_id) : `/api/jobs/${j.id}/${el === video ? "video" : "audio"}?sig=${sig}`;
+  const loaded = el === ytMedia ? ytMedia.src === src && ytMedia.job === j.id : el.src.endsWith(src);
+  const load = () => (el === ytMedia ? ytMedia.open(src, j.id, j.audio_s) : (el.src = src));
+  if (media !== el) {  // e.g. the video became ready while the audio played, or YouTube's failed: go on from the same moment
+    const was = media, t = was.currentTime, playing = !was.paused;
+    const same = was === ytMedia ? ytMedia.job === j.id : was.src.includes(`/api/jobs/${j.id}/`);
     media = el;
     was.pause();
     was.removeAttribute("src");
     was.load();
-    if (!el.src.endsWith(src)) el.src = src;
+    if (!loaded) load();
     el.playbackRate = el.defaultPlaybackRate = parseFloat($("#rate").value);
     if (same && t) el.currentTime = t;
     if (same && playing) el.play().catch(() => {});
     S.currentLine = -1;
     setPlayIcon();
     $("#durTime").textContent = clock(isFinite(el.duration) ? el.duration : 0);
-  } else if (!el.src.endsWith(src)) { el.src = src; S.currentLine = -1; }
+  } else if (!loaded) { load(); S.currentLine = -1; }
   $("#nowTitle").textContent = j.title || "";
   $("#player").hidden = false;
 }
+
+// YouTube's player didn't load (no internet, or a video that YouTube doesn't let other sites play): the job page
+// says so and plays the downloaded sound instead, from the same moment. The page isn't drawn again, so edits in
+// progress stay. A player that fails while its page isn't shown is only closed: the page tries again next time.
+ytMedia.addEventListener("fail", () => {
+  const j = S.job;
+  if (S.route.name !== "job" || !j || j.id !== ytMedia.job) {
+    if (media === ytMedia) ytMedia.removeAttribute("src");
+    return;
+  }
+  YT_FAILED.add(j.id);
+  if (view.contains(videoPanel)) videoPanel.remove();
+  const body = $(".job-body");
+  if (body) {
+    body.classList.remove("has-video", "video-large");
+    if (!$("#ytFallback")) body.insertAdjacentHTML("beforebegin", ytFallbackNote(j));
+  }
+  showPlayer(j, "audio");
+});
+
+// "Try again" on that note: YouTube's player goes back in its place and loads at once, from where the sound was (and
+// playing, if the sound was). If it fails again, the note comes back. As above, the page isn't drawn again.
+function ytRetry() {
+  const j = S.job, body = $(".job-body");
+  if (!j || !body || !YT_FAILED.delete(j.id) || !streamed()) return;
+  $("#ytFallback")?.remove();
+  body.classList.add("has-video");
+  body.querySelector(".side-col")?.insertAdjacentHTML("afterbegin", videoSlot());
+  placeVideo(false);
+  showPlayer(j, "youtube");
+  ytMedia.start();
+}
+document.addEventListener("click", (e) => e.target.closest?.("#ytRetry") && ytRetry());
 function hidePlayer() {
   if (!media.paused) media.pause();
   $("#player").hidden = true;
@@ -1825,7 +1881,7 @@ function syncCurrentLine(force = false) {
 }
 
 // the same handlers on both elements; only the one in use is heard
-const onMedia = (type, fn) => [audio, video].forEach((el) => el.addEventListener(type, (e) => el === media && fn(e)));
+const onMedia = (type, fn) => [audio, video, ytMedia].forEach((el) => el.addEventListener(type, (e) => el === media && fn(e)));
 onMedia("timeupdate", () => {
   $("#curTime").textContent = clock(media.currentTime);
   if (isFinite(media.duration) && document.activeElement !== $("#seek")) $("#seek").value = Math.round(media.currentTime / media.duration * 1000);
@@ -1883,11 +1939,13 @@ showVideoLarge(videoLarge());
 
 // The job page's slot for the video panel or, while the video is still being made, a box of the same
 // shape with its progress. The panel is one element kept across renders, so the video plays on when the
-// page is drawn again (placeVideo moves it into the new slot).
+// page is drawn again (placeVideo moves it into the new slot). A streamed video's panel holds YouTube's
+// player instead, with a bar below it that says so (the class "yt").
 function videoSlot() {
   const v = S.job?.video, prep = S.job?.video_prep;
   const ar = (v && v.width && v.height ? v.width / v.height : 16 / 9).toFixed(4);
   if (S.hasVideo) return `<div id="videoSlot" data-ar="${ar}"></div>`;
+  if (streamed()) return `<div id="videoSlot" data-ar="${(16 / 9).toFixed(4)}" data-kind="youtube"></div>`;
   if (!prep) return "";
   const busy = prep.done == null || !prep.total;
   return `<div class="video-panel video-prep" style="--ar:${ar}">
@@ -1896,14 +1954,35 @@ function videoSlot() {
 }
 const videoPrepPct = (p) => (p.done != null && p.total ? Math.min(100, p.done / p.total * 100) : 0);
 const videoPrepText = (p) => `${p.done == null ? "Waiting to start" : `${Math.round(videoPrepPct(p))}%`} · the transcript doesn't wait for it`;
-function placeVideo() {
+// kept: the panel was on this page before it was drawn again (renderJob), so its player stays.
+function placeVideo(kept = false) {
   const slot = $("#videoSlot");
-  if (!slot) return;
+  if (!slot) {
+    if (videoPanel.parentNode === document.body) videoPanel.remove();  // set aside by renderJob, and not shown now
+    return;
+  }
+  const yt = slot.dataset.kind === "youtube";
+  // A player left from another page is closed first, so it doesn't load again for nothing when the panel goes in;
+  // this page's own, back after the page was left, loads again only when it is played
+  if (ytMedia.job && (!yt || ytMedia.job !== S.job?.id)) ytMedia.removeAttribute("src");
+  else if (ytMedia.frame && !kept) ytMedia.unload();
   videoPanel.style.setProperty("--ar", slot.dataset.ar);
-  slot.replaceWith(videoPanel);
+  videoPanel.classList.toggle("yt", yt);
+  movePanel(slot.parentNode, slot);
+  slot.remove();
   videoPanel.hidden = false;
   $(".job-body").classList.toggle("video-large", videoLarge());
 }
+// Moves the panel where the browser can do it without reloading YouTube's player in it (Element.moveBefore);
+// elsewhere the player loads again and goes on from where it was (youtube.js).
+function movePanel(parent, before = null) {
+  if (parent.moveBefore && videoPanel.isConnected && parent.isConnected) {
+    try { parent.moveBefore(videoPanel, before); return; } catch { /* moved as before, below */ }
+  }
+  parent.insertBefore(videoPanel, before);
+}
+$("#videoSource").insertAdjacentHTML("afterbegin", YT_ICON.video);
+$("#ytStart").onclick = () => media === ytMedia && media.play();  // loads YouTube's player (youtube.js)
 function updateVideoPrep() {
   const prep = S.job?.video_prep, text = $("#videoPrepText"), bar = $("#videoPrepBar");
   if (!prep || !text) return;
@@ -2142,11 +2221,37 @@ function modelsPanel(items) {
       ${busy ? `<div class="set-item-more">${downloadBlock(id, d, true)}</div>` : ""}
       ${open ? detailsBox("models", id, title, localDetails(m, d, cached)) : ""}</div>`;
   }).join("");
-  return `<h3>Models on this computer</h3>
+  return `${defaultModelRow()}
+    <h3>Models on this computer</h3>
     <div class="set-items">${rows || '<p class="hint">No downloadable models are configured.</p>'}</div>
     ${speakerGroup()}
     <p class="hint">Downloads resume if the connection drops and are checked against a pinned checksum before use.
       <button type="button" class="linkish" data-set-tab="add">Find more models</button></p>`;
+}
+
+// The model a new transcription starts with, saved as default_model (saved at once, like the switches) and used by
+// the new transcription page and the API (S.status.defaults.model). One that isn't ready can still be chosen: until it
+// is, the page starts with the first ready model, as it does when [defaults] model isn't ready.
+function defaultModelRow() {
+  const models = S.status.models || [], pick = S.status.defaults?.model;
+  if (!models.length) return "";
+  const opts = models.map((m) => `<option value="${esc(m.id)}"${m.id === pick ? " selected" : ""}>${esc(m.title)}${notReady(m)}</option>`).join("");
+  const chosen = model(pick), note = chosen && !chosen.ready ? " Not ready yet, so the first ready model is used." : "";
+  return `<div class="set-list def-model">
+      <div class="set-row">
+        <div class="set-text"><label for="defModel"><b>Default model</b></label><span class="hint" id="defModelHint">Selected when a new transcription starts.${esc(note)}</span></div>
+        <select id="defModel" data-setting="default_model" aria-describedby="defModelHint">${opts}</select>
+      </div>
+    </div>`;
+}
+
+// Why a model in that list can't run yet, in the words of its card: a hosted one has no key, a local one isn't
+// downloaded (or, from Hugging Face, not converted yet)
+function notReady(m) {
+  if (m.ready) return "";
+  if (m.kind === "hosted") return " (no key)";
+  if (m.hub?.kind === "transformers" && m.download && !m.download.missing) return " (not converted)";
+  return m.download ? " (not downloaded)" : " (not ready)";
 }
 
 // Speaker labels: the speaker models, one row each with a radio button for the one that labels the speakers (saved at
@@ -2337,9 +2442,9 @@ function bindSettings(focus) {
   $$("[data-power]").forEach((b) => (b.onclick = async () => {
     try { await api.post("/api/power", { profile: b.dataset.power }); await refreshStatus(); renderSettings(); toast(`Power mode: ${b.dataset.power}`); } catch (e) { toast(e.message, "error"); }
   }));
-  $$("input[data-setting]").forEach((el) => (el.onchange = async () => {
+  $$("input[data-setting], select[data-setting]").forEach((el) => (el.onchange = async () => {
     const key = el.dataset.setting;
-    const value = el.type === "radio" ? el.value  // the speaker model (Settings → Models)
+    const value = el.type === "radio" || el.tagName === "SELECT" ? el.value  // the speaker model, the default model (Settings → Models)
       : key === "device" ? (el.checked ? "auto" : "cpu") : key === "threads" ? parseInt(el.value, 10) : el.checked;
     if (key === "threads" && !(value >= 1 && value <= cores)) { el.value = threads; return; }
     try { S.status = await api.post("/api/settings", { [key]: value }); renderTop(); renderSettings(); if (S.route.name === "new") renderModelGrid(); toast("Saved"); }
@@ -2573,6 +2678,8 @@ $("#themeBtn").onclick = () => {
   prefPut("sedjem-theme", dark ? "dark" : "light");
 };
 $("#menuToggle").onclick = () => $("#sidebar").classList.toggle("open");
+$("#exportManyBtn").innerHTML = `${ICON.download} Export…`;
+$("#exportManyBtn").onclick = () => openExportMany();  // many transcripts at once (exports.js)
 $("#jobSearch").oninput = renderSidebar;
 $("#jobSort").innerHTML = Object.entries(SORTS).map(([v, [label]]) => `<option value="${v}">${label}</option>`).join("");
 $("#jobSort").value = sortKept();

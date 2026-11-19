@@ -20,6 +20,7 @@ flowchart LR
   models["Model hosts<br/>Hugging Face, GitHub releases<br/>and PyPI's file host"]
   github["GitHub<br/>releases and the tested main branch"]
   youtube["YouTube<br/>videos and captions from links"]
+  gdrive["Google Drive<br/>shared files from links"]
   aptabase["Aptabase<br/>anonymous usage counts"]
 
   you -->|"adds recordings,<br/>reads transcripts"| sedjem
@@ -29,6 +30,7 @@ flowchart LR
   sedjem -->|"downloads the models and<br/>libraries you choose"| models
   sedjem -->|"checks for updates if you agreed,<br/>downloads one when you ask"| github
   sedjem -->|"fetches a linked video"| youtube
+  sedjem -->|"fetches a linked file"| gdrive
   sedjem -->|"sends the counts<br/>when allowed"| aptabase
 
   classDef person fill:#08427b,stroke:#052e56,color:#fff
@@ -36,7 +38,7 @@ flowchart LR
   classDef external fill:#8a8a8a,stroke:#5e5e5e,color:#fff
   class you person
   class sedjem system
-  class assistant,other,hosted,models,github,youtube,aptabase external
+  class assistant,other,hosted,models,github,youtube,gdrive,aptabase external
 ```
 
 ## The parts inside Sedjem
@@ -51,7 +53,7 @@ flowchart TB
   you(["You"])
   assistant["AI assistant<br/>an MCP client"]
   other["Another computer with Sedjem<br/>paired with this one"]
-  internet["Internet services<br/>hosted services, model hosts,<br/>GitHub, YouTube and Aptabase"]
+  internet["Internet services<br/>hosted services, model hosts,<br/>GitHub, YouTube, Google Drive and Aptabase"]
 
   subgraph sedjem["Sedjem"]
     window["Window<br/>pywebview, or a browser in app mode"]
@@ -72,8 +74,9 @@ flowchart TB
   worker -->|"progress and the lines"| data
   runner -->|"job.json and transcript.json"| data
   server -->|"reads and writes"| data
-  server -->|"model downloads, update checks and downloads,<br/>YouTube link checks, usage counts (HTTPS)"| internet
-  runner -->|"hosted uploads and YouTube<br/>(HTTPS)"| internet
+  server -->|"model downloads, update checks and downloads,<br/>link checks, usage counts (HTTPS)"| internet
+  runner -->|"hosted uploads, YouTube and<br/>Google Drive (HTTPS)"| internet
+  ui -->|"YouTube's player, only to play<br/>a streamed video (HTTPS)"| internet
   runner -->|"sends jobs (HTTPS)"| other
   other -->|"sends jobs (HTTPS)"| remote
   remote -->|"queues their jobs"| runner

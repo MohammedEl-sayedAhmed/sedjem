@@ -6,9 +6,11 @@ people made for each (yt-dlp's "subtitles"; YouTube's automatic captions are nev
 one video for a job: the best H.264 video stream up to 720 pixels high and the best AAC sound, joined into
 video.mp4 with PyAV (the streams copied, the index at the start so a browser can play it while it loads).
 Without such a pair it takes a single MP4 that has both, and without any H.264 version only the sound
-(source.<ext>), so the video can still be transcribed. No ffmpeg program is needed. When the video has
-captions made by people in its own language (Arabic or English), they are saved as captions.vtt and the job
-uses them as its transcript instead of a speech model (caption_lines).
+(source.<ext>), so the video can still be transcribed. A job added with streaming ("stream": true) takes only
+the sound, the best AAC stream: its page plays the video from YouTube's embedded player (app/static/youtube.js).
+No ffmpeg program is needed. When the video has captions made by people in its own language (Arabic or
+English), they are saved as captions.vtt and the job uses them as its transcript instead of a speech model
+(caption_lines).
 
 YouTube hides the addresses of its streams behind a JavaScript challenge. yt-dlp solves it with the
 yt-dlp-ejs scripts in a JavaScript runtime: the Deno that Settings can download (pinned like the models),
@@ -25,6 +27,7 @@ import urllib.parse
 from concurrent.futures import ThreadPoolExecutor
 from itertools import islice
 from pathlib import Path
+from typing import Callable, NamedTuple
 
 from .config import replace_file
 from .engines import Cancelled
@@ -55,14 +58,22 @@ def watch_url(video_id):
     return f"https://www.youtube.com/watch?v={video_id}"
 
 
+def with_scheme(url):
+    """A pasted link with https:// before it when it has no scheme of its own (letters, digits, + . -, then ://).
+    Read without a regular expression, so a long pasted text costs no more than its length."""
+    head, sep, _ = url.partition("://")
+    ok = bool(sep) and head[:1].isascii() and head[:1].isalpha() and all(c.isascii() and (c.isalnum() or c in "+.-")
+                                                                          for c in head)
+    return url if ok or not url else "https://" + url
+
+
 def check_url(url):
     """A YouTube link rebuilt from its parts, so nothing else of it reaches yt-dlp: the video's
     https://www.youtube.com/watch?v=<id> (with &list=<id> when it names a playlist too), or the playlist's
     https://www.youtube.com/playlist?list=<id>. Raises YouTubeError for anything else: another site, a host
     that only looks like YouTube's, a user name, password or odd port in the address, a channel."""
     url = str(url or "").strip()
-    if url and not re.match(r"(?i)[a-z][a-z0-9+.-]*://", url):
-        url = "https://" + url
+    url = with_scheme(url)
     try:
         p = urllib.parse.urlsplit(url)
         port = p.port
@@ -96,8 +107,20 @@ def check_url(url):
     raise YouTubeError(NOT_YOUTUBE)
 
 
-def on_youtube(url, hosts=HOSTS):
-    """Whether an address yt-dlp gave back is still YouTube's (hosts, or names ending in one of them)."""
+def link_host(url):
+    """The host of a pasted link, in lower case ("" when it has none), read as check_url reads it: a link without
+    its scheme is taken as https://."""
+    url = str(url or "").strip()
+    url = with_scheme(url)
+    try:
+        return (urllib.parse.urlsplit(url).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
+def on_hosts(url, hosts=HOSTS):
+    """Whether an address yt-dlp gave back is on these hosts: a set of names, or a tuple of the endings of names
+    (YouTube's by default; app/drive.py has Google Drive's)."""
     try:
         p = urllib.parse.urlsplit(str(url or ""))
         host = (p.hostname or "").lower()
@@ -108,15 +131,35 @@ def on_youtube(url, hosts=HOSTS):
     return p.scheme in ("http", "https") and named and "@" not in p.netloc and ok_port
 
 
-def clean_error(e):
+def plain_error(e):
     """yt-dlp's message without its prefixes and command-line advice: "Video unavailable. This video is private"."""
     msg = re.sub(r"\x1b\[[0-9;]*m", "", str(getattr(e, "msg", None) or e)).strip()
     msg = re.sub(r"^(ERROR:\s*)?(\[[\w:]+\]\s*)?([\w-]{6,}:\s+)?", "", msg)
     msg = re.split(r"\.?\s+(Use --|See https://github\.com/yt-dlp)", msg)[0].strip()
     msg = re.sub(r"\s*\(caused by <.*>\)$", "", msg)
+    return msg or type(e).__name__
+
+
+def clean_error(e):
+    """plain_error, and YouTube's answer to a link it doesn't know said in words."""
+    msg = plain_error(e)
     if re.search(r"HTTP Error (400|404)\b|does not exist", msg):  # often a link pasted only in part
         return "YouTube doesn't know this video or playlist; check that the whole link was pasted"
-    return msg or type(e).__name__
+    return msg
+
+
+class Site(NamedTuple):
+    """What _extract lets yt-dlp read for one kind of link: YouTube's (YOUTUBE), or Google Drive's (app/drive.py)."""
+    check_url: Callable    # the link rebuilt from its parts; raises `error` for any other
+    extractor_keys: set    # the yt-dlp extractors that may have read it
+    hosts: set             # where the page it was read from must be
+    error: type            # what a refusal raises
+    clean_error: Callable  # yt-dlp's message in words
+    elsewhere: str         # the refusal of a link that led somewhere else
+
+
+YOUTUBE = Site(check_url, EXTRACTOR_KEYS, HOSTS, YouTubeError, clean_error,
+               "the link did not lead to a YouTube video or playlist")
 
 
 # ---- the JavaScript runtime ------------------------------------------------------------------------
@@ -201,19 +244,20 @@ def _ydl(cfg, **extra):
                              **extra})
 
 
-def _extract(ydl, url, hops=3):
-    """What yt-dlp reads from a checked link (check_url), refused unless one of YouTube's own extractors read
-    it from a YouTube page. A link it answers with another link is followed only if that is YouTube's too."""
+def _extract(ydl, url, site=YOUTUBE, hops=3):
+    """What yt-dlp reads from a checked link (the site's check_url), refused unless one of the site's own
+    extractors read it from one of its pages: YouTube's, or Google Drive's (app/drive.py). A link it answers with
+    another link is followed only if that is the site's too."""
     try:
-        info = ydl.extract_info(check_url(url), download=False, process=False)
-    except (Cancelled, YouTubeError):
+        info = ydl.extract_info(site.check_url(url), download=False, process=False)
+    except (Cancelled, site.error):
         raise
     except Exception as e:  # yt-dlp's DownloadError and ExtractorError carry a message worth showing
-        raise YouTubeError(clean_error(e))
+        raise site.error(site.clean_error(e))
     if info.get("_type") in ("url", "url_transparent") and hops:
-        return _extract(ydl, info.get("url"), hops - 1)
-    if info.get("extractor_key") not in EXTRACTOR_KEYS or not on_youtube(info.get("webpage_url")):
-        raise YouTubeError("the link did not lead to a YouTube video or playlist")
+        return _extract(ydl, info.get("url"), site, hops - 1)
+    if info.get("extractor_key") not in site.extractor_keys or not on_hosts(info.get("webpage_url"), site.hosts):
+        raise site.error(site.elsewhere)
     return info
 
 
@@ -224,7 +268,7 @@ def human_captions(info):
     automatic ones), with a WebVTT version."""
     out = {}
     for code, tracks in (info.get("subtitles") or {}).items():
-        if code.split("-")[0].lower() in LANGS and any(t.get("ext") == "vtt" and on_youtube(t.get("url"), STREAM_HOSTS)
+        if code.split("-")[0].lower() in LANGS and any(t.get("ext") == "vtt" and on_hosts(t.get("url"), STREAM_HOSTS)
                                                        for t in tracks or []):
             out[code] = next((t.get("name") for t in tracks if t.get("name")), None) or LANGS[code.split("-")[0].lower()]
     return out
@@ -254,7 +298,7 @@ def _youtube_entry(e):
     """Whether a playlist's entry is a YouTube video: YouTube's own extractor, a video id, and an address
     (if it has one) on YouTube. Its address is always made again from the id (watch_url)."""
     return e.get("ie_key") in (None, "Youtube") and bool(VIDEO_ID.fullmatch(str(e.get("id") or ""))) \
-        and (not e.get("url") or on_youtube(e["url"]))
+        and (not e.get("url") or on_hosts(e["url"]))
 
 
 def _entry(info, index):
@@ -275,8 +319,8 @@ def _entry(info, index):
 
 
 def inspect(cfg, url, check_captions=True):
-    """A link's video or playlist: {"kind", "id", "title", "uploader", "url", "count", "duration", "entries",
-    "checked", "runtime", "warnings"}. A playlist's videos are listed in order, and their captions looked up
+    """A link's video or playlist: {"site" ("youtube"), "kind", "id", "title", "uploader", "url", "count",
+    "duration", "entries", "checked", "runtime", "warnings"}. A playlist's videos are listed in order, and their captions looked up
     in parallel for up to CHECK_SECONDS (a video not reached has captions None; its job decides then)."""
     url = check_url(url)
     log = None
@@ -302,7 +346,7 @@ def inspect(cfg, url, check_captions=True):
     if kind == "playlist" and check_captions:
         _check_captions(cfg, [e for e in entries if e["available"]])
     pid = info.get("id")
-    return {"kind": kind, "id": pid, "title": info.get("title") or pid,
+    return {"site": "youtube", "kind": kind, "id": pid, "title": info.get("title") or pid,
             "uploader": info.get("uploader") or info.get("channel"),
             "url": entries[0]["url"] if kind == "video" else f"https://www.youtube.com/playlist?list={pid}",
             "count": len(entries), "duration": sum(e["duration"] or 0 for e in entries if e["available"]),
@@ -338,7 +382,7 @@ def pick_formats(formats):
     """(video, audio, both, sound): the best H.264 video-only MP4 stream up to MAX_HEIGHT, the best AAC
     sound-only stream (the original language first, not the "drc" one), the best single MP4 with both, and
     the best sound in any codec (for when there is no H.264 version). Direct downloads come before HLS."""
-    ok = [f for f in formats or [] if f.get("url") and not f.get("has_drm") and on_youtube(f["url"], STREAM_HOSTS)
+    ok = [f for f in formats or [] if f.get("url") and not f.get("has_drm") and on_hosts(f["url"], STREAM_HOSTS)
           and str(f.get("protocol") or "https") in ("https", "http", "m3u8_native")]
     h264 = lambda f: str(f.get("vcodec") or "").startswith(("avc1", "h264"))
     aac = lambda f: str(f.get("acodec") or "").startswith(("mp4a", "aac"))
@@ -360,7 +404,9 @@ def download(cfg, job, folder, on_progress, cancelled):
     """Download a job's video into its folder. Returns the fields the job records: "video" ({"width",
     "height"} of video.mp4, or None when only the sound could be had), "captions" ({"lang", "name"} when
     captions.vtt is to be the transcript), "source_name" and "download_note" (why there is no video).
-    on_progress(done, total) counts bytes; cancelled() is checked while it runs."""
+    A job with "stream" takes only the sound (source.<ext>, the best AAC stream, else the best in any codec),
+    with no note, since that was chosen; if YouTube offers no sound on its own, the video is downloaded as
+    usual. on_progress(done, total) counts bytes; cancelled() is checked while it runs."""
     folder = Path(folder)
     with _ydl(cfg) as ydl:
         info = _extract(ydl, job["source_url"])
@@ -370,7 +416,9 @@ def download(cfg, job, folder, on_progress, cancelled):
             raise YouTubeError("this is a live stream; it can be transcribed once it has ended")
         video, audio, both, sound = pick_formats(info.get("formats"))
         note = None
-        if video and audio:
+        if job.get("stream") and (audio or sound):  # the video plays from YouTube: only the sound is kept
+            plan = [("sound", audio or sound)]
+        elif video and audio:
             plan = [("video", video), ("audio", audio)]
         elif both:
             plan = [("both", both)]
@@ -436,7 +484,7 @@ def save_captions(ydl, info, folder, language):
     code = pick_captions(info, language)
     if not code:
         return None
-    track = next(t for t in info["subtitles"][code] if t.get("ext") == "vtt" and on_youtube(t.get("url"), STREAM_HOSTS))
+    track = next(t for t in info["subtitles"][code] if t.get("ext") == "vtt" and on_hosts(t.get("url"), STREAM_HOSTS))
     try:
         text = ydl.urlopen(track["url"]).read().decode("utf-8", errors="replace")
     except Exception:  # noqa: BLE001 — then the speech model makes the transcript

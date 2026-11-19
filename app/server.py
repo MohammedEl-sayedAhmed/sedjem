@@ -24,7 +24,8 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, engines, hub, remote, report, session, updates, usage, video, youtube
+from . import assistants, compare, courses, drive, engines, exports, hub, remote, report, session, updates, usage, video
+from . import youtube
 from . import transcript as T
 from . import history
 from .config import FALLBACK_SPEAKER_MODEL, FROZEN, _read_json, power_profile, set_power_profile
@@ -44,11 +45,15 @@ def _utf8(text):
 
 # The page's preferences (app/static/app.js, updates.js), kept in <storage>/page.json, not in the browser: the port,
 # and with it the page's origin and its localStorage, is new at each start (app/session.py)
-PREFS = ("sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from")
+PREFS = ("sedjem-theme", "sedjem-sort", "sedjem-video-large", "sedjem-update-noticed", "sedjem-update-from",
+         "sedjem-youtube-video")
 PREFS_FILE = "page.json"
+# The page may frame nothing but YouTube's player, which plays a video added with streaming (app/static/youtube.js)
+PAGE_POLICY = {"Content-Security-Policy": "frame-src https://www.youtube-nocookie.com"}
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".svg": "image/svg+xml", ".png": "image/png"}
 AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
+NOT_A_LINK = "paste the link of a YouTube video or playlist, or of a Google Drive file"
 
 
 class ApiError(Exception):
@@ -82,7 +87,7 @@ class App:
         self.gpu = None         # what transcribe.py can use here; found in the background at start
         self.gpu_probing = False
         self.used = (0.0, None)  # (time, bytes) of the last count of the transcriptions' size
-        self.inspected = {}      # YouTube link -> (time, what youtube.inspect found), for adding it right after
+        self.inspected = {}      # link -> (time, what youtube or drive.inspect found), for adding it right after
         self.settings_lock = threading.Lock()  # settings.json is read, changed and written one request at a time
         self.prefs_lock = threading.Lock()  # and so is page.json, the page's preferences
         # Settings → Updates (app/updates.py); its background check is started by the app's entry points
@@ -237,7 +242,7 @@ class App:
             "deno": self.downloads.status("deno") if "deno" in items else None,  # for YouTube links
             "youtube": {"runtime": youtube.runtime(self.cfg), "courses": str(self.cfg.courses)},
             "gpu": self.gpu, "gpu_probing": self.gpu_probing,
-            "defaults": self.cfg.defaults,
+            "defaults": {**self.cfg.defaults, "model": self.cfg.default_model()},  # with the model pinned in Settings
             "settings": settings,
             # the first-start question about checking for updates, and the top bar's pill (app/updates.py)
             "update": self.updates.summary(settings),
@@ -276,8 +281,8 @@ def summary(job):
     branch, else None; recorded: when the recording was made (sysinfo.recording), or for a job made before that was
     kept, or not prepared yet, when it was added."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
-            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "course", "branch",
-            "remote")
+            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "drive_id", "stream",
+            "course", "branch", "remote")
     source = job.get("source") if isinstance(job.get("source"), dict) else {}
     return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True,
             "recorded": source.get("recorded") or job.get("created")}
@@ -374,6 +379,16 @@ def log_item(entry, jobs):
             "action": str(entry.get("action") or ""), "detail": str(entry.get("detail") or ""), "ids": ids,
             "titles": [(jobs[i].get("title") or "Untitled") if i in jobs else None for i in ids], "text": asked(entry),
             "saved": entry.get("action") == "save_version" and version is not None, "version": version}
+
+
+def attachment(stem, ext, tag=""):
+    """A Content-Disposition for a download named stem.ext, with an ASCII name for clients that don't read the
+    UTF-8 one (a title in Arabic letters has none: transcript then)."""
+    name = f"{stem}.{ext}"
+    ascii_name = re.sub(r"[^A-Za-z0-9._-]", "", name)
+    if not re.search(r"[A-Za-z0-9]", ascii_name.rsplit(".", 1)[0].removesuffix(tag)):
+        ascii_name = f"transcript{tag}.{ext}"
+    return f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{urllib.parse.quote(name)}'
 
 
 def slug(text):
@@ -518,7 +533,8 @@ class Handler(BaseHTTPRequestHandler):
         f = (STATIC / name).resolve()
         if STATIC not in f.parents or not f.is_file():
             raise ApiError(404, "not found")
-        self.reply(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"))
+        self.reply(200, f.read_bytes(), TYPES.get(f.suffix, "application/octet-stream"),
+                   headers=PAGE_POLICY if f.suffix == ".html" else None)
 
     def index(self, _params):
         """The page, in the theme the user chose (app/static/index.html would find it in localStorage, which is new
@@ -528,7 +544,7 @@ class Handler(BaseHTTPRequestHandler):
         theme = self.app.prefs().get("sedjem-theme")
         if theme in ("light", "dark"):
             page = page.replace('<html lang="en">', f'<html lang="en" data-theme="{theme}">', 1)
-        self.reply(200, page.encode(), TYPES[".html"])
+        self.reply(200, page.encode(), TYPES[".html"], headers=PAGE_POLICY)
 
     # ---- API ----------------------------------------------------------------------------------------
     def ping(self, params):
@@ -586,7 +602,7 @@ class Handler(BaseHTTPRequestHandler):
         """The model a request names (else the default), if it can run now; a hosted one only with the
         user's consent to upload the recording."""
         cfg = self.app.cfg
-        model = cfg.models.get(p.get("model") or default or cfg.defaults["model"])
+        model = cfg.models.get(p.get("model") or default or cfg.default_model())
         if model is None:
             raise ApiError(400, "unknown model")
         ready, reason = cfg.availability(model)
@@ -677,22 +693,34 @@ class Handler(BaseHTTPRequestHandler):
         runner.submit(job["id"])
         self.json(summary(self.app.store.get(job["id"])), 201)
 
-    # YouTube links (app/youtube.py): a video, or a playlist made into one job per video
-    def youtube_inspect(self, _params):
-        """{url}: the video or playlist, its videos in order and which have captions made by people."""
-        url = str(self.body_json().get("url") or "").strip()
+    # Links (app/youtube.py, app/drive.py): a YouTube video or playlist, made into one job per video, or a Google
+    # Drive file. /api/youtube and /api/youtube/inspect are the names these had before Drive links, kept for scripts.
+    def inspect_link(self, url, check_captions=True):
+        """What youtube.inspect or drive.inspect finds at a link, by its host; ApiError for another site."""
+        host = youtube.link_host(url)
         try:
-            found = youtube.inspect(self.app.cfg, url)
-        except youtube.YouTubeError as e:
+            if host in drive.HOSTS:
+                return drive.inspect(self.app.cfg, url)
+            if host in youtube.HOSTS:
+                return youtube.inspect(self.app.cfg, url, check_captions=check_captions)
+        except (youtube.YouTubeError, drive.DriveError) as e:
             raise ApiError(400, str(e))
+        raise ApiError(400, NOT_A_LINK)
+
+    def link_inspect(self, _params):
+        """{url}: a YouTube video or playlist, its videos in order and which have captions made by people; or a
+        Google Drive file, its name and length (a Drive folder is refused for now)."""
+        url = str(self.body_json().get("url") or "").strip()
+        found = self.inspect_link(url)
         self.app.inspected = {k: v for k, v in self.app.inspected.items() if time.time() - v[0] < 1800}
         self.app.inspected[url] = self.app.inspected[found["url"]] = (time.time(), found)
         self.json(found)
 
-    def youtube_add(self, _params):
-        """{url, model, speakers, language, prompt, confirm_upload, captions (use captions made by people,
-        default true), entries (the video ids to transcribe; default all)}: one job per video, queued in
-        playlist order, with the playlist as their course. Answers {"jobs": [...]}."""
+    def link_add(self, _params):
+        """{url, model, speakers, language, prompt, confirm_upload, entries (the ids of the videos to transcribe;
+        default all), and for YouTube captions (use captions made by people, default true) and stream (download only
+        the sound, and play the video from YouTube; default false)}: one job per video, queued in playlist order,
+        with the playlist as their course, or one job for a Google Drive file. Answers {"jobs": [...]}."""
         cfg, runner, store = self.app.cfg, self.app.runner, self.app.store
         p = self.body_json()
         model = self.ready_model(p)
@@ -700,31 +728,39 @@ class Handler(BaseHTTPRequestHandler):
         url = str(p.get("url") or "").strip()
         at, found = self.app.inspected.get(url, (0, None))
         if found is None or time.time() - at > 1800:
-            try:
-                found = youtube.inspect(cfg, url, check_captions=False)
-            except youtube.YouTubeError as e:
-                raise ApiError(400, str(e))
+            found = self.inspect_link(url, check_captions=False)
+        on_drive = found.get("site") == "drive"
+        what = "file" if on_drive else "video"
         wanted = p.get("entries")
         if wanted is not None and not isinstance(wanted, list):
-            raise ApiError(400, "entries must be a list of video ids")
+            raise ApiError(400, f"entries must be a list of {what} ids")
         picked = None if wanted is None else {str(x) for x in wanted}
         entries = [e for e in found["entries"] if e["available"] and (picked is None or e["id"] in picked)]
         if not entries:
-            raise ApiError(400, "choose at least one video that can be downloaded")
-        if any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files (app/courses.py)
+            raise ApiError(400, f"choose at least one {what} that can be downloaded")
+        if on_drive and any(not drive.DRIVE_ID.fullmatch(str(e["id"])) for e in entries):
+            raise ApiError(400, "a file has an id Google Drive doesn't use")
+        if not on_drive and any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files
             raise ApiError(400, "a video has an id YouTube doesn't use")
         cfg.storage.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(cfg.storage).free < 2e9:
-            raise ApiError(507, "not enough free disk space to download videos")
+            raise ApiError(507, f"not enough free disk space to download {what}s")
         course = None
         if found["kind"] == "playlist":
             course = {"id": found["id"], "title": found["title"], "url": found["url"], "count": found["count"]}
             if not any((j.get("course") or {}).get("id") == course["id"] for j in store.list()):
                 self.app.usage.count(courses_created=1)  # a playlist added for the first time
             course["folder"] = courses.folder_name(store, course)
+        stream = str(p.get("stream", False)).lower() in ("1", "true")  # every video of a playlist alike
         jobs = []
         for e in entries:
+            if on_drive:  # the file itself, then as an upload: no course, no streaming, no captions
+                jobs.append(runner.new_job(title=e["title"], source_name=e["name"], model_id=model["id"], options=options,
+                                           source_url=drive.file_url(e["id"]), drive_id=e["id"]))
+                continue
             extra = {"course": {**course, "index": e["index"]}} if course else {}
+            if stream:
+                extra["stream"] = True
             jobs.append(runner.new_job(title=e["title"], source_name=f"{e['title']}.mp4", model_id=model["id"],
                                        options=options, source_url=youtube.watch_url(e["id"]), youtube_id=e["id"],
                                        use_captions=str(p.get("captions", True)).lower() not in ("0", "false"), **extra))
@@ -847,7 +883,7 @@ class Handler(BaseHTTPRequestHandler):
         job = self.job(jid)
         p = self.body_json()
         if not (self.app.store.dir(jid) / "audio.flac").exists():
-            if job.get("source_url") and job["status"] not in ACTIVE:  # a YouTube download that failed: again
+            if job.get("source_url") and job["status"] not in ACTIVE:  # a YouTube or Drive download that failed: again
                 return self.retry_download(job, p)
             raise ApiError(409, "this transcription has no prepared audio yet")
         if p.get("run_on"):  # again on a paired computer
@@ -934,12 +970,40 @@ class Handler(BaseHTTPRequestHandler):
         elif self.command == "GET":  # an export
             self.app.usage.exported(fmt)
         tag = f"-v{n}" if n else ""
-        name = f"{slug(job.get('title'))}{tag}.{fmt}"
-        ascii_name = re.sub(r"[^A-Za-z0-9._-]", "", name)
-        if not re.search(r"[A-Za-z0-9]", ascii_name.rsplit(".", 1)[0].removesuffix(tag)):
-            ascii_name = f"transcript{tag}.{fmt}"
-        disposition = f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{urllib.parse.quote(name)}'
-        self.reply(200, body, ctype, {"Content-Disposition": disposition})
+        self.reply(200, body, ctype, {"Content-Disposition": attachment(f"{slug(job.get('title'))}{tag}", fmt, tag)})
+
+    def export_many(self, _params):
+        """{ids, format, combined, as}: the transcripts chosen in the Export dialog, in the order given
+        (app/exports.py). A zip with a file for each (as "zip", the default); their files as JSON, for the page to
+        write into a folder (as "files"); or with combined: true, one file with them all (text, Markdown or JSON).
+        Transcriptions that have no transcript yet are left out."""
+        p = self.body_json(limit=500_000)
+        ids = p.get("ids")
+        # the format's own name from the table, not the request's text, since it goes into a header (file name)
+        fmt = {name: name for name in T.EXPORTS}.get(str(p.get("format")))
+        if not (isinstance(ids, list) and 1 <= len(ids) <= 5000
+                and all(isinstance(x, str) and re.fullmatch(ID, x) for x in ids)):
+            raise ApiError(400, "ids: a list of transcription ids")
+        if fmt is None:
+            raise ApiError(400, "unknown format")
+        combined = p.get("combined") is True
+        if combined and fmt not in exports.COMBINED:
+            raise ApiError(400, "subtitles can't be combined into one file")
+        try:
+            jobs = exports.chosen(self.app.store, ids)
+        except KeyError as e:
+            raise ApiError(404, f"no such transcription: {e.args[0]}")
+        if not jobs:
+            raise ApiError(400, "none of these transcriptions has a transcript yet")
+        self.app.usage.exported(fmt, len(jobs))  # a file of this format for each (app/usage.py)
+        if p.get("as") == "files" and not combined:
+            return self.json({"files": [{"path": a, "text": b} for a, b in exports.files(jobs, fmt, slug)]})
+        stem = exports.name(jobs, slug)
+        if combined:
+            body, ctype, ext = exports.combined(jobs, fmt).encode(), T.EXPORTS[fmt][1], fmt
+        else:
+            body, ctype, ext = exports.zipped(exports.files(jobs, fmt, slug)), "application/zip", "zip"
+        self.reply(200, body, ctype, {"Content-Disposition": attachment(stem, ext)})
 
     # transcripts of one recording: grouping, comparing and combining them (app/compare.py)
     def job_group(self, _params, jid):
@@ -1372,6 +1436,7 @@ ROUTES = [
     ("GET", rf"/api/jobs/{ID}/audio", Handler.audio),
     ("GET", rf"/api/jobs/{ID}/video", Handler.video),
     ("GET", rf"/api/jobs/{ID}/export/(\w+)", Handler.export),
+    ("POST", r"/api/export", Handler.export_many),
     ("GET", rf"/api/jobs/{ID}/group", Handler.job_group),
     ("POST", rf"/api/jobs/{ID}/branch", Handler.branch_job),
     ("POST", rf"/api/jobs/{ID}/main", Handler.set_main),
@@ -1401,8 +1466,10 @@ ROUTES = [
     ("POST", r"/api/downloads/([\w-]+)", Handler.download),
     ("POST", r"/api/downloads/([\w-]+)/cancel", Handler.cancel_download),
     ("DELETE", r"/api/downloads/([\w-]+)", Handler.remove_download),
-    ("POST", r"/api/youtube/inspect", Handler.youtube_inspect),
-    ("POST", r"/api/youtube", Handler.youtube_add),
+    ("POST", r"/api/link/inspect", Handler.link_inspect),
+    ("POST", r"/api/link", Handler.link_add),
+    ("POST", r"/api/youtube/inspect", Handler.link_inspect),  # the names from before Drive links
+    ("POST", r"/api/youtube", Handler.link_add),
     ("POST", r"/api/hub/inspect", Handler.hub_inspect),
     ("POST", r"/api/hub/add", Handler.hub_add),
     ("DELETE", r"/api/models/(hf-[\w-]+)", Handler.forget_model),

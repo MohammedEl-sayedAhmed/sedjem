@@ -15,7 +15,8 @@ Recordings, transcripts and their versions, speaker names, API keys, settings an
 on the computer: `%LOCALAPPDATA%\Sedjem` on Windows, `~/.local/share/sedjem` for the Linux build, and the project
 folder when Sedjem runs from source ([where things are kept](10-desktop.md#where-things-are-kept)). The models it
 downloads are kept there too. Its server answers only on the computer itself (127.0.0.1), and its interface loads
-nothing from the internet. It listens on the network only if you let it run jobs for
+nothing from the internet, except YouTube's player when you play a video that you chose to stream from YouTube
+([below](#what-sedjem-contacts-and-when)). It listens on the network only if you let it run jobs for
 [another computer of yours](#another-computer-of-yours). Uninstalling keeps the data folder; deleting the folder removes everything.
 
 ## What Sedjem contacts, and when
@@ -44,7 +45,20 @@ here.
     unless you changed it. The desktop app and the Windows installer don't do this.
 - YouTube, which is Google's ([privacy policy](https://policies.google.com/privacy)), with its video hosts
   (`*.googlevideo.com`), when you add a link: Sedjem asks, through yt-dlp, for that video or playlist, its streams and
-  its captions, and downloads them.
+  its captions, and downloads them. With *Stream it from YouTube* on the form, only the sound of each video is
+  downloaded. Then, only when you play such a video on its page, the page loads YouTube's player from
+  `www.youtube-nocookie.com`, and the player loads the video and what it needs from Google's servers. They see the
+  computer's IP address and which video plays, and YouTube may keep data in the browser, as it does on its own site.
+  Until you play it, the page asks nothing of YouTube, and it can show no other site in its page. Videos you chose to
+  download play from the computer, with no connection.
+- Google Drive, which is Google's ([privacy policy](https://policies.google.com/privacy)), when you check or add a
+  link to a Drive file, through yt-dlp: Sedjem asks Drive's playback service
+  (`content-workspacevideo-pa.googleapis.com`) for its name and length, and Drive's download
+  (`drive.usercontent.google.com`, which may send it on to a `*.googleusercontent.com` host) for the file itself,
+  answering the page Drive shows before a file too large to scan for viruses. Google sees the computer's IP address
+  and which file is asked for. Sedjem doesn't sign in, so it sends no account or cookie of yours, and it reads only
+  files shared with anyone who has the link. A link to a Drive folder is refused before anything is asked of Google;
+  folders are planned.
 - Aptabase ([privacy policy](https://aptabase.com/legal/privacy)), for anonymous usage counts, at `eu.aptabase.com`
   (a copy built with a key from Aptabase's US region uses `us.aptabase.com`). A few times a month Sedjem sends
   anonymous counts, so that the project knows how many installs use it and what they use: the version, the system

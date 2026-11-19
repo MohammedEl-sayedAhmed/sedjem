@@ -125,6 +125,7 @@ class Config:
     # the same keys in [local].
     SETTINGS = {"performance_while_running": False, "device": "auto", "threads": 10,
                 "speaker_model": FALLBACK_SPEAKER_MODEL,  # Settings → Models: an id of [[local.speaker_models]]
+                "default_model": None,  # Settings → Models: the model a new transcription starts with (None: [defaults])
                 "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],  # assistants (app/assistants.py)
                 "mcp_write": False,  # assistants may save new versions of transcripts (off until the user turns it on)
                 # updates (app/updates.py): check by itself (None: not asked yet), the channel, a version or
@@ -144,6 +145,12 @@ class Config:
     def settings(self):
         return {key: self.setting(key) for key in self.SETTINGS}
 
+    def default_model(self):
+        """The id of the model a new transcription starts with: the one pinned in Settings → Models, while it is still
+        one of the models, else [defaults] model."""
+        pinned = self.setting("default_model")
+        return pinned if isinstance(pinned, str) and pinned in self.models else self.defaults["model"]
+
     def save_settings(self, **values):
         """Check and save settings from the app; returns them all. Raises ValueError on a bad value."""
         for key, value in values.items():
@@ -157,6 +164,8 @@ class Config:
             if key in ("mcp_courses", "mcp_recordings", "mcp_write") and isinstance(value, bool):
                 continue
             if key == "speaker_model" and isinstance(value, str) and value in self.speaker_models():
+                continue
+            if key == "default_model" and (value is None or (isinstance(value, str) and value in self.models)):
                 continue
             if key == "mcp_hidden":
                 from .assistants import check_hidden  # (it imports this module)

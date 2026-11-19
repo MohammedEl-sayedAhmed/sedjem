@@ -90,7 +90,7 @@ request, so it ties together only the events sent together.
 | `min_cohere`, `min_whisper_medium`, `min_whisper_large`, `min_other_local`, `min_hosted` | the audio of the runs by model, in whole minutes |
 | `proc_cohere`, `proc_whisper_medium`, `proc_whisper_large`, `proc_other_local`, `proc_hosted` | the time those runs took by model, in whole minutes, which with the audio gives each model's speed |
 | `failed` | jobs that failed |
-| `failed_read`, `failed_model`, `failed_hosted`, `failed_download` | the same by where they stopped: a recording that couldn't be read, a local model, a hosted service, a YouTube download |
+| `failed_read`, `failed_model`, `failed_hosted`, `failed_download` | the same by where they stopped: a recording that couldn't be read, a local model, a hosted service, a YouTube download (a Google Drive download that fails counts only in `failed`) |
 | `cancelled` | jobs cancelled while they waited or ran, or deleted while they ran |
 | `youtube` | YouTube videos transcribed, by a model or from their captions |
 | `youtube_captions` | of those, the ones that took the captions made by people |
@@ -99,7 +99,7 @@ request, so it ties together only the events sent together.
 | `combines` | versions saved from the compare view |
 | `edit_sessions`, `renames`, `merges` | versions saved by editing lines, changes of the title or of a speaker's name, and speakers merged |
 | `branches`, `restores` | branches made, and versions restored |
-| `txt`, `srt`, `vtt`, `md`, `json` | exports in each format, downloaded or saved |
+| `txt`, `srt`, `vtt`, `md`, `json` | exports in each format, downloaded or saved; exporting many at once counts a file for each |
 | `copies` | times the text was copied with *Copy text* |
 | `days_used` | on how many days of the week Sedjem was started or anything above was counted, by the computer's own calendar |
 | `starts` | times Sedjem was started |

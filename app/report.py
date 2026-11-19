@@ -77,7 +77,8 @@ def details(job, lines=None, edited=None):
                       "extension": source.get("extension") or _extension(name),
                       "duration": source.get("duration") or job.get("audio_s"),  # older jobs: the converted audio
                       "video_shown": _dict(job.get("video")) or None, "video_note": job.get("video_skipped"),
-                      "link": job.get("source_url")},  # a YouTube video (app/youtube.py)
+                      "link": job.get("source_url"),  # a YouTube video (app/youtube.py) or a Drive file (app/drive.py)
+                      "link_site": "Google Drive" if job.get("drive_id") else "YouTube"},
         "model": {"id": job.get("model"), "title": job.get("model_title"), "kind": job.get("kind"),
                   "engine": job.get("engine"), "file": job.get("model_file"), "service": job.get("service"),
                   "api_model": job.get("api_model"), "captions": _dict(job.get("captions")).get("name")},
@@ -284,7 +285,7 @@ def groups(d):
     video, version = rec.get("video"), run.get("app_version")
     group("Recording",
           ("File", rec.get("name"), False),
-          ("YouTube", rec.get("link"), False),
+          (rec.get("link_site") or "YouTube", rec.get("link"), False),
           ("Audio", audio_text(rec), False),
           ("Container", CONTAINERS.get(rec.get("format")) or rec.get("format_name") or rec.get("format"), True),
           ("Bit rate", _num(rec.get("bit_rate")) and f"{round(rec['bit_rate'] / 1000)} kb/s", True),
