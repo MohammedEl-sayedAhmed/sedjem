@@ -582,7 +582,10 @@ class Api(unittest.TestCase):
                                                             "confirm_upload": True}, headers={"X-Sedjem": ""})[0], 403)
         status, r = self.call("POST", "/api/youtube", {"url": "https://youtu.be/vid00000001", "model": "elevenlabs"})
         self.assertEqual((status, r["error"]), (400, "confirm that the recording may be uploaded to ElevenLabs"))
-        self.assertEqual(self.call("POST", "/api/youtube/inspect", {"url": "https://vimeo.com/1"})[1]["error"],
+        for path in ("/api/link/inspect", "/api/youtube/inspect"):  # (the name from before Google Drive links)
+            self.assertEqual(self.call("POST", path, {"url": "https://vimeo.com/1"})[1]["error"],
+                             "paste the link of a YouTube video or playlist, or of a Google Drive file or folder")
+        self.assertEqual(self.call("POST", "/api/link/inspect", {"url": "https://www.youtube.com/"})[1]["error"],
                          "paste the link of a YouTube video or playlist")
         self.assertIn("channel", self.call("POST", "/api/youtube/inspect", {"url": "https://www.youtube.com/@teacher"})[1]["error"])
         self.assertIn("live stream", self.add("https://youtu.be/vidlive0001")[1]["error"])

@@ -24,7 +24,8 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, engines, exports, hub, remote, report, session, updates, usage, video, youtube
+from . import assistants, compare, courses, drive, engines, exports, hub, remote, report, session, updates, usage, video
+from . import youtube
 from . import transcript as T
 from . import history
 from .config import FALLBACK_SPEAKER_MODEL, FROZEN, _read_json, power_profile, set_power_profile
@@ -52,6 +53,7 @@ PAGE_POLICY = {"Content-Security-Policy": "frame-src https://www.youtube-nocooki
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".svg": "image/svg+xml", ".png": "image/png"}
 AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
+NOT_A_LINK = "paste the link of a YouTube video or playlist, or of a Google Drive file or folder"
 
 
 class ApiError(Exception):
@@ -85,7 +87,7 @@ class App:
         self.gpu = None         # what transcribe.py can use here; found in the background at start
         self.gpu_probing = False
         self.used = (0.0, None)  # (time, bytes) of the last count of the transcriptions' size
-        self.inspected = {}      # YouTube link -> (time, what youtube.inspect found), for adding it right after
+        self.inspected = {}      # link -> (time, what youtube or drive.inspect found), for adding it right after
         self.settings_lock = threading.Lock()  # settings.json is read, changed and written one request at a time
         self.prefs_lock = threading.Lock()  # and so is page.json, the page's preferences
         # Settings → Updates (app/updates.py); its background check is started by the app's entry points
@@ -279,8 +281,8 @@ def summary(job):
     branch, else None; recorded: when the recording was made (sysinfo.recording), or for a job made before that was
     kept, or not prepared yet, when it was added."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
-            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "stream", "course",
-            "branch", "remote")
+            "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "drive_id", "stream",
+            "course", "branch", "remote")
     source = job.get("source") if isinstance(job.get("source"), dict) else {}
     return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True,
             "recorded": source.get("recorded") or job.get("created")}
@@ -691,23 +693,34 @@ class Handler(BaseHTTPRequestHandler):
         runner.submit(job["id"])
         self.json(summary(self.app.store.get(job["id"])), 201)
 
-    # YouTube links (app/youtube.py): a video, or a playlist made into one job per video
-    def youtube_inspect(self, _params):
-        """{url}: the video or playlist, its videos in order and which have captions made by people."""
-        url = str(self.body_json().get("url") or "").strip()
+    # Links (app/youtube.py, app/drive.py): a YouTube video or playlist, made into one job per video, or a Google
+    # Drive file. /api/youtube and /api/youtube/inspect are the names these had before Drive links, kept for scripts.
+    def inspect_link(self, url, check_captions=True):
+        """What youtube.inspect or drive.inspect finds at a link, by its host; ApiError for another site."""
+        host = youtube.link_host(url)
         try:
-            found = youtube.inspect(self.app.cfg, url)
-        except youtube.YouTubeError as e:
+            if host in drive.HOSTS:
+                return drive.inspect(self.app.cfg, url)
+            if host in youtube.HOSTS:
+                return youtube.inspect(self.app.cfg, url, check_captions=check_captions)
+        except (youtube.YouTubeError, drive.DriveError) as e:
             raise ApiError(400, str(e))
+        raise ApiError(400, NOT_A_LINK)
+
+    def link_inspect(self, _params):
+        """{url}: a YouTube video or playlist, its videos in order and which have captions made by people; or a
+        Google Drive file, its name and length (a Drive folder is refused for now)."""
+        url = str(self.body_json().get("url") or "").strip()
+        found = self.inspect_link(url)
         self.app.inspected = {k: v for k, v in self.app.inspected.items() if time.time() - v[0] < 1800}
         self.app.inspected[url] = self.app.inspected[found["url"]] = (time.time(), found)
         self.json(found)
 
-    def youtube_add(self, _params):
-        """{url, model, speakers, language, prompt, confirm_upload, captions (use captions made by people,
-        default true), stream (download only the sound, and play the video from YouTube; default false),
-        entries (the video ids to transcribe; default all)}: one job per video, queued in playlist order, with
-        the playlist as their course. Answers {"jobs": [...]}."""
+    def link_add(self, _params):
+        """{url, model, speakers, language, prompt, confirm_upload, entries (the ids of the videos to transcribe;
+        default all), and for YouTube captions (use captions made by people, default true) and stream (download only
+        the sound, and play the video from YouTube; default false)}: one job per video, queued in playlist order,
+        with the playlist as their course, or one job for a Google Drive file. Answers {"jobs": [...]}."""
         cfg, runner, store = self.app.cfg, self.app.runner, self.app.store
         p = self.body_json()
         model = self.ready_model(p)
@@ -715,22 +728,23 @@ class Handler(BaseHTTPRequestHandler):
         url = str(p.get("url") or "").strip()
         at, found = self.app.inspected.get(url, (0, None))
         if found is None or time.time() - at > 1800:
-            try:
-                found = youtube.inspect(cfg, url, check_captions=False)
-            except youtube.YouTubeError as e:
-                raise ApiError(400, str(e))
+            found = self.inspect_link(url, check_captions=False)
+        on_drive = found.get("site") == "drive"
+        what = "file" if on_drive else "video"
         wanted = p.get("entries")
         if wanted is not None and not isinstance(wanted, list):
-            raise ApiError(400, "entries must be a list of video ids")
+            raise ApiError(400, f"entries must be a list of {what} ids")
         picked = None if wanted is None else {str(x) for x in wanted}
         entries = [e for e in found["entries"] if e["available"] and (picked is None or e["id"] in picked)]
         if not entries:
-            raise ApiError(400, "choose at least one video that can be downloaded")
-        if any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files (app/courses.py)
+            raise ApiError(400, f"choose at least one {what} that can be downloaded")
+        if on_drive and any(not drive.DRIVE_ID.fullmatch(str(e["id"])) for e in entries):
+            raise ApiError(400, "a file has an id Google Drive doesn't use")
+        if not on_drive and any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files
             raise ApiError(400, "a video has an id YouTube doesn't use")
         cfg.storage.mkdir(parents=True, exist_ok=True)
         if shutil.disk_usage(cfg.storage).free < 2e9:
-            raise ApiError(507, "not enough free disk space to download videos")
+            raise ApiError(507, f"not enough free disk space to download {what}s")
         course = None
         if found["kind"] == "playlist":
             course = {"id": found["id"], "title": found["title"], "url": found["url"], "count": found["count"]}
@@ -740,6 +754,10 @@ class Handler(BaseHTTPRequestHandler):
         stream = str(p.get("stream", False)).lower() in ("1", "true")  # every video of a playlist alike
         jobs = []
         for e in entries:
+            if on_drive:  # the file itself, then as an upload: no course, no streaming, no captions
+                jobs.append(runner.new_job(title=e["title"], source_name=e["name"], model_id=model["id"], options=options,
+                                           source_url=drive.file_url(e["id"]), drive_id=e["id"]))
+                continue
             extra = {"course": {**course, "index": e["index"]}} if course else {}
             if stream:
                 extra["stream"] = True
@@ -865,7 +883,7 @@ class Handler(BaseHTTPRequestHandler):
         job = self.job(jid)
         p = self.body_json()
         if not (self.app.store.dir(jid) / "audio.flac").exists():
-            if job.get("source_url") and job["status"] not in ACTIVE:  # a YouTube download that failed: again
+            if job.get("source_url") and job["status"] not in ACTIVE:  # a YouTube or Drive download that failed: again
                 return self.retry_download(job, p)
             raise ApiError(409, "this transcription has no prepared audio yet")
         if p.get("run_on"):  # again on a paired computer
@@ -1448,8 +1466,10 @@ ROUTES = [
     ("POST", r"/api/downloads/([\w-]+)", Handler.download),
     ("POST", r"/api/downloads/([\w-]+)/cancel", Handler.cancel_download),
     ("DELETE", r"/api/downloads/([\w-]+)", Handler.remove_download),
-    ("POST", r"/api/youtube/inspect", Handler.youtube_inspect),
-    ("POST", r"/api/youtube", Handler.youtube_add),
+    ("POST", r"/api/link/inspect", Handler.link_inspect),
+    ("POST", r"/api/link", Handler.link_add),
+    ("POST", r"/api/youtube/inspect", Handler.link_inspect),  # the names from before Drive links
+    ("POST", r"/api/youtube", Handler.link_add),
     ("POST", r"/api/hub/inspect", Handler.hub_inspect),
     ("POST", r"/api/hub/add", Handler.hub_add),
     ("DELETE", r"/api/models/(hf-[\w-]+)", Handler.forget_model),

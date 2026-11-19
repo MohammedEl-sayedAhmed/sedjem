@@ -332,7 +332,7 @@ class StreamedVideo(UiTestCase):
     def test_the_choice_on_the_form_is_remembered_and_used(self):
         self.player()
         self.open()
-        self.page.click("[data-src=youtube]")
+        self.page.click("[data-src=link]")
         self.assertTrue(self.page.is_checked("input[name=ytVideo][value=download]"), "as before until the user picks")
         group = self.page.get_by_role("group", name="The video")
         self.assertEqual(group.get_by_role("radio").count(), 2, "a fieldset named by its legend")
@@ -350,7 +350,7 @@ class StreamedVideo(UiTestCase):
         self.page.evaluate("() => localStorage.clear()")  # as at the next start, on a new port: from the data folder
         self.page.reload()
         self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
-        self.page.click("[data-src=youtube]")
+        self.page.click("[data-src=link]")
         self.assertTrue(self.page.is_checked("input[name=ytVideo][value=stream]"), "remembered")
 
         self.page.fill("#ytUrl", "https://youtu.be/vidnewstrm1")
@@ -372,7 +372,7 @@ class StreamedVideo(UiTestCase):
         self.assertEqual(self.texts("#transcript .line .text"), ["Welcome to the course.", "Today we stream it."])
 
         self.open()
-        self.page.click("[data-src=youtube]")
+        self.page.click("[data-src=link]")
         self.page.click("label.yt-video-opt:has-text('Download the video')")
         end = time.time() + 10
         while self.prefs().get("sedjem-youtube-video") != "download" and time.time() < end:

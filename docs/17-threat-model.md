@@ -31,10 +31,11 @@ The app's page and its API are served by a local server, which asks for no passw
   up. On Windows the port is opened for the app alone, so no other account can bind it too.
 - A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
   they are for, and only the user's own window can send them.
-- Text from outside (YouTube titles and captions, the hosted services' transcripts, paired computers, Hugging Face,
-  assistants, release notes) could carry script into the page. Every such text is escaped or set as plain text, and
-  links built from data are `https://` only. A one-off review of every place the page builds HTML, with injected
-  script tried in eleven views, found none that runs; the repository has no test for this yet.
+- Text from outside (YouTube titles and captions, Google Drive file names, the hosted services'
+  transcripts, paired computers, Hugging Face, assistants, release notes) could carry script into the page. Every
+  such text is escaped or set as plain text, and links built from data are `https://` only. A one-off review of
+  every place the page builds HTML, with injected script tried in eleven views, found none that runs; the
+  repository has no test for this yet.
 - A video added with streaming plays in YouTube's player, a frame from `www.youtube-nocookie.com` that the page loads
   only when the video is played ([AgDR 20](agdr/AgDR-0020-youtube-player-driven-by-postmessage.md)). The frame's
   address is built from a video ID that the page checks first, the page reads only messages from that frame with
@@ -97,6 +98,23 @@ only programs the user runs can reach it.
   with its permission model. Left: without either, it can run in QuickJS, which has no sandbox; and a Whisper model
   added from Hugging Face can be converted from a `pytorch_model.bin`, which can hold code. Both are in
   [#126](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/126).
+
+## Google Drive links
+
+- Only links to Drive files on `drive.google.com` and `docs.google.com` are accepted, rebuilt from the file id
+  before yt-dlp sees them, and only yt-dlp's GoogleDrive extractor runs, so its generic one never reads another page
+  and its folder one doesn't run either. A folder's link is refused before yt-dlp sees it; folders are planned. Drive
+  is a new outside host: its playback service and its download hosts are listed in the privacy policy.
+- A file is downloaded only as itself (yt-dlp's `source` format) and only from `drive.google.com`,
+  `docs.google.com`, `drive.usercontent.google.com` or a `*.googleusercontent.com` host; an address elsewhere is
+  refused before anything is fetched from it. yt-dlp's own requests while it reads a link follow Google's redirects,
+  as a browser would.
+- A download is stopped as soon as it is larger than the upload limit or the free disk space allows, and what came
+  is deleted. The file is then read as an uploaded file is, by the same code.
+- Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file that isn't shared with
+  anyone who has the link can't be read.
+- The tests run yt-dlp's own Drive extractor, the virus-scan page included, against a stand-in for Google's
+  servers ([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
 
 ## Updates and models
 
