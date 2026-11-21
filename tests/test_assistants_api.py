@@ -14,6 +14,7 @@ import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from unittest import mock
@@ -275,7 +276,13 @@ class AssistantsApi(unittest.TestCase):
             self.assertIn("hosted models are off for assistants", refused("POST", "/api/jobs", hosted))
             self.assertIn("hosted models are off for assistants", refused("POST", "/api/link", {**link, "model": "elevenlabs",
                                                                                                 "confirm_upload": True}))
-            req = urllib.request.Request(self.base + "/api/jobs?model=cohere&name=x.m4a&assistant=Rogue", data=b"(sound)",
+            odd = {"id": "odd", "kind": "satellite", "title": "A kind added later", "prompt": False}
+            with mock.patch.dict(self.app.cfg.models, {"odd": odd}):
+                self.assertIn("hosted models are off for assistants", refused("POST", "/api/jobs", {**mine, "model": "odd"}),
+                              "any kind but local counts as hosted")
+            query = urllib.parse.urlencode({"model": "cohere", "name": "x.m4a", "assistant": "Rogue",
+                                            "path": str(folder / "standup.m4a")})  # (a path that would pass)
+            req = urllib.request.Request(self.base + f"/api/jobs?{query}", data=b"(sound)",
                                          method="POST", headers={"X-Sedjem": "1", "X-Sedjem-Token": self.app.session.secret,
                                                                  "Content-Type": "audio/mp4"})
             with self.assertRaises(urllib.error.HTTPError) as upload:

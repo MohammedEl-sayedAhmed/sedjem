@@ -136,8 +136,8 @@ can reach it.
 | `job_status` | How transcriptions are going: status, stage and progress, title, model, and why one failed. Without ids, the ones assistants started that are still waiting or running. |
 | `cancel_job` | Cancels a transcription that an assistant started and that is still waiting or running. |
 
-The last six are offered only while the user lets assistants start transcriptions, and only while Sedjem is open
-do they do anything. See [starting transcriptions](#starting-transcriptions).
+The last six are offered only while the user lets assistants start transcriptions, and all but `list_models` work
+only while Sedjem is open. See [starting transcriptions](#starting-transcriptions).
 
 A long transcript is read in pieces: one answer holds up to 12,000 characters by default and 40,000 at
 most, and an answer that is cut ends with the exact call that continues it, by time or by line. A long
@@ -196,7 +196,9 @@ it on:
 - *Start jobs from YouTube and Google Drive links*: `inspect_link` and `transcribe_link`.
 - *Transcribe files in these folders*: `transcribe_file`, for a recording inside one of the folders listed under
   the switch. In the desktop app *Add a folder…* opens the system's folder picker; in a browser a folder is added by
-  its full path. A folder that isn't there allows nothing, and Settings marks it *Not found*.
+  its full path. A folder that isn't there allows nothing, and Settings marks it *Not found*. Choose folders of
+  recordings, not one that holds Sedjem's data folder (such as the home folder), since the recordings kept there,
+  of hidden transcriptions too, are then inside it.
 - *Use hosted models (uploads the recording)*: without it, assistants use only the models on this computer, and
   `list_models` leaves the hosted ones out. With it, an assistant may choose a hosted model, and the recording is
   uploaded to that service, as when the user picks one and confirms the upload.
@@ -224,8 +226,9 @@ are still waiting or running, and with ids any transcription that assistants may
 
 #### How they reach the app
 
-These tools need Sedjem to be open. The MCP server never starts it: when the app isn't running, each of them answers
-that Sedjem isn't open, and the assistant asks the user to open it and try again. Reading works as before.
+These tools, except `list_models`, need Sedjem to be open. The MCP server never starts it: when the app isn't
+running, each of them answers that Sedjem isn't open, and the assistant asks the user to open it and try again.
+`list_models` and reading work as before.
 
 The MCP server is then one more client of the app's local API on this computer, and the API needs the secret that
 only the user's own window has ([AgDR 19](agdr/AgDR-0019-a-secret-between-the-server-and-its-window.md)). The MCP

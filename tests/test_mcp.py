@@ -32,6 +32,7 @@ import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -41,7 +42,7 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from app import __version__, assistants, courses, drive, engines, history, server  # noqa: E402
+from app import __version__, assistants, courses, drive, engines, history, server, session  # noqa: E402
 from app import youtube as youtube_site  # noqa: E402  (youtube() below makes a demo job)
 from app import mcp as sedjem_mcp  # noqa: E402
 from app.config import Config  # noqa: E402
@@ -1389,11 +1390,66 @@ class Jobs(Case):
         (self.cfg.storage / "port").write_text(str(self.http.server_address[1]), encoding="utf-8")
         self.assertIn("Started 1 transcription", self.text("transcribe_file", path=str(self.wav)), "the real one does")
 
+    def serve(self, handler):
+        """A stand-in server on 127.0.0.1, stopped at the end of the test."""
+        stand_in = ThreadingHTTPServer(("127.0.0.1", 0), handler)
+        threading.Thread(target=stand_in.serve_forever, daemon=True).start()
+        self.addCleanup(stand_in.server_close)
+        self.addCleanup(stand_in.shutdown)
+        return stand_in
+
     def test_a_proxy_in_the_environment_is_not_used(self):
+        """http_proxy is set before Sedjem's code is imported, as urllib reads it when an opener is made: the MCP server,
+        in a process of its own, still goes straight to the app, and the proxy gets no request."""
         self.allow()
-        with mock.patch.dict(os.environ, {"http_proxy": "http://127.0.0.1:9", "HTTP_PROXY": "http://127.0.0.1:9",
-                                          "no_proxy": "", "NO_PROXY": ""}):
-            self.assertIn("Started 1 transcription", self.text("transcribe_file", path=str(self.wav)))
+        proxy = self.serve(type("Proxy", (Squatter,), {"seen": []}))
+        url = f"http://127.0.0.1:{proxy.server_address[1]}"
+        call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+                "params": {"name": "transcribe_file", "arguments": {"path": str(self.wav)},
+                           "_meta": {sedjem_mcp.VERSION_KEY: "2026-07-28", sedjem_mcp.CAPABILITIES_KEY: {},
+                                     sedjem_mcp.CLIENT_KEY: CLIENT}}}
+        code = ("import json, sys\nfrom unittest import mock\nfrom app import mcp\nfrom app.config import Config\n"
+                "mock.patch.object(Config, 'availability', lambda cfg, model: (True, None)).start()\n"
+                "print(json.dumps(mcp.Server(Config()).handle(json.loads(sys.argv[1]))))\n")
+        env = {**os.environ, "PYTHONPATH": str(ROOT), "SEDJEM_HOME": str(self.home), "http_proxy": url,
+               "HTTP_PROXY": url, "no_proxy": "", "NO_PROXY": ""}
+        done = subprocess.run([sys.executable, "-P", "-c", code, json.dumps(call)], env=env, cwd=self.home,
+                              capture_output=True, timeout=120)
+        self.assertEqual(done.returncode, 0, done.stderr.decode(errors="replace"))
+        self.assertIn("Started 1 transcription", json.loads(done.stdout)["result"]["content"][0]["text"])
+        self.assertEqual(proxy.RequestHandlerClass.seen, [], "the proxy saw nothing")
+
+    def test_a_redirect_is_not_followed(self):
+        """A server that proves it knows the secret, then answers with a redirect: the request is refused, not sent on,
+        so the secret never goes to the address the redirect names."""
+        self.allow()
+        target = self.serve(type("Target", (Squatter,), {"seen": []}))
+        storage, secret = self.cfg.storage, self.app.session.secret
+
+        class Redirecting(BaseHTTPRequestHandler):
+            def do_GET(self):  # the ping, with the real proof for this port
+                nonce = urllib.parse.parse_qs(urllib.parse.urlsplit(self.path).query)["nonce"][0]
+                proof = session.Session(storage, secret).proof(nonce, self.server.server_address[1])
+                body = json.dumps({"app": "sedjem", "proof": proof}).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_POST(self):
+                self.rfile.read(int(self.headers.get("Content-Length") or 0))
+                self.send_response(303)  # (urllib would follow it as a GET, with the request's headers)
+                self.send_header("Location", f"http://127.0.0.1:{target.server_address[1]}/collect")
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+
+            def log_message(self, *args):
+                pass
+        redirecting = self.serve(Redirecting)
+        (storage / "port").write_text(str(redirecting.server_address[1]), encoding="utf-8")
+        self.assertEqual(self.problem("transcribe_file", path=str(self.wav)), "Sedjem refused it: it answered 303.")
+        self.assertEqual(target.RequestHandlerClass.seen, [], "nothing went where the redirect points")
 
 
 if __name__ == "__main__":

@@ -635,8 +635,9 @@ class Handler(BaseHTTPRequestHandler):
         return {"client": " ".join(name.split())[:120]}
 
     def assistant_model(self, mark, model):
-        """A hosted model uploads the recording: an assistant may choose one only when the user allowed it."""
-        if mark and model.get("kind") == "hosted" and not assistants.hosted(self.app.cfg):
+        """A hosted model uploads the recording: an assistant may choose one only when the user allowed it. Any kind of
+        model but a local one counts as hosted here, so a kind added later is refused until it is thought through."""
+        if mark and model.get("kind") != "local" and not assistants.hosted(self.app.cfg):
             raise ApiError(403, f"assistants may not use {model['title']}: it uploads the recording to "
                                 f"{model.get('service') or 'its service'}, and hosted models are off for assistants in "
                                 "Settings → Assistants")
