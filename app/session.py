@@ -11,7 +11,8 @@ another user account runs. So every API request must carry a secret that only th
 - a browser tab the app opens loads <storage>/open-sedjem.html, a page only this user can read, which posts the
   secret to /api/login; the answer, from the app's own origin, stores it and goes on to the app. So the secret is
   never in a command line or an address the app opens;
-- tests and scripts send the header.
+- tests and scripts send the header, and so does the MCP server when an assistant starts, follows or cancels a
+  transcription (app/mcp.py, through running()).
 
 Before the app trusts a server on a port as its own copy (starting a second time), the server proves that it knows
 the secret for that port without showing it (proof()); a program that took the port first can't, even by asking the
@@ -47,6 +48,16 @@ LOGIN_FILE = "open-sedjem.html"
 HEX64 = re.compile(r"[0-9a-f]{64}")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None  # a redirect is answered as the error it is: the secret is never sent on to another address
+
+
+# Requests to the app on this computer: never through a proxy that the environment names (http_proxy would get the
+# secret, and 127.0.0.1 would mean the proxy's own computer), and never on to where a redirect points
+LOCAL = urllib.request.build_opener(urllib.request.ProxyHandler({}), _NoRedirect)
+
+
 def write_private(path, text):
     """Write text to path through a temporary file that only this user can read, then replace path with it."""
     path = Path(path)
@@ -61,6 +72,22 @@ def write_private(path, text):
         raise
 
 
+def running(storage, timeout=2):
+    """(port, secret) of this user's Sedjem that is running on this data folder, for another program of the user's
+    own that uses its API, such as the MCP server (app/mcp.py); None when none is. It reads <storage>/port and
+    <storage>/session.key, writes nothing, and gives the secret only once the server on that port has proved that it
+    knows it (Session.answers): a program that took the port never gets the secret."""
+    storage = Path(storage)
+    try:
+        port = int((storage / PORT_FILE).read_text(encoding="utf-8"))
+        secret = (storage / KEY_FILE).read_text(encoding="utf-8").strip()
+    except (OSError, ValueError):
+        return None
+    if not 0 < port < 65536 or not HEX64.fullmatch(secret) or not Session(storage, secret).answers(port, timeout):
+        return None
+    return port, secret
+
+
 def running_port(storage, *ports):
     """The port of this user's Sedjem that is already running on this data folder: one of ports, or the one it noted
     in <storage>/port, and only if it proves that it knows the secret in <storage>/session.key. None if none is."""
@@ -73,12 +100,13 @@ def running_port(storage, *ports):
 
 
 class Session:
-    def __init__(self, storage):
+    def __init__(self, storage, secret=None):
         """The secret in use on this data folder, read from <storage>/session.key (or a new one if there is none).
-        Reading it never changes it, so a second start leaves the copy that is running alone."""
+        Reading it never changes it, so a second start leaves the copy that is running alone. secret: one already
+        read (running()), so nothing is read or made."""
         self.storage = Path(storage)
         self.path = self.storage / KEY_FILE
-        self.secret = self._load()
+        self.secret = secret if secret is not None else self._load()
 
     def rotate(self, port):
         """The server, once it has its port: a new secret, and the port noted for a second start."""
@@ -137,7 +165,7 @@ class Session:
         the proof. A program that only took the port, or passes the nonce on to Sedjem on another port, fails."""
         nonce = secrets.token_hex(16)
         try:
-            with urllib.request.urlopen(f"http://127.0.0.1:{int(port)}/api/ping?nonce={nonce}", timeout=timeout) as r:
+            with LOCAL.open(f"http://127.0.0.1:{int(port)}/api/ping?nonce={nonce}", timeout=timeout) as r:
                 found = json.load(r)
         except (OSError, ValueError):
             return False

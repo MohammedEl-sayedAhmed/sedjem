@@ -139,6 +139,13 @@ class Api:
         result = self._window.create_file_dialog(self._dialog("OPEN"), allow_multiple=False, file_types=RECORDINGS)
         return str(result[0]) if result else None
 
+    def pick_folder(self):
+        """A folder picked here, for Settings → Assistants (the folders assistants may transcribe files from): its
+        path, or None. The page saves it with the other settings."""
+        result = self._window.create_file_dialog(self._dialog("FOLDER"))
+        folder = (result[0] if result else None) if isinstance(result, (list, tuple)) else result
+        return str(folder) if folder else None
+
     def save_export(self, job_id, fmt, version=None):
         store = self._app.store
         job = store.get(job_id)

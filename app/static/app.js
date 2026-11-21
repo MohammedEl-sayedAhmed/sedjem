@@ -784,6 +784,7 @@ function renderJob() {
     stats.ids.length ? `<span>${ICON.users} ${stats.ids.length} speaker${stats.ids.length === 1 ? "" : "s"}</span>` : "",
     j.seconds ? `<span>${ICON.cpu} took ${human(j.seconds)}${j.rtf ? ` (${Number(j.rtf).toFixed(2)}× real time)` : ""}</span>` : "",
     `<span>${esc(when(j.created))}</span>`,
+    j.assistant ? `<span class="ai-started">${AI_ICON.chat} Started by an assistant${j.assistant.client ? ` (${esc(j.assistant.client)})` : ""}</span>` : "",  // over MCP (app/mcp.py)
   ].filter(Boolean).join("");
   const exportMenu = ["txt", "srt", "vtt", "md", "json"].map((fmt) => `<a href="/api/jobs/${j.id}/export/${fmt}" data-fmt="${fmt}" download>${ICON.download} ${{ txt: "Text (.txt)", srt: "Subtitles (.srt)", vtt: "Web subtitles (.vtt)", md: "Markdown (.md)", json: "JSON (.json)" }[fmt]}</a>`).join("");
   rerunShown = rerunMenu(j);

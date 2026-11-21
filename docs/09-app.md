@@ -25,7 +25,7 @@ labels* the speaker models, with the choice of the one that labels the speakers
 ([speaker models](#speaker-models)). A default model that isn't ready yet, with no key or not downloaded,
 can still be chosen: until it is, a new transcription starts with the first ready model. *Add models* has two views: *Recommended* and *From
 Hugging Face*. *Hosted services* holds the API keys, *Speed* the graphics card, power mode and
-processor threads, *Assistants* what assistants connected over MCP may see, how to connect them and
+processor threads, *Assistants* what assistants connected over MCP may see and do, how to connect them and
 what they asked ([assistants](11-assistants.md)), *Other computers* the pairing with another computer of yours that
 runs transcriptions for this one, and the switch that lets this one run them for others
 ([running jobs on another computer](15-remote-runs.md)), *About* the version, the licence, the folder where
@@ -861,6 +861,7 @@ says only whether Sedjem answers.
 | `POST /api/settings` with `{"speaker_model": …}` | the speaker model chosen in *Settings → Models*, one of the `id`s that `GET /api/status` lists under `speaker_models` with their downloads, the one chosen and the one used |
 | `POST /api/jobs?model=&speakers=&language=&prompt=&title=&name=&modified=&confirm_upload=` | the body is the file; `modified` is the file's modified time in milliseconds, kept as the recording's date when its tags have none |
 | `POST /api/jobs` with JSON `{"path": …, "model": …, …}` | a file on this computer, read in place |
+| `"assistant": "<name>"` in `POST /api/jobs`, `POST /api/link/inspect`, `POST /api/link` and `POST /api/jobs/<id>/cancel` | a request from the MCP server for an assistant: held to the rules the user set in *Settings → Assistants*, and each job it starts has `"assistant": {"client": "<name>"}` ([starting transcriptions](11-assistants.md#starting-transcriptions)) |
 | `GET /api/jobs`, `GET /api/jobs/<id>` | the list, newest first, each with `changed` (when its latest version was saved, else when it finished or was added) and `recorded` (when the recording was made, else when it was added); one job with its lines (partial while it runs), its `details`, and the same as the labelled `detail_groups` the page shows |
 | `PATCH /api/jobs/<id>` | `title`, `speaker_names`, `lines`, or `merge: {from, into}`; with `base_version`, 409 and no change when that isn't the latest version |
 | `POST /api/jobs/<id>/cancel`, `POST /api/jobs/<id>/rerun`, `DELETE /api/jobs/<id>` | |

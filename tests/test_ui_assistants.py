@@ -1,9 +1,11 @@
 """Browser tests of assistants over MCP in the app (app/static/assistants.js): Settings → Assistants with its two
-switches (kept after a reload) and the switch that lets assistants save versions (off until turned on), what is
-hidden one by one and Show again, the four connection snippets and Copy, and what assistants asked (written here
-with assistants.log, as app/mcp.py does, a saved version standing out) and Clear; hiding a transcription
-from its page and a course from a lecture's course bar; the dark theme and a narrow window. Headless Chromium
-against a Sedjem server with demo transcripts (see tests/ui_support.py).
+switches (kept after a reload), the switch that lets assistants save versions and the ones that let them start jobs
+(each off until turned on), the folders they may transcribe files from (added with a text field in a browser or the
+folder picker in the desktop window, and removed, by keyboard too), what is hidden one by one and Show again, the four
+connection snippets and Copy, and what assistants asked (written here with assistants.log, as app/mcp.py does, a saved
+version standing out) and Clear; hiding a transcription from its page and a course from a lecture's course bar, and a
+page that says an assistant started it; the dark theme and a narrow window. Headless Chromium against a Sedjem server
+with demo transcripts (see tests/ui_support.py).
 Run: .venv/bin/python -m unittest discover -s tests -p "test_ui_assistants.py" -v
 """
 import unittest
@@ -30,8 +32,9 @@ class Assistants(UiTestCase):
 
     def setUp(self):
         super().setUp()
-        self.cfg = self.app.cfg  # each test starts with everything visible, saving off and nothing in the log
-        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[], mcp_write=False)
+        self.cfg = self.app.cfg  # each test starts with everything visible, saving and jobs off and nothing in the log
+        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[], mcp_write=False, mcp_links=False,
+                               mcp_files=False, mcp_folders=[], mcp_hosted=False)
         assistants.clear_log(self.cfg)
 
     def open_tab(self):
@@ -51,14 +54,18 @@ class Assistants(UiTestCase):
         self.assertIn("Claude Desktop, Claude Code, Cursor and VS Code can read and search",
                       self.page.inner_text("#settings .ai-intro"))
         self.assertEqual(self.texts("#settings .ai-sec h4"),
-                         ["What assistants can see", "What assistants can change", "Hidden from assistants",
+                         ["What assistants can see", "What assistants can do", "Hidden from assistants",
                           "Connect an assistant", "What assistants asked"])
         self.assertEqual(self.texts("#settings .ai-sec .set-row .set-text b"),
                          ["Courses and YouTube videos", "Meetings and other recordings",
-                          "Let assistants save new versions of transcripts"])
+                          "Let assistants save new versions of transcripts", "Start jobs from YouTube and Google Drive links",
+                          "Transcribe files in these folders", "Use hosted models (uploads the recording)"])
         self.assertTrue(self.page.is_checked("#settings [data-setting=mcp_courses]"))
         self.assertTrue(self.page.is_checked("#settings [data-setting=mcp_recordings]"))
-        self.assertFalse(self.page.is_checked("#settings [data-setting=mcp_write]"), "saving is off at first")
+        for key in ("mcp_write", "mcp_links", "mcp_files", "mcp_hosted"):
+            self.assertFalse(self.page.is_checked(f"#settings [data-setting={key}]"), f"{key} is off at first")
+        self.assertIn("Each is off unless you turn it on", self.page.inner_text("#settings .ai-sec:has(#ai-do) .ai-lead"))
+        self.assertIn("No folder yet", self.page.inner_text("#settings .ai-folders"))
         self.assertIn("Nothing is hidden", self.page.inner_text("#settings .ai-empty >> nth=0"))
         snippets = assistants.snippets(self.cfg)
         self.assertEqual(self.texts("#settings .ai-snippet-head b"), CLIENTS)
@@ -100,7 +107,7 @@ class Assistants(UiTestCase):
     def test_saving_versions_is_off_until_turned_on_and_a_save_stands_out_in_the_log(self):
         self.open()
         self.open_tab()
-        hint = self.page.inner_text("#settings .ai-sec:has(#ai-change) .set-text .hint")
+        hint = self.page.inner_text("#settings label.set-row:has([data-setting=mcp_write]) .hint")
         self.assertIn("A save never deletes anything", hint)
         self.assertIn("History can undo it", hint)
         self.page.locator("#settings [data-setting=mcp_write]").check()
@@ -131,6 +138,74 @@ class Assistants(UiTestCase):
         marked, plain = self.page.evaluate("""() => [...document.querySelectorAll('#settings .ai-log li')].slice(0, 2)
             .map((li) => getComputedStyle(li).backgroundColor)""")[::-1]
         self.assertNotEqual(marked, plain)
+
+    def test_starting_jobs_and_the_folders(self):
+        here, gone = self.home / "recordings", self.home / "not-there"
+        here.mkdir(exist_ok=True)
+        self.open()
+        self.open_tab()
+        for key in ("mcp_links", "mcp_files", "mcp_hosted"):
+            self.page.locator(f"#settings [data-setting={key}]").check()
+            self.page.wait_for_function(f"() => S.status.settings.{key} === true")
+        self.assertEqual({k: self.cfg.settings()[k] for k in ("mcp_links", "mcp_files", "mcp_hosted")},
+                         {"mcp_links": True, "mcp_files": True, "mcp_hosted": True})
+        hint = self.page.inner_text("#settings label.set-row:has([data-setting=mcp_hosted]) .hint")
+        self.assertIn("uploads the recording to its service", hint)
+
+        # in a browser, a folder is added by its path, with the keyboard
+        self.assertEqual(self.page.locator("#aiFolderPick").count(), 0)
+        self.assertEqual(self.page.get_attribute("#aiFolderPath", "id"), "aiFolderPath")
+        self.assertEqual(self.texts("#settings .ai-folder-field > span"), ["Add a folder by its full path"])
+        self.page.fill("#aiFolderPath", str(here))
+        self.page.evaluate("() => renderSettings()")  # (Settings is drawn again while downloads run)
+        self.assertEqual(self.page.input_value("#aiFolderPath"), str(here), "what was typed is kept")
+        self.page.focus("#aiFolderPath")
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_selector(".toast >> text=Folder added")
+        self.page.wait_for_selector("#settings .ai-folder-list li")
+        self.assertEqual(self.page.input_value("#aiFolderPath"), "", "and emptied once it is added")
+        self.assertEqual(self.page.evaluate("() => document.activeElement.id"), "aiFolderPath")
+        self.page.fill("#aiFolderPath", str(gone))
+        self.page.click("#aiFolderAdd button[type=submit]")
+        self.page.wait_for_selector("#settings .ai-folder-list li:nth-child(2)")
+        self.assertEqual(self.cfg.settings()["mcp_folders"], [str(here), str(gone)])
+        self.page.wait_for_selector("#settings .ai-folder-list li:nth-child(2) .ai-missing")
+        self.assertEqual(self.texts("#settings .ai-folder-list li"), [f"{here} Remove", f"{gone} Not found Remove"])
+        self.page.fill("#aiFolderPath", str(here))
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_selector(".toast >> text=That folder is already listed")
+        self.assertEqual(self.cfg.settings()["mcp_folders"], [str(here), str(gone)])  # (a path that isn't whole: test_assistants_api)
+
+        # removed, and the focus goes on to the next one
+        self.assertEqual(self.page.get_attribute("#settings [data-ai-folder-remove='0']", "aria-label"), f"Remove the folder {here}")
+        self.page.focus("#settings [data-ai-folder-remove='0']")
+        self.page.keyboard.press("Enter")
+        self.page.wait_for_selector(".toast >> text=Folder removed")
+        self.page.wait_for_function("() => document.querySelectorAll('#settings .ai-folder-list li').length === 1")
+        self.assertEqual(self.cfg.settings()["mcp_folders"], [str(gone)])
+        self.assertEqual(self.page.evaluate("() => document.activeElement.dataset.aiFolderRemove"), "0")
+
+        # in the desktop window, the folder picker
+        self.page.evaluate("""(path) => { window.pywebview = { api: { pick_folder: async () => path } }; renderSettings(); }""",
+                           str(here))
+        self.assertEqual(self.page.locator("#aiFolderPath").count(), 0)
+        self.page.click("#aiFolderPick")
+        self.page.wait_for_selector(".toast >> text=Folder added")
+        self.assertEqual(self.cfg.settings()["mcp_folders"], [str(gone), str(here)])
+        self.assertEqual(self.page.evaluate("() => document.activeElement.id"), "aiFolderPick")
+        self.page.reload()
+        self.page.wait_for_function("() => typeof S !== 'undefined' && S.status")
+        self.open_tab()
+        self.assertTrue(self.page.is_checked("#settings [data-setting=mcp_files]"), "kept after a reload")
+        self.assertEqual(self.page.locator("#settings .ai-folder-list li").count(), 2)
+
+    def test_a_page_says_an_assistant_started_it(self):
+        self.app.store.update(MEETING, assistant={"client": "Cursor 2.0 <b>"})
+        self.addCleanup(self.app.store.update, MEETING, assistant=None)
+        self.job_page(MEETING)
+        self.assertEqual(self.page.inner_text(".meta .ai-started").strip(), "Started by an assistant (Cursor 2.0 <b>)")
+        self.job_page(INTRO)
+        self.assertEqual(self.page.locator(".meta .ai-started").count(), 0, "not on one the user started")
 
     def test_hiding_from_a_page_and_from_a_course_bar(self):
         self.job_page(MEETING)

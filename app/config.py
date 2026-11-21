@@ -128,6 +128,9 @@ class Config:
                 "default_model": None,  # Settings → Models: the model a new transcription starts with (None: [defaults])
                 "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],  # assistants (app/assistants.py)
                 "mcp_write": False,  # assistants may save new versions of transcripts (off until the user turns it on)
+                # assistants may start transcriptions from links, from files in mcp_folders, and with a hosted model
+                # (each off until the user turns it on)
+                "mcp_links": False, "mcp_files": False, "mcp_folders": [], "mcp_hosted": False,
                 # updates (app/updates.py): check by itself (None: not asked yet), the channel, a version or
                 # commit the user skipped
                 "update_check": None, "update_channel": "stable", "update_skip": None,
@@ -161,8 +164,13 @@ class Config:
             if key == "threads" and isinstance(value, int) and not isinstance(value, bool) \
                     and 1 <= value <= max(1, os.cpu_count() or 1):
                 continue
-            if key in ("mcp_courses", "mcp_recordings", "mcp_write") and isinstance(value, bool):
+            if key in ("mcp_courses", "mcp_recordings", "mcp_write", "mcp_links", "mcp_files", "mcp_hosted") \
+                    and isinstance(value, bool):
                 continue
+            if key == "mcp_folders":
+                from .assistants import check_folders  # (it imports this module)
+                if check_folders(value):
+                    continue
             if key == "speaker_model" and isinstance(value, str) and value in self.speaker_models():
                 continue
             if key == "default_model" and (value is None or (isinstance(value, str) and value in self.models)):

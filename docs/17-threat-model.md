@@ -3,7 +3,8 @@
 This page weighs, for each part of Sedjem that holds secrets or talks to other programs, what could go wrong, what
 already stops it, and what is left. It was made on 18 November 2026 from the code at 2585786, with STRIDE (spoofing,
 tampering, repudiation, information disclosure, denial of service, elevation of privilege) applied to each place where
-data crosses from one side to another. [How Sedjem fits together](16-architecture.md) shows the parts.
+data crosses from one side to another. [How Sedjem fits together](16-architecture.md) shows the parts. The part on
+assistants was brought up to date on 20 November 2026, when they could start transcriptions.
 
 Three changes would make Sedjem harder to attack, and each has an issue:
 [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125) (the page and the local server),
@@ -30,7 +31,8 @@ The app's page and its API are served by a local server, which asks for no passw
   Chromium-family browser, and offers no installed web app. A port fixed with `--port` or `[server] port` gives that
   up. On Windows the port is opened for the app alone, so no other account can bind it too.
 - A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
-  they are for, and only the user's own window can send them.
+  they are for, and only the user's own window can send them. A request that names an assistant reads only a file
+  inside the folders the user chose for assistants ([assistants over MCP](#assistants-over-mcp)).
 - Text from outside (YouTube titles and captions, Google Drive file names, the hosted services'
   transcripts, paired computers, Hugging Face, assistants, release notes) could carry script into the page. Every
   such text is escaped or set as plain text, and links built from data are `https://` only. A one-off review of
@@ -89,6 +91,23 @@ only programs the user runs can reach it.
   switched on (it is off at first), each change is a new version that can be restored, and every tool call, read
   and prompt is logged.
   The server tells the assistant that transcript text is quoted data, not instructions.
+- Assistants can also start transcriptions, which download from YouTube or Google Drive, read a file on the
+  computer, or upload a recording to a hosted service, and words in a transcript, a video's title or a web page could
+  steer an assistant into starting one. Each kind is off until the user turns it on: links, files in the folders the
+  user chose, and hosted models. The tool descriptions and the server's description say to start a transcription
+  only when the user asks for it, and every look at a link, start and cancel is logged with the transcriptions' ids;
+  each transcription an assistant started says so on its page. A file is taken only when it is a recording inside
+  one of the chosen folders, with every symbolic link followed in its path and in the folder's, so neither `..` nor a
+  link can reach outside them. An assistant never uploads a file of its own, never sends a job to a paired computer,
+  and may cancel only a transcription that an assistant started. Left: within what the user allowed, a steered
+  assistant can still start transcriptions the user didn't ask for; the log and the pages show them.
+- For these tools the MCP server uses the running app's own API, with the app's secret. It sends the secret only
+  after the server on the port noted in the data folder proves that it knows it, so a program that took the port
+  gets nothing but that check; the requests go to 127.0.0.1 through no proxy and follow no redirect, and the secret is
+  never in an answer or in the log. The app's server checks the assistant rules again itself, with the settings as
+  they are then, for every request that names an assistant
+  ([AgDR 22](agdr/AgDR-0022-assistants-start-jobs-through-the-running-app.md)). Left: a program that already has the
+  secret can name an assistant or not, as it likes; it can use the whole API anyway.
 
 ## YouTube links
 
@@ -138,5 +157,5 @@ Aptabase, still sees the address they come from and the operating system and its
 
 ## Who changed what
 
-Each saved version of a transcript records whether the user or an assistant made it, and the MCP log records what
-assistants asked for.
+Each saved version of a transcript records whether the user or an assistant made it, each transcription an assistant
+started is marked with the assistant's name, and the MCP log records what assistants asked for.

@@ -8,7 +8,8 @@ Sedjem, [the privacy policy](privacy.md) lists everything it contacts, and
 ## What Sedjem talks to
 
 You work in Sedjem's window. Each arrow gives the main reason for a connection, and the privacy policy gives the
-details. An assistant reaches the transcripts through MCP, and a paired computer of yours can run jobs for this one.
+details. An assistant reaches the transcripts through MCP, and starts transcriptions there when you allow it, and a
+paired computer of yours can run jobs for this one.
 
 ```mermaid
 flowchart LR
@@ -24,7 +25,7 @@ flowchart LR
   aptabase["Aptabase<br/>anonymous usage counts"]
 
   you -->|"adds recordings,<br/>reads transcripts"| sedjem
-  assistant -->|"reads transcripts<br/>(MCP over stdio)"| sedjem
+  assistant -->|"reads transcripts, starts jobs<br/>when you allow it (MCP over stdio)"| sedjem
   sedjem -->|"sends audio, gets the transcript<br/>(HTTPS, TLS 1.3)"| other
   sedjem -->|"uploads a recording<br/>after you allow it"| hosted
   sedjem -->|"downloads the models and<br/>libraries you choose"| models
@@ -46,7 +47,9 @@ flowchart LR
 Sedjem runs as one Python process: the local server, the job runner's threads, and the threads for model downloads,
 updates and usage counts. Each local transcription gets a short-lived worker process, so the models never run in the
 app itself, and cancelling a job ends that process. The MCP server is a separate process that the
-assistant starts; it reads the data folder directly, so it works while the app is closed.
+assistant starts; it reads the data folder directly, so reading works while the app is closed. When the user lets
+assistants start transcriptions, the MCP server asks the running app for them through its local API, after the app
+has proved that it knows the secret ([AgDR 22](agdr/AgDR-0022-assistants-start-jobs-through-the-running-app.md)).
 
 ```mermaid
 flowchart TB
@@ -82,6 +85,7 @@ flowchart TB
   remote -->|"queues their jobs"| runner
   assistant -->|"asks (stdio)"| mcp
   mcp -->|"reads transcripts, writes its log"| data
+  mcp -->|"starts, follows and cancels jobs,<br/>when allowed (HTTP)"| server
 
   classDef person fill:#08427b,stroke:#052e56,color:#fff
   classDef part fill:#438dd5,stroke:#2e6295,color:#fff
