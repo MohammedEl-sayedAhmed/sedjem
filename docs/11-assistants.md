@@ -122,16 +122,16 @@ can reach it.
 
 | Tool | What it gives |
 |---|---|
-| `list_transcriptions` | The transcriptions, newest first: id, date, length, model, status, speakers, and for a lecture its course, number ("lecture 4 of 38") and YouTube link. A recording transcribed more than once is listed once: its main transcript when one is chosen in the app, then its branches, each with its label, model, id and latest version. Filters: words in the title, a branch's name or the speaker names, a course, the kind (courses or recordings) and the status, in pages of recordings. |
-| `list_courses` | The courses (YouTube playlists): playlist id and link, how many lectures are transcribed, and their total length. |
+| `list_transcriptions` | The transcriptions, newest first: id, date, length, model, status, speakers, and for a lecture its course, number ("lecture 4 of 38") and its YouTube or Google Drive link. A recording transcribed more than once is listed once: its main transcript when one is chosen in the app, then its branches, each with its label, model, id and latest version. Filters: words in the title, a branch's name or the speaker names, a course, the kind (courses or recordings) and the status, in pages of recordings. |
+| `list_courses` | The courses (YouTube playlists and Google Drive folders): course id (the playlist's or the folder's) and link, how many lectures are transcribed, and their total length. |
 | `course_outline` | A course's lectures in order, each with its number, id, title, length, status, link and the first words of its transcript, so an assistant can find the right lecture without reading everything. |
 | `get_transcript` | A transcript by id, or by course and lecture number, as lines of `[mm:ss] Speaker: text`, for a time range or from a line on, and an earlier version of it with `version`. Each answer says which version it gives, of how many, and whether it is the recording's main transcript or a branch. |
 | `search` | Where something was said, across everything or in one course or transcription: each match with its lecture, time, the lines around it, and for a YouTube video a link that opens it at that moment. Of a recording with a main transcript, only that one is searched unless `include_branches` is true; without one, its transcripts that aren't branches made in the app. |
-| `get_course_text` | A whole course as one text, the same as its `course.md` file, in pieces. |
+| `get_course_text` | A whole course as one text, the same as its `course.md` file, in pieces (a Google Drive folder's course has the same text, though no file). |
 | `save_version` | A corrected version of a transcript, saved as its newest version, from line edits or from all its lines, on top of the version it was made on. Offered only while saving is turned on. See [saving a version](#saving-a-version). |
 | `list_models` | The models that are ready, each with its id, title, and whether it runs on this computer or uploads the recording to a hosted service, and the default model. Hosted models only when the user allows them. |
-| `inspect_link` | What is at a link: a YouTube playlist's videos in order with their numbers, ids and lengths, whether each can be transcribed and which have captions made by people; a YouTube video; or a Google Drive file. |
-| `transcribe_link` | Starts transcribing a link: one transcription per video, in playlist order, a playlist becoming a course, as the Link tab does. Takes `entries` (video ids; all that can be transcribed by default), `model`, `language`, `speakers` and `captions` (captions made by people instead of a model; true by default). |
+| `inspect_link` | What is at a link: a YouTube playlist's videos in order with their numbers, ids and lengths, whether each can be transcribed and which have captions made by people; a YouTube video; a Google Drive file; or a Google Drive folder's audio and video files in natural name order with their numbers and ids, and how many subfolders and other files were skipped. |
+| `transcribe_link` | Starts transcribing a link: one transcription per video or file, in playlist or folder order, a playlist or a folder becoming a course, as the Link tab does. Takes `entries` (video or file ids; all that can be transcribed by default), `model`, `language`, `speakers` and `captions` (captions made by people instead of a model; true by default). |
 | `transcribe_file` | Starts transcribing a recording on this computer, read where it is, when it is inside a folder the user chose. Takes `path`, and `title`, `model`, `language` and `speakers`. |
 | `job_status` | How transcriptions are going: status, stage and progress, title, model, and why one failed. Without ids, the ones assistants started that are still waiting or running. |
 | `cancel_job` | Cancels a transcription that an assistant started and that is still waiting or running. |
@@ -144,7 +144,7 @@ most, and an answer that is cut ends with the exact call that continues it, by t
 course (Prompt Engineering is about 49,000 words) is read the same way, lecture by lecture, so an
 assistant with a small context can still go through all of it.
 
-A course is named by its playlist id or by its title, in any case, and a part of the title is enough
+A course is named by its course id (its playlist's or its Drive folder's id) or by its title, in any case, and a part of the title is enough
 when only one course has it. For a lecture transcribed more than once, assistants get its main
 transcript when one is chosen, else the transcription that finished last, the same one the course
 files follow.
@@ -250,7 +250,7 @@ Assistants that support MCP resources can attach a transcript or a course to a c
 | Address | What it is |
 |---|---|
 | `sedjem://transcript/<id>` | One transcript as Markdown: its title, where it comes from, and every line with its time and speaker (for a YouTube video, the same text as its `.md` file in the courses folder). |
-| `sedjem://course/<playlist id>` | A whole course as Markdown, the same text as its `course.md`. |
+| `sedjem://course/<course id>` | A whole course as Markdown, the same text as its `course.md`. |
 
 The list of resources holds every visible course and finished transcription, in pages.
 
@@ -285,7 +285,8 @@ picks one.
 
 *Settings → Assistants* has two switches for what they may see:
 
-- *Courses and YouTube videos*: every course lecture, and every YouTube video added on its own.
+- *Courses and YouTube videos*: every course lecture (of a YouTube playlist or a Google Drive folder), and every
+  YouTube video added on its own.
 - *Meetings and other recordings*: everything else.
 
 Under *What assistants can do*, four more switches, each off by default, let them save new versions of transcripts

@@ -312,8 +312,8 @@ def settings_facts(cfg):
 
 def library_facts(jobs):
     """active_month's props about the library: how many transcriptions there are and how many courses (YouTube
-    playlists), in ranges."""
-    courses = {(j.get("course") or {}).get("id") for j in jobs if isinstance(j, dict)} - {None, ""}
+    playlists; a Google Drive folder's course isn't counted), in ranges."""
+    courses = {(j.get("course") or {}).get("id") for j in jobs if isinstance(j, dict) and not j.get("drive_id")} - {None, ""}
     return {"library": ranged(len(jobs), (1, 10, 50, 200), VALUES["library"]),
             "courses": ranged(len(courses), (1, 5, 20), VALUES["courses"])}
 

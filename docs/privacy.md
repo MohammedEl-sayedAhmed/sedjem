@@ -57,8 +57,12 @@ here.
   (`drive.usercontent.google.com`, which may send it on to a `*.googleusercontent.com` host) for the file itself,
   answering the page Drive shows before a file too large to scan for viruses. Google sees the computer's IP address
   and which file is asked for. Sedjem doesn't sign in, so it sends no account or cookie of yours, and it reads only
-  files shared with anyone who has the link. A link to a Drive folder is refused before anything is asked of Google;
-  folders are planned.
+  files shared with anyone who has the link. For a link to a Drive folder, Sedjem asks `drive.google.com` for the
+  folder's embedded view (`/embeddedfolderview`), a page with the folder's name and each file's name, type and id,
+  sending the folder's id (and the link's `resourcekey`, if it has one) and nothing else of the link; Google sees the
+  computer's IP address and which folder is asked for, and Sedjem keeps no cookie it sets. Sedjem follows no
+  redirect from that page and asks for nothing else on it, such as its thumbnails. Each file you pick is then asked
+  for as a file's link is, above.
 - Aptabase ([privacy policy](https://aptabase.com/legal/privacy)), for anonymous usage counts, at `eu.aptabase.com`
   (a copy built with a key from Aptabase's US region uses `us.aptabase.com`). A few times a month Sedjem sends
   anonymous counts, so that the project knows how many installs use it and what they use: the version, the system

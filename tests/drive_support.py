@@ -15,13 +15,24 @@ own code runs, offline:
   google = GoogleServers()
   google.file(FILE_ID, "Big lecture.mp4", data, scan=True)
   with mock.patch.object(drive, "_ydl", google.ydl(drive._ydl)): ...
+
+FolderPages answers for Drive's embedded folder view, which app/drive.py reads to list a folder, through the app's own
+opener (urllib with its no-redirect handler), so the request, the answer's checks and the parser all run, offline:
+
+  pages = FolderPages()
+  pages.folder(FOLDER_ID, "Course", [("file", drive_id(1), "Lecture 1.mp4", "video/mp4"), ("folder", ...)])
+  with mock.patch.object(drive, "OPENER", pages.opener()): ...
 """
+import html
+import http.client
 import io
 import json
 import re
 import threading
 import time
 import urllib.parse
+import urllib.request
+import urllib.response
 from pathlib import Path
 
 from youtube_support import media
@@ -220,3 +231,95 @@ class GoogleServers:
             stated = {"Content-Length": str(f["stated"])} if f["stated"] is not None else {}
             return reply(data, status, {"Content-Type": "application/octet-stream", **stated}, at=at, sized=f["sized"])
         return reply("Not found", 404, reason="Not Found")
+
+
+# ---- Drive's embedded folder view, for app/drive.py's folder listing ----------------------------------
+
+# The page as Drive wrote it for real public folders on 21 November 2026, cut down to what is around the entries.
+FOLDER_PAGE = """<!DOCTYPE html><html><head><title>{title}</title><meta http-equiv="content-type" content="text/html; \
+charset=utf-8"/><link rel="shortcut icon" href="//ssl.gstatic.com/docs/collections/images/favicon_shared.ico"/></head>\
+<body class="flip-embedded"><div class="flip-butter-container"><div id="flip-butter"></div></div><div id="flip-contents" \
+class="flip-contents flip-list-view"><script nonce="abc">var fragmentHandler = function() {{}};</script><div \
+class="flip-list-header"><div role="heading" aria-level="2" class="flip-list-title-header">TITLE</div><div \
+role="heading" aria-level="2" class="flip-list-last-modified-header">LAST MODIFIED</div></div><div class="flip-entries">\
+{entries}</div></div></body></html>"""
+FILE_ENTRY = """<div class="flip-entry" id="entry-{id}" tabindex="0" role="link"><div class="flip-entry-info"><a \
+href="{href}" target="_blank"><div class="flip-entry-visual"><div class="flip-entry-visual-card"><div \
+class="flip-entry-thumb"><img src="https://lh3.googleusercontent.com/drive-storage/AJQWtBOSW0Pd=s190" alt=""/></div>\
+</div></div><div class="flip-entry-list-icon"><img src="https://drive-thirdparty.googleusercontent.com/16/type/{mime}" \
+alt=""/></div><div class="flip-entry-title">{name}</div></a></div><div class="flip-entry-last-modified"><div>10/22/19\
+</div></div></div>"""
+FOLDER_ENTRY = """<div class="flip-entry" id="entry-{id}" tabindex="0" role="link"><div class="flip-entry-info"><a \
+href="https://drive.google.com/drive/folders/{id}" target="_blank"><div class="flip-entry-visual"><div \
+class="flip-entry-visual-card"><div class="flip-entry-icon"><div aria-label="Folder" class="icon-color-1 \
+drive-sprite-folder-grid-shared-icon"></div></div></div></div><div class="flip-entry-list-icon"><div \
+aria-label="Folder" class="icon-color-1 drive-sprite-folder-list-shared-icon"></div></div><div \
+class="flip-entry-title">{name}</div></a></div><div class="flip-entry-last-modified"><div>6/25/22</div></div></div>"""
+NOT_FOUND = "<html lang=en><meta charset=utf-8><title>Error 404 (Not Found)!!1</title><p><b>404.</b> That\u2019s an error."
+
+
+def folder_page(title, entries):
+    """A folder's page: entries are (kind, id, name, MIME type), kind "file", "folder" or "doc" (a Google Docs file,
+    linked on docs.google.com)."""
+    out = []
+    for kind, fid, name, mime in entries:
+        if kind == "folder":
+            out.append(FOLDER_ENTRY.format(id=fid, name=html.escape(name)))
+            continue
+        href = (f"https://docs.google.com/document/d/{fid}/edit?usp=drive_web" if kind == "doc"
+                else f"https://drive.google.com/file/d/{fid}/view?usp=drive_web")
+        out.append(FILE_ENTRY.format(id=fid, href=href, mime=mime, name=html.escape(name)))
+    return FOLDER_PAGE.format(title=html.escape(title), entries="".join(out))
+
+
+class FolderPages:
+    """Drive's embedded folder view: folders by id ({title, entries}), ids that aren't shared (answered 404, as a
+    made-up id was), answers to give instead for an id ((status, headers, body), or an exception to raise, as a
+    connection that fails), and every request made, as (url, headers)."""
+
+    def __init__(self):
+        self.folders, self.private, self.answers, self.requests = {}, set(), {}, []
+
+    def folder(self, fid, title, entries):
+        self.folders[fid] = {"title": title, "entries": list(entries)}
+        return fid
+
+    def opener(self):
+        """An opener like app/drive.py's OPENER (its no-redirect handler included) whose requests come here."""
+        from app import drive
+
+        pages = self
+
+        class Pages(urllib.request.BaseHandler):
+            handler_order = 100  # before urllib's own handlers: nothing reaches the network
+
+            def https_open(self, request):
+                return pages.answer(request)
+
+            http_open = https_open
+
+        return urllib.request.build_opener(drive._NoRedirect, Pages)
+
+    def answer(self, request):
+        url = request.full_url
+        self.requests.append((url, dict(request.header_items())))
+        p = urllib.parse.urlsplit(url)
+        fid = (urllib.parse.parse_qs(p.query).get("id") or [""])[0]
+        if p.hostname != "drive.google.com" or p.path != "/embeddedfolderview":
+            status, headers, body = 404, {"Content-Type": "text/html"}, NOT_FOUND
+        elif isinstance(self.answers.get(fid), Exception):
+            raise self.answers[fid]
+        elif fid in self.answers:
+            status, headers, body = self.answers[fid]
+        elif fid in self.private or fid not in self.folders:
+            status, headers, body = 404, {"Content-Type": "text/html; charset=UTF-8"}, NOT_FOUND
+        else:
+            f = self.folders[fid]
+            status, headers, body = 200, {"Content-Type": "text/html; charset=utf-8"}, folder_page(f["title"], f["entries"])
+        message = http.client.HTTPMessage()
+        for k, v in headers.items():
+            message[k] = v
+        answer = urllib.response.addinfourl(io.BytesIO(body.encode() if isinstance(body, str) else body), message, url,
+                                            status)
+        answer.msg = http.client.responses.get(status, "")
+        return answer

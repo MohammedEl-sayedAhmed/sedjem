@@ -39,13 +39,13 @@ function assistantsPanel() {
       transcripts through MCP, also while Sedjem is closed. What an assistant reads goes to its model, like anything
       else shared in a chat with it. Assistants only read, unless you let them do more below.</p>
     <section class="ai-sec" aria-labelledby="ai-see"><h4 id="ai-see">What assistants can see</h4>
-      <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists, and YouTube videos added on their own.")}
+      <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists and Google Drive folders, and YouTube videos added on their own.")}
         ${sw("mcp_recordings", "Every other transcription: meetings, calls and other files.")}</div></section>
     <section class="ai-sec" aria-labelledby="ai-do"><h4 id="ai-do">What assistants can do</h4>
       <p class="hint ai-lead">Each is off unless you turn it on. Words in a transcript or on a web page can try to steer an
         assistant, so it acts only where you allow it here. Starting jobs needs Sedjem to be open.</p>
       <div class="set-list">${sw("mcp_write", "An assistant saves a corrected version when you ask it to. A save never deletes anything: it is a new version, and History can undo it.", set.mcp_write === true)}
-        ${sw("mcp_links", "An assistant starts transcriptions of the YouTube videos, playlists and Google Drive files you ask it to.", set.mcp_links === true)}
+        ${sw("mcp_links", "An assistant starts transcriptions of the YouTube videos and playlists and Google Drive files and folders you ask it to.", set.mcp_links === true)}
         ${sw("mcp_files", "An assistant transcribes a recording you ask it to, when the file is inside one of these folders.", set.mcp_files === true)}
         ${aiFolders(set)}
         ${sw("mcp_hosted", "An assistant may choose a hosted model, which uploads the recording to its service. Without this, assistants use the models on this computer only.", set.mcp_hosted === true)}</div></section>
@@ -220,7 +220,7 @@ async function aiClearLog() {
   } catch (e) { toast(e.message, "error"); }
 }
 
-// Hides a transcription ("job:<id>") or a course ("course:<playlist id>") from assistants, or shows it again.
+// Hides a transcription ("job:<id>") or a course ("course:<course id>") from assistants, or shows it again.
 // Settings and the job page follow at once. Returns whether it was saved.
 async function aiSetHidden(key, hide) {
   try { AI.data = await api.post("/api/assistants/hide", { key, hidden: hide }); }

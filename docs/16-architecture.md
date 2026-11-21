@@ -21,7 +21,7 @@ flowchart LR
   models["Model hosts<br/>Hugging Face, GitHub releases<br/>and PyPI's file host"]
   github["GitHub<br/>releases and the tested main branch"]
   youtube["YouTube<br/>videos and captions from links"]
-  gdrive["Google Drive<br/>shared files from links"]
+  gdrive["Google Drive<br/>shared files and folders from links"]
   aptabase["Aptabase<br/>anonymous usage counts"]
 
   you -->|"adds recordings,<br/>reads transcripts"| sedjem
@@ -31,7 +31,7 @@ flowchart LR
   sedjem -->|"downloads the models and<br/>libraries you choose"| models
   sedjem -->|"checks for updates if you agreed,<br/>downloads one when you ask"| github
   sedjem -->|"fetches a linked video"| youtube
-  sedjem -->|"fetches a linked file"| gdrive
+  sedjem -->|"lists a linked folder,<br/>fetches a linked file"| gdrive
   sedjem -->|"sends the counts<br/>when allowed"| aptabase
 
   classDef person fill:#08427b,stroke:#052e56,color:#fff
