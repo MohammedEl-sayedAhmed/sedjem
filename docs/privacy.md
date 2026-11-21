@@ -189,6 +189,10 @@ sent until the two computers are paired with a one-time code.
 An assistant connected over MCP, such as Claude Desktop, Cursor or VS Code, reads the transcripts that
 *Settings → Assistants* allows, on the computer. What it reads then goes to the assistant's own model and service,
 under that service's terms. It never gets the audio, the keys or the settings ([assistants](11-assistants.md)).
+When you turn it on, an assistant can also start transcriptions in the app: of YouTube and Google Drive links, of
+recordings in the folders you chose, and with a hosted model only if you allow that too. Such a transcription is
+like one you start yourself: a link is downloaded from YouTube or Google Drive, and a hosted model gets the
+recording, as described above.
 
 ## Changes and contact
 

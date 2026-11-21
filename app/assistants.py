@@ -1,12 +1,20 @@
-"""What assistants connected over MCP (app/mcp.py) may see, the log of what they asked, and how to connect them.
+"""What assistants connected over MCP (app/mcp.py) may see and do, the log of what they asked, and how to connect them.
 
-Four settings, saved like the others in <storage>/settings.json and changed in Settings → Assistants:
+The settings, saved like the others in <storage>/settings.json and changed in Settings → Assistants:
   mcp_courses     YouTube courses and videos added on their own are visible (default on)
   mcp_recordings  every other transcription (meetings, calls, files) is visible (default on)
   mcp_hidden      transcriptions and courses hidden one by one: "job:<id>" and "course:<playlist id>"
   mcp_write       assistants may save new versions of transcripts (save_version; default off). Transcript text is
                   quoted data that anyone in a recording could have said, so nothing an assistant reads in it can
                   lead to a save unless the user turned this on; a save never deletes anything either.
+  mcp_links       assistants may start transcriptions from YouTube and Google Drive links (default off)
+  mcp_files       assistants may transcribe recordings inside the folders in mcp_folders (default off)
+  mcp_folders     those folders: absolute paths, at most MAX_FOLDERS
+  mcp_hosted      assistants may choose a hosted model, which uploads the recording (default off: local models only)
+The four switches that let an assistant act are off until the user turns them on, for the same reason as saving:
+transcript text and web pages can hold words that try to steer an assistant. An assistant starts a transcription
+through the running app (app/server.py checks these rules again for every request that names an assistant), and
+it may cancel only a transcription that an assistant started (its job has "assistant": {"client": name}).
 
 To an assistant, a hidden or switched-off transcription is as if it didn't exist: it is never listed, searched,
 read, offered as a resource or suggested in a completion.
@@ -30,6 +38,11 @@ ID = r"\d{8}-\d{6}-[0-9a-f]{4}"                 # a transcription (app/jobs.py I
 COURSE_ID = r"[A-Za-z0-9_-]{2,64}"              # a YouTube playlist (app/youtube.py LIST_ID)
 HIDDEN_KEY = re.compile(rf"^(job:{ID}|course:{COURSE_ID})$")
 MAX_HIDDEN = 5000
+MAX_FOLDERS, MAX_FOLDER_CHARS = 50, 1000  # mcp_folders: how many, and how long each path may be
+# The recordings an assistant may transcribe from a folder, by extension: the desktop app's file picker's list
+# (app/desktop.py RECORDINGS) and .3gp, which the page's file field takes too
+RECORDING_TYPES = (".mp3", ".m4a", ".wav", ".ogg", ".opus", ".flac", ".aac", ".amr", ".wma", ".mp4", ".mkv", ".mov",
+                   ".webm", ".avi", ".3gp")
 LOG_KEEP, LOG_TRIM_AT = 2000, 2500
 _log_lock = threading.Lock()
 
@@ -64,6 +77,95 @@ def writes(cfg, settings=None):
     """Whether assistants may save new versions of transcripts (mcp_write: only when the user turned it on)."""
     s = settings if settings is not None else cfg.settings()
     return s.get("mcp_write") is True
+
+
+def links(cfg, settings=None):
+    """Whether assistants may start transcriptions from YouTube and Google Drive links (mcp_links)."""
+    s = settings if settings is not None else cfg.settings()
+    return s.get("mcp_links") is True
+
+
+def files(cfg, settings=None):
+    """Whether assistants may transcribe recordings inside the allowed folders (mcp_files)."""
+    s = settings if settings is not None else cfg.settings()
+    return s.get("mcp_files") is True
+
+
+def hosted(cfg, settings=None):
+    """Whether assistants may choose a hosted model, which uploads the recording (mcp_hosted)."""
+    s = settings if settings is not None else cfg.settings()
+    return s.get("mcp_hosted") is True
+
+
+def starts_jobs(cfg, settings=None):
+    """Whether assistants may start transcriptions at all: from links, or from files."""
+    s = settings if settings is not None else cfg.settings()
+    return links(cfg, s) or files(cfg, s)
+
+
+class Refused(ValueError):
+    """A file an assistant may not transcribe, and why, in words for the assistant."""
+
+
+def folders(settings):
+    """The folders an assistant may transcribe files from: mcp_folders with every symbolic link followed, those
+    that are folders now (a path written by hand that isn't absolute is left out)."""
+    saved = settings.get("mcp_folders")
+    out = []
+    for f in saved if isinstance(saved, list) else []:
+        if isinstance(f, str) and f and "\0" not in f and os.path.isabs(f):
+            real = os.path.realpath(f)
+            if os.path.isdir(real) and real not in out:
+                out.append(real)
+    return out
+
+
+def recording_path(path, settings):
+    """The real path of a recording an assistant asked to transcribe, once it is allowed: a file (not a folder) with
+    a recording's extension, inside one of the allowed folders, both with every symbolic link followed, so neither
+    ".." nor a link can lead outside them. Raises Refused saying why. The caller checks mcp_files."""
+    if not isinstance(path, str) or not path.strip() or "\0" in path or len(path) > 4096:
+        raise Refused("Give the recording's full path.")
+    if not os.path.isabs(path):
+        raise Refused(f"Give the recording's full path, not {path!r}.")
+    allowed = folders(settings)
+    if not allowed:
+        raise Refused("The user hasn't chosen any folders that assistants may transcribe files from: they are chosen "
+                      "in Settings → Assistants.")
+    real = os.path.realpath(path)
+    # Inside an allowed folder by its path's parts (commonpath), not as text, so /music-other isn't inside /music.
+    # The same test is made again as text on the folder with a separator after it, which is the check CodeQL
+    # recognises before a path is used.
+    outside = Refused(f"{path} is not inside a folder that the user lets assistants transcribe files from: "
+                      f"{', '.join(allowed)}.")
+    inside = [f for f in allowed if _common(real, f) == f]
+    if not inside:
+        raise outside
+    if not real.startswith(tuple(f if f.endswith(os.sep) else f + os.sep for f in inside)):
+        raise outside
+    if not os.path.exists(real):
+        raise Refused(f"There is no file at {path}.")
+    if not os.path.isfile(real):
+        raise Refused(f"{path} is not a file.")
+    if os.path.splitext(real)[1].lower() not in RECORDING_TYPES:
+        raise Refused(f"{path} is not a recording that Sedjem takes ({', '.join(RECORDING_TYPES)}).")
+    return real
+
+
+def _common(path, folder):
+    """The path the two have in common, or None (on Windows, two drives have none)."""
+    try:
+        return os.path.commonpath([path, folder])
+    except ValueError:
+        return None
+
+
+def check_folders(value):
+    """Whether a value is a valid mcp_folders setting (used by Config.save_settings): a list of different absolute
+    paths. Nothing on disk is read here; a folder that isn't there allows nothing."""
+    return isinstance(value, list) and len(value) <= MAX_FOLDERS and len(set(map(str, value))) == len(value) and all(
+        isinstance(f, str) and 0 < len(f) <= MAX_FOLDER_CHARS and f == f.strip() and "\0" not in f
+        and os.path.isabs(f) for f in value)
 
 
 def set_hidden(cfg, key, hide):

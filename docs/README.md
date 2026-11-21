@@ -91,7 +91,7 @@ the usual measure (DER) and the charts are in [speaker labels](04-speaker-labels
 | [Disk space and cleanup](08-disk-and-cleanup.md) | what the project puts on disk and how to remove it |
 | [The app](09-app.md) | using Sedjem, the model settings in `app/config.toml`, API keys, privacy |
 | [Desktop app](10-desktop.md) | Sedjem on Windows and Linux: running, building, the installer, what has been verified |
-| [Assistants](11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, the tools, resources and prompts, what assistants may see, the log |
+| [Assistants](11-assistants.md) | connecting Claude, Cursor or VS Code over MCP, the tools, resources and prompts, what assistants may see and do, starting transcriptions, the log |
 | [Updates](12-updates.md) | the two channels, the first-start question and what is sent to GitHub, *Update now* for each kind of install, updating by hand, nightly previews |
 | [The pipeline](14-pipeline.md) | what runs when for each change and release, reading a failed run, cutting and undoing a release, the security checks, the rules for public text, signing |
 | [Usage counts](13-usage-counts.md) | the anonymous counts sent to Aptabase: each event and each value, when, what is never sent, where it goes, turning them off, and the public totals |

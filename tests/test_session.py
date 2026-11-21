@@ -394,7 +394,18 @@ class Desktop(unittest.TestCase):
         api = desktop.SessionApi("s" * 64)
         self.assertEqual(api.session(), "s" * 64)
         self.assertTrue(callable(api.open_url))
-        self.assertFalse(hasattr(api, "pick_file") or hasattr(api, "save_export"))  # the page uses the browser's
+        self.assertFalse(hasattr(api, "pick_file") or hasattr(api, "save_export") or hasattr(api, "pick_folder"))  # the page uses the browser's
+
+    def test_the_desktop_window_picks_a_folder_for_assistants(self):
+        """Settings → Assistants in the desktop window adds a folder with the system's folder picker."""
+        api = desktop.Api(mock.Mock())
+        api._window, api._dialog = mock.Mock(), lambda kind: kind
+        api._window.create_file_dialog.return_value = ["/home/you/Recordings"]
+        self.assertEqual(api.pick_folder(), "/home/you/Recordings")
+        self.assertEqual(api._window.create_file_dialog.call_args.args, ("FOLDER",))
+        for nothing in (None, [], ""):
+            api._window.create_file_dialog.return_value = nothing
+            self.assertIsNone(api.pick_folder(), "none picked")
 
     def test_the_address_shown_names_the_login_page(self):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as out:

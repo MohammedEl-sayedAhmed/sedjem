@@ -7,6 +7,12 @@ Every /api request except /api/ping and /api/login must also carry the secret th
 own window has (app/session.py), since other programs on the computer, other user accounts included,
 can connect too; the port is new at each start, and so is the secret. Running jobs for other computers (app/remote.py) has a server of its own, on another
 port, off unless it is switched on.
+
+The MCP server (app/mcp.py) is one of these clients when an assistant starts, follows or cancels a transcription. Its
+requests carry "assistant", the assistant's name, and for them this server checks the assistant rules itself, with the
+settings as they are at that moment (Handler.assistant): the switch for links or files on, a file only inside a
+folder the user allowed, a hosted model only when allowed, never another computer, and a cancel only of a job an
+assistant started. Each job an assistant starts is marked "assistant": {"client": name}.
 """
 import json
 import os
@@ -259,12 +265,16 @@ class App:
         }
 
     def assistants_view(self):
-        """Settings → Assistants: the two switches, what is hidden one by one (newest first, with titles), the
-        newest entries of the log of what assistants asked, and the configuration for each assistant."""
+        """Settings → Assistants: the switches, the folders assistants may transcribe files from (each with whether
+        it is a folder now), what is hidden one by one (newest first, with titles), the newest entries of the log of
+        what assistants asked, and the configuration for each assistant."""
         s = self.cfg.settings()
         jobs = {j["id"]: j for j in self.store.list()}  # newest first
         marks = s["mcp_hidden"] if isinstance(s["mcp_hidden"], list) else []
-        return {"settings": {k: bool(s[k]) for k in ("mcp_courses", "mcp_recordings")} | {"mcp_write": s["mcp_write"] is True},
+        folders = [f for f in s["mcp_folders"] if isinstance(f, str)] if isinstance(s["mcp_folders"], list) else []
+        return {"settings": {k: bool(s[k]) for k in ("mcp_courses", "mcp_recordings")}
+                | {k: s[k] is True for k in ("mcp_write", "mcp_links", "mcp_files", "mcp_hosted")},
+                "folders": [{"path": f, "found": os.path.isdir(f)} for f in folders],
                 "hidden": [hidden_item(k, jobs) for k in reversed(marks) if isinstance(k, str)],
                 "log": [log_item(e, jobs) for e in assistants.read_log(self.cfg, 50)],
                 "snippets": assistants.snippets(self.cfg)}
@@ -282,7 +292,7 @@ def summary(job):
     kept, or not prepared yet, when it was added."""
     keys = ("id", "title", "created", "model", "model_title", "kind", "status", "stage", "done", "total",
             "audio_s", "seconds", "rtf", "elapsed", "source_name", "source_url", "youtube_id", "drive_id", "stream",
-            "course", "branch", "remote")
+            "course", "branch", "remote", "assistant")
     source = job.get("source") if isinstance(job.get("source"), dict) else {}
     return {**{k: job.get(k) for k in keys}, "main": job.get("main") is True,
             "recorded": source.get("recorded") or job.get("created")}
@@ -353,6 +363,13 @@ ASKED = {"list_transcriptions": ("Listed the transcriptions ({})", "Listed the t
          "search": ("Searched for {}", "Searched the transcripts"),
          "get_course_text": ("Read the course text of {}", "Read the text of a course"),
          "save_version": ("{}", "Asked to save a version"),  # the detail says what was saved, or why it wasn't
+         # starting, following and cancelling transcriptions: the detail says what was done, or why it wasn't
+         "list_models": ("Listed the models ({})", "Listed the models"),
+         "inspect_link": ("{}", "Looked at a link"),
+         "transcribe_link": ("{}", "Asked to transcribe a link"),
+         "transcribe_file": ("{}", "Asked to transcribe a file"),
+         "job_status": ("{}", "Asked how transcriptions are going"),
+         "cancel_job": ("{}", "Asked to cancel a transcription"),
          "resources/read": ("Read {}", "Read a transcript or a course"),
          "prompts/get": ("Used the prompt {}", "Used a prompt"),
          "tools/call": ("Asked for {}", "Asked for a tool that doesn't exist")}
@@ -598,6 +615,32 @@ class Handler(BaseHTTPRequestHandler):
                              "changed": history.latest_time(store, j["id"]) or j.get("finished") or j.get("created")}
                             for j in jobs]})
 
+    def assistant(self, p, switch=None):
+        """For a request that an assistant made through the MCP server (app/mcp.py), which carries "assistant", its
+        name: the mark for the jobs it starts, {"client": name}, once the assistant rules hold with the settings as
+        they are now; None for any other request. switch: the setting that must be on, "mcp_links" or "mcp_files"
+        (None: one of them). An assistant never sends a job to another computer."""
+        if not isinstance(p, dict) or "assistant" not in p:
+            return None
+        name = p["assistant"]
+        if not isinstance(name, str):
+            raise ApiError(400, "assistant must be the assistant's name")
+        s = self.app.cfg.settings()
+        if not (s.get(switch) is True if switch else assistants.starts_jobs(None, s)):
+            what = {"mcp_links": "start transcriptions from links", "mcp_files": "transcribe files"}.get(
+                switch, "start transcriptions")
+            raise ApiError(403, f"assistants may not {what}: that is off in Settings → Assistants")
+        if p.get("run_on"):
+            raise ApiError(403, "assistants can't send a transcription to another computer")
+        return {"client": " ".join(name.split())[:120]}
+
+    def assistant_model(self, mark, model):
+        """A hosted model uploads the recording: an assistant may choose one only when the user allowed it."""
+        if mark and model.get("kind") == "hosted" and not assistants.hosted(self.app.cfg):
+            raise ApiError(403, f"assistants may not use {model['title']}: it uploads the recording to "
+                                f"{model.get('service') or 'its service'}, and hosted models are off for assistants in "
+                                "Settings → Assistants")
+
     def ready_model(self, p, default=None):
         """The model a request names (else the default), if it can run now; a hosted one only with the
         user's consent to upload the recording."""
@@ -643,11 +686,20 @@ class Handler(BaseHTTPRequestHandler):
         ctype = self.headers.get("Content-Type", "")
         is_json = ctype.startswith("application/json")
         p = self.body_json() if is_json else params
-        computer, extra = None, {}
+        mark = self.assistant(p, "mcp_files")
+        if mark:  # an assistant: a recording inside a folder the user allowed, by its real path, never an upload
+            if not is_json:
+                raise ApiError(403, "an assistant transcribes a file by its path, not an upload")
+            try:
+                p = {**p, "path": assistants.recording_path(p.get("path"), self.app.cfg.settings())}
+            except assistants.Refused as e:
+                raise ApiError(403, str(e))
+        computer, extra = None, {"assistant": mark} if mark else {}
         if p.get("run_on"):  # on a paired computer
             computer, model, extra = self.remote_choice(p)
         else:
             model = self.ready_model(p)
+            self.assistant_model(mark, model)
         options = parse_options(p, cfg, model)
         if is_json:  # a file already on this computer: read it in place, no copy
             source = Path(str(p.get("path") or "")).expanduser()
@@ -710,7 +762,9 @@ class Handler(BaseHTTPRequestHandler):
     def link_inspect(self, _params):
         """{url}: a YouTube video or playlist, its videos in order and which have captions made by people; or a
         Google Drive file, its name and length (a Drive folder is refused for now)."""
-        url = str(self.body_json().get("url") or "").strip()
+        p = self.body_json()
+        self.assistant(p, "mcp_links")
+        url = str(p.get("url") or "").strip()
         found = self.inspect_link(url)
         self.app.inspected = {k: v for k, v in self.app.inspected.items() if time.time() - v[0] < 1800}
         self.app.inspected[url] = self.app.inspected[found["url"]] = (time.time(), found)
@@ -723,7 +777,9 @@ class Handler(BaseHTTPRequestHandler):
         with the playlist as their course, or one job for a Google Drive file. Answers {"jobs": [...]}."""
         cfg, runner, store = self.app.cfg, self.app.runner, self.app.store
         p = self.body_json()
+        mark = self.assistant(p, "mcp_links")
         model = self.ready_model(p)
+        self.assistant_model(mark, model)
         options = parse_options(p, cfg, model)
         url = str(p.get("url") or "").strip()
         at, found = self.app.inspected.get(url, (0, None))
@@ -752,13 +808,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.app.usage.count(courses_created=1)  # a playlist added for the first time
             course["folder"] = courses.folder_name(store, course)
         stream = str(p.get("stream", False)).lower() in ("1", "true")  # every video of a playlist alike
+        marked = {"assistant": mark} if mark else {}  # started by an assistant (app/mcp.py)
         jobs = []
         for e in entries:
             if on_drive:  # the file itself, then as an upload: no course, no streaming, no captions
                 jobs.append(runner.new_job(title=e["title"], source_name=e["name"], model_id=model["id"], options=options,
-                                           source_url=drive.file_url(e["id"]), drive_id=e["id"]))
+                                           source_url=drive.file_url(e["id"]), drive_id=e["id"], **marked))
                 continue
-            extra = {"course": {**course, "index": e["index"]}} if course else {}
+            extra = {"course": {**course, "index": e["index"]}, **marked} if course else dict(marked)
             if stream:
                 extra["stream"] = True
             jobs.append(runner.new_job(title=e["title"], source_name=f"{e['title']}.mp4", model_id=model["id"],
@@ -875,7 +932,15 @@ class Handler(BaseHTTPRequestHandler):
         self.json({"deleted": jid})
 
     def cancel_job(self, _params, jid):
-        self.job(jid)
+        """Cancels a job. An assistant's request (with "assistant") may cancel only a job that an assistant started and
+        that assistants may see; to it, one they may not see isn't there."""
+        job = self.job(jid)
+        p = self.body_json(limit=20_000)
+        if self.assistant(p) is not None:
+            if not assistants.visible(self.app.cfg, job):
+                raise ApiError(404, "no such transcription")
+            if not isinstance(job.get("assistant"), dict):
+                raise ApiError(403, "an assistant may cancel only a transcription that an assistant started")
         self.app.runner.cancel(jid)
         self.json(summary(self.app.store.get(jid)))
 
