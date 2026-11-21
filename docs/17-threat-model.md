@@ -120,10 +120,20 @@ only programs the user runs can reach it.
 
 ## Google Drive links
 
-- Only links to Drive files on `drive.google.com` and `docs.google.com` are accepted, rebuilt from the file id
-  before yt-dlp sees them, and only yt-dlp's GoogleDrive extractor runs, so its generic one never reads another page
-  and its folder one doesn't run either. A folder's link is refused before yt-dlp sees it; folders are planned. Drive
-  is a new outside host: its playback service and its download hosts are listed in the privacy policy.
+- Only links to Drive files and folders on `drive.google.com` and `docs.google.com` are accepted, rebuilt from the id
+  before anything is asked, and only yt-dlp's GoogleDrive extractor runs, so its generic one never reads another page
+  and its folder one doesn't run either. Drive is an outside host: its playback service, its download hosts and its
+  folder view are listed in the privacy policy.
+- A folder's link is never given to yt-dlp. The app asks `https://drive.google.com/embeddedfolderview` for the
+  folder's page, with the folder's id and a `resourcekey` checked against a short list of characters, follows no
+  redirect (one to Google's sign-in reads as a folder that isn't shared, any other as a refusal), reads at most 8 MB
+  of an HTML answer and refuses anything else. The page is parsed with the standard library's `html.parser`, not
+  with regular expressions over it. Each entry's link is read as a pasted link is, so only a Drive file's id can
+  become a lecture; its name and type are text from the web, shown escaped and never followed. The files picked are
+  then read and downloaded by the file path above, with its hosts, limits and messages, one job each. Left: Google
+  can change the page without notice; the app then says the answer wasn't a folder's list of files, and the tests,
+  which use a copy of the real page's markup, can't see the change
+  ([AgDR 23](agdr/AgDR-0023-google-drive-folders-from-the-embedded-folder-view.md)).
 - A file is downloaded only as itself (yt-dlp's `source` format) and only from `drive.google.com`,
   `docs.google.com`, `drive.usercontent.google.com` or a `*.googleusercontent.com` host. The address yt-dlp read the
   link from is checked, after the redirects of that reading, and so is the answer to the download itself: yt-dlp's
@@ -135,8 +145,8 @@ only programs the user runs can reach it.
   space is checked against the stated size at the first block, and as the bytes come every 32 MB (from the start
   when there is no size), with the same 1 GB margin. The file is then read as an uploaded file is, by the same code. Left: a write error's message can
   name the file's path on the computer in the job's error, as it can for YouTube.
-- Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file that isn't shared with
-  anyone who has the link can't be read.
+- Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file or folder that isn't
+  shared with anyone who has the link can't be read.
 - The tests run yt-dlp's own Drive extractor, the virus-scan page included, against a stand-in for Google's
   servers ([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
 

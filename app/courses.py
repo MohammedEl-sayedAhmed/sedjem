@@ -116,15 +116,19 @@ def paragraphs(job, lines, longest=60.0, gap=3.0):
 
 def course_md(course, lectures):
     """All finished lectures of a course in playlist order, for pasting into a chat assistant: a heading per
-    lecture, then its text in paragraphs. lectures: [(job, lines)]."""
+    lecture, then its text in paragraphs. lectures: [(job, lines)]. A Google Drive folder's course (app/drive.py)
+    names its folder and files instead of a playlist and videos."""
     count = course.get("count") or len(lectures)
     done = "all" if len(lectures) >= count else f"{len(lectures)} of {count}"
-    out = [f"# {course.get('title')}", "", f"Playlist: {course.get('url')}  ",
-           f"Transcripts of {done} lectures, in playlist order. Times in brackets are minutes:seconds into each video.", ""]
+    drive = any(job.get("drive_id") for job, _ in lectures)
+    where, item, order = ("Folder", "File", "the folder's order") if drive else ("Playlist", "Video", "playlist order")
+    out = [f"# {course.get('title')}", "", f"{where}: {course.get('url')}  ",
+           f"Transcripts of {done} lectures, in {order}. Times in brackets are minutes:seconds into each "
+           f"{item.lower()}.", ""]
     for job, lines in lectures:
         c = job["course"]
         out += [f"## Lecture {c['index']}: {job.get('title') or 'Untitled'} ({T.clock(job.get('audio_s') or 0)})", "",
-                f"Video: {job.get('source_url')}", ""]
+                f"{item}: {job.get('source_url')}", ""]
         for p in paragraphs(job, lines):
             out += [p, ""]
     return "\n".join(out)

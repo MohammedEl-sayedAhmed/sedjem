@@ -59,7 +59,7 @@ PAGE_POLICY = {"Content-Security-Policy": "frame-src https://www.youtube-nocooki
 TYPES = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8", ".js": "text/javascript; charset=utf-8",
          ".svg": "image/svg+xml", ".png": "image/png"}
 AUDIO_EXT = re.compile(r"^\.[A-Za-z0-9]{1,6}$")
-NOT_A_LINK = "paste the link of a YouTube video or playlist, or of a Google Drive file"
+NOT_A_LINK = "paste the link of a YouTube video or playlist, or of a Google Drive file or folder"
 
 
 class ApiError(Exception):
@@ -747,7 +747,8 @@ class Handler(BaseHTTPRequestHandler):
         self.json(summary(self.app.store.get(job["id"])), 201)
 
     # Links (app/youtube.py, app/drive.py): a YouTube video or playlist, made into one job per video, or a Google
-    # Drive file. /api/youtube and /api/youtube/inspect are the names these had before Drive links, kept for scripts.
+    # Drive file or folder, one job per file. /api/youtube and /api/youtube/inspect are the names these had before
+    # Drive links, kept for scripts.
     def inspect_link(self, url, check_captions=True):
         """What youtube.inspect or drive.inspect finds at a link, by its host; ApiError for another site."""
         host = youtube.link_host(url)
@@ -761,8 +762,9 @@ class Handler(BaseHTTPRequestHandler):
         raise ApiError(400, NOT_A_LINK)
 
     def link_inspect(self, _params):
-        """{url}: a YouTube video or playlist, its videos in order and which have captions made by people; or a
-        Google Drive file, its name and length (a Drive folder is refused for now)."""
+        """{url}: a YouTube video or playlist, its videos in order and which have captions made by people; a Google
+        Drive file, its name and length; or a Drive folder, its audio and video files in natural name order and how
+        many subfolders and other files it skipped."""
         p = self.body_json()
         self.assistant(p, "mcp_links")
         url = str(p.get("url") or "").strip()
@@ -775,7 +777,8 @@ class Handler(BaseHTTPRequestHandler):
         """{url, model, speakers, language, prompt, confirm_upload, entries (the ids of the videos to transcribe;
         default all), and for YouTube captions (use captions made by people, default true) and stream (download only
         the sound, and play the video from YouTube; default false)}: one job per video, queued in playlist order,
-        with the playlist as their course, or one job for a Google Drive file. Answers {"jobs": [...]}."""
+        with the playlist as their course, or one job for a Google Drive file, or for each file picked of a Drive
+        folder, queued in the folder's order with the folder as their course. Answers {"jobs": [...]}."""
         cfg, runner, store = self.app.cfg, self.app.runner, self.app.store
         p = self.body_json()
         mark = self.assistant(p, "mcp_links")
@@ -795,7 +798,7 @@ class Handler(BaseHTTPRequestHandler):
         entries = [e for e in found["entries"] if e["available"] and (picked is None or e["id"] in picked)]
         if not entries:
             raise ApiError(400, f"choose at least one {what} that can be downloaded")
-        if on_drive and any(not drive.DRIVE_ID.fullmatch(str(e["id"])) for e in entries):
+        if on_drive and any(not drive.DRIVE_ID.fullmatch(str(x)) for x in [found["id"]] + [e["id"] for e in entries]):
             raise ApiError(400, "a file has an id Google Drive doesn't use")
         if not on_drive and any(not youtube.SAFE_ID.fullmatch(str(e["id"])) for e in entries):  # it names files
             raise ApiError(400, "a video has an id YouTube doesn't use")
@@ -803,7 +806,10 @@ class Handler(BaseHTTPRequestHandler):
         if shutil.disk_usage(cfg.storage).free < 2e9:
             raise ApiError(507, f"not enough free disk space to download {what}s")
         course = None
-        if found["kind"] == "playlist":
+        if found["kind"] == "folder":  # a Drive folder: a course, with no files in the courses folder and no count
+            course = {"id": found["id"], "title": found["title"], "url": drive.folder_url(found["id"]),
+                      "count": found["count"]}
+        elif found["kind"] == "playlist":
             course = {"id": found["id"], "title": found["title"], "url": found["url"], "count": found["count"]}
             if not any((j.get("course") or {}).get("id") == course["id"] for j in store.list()):
                 self.app.usage.count(courses_created=1)  # a playlist added for the first time
@@ -812,17 +818,17 @@ class Handler(BaseHTTPRequestHandler):
         marked = {"assistant": mark} if mark else {}  # started by an assistant (app/mcp.py)
         jobs = []
         for e in entries:
-            if on_drive:  # the file itself, then as an upload: no course, no streaming, no captions
-                jobs.append(runner.new_job(title=e["title"], source_name=e["name"], model_id=model["id"], options=options,
-                                           source_url=drive.file_url(e["id"]), drive_id=e["id"], **marked))
-                continue
             extra = {"course": {**course, "index": e["index"]}, **marked} if course else dict(marked)
+            if on_drive:  # the file itself, then as an upload: no streaming, no captions
+                jobs.append(runner.new_job(title=e["title"], source_name=e["name"], model_id=model["id"], options=options,
+                                           source_url=drive.file_url(e["id"]), drive_id=e["id"], **extra))
+                continue
             if stream:
                 extra["stream"] = True
             jobs.append(runner.new_job(title=e["title"], source_name=f"{e['title']}.mp4", model_id=model["id"],
                                        options=options, source_url=youtube.watch_url(e["id"]), youtube_id=e["id"],
                                        use_captions=str(p.get("captions", True)).lower() not in ("0", "false"), **extra))
-        for job in jobs:  # in playlist order: downloads run one at a time, in the order they were queued
+        for job in jobs:  # in playlist (or folder) order: downloads run one at a time, in the order they were queued
             runner.submit(job["id"])
         self.json({"jobs": [summary(store.get(j["id"])) for j in jobs]}, 201)
 

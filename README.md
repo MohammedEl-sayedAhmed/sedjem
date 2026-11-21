@@ -37,7 +37,7 @@ recording on your machine unless you choose a hosted service.
 
 ## What it does
 
-- Transcribes recordings, videos, YouTube links and shared Google Drive files (folders are planned) with three local
+- Transcribes recordings, videos, YouTube links and shared Google Drive files and folders with three local
   models chosen for Egyptian Arabic–English.
 - Labels each speaker by voice, and plays the audio in step with the text.
 - Combines two models' transcripts line by line, and keeps every version (below).

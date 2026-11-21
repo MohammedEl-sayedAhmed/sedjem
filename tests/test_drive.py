@@ -1,9 +1,11 @@
-"""Tests for Google Drive links (app/drive.py): the links taken and refused, a folder's link refused before yt-dlp
-sees it, yt-dlp limited to Drive's file extractor and its downloads to Drive's hosts, a file that isn't shared, a
-download (past the page saying a large file can't be scanned for viruses), and a file added through the app's API: its
-job, what assistants see of it, and the usage counts that leave it out. Two stand-ins (tests/drive_support.py): yt-dlp
-answering with info dicts as Drive's extractor gives them, and the real yt-dlp talking to a stand-in for Google's
-servers. Nothing is fetched from the network.
+"""Tests for Google Drive links (app/drive.py): the links taken and refused, yt-dlp limited to Drive's file extractor
+and its downloads to Drive's hosts, a file that isn't shared, a download (past the page saying a large file can't be
+scanned for viruses), a folder listed from Drive's embedded view without yt-dlp (its entries, subfolders and other
+files, natural name order, an empty or private folder, the answers that aren't a listing), and a file or a folder added
+through the app's API: their jobs, a folder's course, what assistants see of them, and the usage counts that leave
+them out. Three stand-ins (tests/drive_support.py): yt-dlp answering with info dicts as Drive's extractor gives them,
+the real yt-dlp talking to a stand-in for Google's servers, and Drive's folder view answering the app's own opener.
+Nothing is fetched from the network.
 Run: .venv/bin/python -m unittest tests.test_drive -v
 """
 import json
@@ -22,14 +24,15 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from app import drive, engines, server, usage  # noqa: E402
+from app import assistants, drive, engines, server, usage  # noqa: E402
 from app import mcp as sedjem_mcp  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.engines import Cancelled  # noqa: E402
 from app.server import make_server  # noqa: E402
-from drive_support import AUDIO, FakeDrive, GoogleServers, drive_id  # noqa: E402
+from drive_support import AUDIO, FakeDrive, FolderPages, GoogleServers, drive_id, folder_page  # noqa: E402
 
-FILE, FOLDER = drive_id(1), drive_id(1, "d")
+FILE, FOLDER, DRIVE_COURSE = drive_id(1), drive_id(1, "d"), drive_id(9, "d")
+OPENER = drive.OPENER  # the app's own, before a test puts the stand-in in its place
 FOLDER_LINKS = (f"https://drive.google.com/drive/folders/{FOLDER}?usp=sharing", f"drive.google.com/drive/u/0/folders/{FOLDER}",
                 f"https://drive.google.com/drive/mobile/folders/{FOLDER}?usp=drive_link",
                 f"http://docs.google.com/drive/folders/{FOLDER}#x")
@@ -46,13 +49,24 @@ class Links(unittest.TestCase):
                     f"https://drive.google.com/open?id={FILE}&authuser=0"):
             self.assertEqual(drive.check_url(url), file, url)
 
-    def test_a_folder_is_recognised_and_refused(self):
+    def test_a_folders_link(self):
+        """The forms people paste, with or without ?usp= and a resource key; yt-dlp is never given one (check_url)."""
         for url in FOLDER_LINKS:
             self.assertEqual(drive.parse(url), ("folder", FOLDER), url)
+            self.assertEqual(drive.folder_link(url), (FOLDER, None), url)
             with self.assertRaises(drive.DriveError, msg=url) as e:
                 drive.check_url(url)
-            self.assertEqual(str(e.exception),
-                             "Google Drive folders can't be read yet. Add the files one by one, each with its own link.")
+            self.assertEqual(str(e.exception), drive.NOT_A_FILE)
+        keyed = f"https://drive.google.com/drive/folders/{FOLDER}?resourcekey=0-AbC_d-9&usp=sharing"
+        self.assertEqual(drive.folder_link(keyed), (FOLDER, "0-AbC_d-9"))
+        self.assertEqual(drive.listing_url(FOLDER, "0-AbC_d-9"),
+                         f"https://drive.google.com/embeddedfolderview?id={FOLDER}&resourcekey=0-AbC_d-9")
+        self.assertEqual(drive.folder_link(f"https://drive.google.com/drive/folders/{FOLDER}?resourcekey="), (FOLDER, None))
+        for url in (f"https://drive.google.com/drive/folders/{FOLDER}?resourcekey=0-a%26id%3Dx",  # nothing else rides in
+                    drive.file_url(FILE)):
+            with self.assertRaises(drive.DriveError, msg=url) as e:
+                drive.folder_link(url)
+            self.assertEqual(str(e.exception), drive.NOT_DRIVE, url)
 
     def test_only_drive_itself(self):
         for url in ("", "https://vimeo.com/1", "file:///etc/passwd", "javascript:alert(1)", f"ftp://drive.google.com/file/d/{FILE}",
@@ -122,6 +136,146 @@ class Allowlists(unittest.TestCase):
         self.assertIsNone(drive.pick_source([source("https://drive.usercontent.google.com/x", protocol="m3u8_native")]))
 
 
+class Folders(unittest.TestCase):
+    """A folder listed from Drive's embedded view (app/drive.py list_folder, inspect_folder): the app's own opener asks
+    a stand-in (FolderPages) that answers with pages shaped as Drive's real ones."""
+
+    def setUp(self):
+        self.pages = FolderPages()
+        self.patch = mock.patch.object(drive, "OPENER", self.pages.opener())
+        self.patch.start()
+
+    def tearDown(self):
+        self.patch.stop()
+
+    def refused(self, url=None):
+        with self.assertRaises(drive.DriveError) as e:
+            drive.inspect_folder(url or drive.folder_url(FOLDER))
+        return str(e.exception)
+
+    def test_its_audio_and_video_files_in_natural_name_order(self):
+        files = [("Lecture 10 - Recursion.mp4", "video/mp4"), ("lecture 2 - Loops.MP3", "audio/mpeg"),
+                 ("Lecture 1 - Intro.webm", "video/webm"), ("Lecture 1 - Intro (notes).pdf", "application/pdf"),
+                 ("Week 3.m4a", "application/octet-stream"),  # a type Drive didn't know: the extension decides
+                 ("setup.bin", "application/octet-stream"), ("Q&A <live>.ogg", "audio/ogg"), ("Talk", "")]
+        entries = [("file", drive_id(i), name, mime) for i, (name, mime) in enumerate(files)]
+        entries += [("folder", drive_id(20, "d"), "Exercises", ""), ("doc", drive_id(21), "Syllabus", "application/vnd.google-apps.document"),
+                    ("file", drive_id(0), "Lecture 10 - Recursion.mp4", "video/mp4")]  # the same file twice: once
+        self.pages.folder(FOLDER, "Physics & Maths", entries)
+        found = drive.inspect_folder(f"https://drive.google.com/drive/u/1/folders/{FOLDER}?usp=drive_link")
+        self.assertEqual((found["site"], found["kind"], found["id"], found["title"], found["url"], found["count"],
+                          found["duration"], found["cut"]),
+                         ("drive", "folder", FOLDER, "Physics & Maths", drive.folder_url(FOLDER), 5, None, False))
+        self.assertEqual([(e["index"], e["name"], e["title"]) for e in found["entries"]],
+                         [(1, "Lecture 1 - Intro.webm", "Lecture 1 - Intro"), (2, "lecture 2 - Loops.MP3", "lecture 2 - Loops"),
+                          (3, "Lecture 10 - Recursion.mp4", "Lecture 10 - Recursion"), (4, "Q&A <live>.ogg", "Q&A <live>"),
+                          (5, "Week 3.m4a", "Week 3")], "natural name order, the names' entities read")
+        self.assertEqual([(e["id"], e["url"], e["type"], e["available"]) for e in found["entries"]][:2],
+                         [(drive_id(2), drive.file_url(drive_id(2)), "video/webm", True),
+                          (drive_id(1), drive.file_url(drive_id(1)), "audio/mpeg", True)])
+        self.assertEqual(found["skipped"], {"folders": 1, "files": 4}, "the subfolder; the pdf, bin, Docs file and the "
+                                                                       "file with no type and no extension")
+        self.assertEqual(self.pages.requests, [(f"https://drive.google.com/embeddedfolderview?id={FOLDER}",
+                                                {"Host": "drive.google.com", "User-agent": "Sedjem", "Accept": "text/html"})],
+                         "one request, to Drive's own page, with nothing of the link but the id")
+
+    def test_names_in_natural_order(self):
+        names = ["Lecture 10.mp4", "lecture 9.mp4", "Lecture 1.mp4", "Lecture 01b.mp4", "Intro.mp4", "محاضرة ١٠.mp3",
+                 "محاضرة ٢.mp3", "Part 2 - 10.mp4", "Part 2 - 9.mp4", "9" * 600 + ".mp4"]
+        self.assertEqual(sorted(names, key=lambda n: (drive.natural_key(n), n)),
+                         ["9" * 600 + ".mp4", "Intro.mp4", "Lecture 1.mp4", "Lecture 01b.mp4", "lecture 9.mp4",
+                          "Lecture 10.mp4", "Part 2 - 9.mp4", "Part 2 - 10.mp4", "محاضرة ٢.mp3", "محاضرة ١٠.mp3"])
+
+    def test_what_counts_as_audio_or_video(self):
+        for name, mime in (("a.mp4", "video/mp4"), ("a", "audio/x-m4a"), ("notes.pdf", "video/quicktime"),
+                           ("talk.opus", ""), ("talk.MKV", "application/octet-stream")):
+            self.assertTrue(drive.is_media(name, mime), (name, mime))
+        for name, mime in (("a.mp4", "application/pdf"), ("a.mp3", "text/plain"), ("talk", ""), ("talk.bin", ""),
+                           ("Week 1.2", "application/octet-stream"), ("x.mp4", "application/vnd.google-apps.folder")):
+            self.assertFalse(drive.is_media(name, mime), (name, mime))
+        for src, mime in (("https://drive-thirdparty.googleusercontent.com/16/type/video/webm", "video/webm"),
+                          ("https://drive-thirdparty.googleusercontent.com/16/type/application/vnd.google-apps.document",
+                           "application/vnd.google-apps.document"),
+                          ("https://drive-thirdparty.googleusercontent.com/16/type/Audio/MPEG", "audio/mpeg"),
+                          ("https://lh3.googleusercontent.com/drive-storage/AJQWtBO=s190", ""),  # a thumbnail
+                          ("http://drive-thirdparty.googleusercontent.com/16/type/video/mp4", ""),
+                          ("https://evil.example/16/type/video/mp4", ""),
+                          ("https://drive-thirdparty.googleusercontent.com/16/type/video", ""),
+                          ("https://drive-thirdparty.googleusercontent.com/16/type/video/mp4%20x", ""), ("", ""), (None, "")):
+            self.assertEqual(drive.icon_type(src), mime, src)
+
+    def test_a_subfolder_is_known_by_its_icon_too(self):
+        """A subfolder links to …/drive/folders/<id>, and its icon says Folder (it names no type, as real ones don't):
+        either is enough."""
+        sub = drive_id(30, "d")
+        page = folder_page("Course", [("folder", sub, "Week 1", ""), ("file", drive_id(31), "Lecture.mp4", "video/mp4")])
+        page = page.replace(f"https://drive.google.com/drive/folders/{sub}", f"https://drive.google.com/open?id={sub}")
+        self.pages.answers[FOLDER] = (200, {"Content-Type": "text/html; charset=utf-8"}, page)
+        found = drive.inspect_folder(drive.folder_url(FOLDER))
+        self.assertEqual((found["count"], found["skipped"]), (1, {"folders": 1, "files": 0}))
+
+    def test_the_counts_of_what_was_skipped(self):
+        self.assertEqual(drive.skipped_words({"folders": 2, "files": 1}), "2 subfolders and 1 other file")
+        self.assertEqual(drive.skipped_words({"folders": 1, "files": 0}), "1 subfolder")
+        self.assertEqual(drive.skipped_words({"folders": 0, "files": 3}), "3 other files")
+        self.assertEqual(drive.skipped_words({}), "")
+
+    def test_an_empty_folder_and_one_without_audio_or_video(self):
+        self.pages.folder(FOLDER, "Empty", [])
+        self.assertEqual(self.refused(), "this folder is empty")
+        self.pages.folder(FOLDER, "Papers", [("folder", drive_id(40, "d"), "2025", ""), ("folder", drive_id(41, "d"), "2026", ""),
+                                             ("file", drive_id(42), "paper.pdf", "application/pdf")])
+        self.assertEqual(self.refused(), "this folder has no audio or video files (2 subfolders and 1 other file skipped)")
+
+    def test_a_private_or_removed_folder(self):
+        """Drive answers a made-up id with 404; a folder that isn't shared gets the same message, as a file does."""
+        self.pages.folder(FOLDER, "Mine", [("file", drive_id(50), "a.mp4", "video/mp4")])
+        self.pages.private.add(FOLDER)
+        self.assertEqual(self.refused(), drive.PRIVATE_FOLDER)
+        self.assertEqual(self.refused(drive.folder_url(drive_id(99, "d"))), drive.PRIVATE_FOLDER)
+        self.assertEqual(drive.PRIVATE_FOLDER,
+                         "This folder isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet.")
+        for status in (401, 403):
+            self.pages.answers[FOLDER] = (status, {"Content-Type": "text/html"}, "No")
+            self.assertEqual(self.refused(), drive.PRIVATE_FOLDER, status)
+        self.pages.answers[FOLDER] = (302, {"Location": "https://accounts.google.com/ServiceLogin?continue=x"}, "")
+        self.assertEqual(self.refused(), drive.PRIVATE_FOLDER, "sent to sign in")
+
+    def test_a_redirect_is_never_followed(self):
+        self.assertTrue(any(isinstance(h, drive._NoRedirect) for h in OPENER.handlers), "the app's opener has the guard")
+        for to in ("https://evil.example/embeddedfolderview?id=x", "https://drive.google.com/embeddedfolderview?id=other"):
+            self.pages.requests.clear()
+            self.pages.answers[FOLDER] = (302, {"Location": to}, "")
+            self.assertEqual(self.refused(), "Google Drive didn't list the folder: it answered 302", to)
+            self.assertEqual(len(self.pages.requests), 1, "nothing asked of the address it was sent to")
+
+    def test_answers_that_arent_a_list(self):
+        html_type = {"Content-Type": "text/html; charset=utf-8"}
+        for answer, error in (((429, html_type, "Too many"), drive.BUSY_FOLDER),
+                              ((500, html_type, "Oops"), "Google Drive didn't list the folder: it answered 500"),
+                              ((200, {"Content-Type": "application/json"}, "{}"), drive.NOT_LISTED),
+                              ((200, html_type, "<html><title>Sign in - Google Accounts</title><form></form></html>"),
+                               drive.NOT_LISTED),  # a page of another kind, though it came with 200
+                              (urllib.error.URLError("timed out"), "Google Drive couldn't be reached: timed out")):
+            self.pages.answers[FOLDER] = answer
+            self.assertEqual(self.refused(), error, answer)
+
+    def test_a_page_too_long_to_read(self):
+        self.pages.folder(FOLDER, "Big", [("file", drive_id(i), f"Lecture {i}.mp4", "video/mp4") for i in range(60)])
+        with mock.patch.object(drive, "MAX_PAGE", 20_000):
+            self.assertEqual(self.refused(), drive.TOO_LONG)
+        with mock.patch.object(drive, "MAX_FILES", 25):
+            found = drive.inspect_folder(drive.folder_url(FOLDER))
+        self.assertEqual((found["count"], found["cut"], found["entries"][-1]["name"]), (25, True, "Lecture 24.mp4"),
+                         "the first files in natural order, and a note that there are more")
+
+    def test_a_resource_key_is_passed_on(self):
+        self.pages.folder(FOLDER, "Old share", [("file", drive_id(60), "Lecture.mp4", "video/mp4")])
+        drive.inspect_folder(f"https://drive.google.com/drive/folders/{FOLDER}?resourcekey=0-Old_Key-1&usp=sharing")
+        self.assertEqual(self.pages.requests[0][0],
+                         f"https://drive.google.com/embeddedfolderview?id={FOLDER}&resourcekey=0-Old_Key-1")
+
+
 class InspectAndDownload(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp(prefix="sedjem-drive-"))
@@ -162,10 +316,13 @@ class InspectAndDownload(unittest.TestCase):
         self.assertEqual((got["source_name"], [p.name for p in self.dir.iterdir()]), ("Week 1.2", ["source.bin"]))
 
     def test_a_folder_never_reaches_yt_dlp(self):
-        with mock.patch.object(drive, "_ydl", side_effect=AssertionError("yt-dlp was asked")):
+        pages = FolderPages()
+        pages.folder(FOLDER, "Course", [("file", self.video, "01 Introduction.mp4", "video/mp4")])
+        with mock.patch.object(drive, "_ydl", side_effect=AssertionError("yt-dlp was asked")), \
+                mock.patch.object(drive, "OPENER", pages.opener()):
             for url in FOLDER_LINKS:
-                with self.assertRaisesRegex(drive.DriveError, "^Google Drive folders can't be read yet", msg=url):
-                    drive.inspect(self.cfg, url)
+                found = drive.inspect(self.cfg, url)
+                self.assertEqual((found["kind"], found["id"], found["count"]), ("folder", FOLDER, 1), url)
 
     def test_what_isnt_shared(self):
         self.fake.private.add(self.video)
@@ -363,12 +520,22 @@ class Api(unittest.TestCase):
         cls.video = fake.file(drive_id(50), "Week 1 lecture.mp4", seconds=2)
         cls.sound = fake.file(drive_id(51), "Interview 2026.11.19", kind=AUDIO, seconds=2)
         cls.later = fake.file(drive_id(52), "Unshared later.mp4", seconds=2)
+        cls.lectures = [fake.file(drive_id(53), "Lecture 10 - Filters.mp4", seconds=2),
+                        fake.file(drive_id(54), "Lecture 2 - Signals.m4a", kind=AUDIO, seconds=2),
+                        fake.file(drive_id(55), "Lecture 1 - Welcome.mp4", seconds=2)]
+        cls.pages = pages = FolderPages()
+        cls.folder = pages.folder(drive_id(56, "d"), "Signals and systems", [
+            ("file", drive_id(53), "Lecture 10 - Filters.mp4", "video/mp4"), ("folder", drive_id(57, "d"), "Exams", ""),
+            ("file", drive_id(54), "Lecture 2 - Signals.m4a", "audio/x-m4a"),
+            ("file", drive_id(58), "Slides.pdf", "application/pdf"),
+            ("file", drive_id(55), "Lecture 1 - Welcome.mp4", "video/mp4")])
         cls.ran = []
 
         def hosted(cfg, model, job_dir, job, on_progress, cancelled):
             cls.ran.append(job["drive_id"])
             return {"lines": [{**LINE[0], "text": f"Spoken words of {job['title']}"}], "meta": {}}
-        cls.patches = [mock.patch.object(drive, "_ydl", fake.ydl), mock.patch.object(engines, "run_hosted", hosted)]
+        cls.patches = [mock.patch.object(drive, "_ydl", fake.ydl), mock.patch.object(engines, "run_hosted", hosted),
+                       mock.patch.object(drive, "OPENER", pages.opener())]
         for p in cls.patches:
             p.start()
         cls.server, cls.app = make_server(cls.cfg, port=0)
@@ -461,10 +628,10 @@ class Api(unittest.TestCase):
 
     def test_4_what_is_refused(self):
         self.fake.private.add(drive_id(70))
-        for url, error in ((drive.file_url(drive_id(70)), drive.PRIVATE), (FOLDER_LINKS[0], drive.FOLDERS_LATER),
+        for url, error in ((drive.file_url(drive_id(70)), drive.PRIVATE), (FOLDER_LINKS[0], drive.PRIVATE_FOLDER),
                            ("https://vimeo.com/1", server.NOT_A_LINK), ("https://drive.google.com/drive/my-drive", drive.NOT_DRIVE)):
             self.assertEqual(self.call("POST", "/api/link/inspect", {"url": url}), (400, {"error": error}), url)
-        self.assertEqual(self.add(FOLDER_LINKS[1]), (400, {"error": drive.FOLDERS_LATER}))
+        self.assertEqual(self.add(FOLDER_LINKS[1]), (400, {"error": drive.PRIVATE_FOLDER}), "not shared, or removed")
         forged = drive.file_url(drive_id(71))  # an id that isn't Drive's never becomes a job
         self.app.inspected[forged] = (time.time(), {"site": "drive", "kind": "file", "id": drive_id(71), "title": "x",
                                                     "url": forged, "count": 1, "entries": [{"id": "../../etc", "title": "x",
@@ -472,6 +639,54 @@ class Api(unittest.TestCase):
                                                                                             "available": True}]})
         status, r = self.add(forged)
         self.assertEqual((status, r["error"]), (400, "a file has an id Google Drive doesn't use"))
+
+
+    def test_5_a_folder_becomes_a_course(self):
+        url = f"https://drive.google.com/drive/folders/{self.folder}?usp=sharing"
+        status, found = self.call("POST", "/api/link/inspect", {"url": url})
+        self.assertEqual((status, found["kind"], found["title"], found["count"], found["skipped"]),
+                         (200, "folder", "Signals and systems", 3, {"folders": 1, "files": 1}), found)
+        self.assertEqual([e["id"] for e in found["entries"]], [self.lectures[2], self.lectures[1], self.lectures[0]],
+                         "natural name order: lecture 1, 2, then 10")
+        self.ran.clear()
+        with mock.patch.object(self.app.usage, "count") as count:
+            status, r = self.add(url, entries=[self.lectures[0], self.lectures[2]], stream=True, captions=True)
+        self.assertEqual(status, 201, r)
+        self.assertEqual(count.call_args_list, [], "no usage count: not a YouTube course")
+        course = {"id": self.folder, "title": "Signals and systems", "url": drive.folder_url(self.folder), "count": 3}
+        self.assertEqual([(j["title"], j["source_name"], j["drive_id"], j["source_url"], j["course"], j["youtube_id"],
+                           j["stream"]) for j in r["jobs"]],
+                         [("Lecture 1 - Welcome", "Lecture 1 - Welcome.mp4", self.lectures[2], drive.file_url(self.lectures[2]),
+                           {**course, "index": 1}, None, None),
+                          ("Lecture 10 - Filters", "Lecture 10 - Filters.mp4", self.lectures[0], drive.file_url(self.lectures[0]),
+                           {**course, "index": 3}, None, None)],
+                         "the picked files, numbered in the folder's order, with the folder as their course")
+        done = [self.wait(j["id"]) for j in r["jobs"]]
+        self.assertEqual([d["job"]["status"] for d in done], ["done", "done"], [d["job"].get("error") for d in done])
+        self.assertEqual(self.ran, [self.lectures[2], self.lectures[0]], "downloaded and transcribed in the folder's order")
+        time.sleep(0.3)
+        self.assertFalse(any((self.tmp / "courses").rglob("*")), "a Drive course has no files in the courses folder")
+        status, files = self.call("POST", "/api/export", {"ids": [j["id"] for j in r["jobs"]], "format": "txt", "as": "files"})
+        self.assertEqual((status, [f["path"] for f in files["files"]]),
+                         (200, ["Signals-and-systems/01-Lecture-1---Welcome.txt", "Signals-and-systems/03-Lecture-10---Filters.txt"]),
+                         "exported as a course")
+        self.assertEqual(usage.library_facts(self.app.store.list())["courses"], "0", "only YouTube courses are counted")
+        status, again = self.add(url, entries=[self.lectures[1]])
+        self.assertEqual((status, again["jobs"][0]["course"]), (201, {**course, "index": 2}), "the same course again")
+        self.wait(again["jobs"][0]["id"])
+
+    def test_6_a_private_folder(self):
+        hidden = self.pages.folder(drive_id(59, "d"), "Private course", [("file", drive_id(53), "Lecture.mp4", "video/mp4")])
+        self.pages.private.add(hidden)
+        self.assertEqual(self.call("POST", "/api/link/inspect", {"url": drive.folder_url(hidden)}),
+                         (400, {"error": drive.PRIVATE_FOLDER}))
+        self.assertEqual(self.add(drive.folder_url(hidden)), (400, {"error": drive.PRIVATE_FOLDER}))
+        forged = drive.folder_url(drive_id(71, "d"))  # an id that isn't Drive's never becomes a course
+        self.app.inspected[forged] = (time.time(), {"site": "drive", "kind": "folder", "id": "../../x", "title": "x",
+                                                    "url": forged, "count": 1, "entries": [{"id": drive_id(53), "title": "x",
+                                                                                            "name": "x.mp4", "index": 1,
+                                                                                            "available": True}]})
+        self.assertEqual(self.add(forged), (400, {"error": "a file has an id Google Drive doesn't use"}))
 
 
 class Elsewhere(unittest.TestCase):
@@ -505,6 +720,45 @@ class Elsewhere(unittest.TestCase):
         self.assertIn("Google Drive file", self.tool("get_transcript", id=self.jid))
         self.assertNotIn("&t=", self.tool("search", query="Spoken"), "Drive links can't open a file at a moment")
         self.assertIn("There are no courses", self.tool("list_courses"), "a Drive file is no course")
+
+    def lecture(self, jid, index, fid, title):
+        """A finished lecture of a Drive folder's course, written as the app writes it."""
+        course = {"id": DRIVE_COURSE, "title": "Signals and systems", "url": drive.folder_url(DRIVE_COURSE), "count": 3,
+                  "index": index}
+        folder = self.home / "app_data" / "jobs" / jid
+        folder.mkdir(parents=True)
+        job = {"id": jid, "title": title, "created": f"2026-10-20T09:00:0{index}+03:00", "model": "cohere",
+               "model_title": "Cohere Transcribe Arabic", "kind": "local", "status": "done", "audio_s": 30.0,
+               "speaker_names": {}, "finished": f"2026-10-20T09:10:0{index}+03:00", "drive_id": fid,
+               "source_url": drive.file_url(fid), "course": course}
+        (folder / "job.json").write_text(json.dumps(job), encoding="utf-8")
+        (folder / "transcript.json").write_text(json.dumps({"lines": [{**LINE[0], "text": f"Words of {title}"}]}),
+                                                encoding="utf-8")
+
+    def test_assistants_see_a_drive_folder_as_a_course(self):
+        self.lecture("20261020-090000-e101", 1, drive_id(91), "Lecture 1 - Welcome")
+        self.lecture("20261020-090000-e103", 3, drive_id(93), "Lecture 10 - Filters")
+        folder_link = drive.folder_url(DRIVE_COURSE)
+        text = self.tool("list_courses")
+        self.assertIn(f"- Signals and systems\n  course id {DRIVE_COURSE} · {folder_link}\n  2 of 3 lectures transcribed",
+                      text, "listed among the courses, with the folder's link")
+        self.assertNotIn("youtube.com", text)
+        text = self.tool("course_outline", course="signals and systems")
+        self.assertIn(f"course id {DRIVE_COURSE} · folder {folder_link}", text)
+        self.assertIn("3 lectures in the folder, 2 transcribed", text)
+        self.assertIn(f"3. Lecture 10 - Filters · 00:30 · id 20261020-090000-e103 · done\n   {drive.file_url(drive_id(93))}", text)
+        self.assertIn("Not added to Sedjem: lecture 2.", text)
+        text = self.tool("get_course_text", course=DRIVE_COURSE)
+        self.assertIn(f"Folder: {folder_link}", text)
+        self.assertIn("in the folder's order. Times in brackets are minutes:seconds into each file.", text)
+        self.assertIn(f"## Lecture 3: Lecture 10 - Filters (00:30)\n\nFile: {drive.file_url(drive_id(93))}", text)
+        self.assertNotIn("Playlist", text)
+        self.assertIn(f"  course Signals and systems ({DRIVE_COURSE}), lecture 1 of 3 · {drive.file_url(drive_id(91))}",
+                      self.tool("list_transcriptions", kind="course"))
+        self.assertIn("Lecture 10 - Filters", self.tool("get_transcript", course=DRIVE_COURSE, lecture=3))
+        assistants.set_hidden(self.mcp.cfg, f"course:{DRIVE_COURSE}", True)  # hidden as a YouTube course is
+        self.assertIn("There are no courses", self.tool("list_courses"))
+        self.assertTrue(assistants.HIDDEN_KEY.match(f"course:{drive_id(1, 'd' * 60)}"), "a long Drive id fits")
 
     def test_the_usage_counts_leave_drive_out(self):
         u = usage.Usage(Config(home=self.home), version=lambda: "0.3.1", facts=lambda: {})

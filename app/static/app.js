@@ -494,7 +494,7 @@ function renderNew() {
     : S.uploading ? "Uploading…" : "Start transcription";
   view.innerHTML = `
   <h1>New transcription</h1>
-  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a link to a YouTube video or playlist or a Google Drive file. Local models keep everything on this computer.</p>
+  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a link to a YouTube video or playlist or a Google Drive file or folder. Local models keep everything on this computer.</p>
 
   <div class="card">
     <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Link" : "Recording"}
@@ -542,7 +542,7 @@ function renderNew() {
         <div class="segmented" id="lang">${LANGUAGES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
         <p class="hint">${languageHint(m, f.language)}</p>
       </div>
-      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">${onDrive ? "The transcription is named after the file" : "Each transcription is named after its video"}; you can rename it later.</p></div>` : `<div class="field">
+      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">${onDrive ? (YT.found.kind === "folder" ? "Each transcription is named after its file" : "The transcription is named after the file") : "Each transcription is named after its video"}; you can rename it later.</p></div>` : `<div class="field">
         <label for="titleInput">Title</label>
         <input type="text" id="titleInput" dir="${mixDir(f.title)}" data-mixdir value="${esc(f.title)}" placeholder="${esc(src ? src.name.replace(/\.[^.]+$/, "") : "Meeting title")}">
       </div>`}
@@ -557,7 +557,7 @@ function renderNew() {
   ${hosted && m.ready ? `<div class="card consent">
     ${ICON.cloud}
     <div>
-      <p><b>This model uploads ${onDrive ? "the sound of the file" : yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
+      <p><b>This model uploads ${onDrive ? (YT.found.kind === "folder" ? "the sound of each file it transcribes" : "the sound of the file") : yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
       <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : "this recording"} to ${esc(m.service)}</label>
     </div>
   </div>` : ""}
@@ -797,7 +797,7 @@ function renderJob() {
     statusCard = `<div class="card progress-card" id="progressCard">
       <div class="row"><span class="stage" id="stageLabel">${esc(si.label)}</span><span class="hint" id="stageDetail" style="margin:0">${esc(si.detail || "")}</span><span class="times" id="stageTimes">${etaText(j)}</span></div>
       <div class="progress${si.pct == null ? " indeterminate" : ""}" id="stageBar"><i style="width:${(si.pct || 0).toFixed(1)}%"></i></div>
-      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The ${j.drive_id ? "file is downloaded first" : j.stream ? "sound is downloaded first (the video plays from YouTube)" : "video is downloaded first (up to 720p, to play beside the transcript)"}, then ${j.course ? "transcribed; the other lectures follow in playlist order" : "transcribed"}. You can leave this page; it keeps going while the app is open.`
+      <p class="note">${["downloading", "waiting-download"].includes(j.stage) ? `The ${j.drive_id ? "file is downloaded first" : j.stream ? "sound is downloaded first (the video plays from YouTube)" : "video is downloaded first (up to 720p, to play beside the transcript)"}, then ${j.course ? `transcribed; the other lectures follow in ${j.drive_id ? "the folder's" : "playlist"} order` : "transcribed"}. You can leave this page; it keeps going while the app is open.`
         : j.kind === "local" ? "Running on this computer. You can leave this page; it keeps going while the app is open."
         : j.kind === "remote" ? rmNote(j) : `Sent to ${esc(m?.service || "the service")}. You can leave this page.`}</p>
       <div style="margin-top:12px"><button class="btn btn-sm btn-danger" id="cancelBtn">${ICON.stop} Cancel</button></div>
@@ -2406,7 +2406,7 @@ function aboutPanel() {
         </div>
         ${usageRow()}
       </div>
-      <p class="hint">Models are kept in <code class="mono">${esc(st.home)}/models</code>. The transcripts of YouTube videos and courses are saved as files in <code class="mono">${esc(st.youtube?.courses || "")}</code>. The port, defaults and model list are set in <code class="mono">app/config.toml</code>; your own changes can go in <code class="mono">${esc(st.storage.dir)}/config.toml</code>.</p>`;
+      <p class="hint">Models are kept in <code class="mono">${esc(st.home)}/models</code>. The transcripts of YouTube videos and playlists are saved as files in <code class="mono">${esc(st.youtube?.courses || "")}</code>. The port, defaults and model list are set in <code class="mono">app/config.toml</code>; your own changes can go in <code class="mono">${esc(st.storage.dir)}/config.toml</code>.</p>`;
 }
 
 function bindSettings(focus) {

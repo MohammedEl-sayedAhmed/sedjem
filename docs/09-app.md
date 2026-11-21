@@ -141,7 +141,7 @@ details*. Transcriptions made before this was added sort by the date they were a
 ## YouTube videos and courses
 
 On the new transcription page, *Link* next to the file picker takes a link to a video or a playlist, or to a
-Google Drive file ([below](#google-drive-files)). For YouTube, *Check* reads it and shows
+Google Drive file or folder ([below](#google-drive-files-and-folders)). For YouTube, *Check* reads it and shows
 the title, the uploader, the number of videos, their total length, and which of them have captions made by
 people. A playlist lists its videos in order, and any of them can be left out; private, deleted and live videos
 are listed but can't be picked. The model and the options are chosen as for a file, and *Start* adds one
@@ -191,7 +191,8 @@ again with a model like any other.
 
 A playlist becomes a course. The sidebar shows it once, with how many of its lectures are done and the
 lectures in order, and a lecture's page has its YouTube link, the lectures before and after it, and *Open
-course folder*.
+course folder*. A Google Drive folder becomes a course in the same way, but without files in the courses folder
+([Drive folders as courses](#drive-folders-as-courses)).
 
 Each finished lecture is also saved as files, to read or to paste into a chat assistant such as Claude,
 ChatGPT or NotebookLM to make study notes; the app itself doesn't summarise. An assistant connected over
@@ -230,7 +231,7 @@ it too. Without a runtime yt-dlp still gets many videos, but YouTube may hold so
 Downloading from YouTube is meant for personal use, and keeping to YouTube's terms of service and the
 rights of the people who made the videos is up to you.
 
-## Google Drive files
+## Google Drive files and folders
 
 The same *Link* field takes a Google Drive file shared with anyone who has the link. *Check* reads it in the same way
 and shows its name and length; *Start* adds a transcription named after the file without its extension. The links
@@ -264,9 +265,33 @@ Sedjem doesn't sign in to Google. A file that isn't shared with anyone who has t
 turned downloading off is refused too. A download that fails says why on its page and can be tried again, as a
 YouTube download can.
 
-Drive folders are planned. For now a folder's link is refused with "Google Drive folders can't be read yet. Add the
-files one by one, each with its own link.", because yt-dlp can't read Drive folders at the moment
-([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
+### Drive folders as courses
+
+A link to a Drive folder shared with anyone who has the link lists the folder's audio and video files. The forms Drive
+gives all work: `drive.google.com/drive/folders/…`, with `u/0/` (any account number) or `mobile/` before `folders`,
+with or without `?usp=…`; a `resourcekey=…` in the link is passed on to Drive with the folder's id. *Check* shows the
+folder's name and its audio and video files in natural name order, so "Lecture 2" comes before "Lecture 10", each
+with its name as Drive shows it. The files are known by the type Drive gives them (audio or video); a file whose type
+Drive doesn't know counts when its name ends in the extension of a recording the app takes, such as `.mp3` or `.mkv`.
+Below the list the page says how many subfolders and other files were skipped, for example "2 subfolders and 3 other
+files skipped". Subfolders aren't read: a subfolder's own link can be added as a course of its own.
+
+Any of the files can be left out, as a playlist's videos can, and *Start* adds one transcription for each file picked,
+named after the file without its extension. Together they are a course named after the folder: numbered in the order
+of the list (a file left out keeps its number free), shown once in the sidebar with its lectures, with the lectures
+before and after it on each lecture's page, *Export course*, and the button that hides the course from assistants.
+Each file is then downloaded and transcribed as a Drive file on its own (above), one at a time in the folder's order,
+with the same hosts, limits and messages. A Drive folder's course has no files in the courses folder, and adds no
+usage count.
+
+Drive's page for a folder gives no sizes or lengths, so the estimate before *Start* gives the time as a share of each
+recording's length, and the size limits apply as each file downloads. The list holds the first 300 audio and video
+files of a folder, and says so when there were more.
+
+A folder that isn't shared with anyone who has the link, or that was removed, says "This folder isn't shared with
+anyone who has the link. Sedjem can't sign in to Google Drive yet." A folder with no audio or video files says so,
+with what was skipped. The list comes from Drive's own page for a folder, read by the app, because yt-dlp can't read
+Drive folders at the moment ([AgDR 23](agdr/AgDR-0023-google-drive-folders-from-the-embedded-folder-view.md)).
 
 ## Version history
 
@@ -765,10 +790,11 @@ the speaker step with a stand-in model process).
   with a hosted model, the sound of each video without captions is uploaded after the same
   confirmation as a recording.
 - Checking or adding a Google Drive link asks Google Drive, through yt-dlp, for that file's details and
-  download, and nothing else. A link is rebuilt from the file id before it is read, a folder's link is
-  refused before anything is asked, nothing signs in to Google, and a file is downloaded only from Drive's
-  own hosts. The files and their transcripts stay on the computer; with a hosted model, each file's sound is
-  uploaded after the same confirmation as a recording.
+  download, and nothing else. A link is rebuilt from the file id before it is read, nothing signs in to
+  Google, and a file is downloaded only from Drive's own hosts. A folder's link asks `drive.google.com` for
+  the folder's page (its name, and each file's name, type and id) and follows no redirect; each file picked
+  is then read and downloaded as a file's link is. The files and their transcripts stay on the computer;
+  with a hosted model, each file's sound is uploaded after the same confirmation as a recording.
 - A video added with *Stream it from YouTube* has only its sound on the computer. Only when you play it
   on its page does the page load YouTube's player from `www.youtube-nocookie.com`, and the player load
   the video from Google's servers, which see the computer's IP address and which video plays; YouTube
@@ -829,7 +855,7 @@ Local jobs run one at a time. Hosted jobs have their own queue and don't wait fo
 | `app/hosted_openai.py` | the OpenAI, Groq and Mistral clients: the Opus upload, parts cut at pauses, speaker numbers across parts, labels from the speaker model |
 | `app/hub.py` | models added from Hugging Face: links, the API, GGUF headers, conversion, `models.json` |
 | `app/youtube.py` | YouTube links with yt-dlp: reading a link, choosing the streams (only the sound, for a video streamed from YouTube), joining them into `video.mp4` with PyAV, captions made by people as transcripts |
-| `app/drive.py` | Google Drive links with yt-dlp's Drive extractor: reading a file's link, downloading the file itself; a folder's link is refused for now |
+| `app/drive.py` | Google Drive links: a file's link read and the file itself downloaded with yt-dlp's Drive extractor; a folder's audio and video files listed from Drive's embedded folder view, read with `html.parser`, in natural name order |
 | `app/courses.py` | the courses folder: each lecture's Markdown and SRT files, and `course.md` |
 | `app/desktop.py`, `app/selftest.py` | the desktop window and the installation check ([desktop app](10-desktop.md)) |
 | `app/updates.py` | checking GitHub for a newer version, *Update now* and the restart ([updates](12-updates.md)) |
@@ -870,8 +896,8 @@ says only whether Sedjem answers.
 | `GET /api/jobs/<id>/audio`, `GET /api/jobs/<id>/export/{txt,srt,vtt,md,json}` | `?details=0` leaves the details out of an export |
 | `POST /api/export` with `{"ids": […], "format": …}` | many transcripts at once, in the order given: a zip with a file for each; with `"combined": true`, one file (`txt`, `md` or `json`); with `"as": "files"`, the files as JSON (`path` and `text`). Transcriptions without a transcript are left out |
 | `GET /api/jobs/<id>/video` | the job's `video.mp4`, when its `video` field (`{"width", "height"}`) is set; both media calls answer byte ranges |
-| `POST /api/link/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people; or a Google Drive file: its name and length (`"site"` says which; a Drive folder's link is refused for now). `POST /api/youtube/inspect`, its name before Drive links, does the same |
-| `POST /api/link` with `{"url": …, "model": …, "entries": […], "captions": true, "stream": false, …}` | one transcription per video (all of them without `entries`), queued in playlist order, or one for a Drive file; with `"stream": true`, each YouTube video downloads only the sound, and its job has `"stream": true` so that its page plays the video from YouTube. A Drive job has `drive_id`, and ignores `captions` and `stream`. `POST /api/youtube` does the same |
+| `POST /api/link/inspect` with `{"url": …}` | a YouTube video or playlist: its videos in order, their lengths, and which have captions made by people; a Google Drive file: its name and length; or a Drive folder (`"kind": "folder"`): its name, its audio and video files in natural name order, each with its `name`, `title`, `index` and `type`, and in `skipped` how many subfolders (`folders`) and other files (`files`) were left out, with `"cut": true` when there were more than 300 (`"site"` says which site). `POST /api/youtube/inspect`, its name before Drive links, does the same |
+| `POST /api/link` with `{"url": …, "model": …, "entries": […], "captions": true, "stream": false, …}` | one transcription per video (all of them without `entries`), queued in playlist order, one for a Drive file, or one for each file of a Drive folder (all of them without `entries`), queued in the folder's order with the folder as their `course` (`id`, `title`, `url`, `count`, `index`); with `"stream": true`, each YouTube video downloads only the sound, and its job has `"stream": true` so that its page plays the video from YouTube. A Drive job has `drive_id`, and ignores `captions` and `stream`. `POST /api/youtube` does the same |
 | `POST /api/open-folder` with `{"job": <id>}` | shows the folder a YouTube transcription's files are in |
 | `POST /api/jobs` with `run_on` and `confirm_send`, `GET /api/remote` and the rest of `/api/remote/` | a transcription on a paired computer, and the pairing ([running jobs on another computer](15-remote-runs.md#for-scripts)) |
 | `GET /api/updates`, `POST /api/updates/check`, `/settings`, `/skip`, `/install` | *Settings → Updates*: the state, *Check now*, the switch and channel, *Skip this version*, *Update now* ([updates](12-updates.md)) |

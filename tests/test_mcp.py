@@ -1072,6 +1072,13 @@ DRIVE_FILE = {"site": "drive", "kind": "file", "id": "1AbCdEfGhIjKlMnOpQrStUvWxY
               "entries": [{"id": "1AbCdEfGhIjKlMnOpQrStUvWxYz012345", "name": "Board meeting.m4a", "title": "Board meeting",
                            "index": 1, "duration": 3600, "available": True, "captions": None,
                            "url": "https://drive.google.com/file/d/1AbCdEfGhIjKlMnOpQrStUvWxYz012345/view"}]}
+DRIVE_FOLDER = {"site": "drive", "kind": "folder", "id": "1FoLdErAbCdEfGhIjKlMnOpQrStUvWxYz", "title": "Signals and systems",
+                "name": "Signals and systems", "url": "https://drive.google.com/drive/folders/1FoLdErAbCdEfGhIjKlMnOpQrStUvWxYz",
+                "count": 2, "duration": None, "skipped": {"folders": 1, "files": 2}, "cut": False,
+                "entries": [{"id": f"1LeCtUrE{n}AbCdEfGhIjKlMnOpQrStUvW", "name": f"Lecture {n}.mp4", "title": f"Lecture {n}",
+                             "index": i, "duration": None, "available": True, "captions": None, "type": "video/mp4",
+                             "url": f"https://drive.google.com/file/d/1LeCtUrE{n}AbCdEfGhIjKlMnOpQrStUvW/view"}
+                            for i, n in ((1, 2), (2, 10))]}
 JOB_TOOLS = ["list_models", "inspect_link", "transcribe_link", "transcribe_file", "job_status", "cancel_job"]
 
 
@@ -1108,7 +1115,7 @@ class Jobs(Case):
         for p in (mock.patch.object(engines, "gpu_info", return_value={"devices": [], "cuda_devices": 0, "cuda_libs": None}),
                   mock.patch.object(Config, "availability", lambda cfg, model: (True, None)),
                   mock.patch.object(youtube_site, "inspect", return_value=PLAYLIST),
-                  mock.patch.object(drive, "inspect", return_value=DRIVE_FILE)):
+                  mock.patch.object(drive, "inspect", lambda cfg, url: DRIVE_FOLDER if "/folders/" in url else DRIVE_FILE)):
             p.start()
             self.addCleanup(p.stop)
         self.http, self.app = server.make_server(Config(home=self.home), port=0)
@@ -1300,7 +1307,7 @@ class Jobs(Case):
         log = assistants.read_log(self.cfg)[0]
         self.assertEqual((log["detail"], len(log["ids"])),
                          ('Started 2 transcriptions of the course "Python for beginners" with whisper-medium code-switching', 2))
-        self.assertIn("entries must be a list of video ids", self.problem("transcribe_link", url=PLAYLIST["url"], entries="all"))
+        self.assertIn("entries must be a list of video or file ids", self.problem("transcribe_link", url=PLAYLIST["url"], entries="all"))
         self.assertIn("language must be one of", self.problem("transcribe_link", url=PLAYLIST["url"], language="fr"))
         self.assertIn("speakers must be", self.problem("transcribe_link", url=PLAYLIST["url"], speakers=40))
 
@@ -1308,6 +1315,19 @@ class Jobs(Case):
         self.assertIn('Google Drive file "Board meeting" · id 1AbCdEfGhIjKlMnOpQrStUvWxYz012345 · 1 file, 1:00:00 in all', text)
         job = self.job(self.text("transcribe_link", url=DRIVE_FILE["url"]))
         self.assertEqual((job["drive_id"], job["assistant"]), (DRIVE_FILE["id"], {"client": "sedjem-tests 1.0"}))
+
+        text = self.text("inspect_link", url=DRIVE_FOLDER["url"] + "?usp=sharing")
+        self.assertIn(f'Google Drive folder "Signals and systems" · id {DRIVE_FOLDER["id"]} · 2 files\n{DRIVE_FOLDER["url"]}', text)
+        self.assertIn("1. id 1LeCtUrE2AbCdEfGhIjKlMnOpQrStUvW · Lecture 2\n2. id 1LeCtUrE10AbCdEfGhIjKlMnOpQrStUvW · Lecture 10", text)
+        self.assertIn("Skipped: 1 subfolder and 2 other files. A subfolder can be looked at, and added as a course of its "
+                      "own, with its own link.", text)
+        self.assertIn("and entries (the ids of the files; all of them when left out). The folder becomes a course", text)
+        text = self.text("transcribe_link", url=DRIVE_FOLDER["url"], entries=["1LeCtUrE10AbCdEfGhIjKlMnOpQrStUvW"])
+        self.assertIn('Started 1 transcription of the course "Signals and systems"', text)
+        job = self.job(text)
+        self.assertEqual((job["drive_id"], job["course"]["id"], job["course"]["index"], job["course"]["url"], job["assistant"]),
+                         ("1LeCtUrE10AbCdEfGhIjKlMnOpQrStUvW", DRIVE_FOLDER["id"], 2, DRIVE_FOLDER["url"],
+                          {"client": "sedjem-tests 1.0"}), "the app's own API made it, with the assistant's mark")
 
     def test_job_status_and_cancel(self):
         self.allow()

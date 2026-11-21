@@ -1,9 +1,10 @@
 """What assistants connected over MCP (app/mcp.py) may see and do, the log of what they asked, and how to connect them.
 
 The settings, saved like the others in <storage>/settings.json and changed in Settings → Assistants:
-  mcp_courses     YouTube courses and videos added on their own are visible (default on)
+  mcp_courses     courses (YouTube playlists and Google Drive folders) and YouTube videos added on their own are
+                  visible (default on)
   mcp_recordings  every other transcription (meetings, calls, files) is visible (default on)
-  mcp_hidden      transcriptions and courses hidden one by one: "job:<id>" and "course:<playlist id>"
+  mcp_hidden      transcriptions and courses hidden one by one: "job:<id>" and "course:<course id>"
   mcp_write       assistants may save new versions of transcripts (save_version; default off). Transcript text is
                   quoted data that anyone in a recording could have said, so nothing an assistant reads in it can
                   lead to a save unless the user turned this on; a save never deletes anything either.
@@ -35,7 +36,7 @@ from pathlib import Path
 from .config import FROZEN, ROOT, home_dir
 
 ID = r"\d{8}-\d{6}-[0-9a-f]{4}"                 # a transcription (app/jobs.py ID_RE)
-COURSE_ID = r"[A-Za-z0-9_-]{2,64}"              # a YouTube playlist (app/youtube.py LIST_ID)
+COURSE_ID = r"[A-Za-z0-9_-]{2,100}"  # a YouTube playlist (app/youtube.py LIST_ID) or a Drive folder (app/drive.py DRIVE_ID)
 HIDDEN_KEY = re.compile(rf"^(job:{ID}|course:{COURSE_ID})$")
 MAX_HIDDEN = 5000
 MAX_FOLDERS, MAX_FOLDER_CHARS = 50, 1000  # mcp_folders: how many, and how long each path may be
@@ -50,7 +51,8 @@ _log_lock = threading.Lock()
 # ---- what assistants may see ----------------------------------------------------------------------
 
 def kind(job):
-    """"course" for a YouTube lecture or a YouTube video added on its own, else "recording"."""
+    """"course" for a course lecture (of a YouTube playlist or a Google Drive folder) or a YouTube video added on its
+    own, else "recording"."""
     return "course" if job.get("youtube_id") or job.get("course") else "recording"
 
 
@@ -169,7 +171,7 @@ def check_folders(value):
 
 
 def set_hidden(cfg, key, hide):
-    """Hide ("job:<id>" or "course:<playlist id>") from assistants, or show again; returns the settings."""
+    """Hide ("job:<id>" or "course:<course id>") from assistants, or show again; returns the settings."""
     if not HIDDEN_KEY.match(str(key or "")):
         raise ValueError(f"not a transcription or a course: {key!r}")
     saved = cfg.setting("mcp_hidden")
