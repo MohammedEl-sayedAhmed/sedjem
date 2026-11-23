@@ -11,13 +11,16 @@
 
 // What is listed: found, what POST /api/local/inspect answered ("kind" "folder" or "files"); picked, the ids of the
 // recordings to transcribe; files, the browser's files (an entry's id is its place in this list), else null; name, the
-// course's name for files picked together; adding, while they are added.
-const LOCAL = { found: null, picked: new Set(), files: null, name: "", adding: false };
+// course's name for files picked together; adding, while they are added; sent, once an upload failed after others
+// were added: {course (its id), title, count, numbers (entry id -> lecture number of each one added)}, so that Start
+// adds the rest to the same course instead of uploading those again.
+const LOCAL = { found: null, picked: new Set(), files: null, name: "", adding: false, sent: null };
 
 const localPicked = () => (LOCAL.found ? LOCAL.found.entries.filter((e) => LOCAL.picked.has(e.id)) : []);
+const localSent = (id) => !!LOCAL.sent?.numbers.has(id);
 
 function localClear() {
-  Object.assign(LOCAL, { found: null, picked: new Set(), files: null, name: "", adding: false });
+  Object.assign(LOCAL, { found: null, picked: new Set(), files: null, name: "", adding: false, sent: null });
 }
 
 // A listing to show in place of the file: every recording picked to start with, and for files picked together the
@@ -26,7 +29,7 @@ function localShow(found, files = null) {
   const f = S.form;
   if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
   Object.assign(f, { file: null, path: null, seconds: null, previewUrl: null });
-  Object.assign(LOCAL, { found, files, name: found.kind === "files" ? found.title : "", adding: false,
+  Object.assign(LOCAL, { found, files, name: found.kind === "files" ? found.title : "", adding: false, sent: null,
                          picked: new Set(found.entries.map((e) => e.id)) });
   renderNew();
 }
@@ -67,7 +70,8 @@ function localSkipped(s) {
 
 // The listing: what it is, the recordings numbered in natural name order, each with its name and size, and what was
 // skipped. A folder's numbers are its list's, as a Drive folder's (a recording left out keeps its number free); files
-// picked together are numbered 1, 2, 3 among the ones picked.
+// picked together are numbered 1, 2, 3 among the ones picked. A recording already added before an upload failed is
+// marked as added, with its number, and can't be picked again.
 function localFound(f) {
   const n = f.entries.length, picked = localPicked(), upload = !!LOCAL.files, folder = f.kind === "folder";
   const skipped = localSkipped(f.skipped), what = `${n} recording${n === 1 ? "" : "s"}`;
@@ -76,7 +80,8 @@ function localFound(f) {
   const how = upload ? "Each is uploaded to the app, as a single file is." : "Each is read where it is, not copied.";
   const after = folder && f.skipped.folders ? " A subfolder can be added as a course of its own, by its own path."
     : !folder && f.skipped.folders ? " A folder is added by its full path, so that its recordings are read where they are." : "";
-  const place = new Map(picked.map((e, i) => [e.id, i + 1]));
+  const first = LOCAL.sent ? LOCAL.sent.numbers.size : 0;
+  const place = new Map([...(LOCAL.sent?.numbers || []), ...picked.map((e, i) => [e.id, first + i + 1])]);
   const off = LOCAL.adding ? "disabled" : "";
   return `<div class="yt-found local-found"><div class="chosen yt-chosen">
       <div class="ico">${folder ? ICON.folder : YT_ICON.course}</div>
@@ -92,11 +97,12 @@ function localFound(f) {
 }
 
 function localRow(e, number, off) {
-  const size = LOCAL.files ? LOCAL.files[Number(e.id)]?.size : e.size;
-  return `<li><label>
-      <input type="checkbox" data-local-entry="${esc(e.id)}" ${LOCAL.picked.has(e.id) ? "checked" : ""} ${off} aria-label="${esc(e.name)}">
+  const size = LOCAL.files ? LOCAL.files[Number(e.id)]?.size : e.size, sent = localSent(e.id);
+  return `<li><label class="${sent ? "off" : ""}">
+      <input type="checkbox" data-local-entry="${esc(e.id)}" ${LOCAL.picked.has(e.id) ? "checked" : ""} ${sent ? "disabled" : off} aria-label="${esc(e.name)}">
       <span class="n">${esc(number ?? "")}</span><span class="t" dir="${mixDir(e.name)}" title="${esc(e.name)}">${esc(e.name)}</span>
-      <span></span><span class="len">${size != null ? bytes(size) : ""}</span></label></li>`;
+      <span></span><span class="len">${size != null ? bytes(size) : ""}</span>
+      ${sent ? `<span class="why">Added to the course</span>` : ""}</label></li>`;
 }
 
 // In the Options card, in place of the title: a folder's course is named after the folder; files picked together
@@ -105,10 +111,11 @@ function localNameField() {
   if (LOCAL.found.kind === "folder") {
     return `<div class="field"><span class="field-label">Titles</span><p class="hint">Each transcription is named after its file, and the course after the folder; you can rename a transcription later.</p></div>`;
   }
+  const sent = LOCAL.sent, name = sent ? sent.title : LOCAL.name;
   return `<div class="field">
       <label for="courseName">Course name</label>
-      <input type="text" id="courseName" dir="${mixDir(LOCAL.name)}" data-mixdir value="${esc(LOCAL.name)}" placeholder="${esc(LOCAL.found.title)}" ${LOCAL.adding ? "disabled" : ""}>
-      <p class="hint">Each transcription is named after its file.</p></div>`;
+      <input type="text" id="courseName" dir="${mixDir(name)}" data-mixdir value="${esc(name)}" placeholder="${esc(LOCAL.found.title)}" ${LOCAL.adding || sent ? "disabled" : ""}>
+      <p class="hint">${sent ? "The rest are added to this course, which has the recordings added before." : "Each transcription is named after its file."}</p></div>`;
 }
 
 function bindLocal() {
@@ -121,7 +128,7 @@ function bindLocal() {
     $$("[data-local-entry]").find((b) => b.dataset.localEntry === id)?.focus();
   }));
   const all = $("#localAll"), none = $("#localNone");
-  if (all) all.onclick = () => { LOCAL.picked = new Set(LOCAL.found.entries.map((e) => e.id)); renderNew(); };
+  if (all) all.onclick = () => { LOCAL.picked = new Set(LOCAL.found.entries.filter((e) => !localSent(e.id)).map((e) => e.id)); renderNew(); };
   if (none) none.onclick = () => { LOCAL.picked = new Set(); renderNew(); };
   const name = $("#courseName");
   if (name) name.oninput = () => (LOCAL.name = name.value);
@@ -134,7 +141,7 @@ function bindLocal() {
 // the first answer giving the course's id to the rest. Opens the first.
 async function localStart(params) {
   const picked = localPicked(), f = LOCAL.found;
-  const title = LOCAL.name.trim() || f.title;
+  const title = LOCAL.sent ? LOCAL.sent.title : LOCAL.name.trim() || f.title;
   LOCAL.adding = true;
   renderNew();
   try {
@@ -161,21 +168,27 @@ async function localStart(params) {
   }
 }
 
+// Each one added leaves the picked ones and is kept in LOCAL.sent, so that after a failed upload, Start goes on with
+// the same course and the next numbers.
 async function localUpload(params, picked, title) {
-  const jobs = [];
-  let course = "";
-  for (const [i, e] of picked.entries()) {
-    const file = LOCAL.files[Number(e.id)];
-    S.uploading = { loaded: 0, total: file.size, n: i + 1, of: picked.length };
+  const jobs = [], sent = LOCAL.sent || { course: "", title, count: 0, numbers: new Map() };
+  sent.count = Math.max(sent.count, sent.numbers.size + picked.length);
+  for (const e of picked) {
+    const file = LOCAL.files[Number(e.id)], index = sent.numbers.size + 1;
+    S.uploading = { loaded: 0, total: file.size, n: index, of: sent.count };
     renderNew();
     try {
       // its modified time is the recording's date when the file's tags have none (sysinfo.recording)
       const job = await api.upload(file, { ...params, title: "", name: file.name, modified: file.lastModified,
-        course_title: title, course_index: i + 1, course_count: picked.length, ...(course ? { course } : {}) }, showUpload);
-      course = job.course.id;
+        course_title: sent.title, course_index: index, course_count: sent.count, ...(sent.course ? { course: sent.course } : {}) }, showUpload);
+      sent.course = job.course.id;
+      sent.numbers.set(e.id, index);
+      LOCAL.sent = sent;
+      LOCAL.picked.delete(e.id);
       jobs.push(job);
     } catch (err) {
-      throw new Error(jobs.length ? `${file.name} couldn't be uploaded (${err.message}); the ${jobs.length} recording${jobs.length === 1 ? "" : "s"} before it ${jobs.length === 1 ? "was" : "were"} added` : err.message);
+      const n = sent.numbers.size;
+      throw new Error(n ? `${file.name} couldn't be uploaded (${err.message}). The ${n} recording${n === 1 ? "" : "s"} before it ${n === 1 ? "was" : "were"} added; Start adds the rest to the same course` : err.message);
     }
   }
   return jobs;

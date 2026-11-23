@@ -8,7 +8,9 @@ Subfolders, other files and hidden files (whose names start with a dot, such as 
 disks) are skipped and counted. A symbolic link counts as what it leads to: a link to a folder is a subfolder, and a
 link to a file is that file only when the file is itself directly in the folder (then it is listed once). A link to
 a file anywhere else is skipped and counted, as an assistant's path that leads out of an allowed folder is refused
-(app/assistants.py recording_path). The first MAX_FILES recordings are listed, as a playlist's videos are.
+(app/assistants.py recording_path), and a link that leads to nothing counts as another file. Only links are
+followed one by one: the folder's own entries are already in its real path, so a folder of many files is read
+quickly. The first MAX_FILES recordings are listed, as a playlist's videos are.
 
 list_files() does the same for paths picked together (the desktop app's file picker): each by its real path, a
 folder among them counted and skipped, and the same for a file that isn't a recording. list_names() does it for the
@@ -81,38 +83,53 @@ def _ordered(found):
 
 def list_folder(path):
     """A folder's recordings: {"path" (its real path), "name", "files" ([(name, real path)] in natural name order),
-    "folders" (how many subfolders), "others" (other files), "outside" (links to files outside the folder)}.
-    LocalError when it isn't there, is a file, or can't be read."""
+    "folders" (how many subfolders), "others" (other files, and links that lead to nothing), "outside" (links to files
+    outside the folder)}. LocalError when it isn't there, is a file, or can't be read."""
     given = full_path(path)
     real = os.path.realpath(given)
     if not os.path.exists(real):
         raise LocalError(f"there is no folder at {given}")
     if not os.path.isdir(real):
         raise LocalError(f"{given} is a file, not a folder")
+    found, folders, others, outside = [], 0, 0, 0
     try:
-        with os.scandir(real) as it:
-            entries = list(it)
+        with os.scandir(real) as entries:
+            for entry in entries:
+                kind = _entry(entry, real)
+                if kind == "folder":
+                    folders += 1
+                elif kind == "outside":
+                    outside += 1
+                elif kind:
+                    found.append(kind)
+                else:
+                    others += 1
     except PermissionError:
         raise LocalError(f"Sedjem isn't allowed to read the folder {given}")
     except OSError as e:
         raise LocalError(f"the folder {given} couldn't be read: {e.strerror or e}")
-    found, folders, others, outside = [], 0, 0, 0
-    for entry in entries:
-        try:
-            if entry.is_dir():  # (a link to a folder too)
-                folders += 1
-                continue
-            target = os.path.realpath(entry.path)
-            if _key(os.path.dirname(target)) != _key(real):  # a link that leads out of the folder
-                outside += 1
-            elif os.path.isfile(target) and is_recording(target):
-                found.append((os.path.basename(target), target))
-            else:
-                others += 1
-        except OSError:  # gone since the folder was read, or not readable
-            others += 1
     return {"path": real, "name": os.path.basename(real) or real, "files": _ordered(found), "folders": folders,
             "others": others, "outside": outside}
+
+
+def _entry(entry, real):
+    """What a folder's entry is: "folder" (a subfolder, or a link to a folder), "outside" (a link to a file outside the
+    folder), (name, real path) for a recording, or None for anything else (another file, a hidden file, a link that
+    leads to nothing, an entry gone since the folder was read). real: the folder's real path, so only a link needs
+    os.path.realpath."""
+    try:
+        if entry.is_dir():  # (a link to a folder too)
+            return "folder"
+        if not entry.is_symlink():
+            return (entry.name, entry.path) if entry.is_file() and is_recording(entry.name) else None
+        target = os.path.realpath(entry.path)
+        if not os.path.exists(target):  # a link that leads to nothing
+            return None
+        if _key(os.path.dirname(target)) != _key(real):  # a link that leads out of the folder
+            return "outside"
+        return (os.path.basename(target), target) if os.path.isfile(target) and is_recording(target) else None
+    except OSError:  # gone since the folder was read, or not readable
+        return None
 
 
 def list_files(paths):

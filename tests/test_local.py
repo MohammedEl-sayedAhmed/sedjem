@@ -96,11 +96,14 @@ class Listing(unittest.TestCase):
         os.symlink(outside / "Secret call.wav", self.folder / "Lecture 2.wav")  # a file outside: skipped
         os.symlink(self.folder / "Lecture 1.mp3", self.folder / "Lecture 1 again.mp3")  # a file inside: listed once
         os.symlink(outside / "Inside", self.folder / "Linked folder")  # a folder: a subfolder
-        os.symlink(self.tmp / "missing.mp3", self.folder / "Broken.mp3")  # leads nowhere, and out of the folder
+        os.symlink(self.tmp / "missing.mp3", self.folder / "Broken.mp3")  # leads nowhere (it would be outside)
+        os.symlink(self.folder / "Removed.mp3", self.folder / "Gone.mp3")  # leads nowhere (it would be inside)
         found = local.inspect_folder(str(self.folder))
         self.assertEqual(self.names(found), ["Lecture 1.mp3"])
-        self.assertEqual(found["skipped"], {"folders": 1, "files": 0, "links": 2})
-        self.assertEqual(local.words(found["skipped"]), "1 subfolder and 2 links to files outside the folder")
+        self.assertEqual(found["skipped"], {"folders": 1, "files": 2, "links": 1},
+                         "a link that leads nowhere is another file, wherever it would lead")
+        self.assertEqual(local.words(found["skipped"]),
+                         "1 subfolder, 2 other files and 1 link to a file outside the folder")
         os.symlink(self.folder, self.tmp / "Link to the course")  # the folder by a link: its real path
         again = local.inspect_folder(str(self.tmp / "Link to the course"))
         self.assertEqual((again["path"], again["entries"][0]["id"]),

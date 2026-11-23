@@ -248,6 +248,11 @@ class LocalCourses(UiTestCase):
         self.page.wait_for_selector(".local-found .yt-list")
         self.assertEqual(self.page.inner_text(".local-found .yt-chosen .name"), "Signals and systems")
 
+    def widths(self):
+        """The width of the first row's name and of its size, in pixels."""
+        return self.page.evaluate("""() => [".t", ".len"].map((c) => document.querySelector(`.yt-list li ${c}`)
+            .getBoundingClientRect().width)""")
+
     def test_narrow_and_dark(self):
         self.page.set_viewport_size({"width": 390, "height": 800})
         self.open()
@@ -256,10 +261,65 @@ class LocalCourses(UiTestCase):
         self.page.wait_for_selector(".local-found .yt-list")
         self.assertLessEqual(self.page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth"), 0,
                              "no sideways scrolling")
+        name, size = self.widths()
+        self.assertGreater(name, 150, "the name has the row's room, not a number's column")
+        self.assertGreater(size, 30, "and the size is still shown")
+        self.assertGreater(name, size)
+        self.assertFalse(self.page.is_visible(".yt-list li .n"), "no numbers in a narrow list, as a playlist's")
         self.page.click("#localChange")
         self.drop([(NAMES[0], self.folder / NAMES[0]), (NAMES[1], self.folder / NAMES[1])])
         self.page.wait_for_selector("#courseName")
         self.assertLessEqual(self.page.evaluate("() => document.documentElement.scrollWidth - window.innerWidth"), 0)
+        name, size = self.widths()
+        self.assertGreater(name, 150)
+        self.assertGreater(name, size)
+        self.page.set_viewport_size({"width": 1280, "height": 800})
+        name, size = self.widths()
+        self.assertGreater(name, 300, "wide: the name's column")
+        self.assertGreater(size, 30, "and the size's own column")
+        self.assertTrue(self.page.is_visible(".yt-list li .n"), "with the numbers")
+
+    def test_an_upload_that_fails_leaves_the_rest_for_the_same_course(self):
+        self.open()
+        self.page.wait_for_selector("#drop")
+        self.drop([(NAMES[0], self.folder / NAMES[0]), (NAMES[1], self.folder / NAMES[1]), (NAMES[2], self.folder / NAMES[2])])
+        self.page.wait_for_selector("#courseName")
+        self.page.fill("#courseName", "Retried week")
+        self.hosted()
+        calls = []
+
+        def second_fails(route):
+            calls.append(route.request.url)
+            if len(calls) == 2:
+                route.fulfill(status=500, content_type="application/json", body='{"error": "the disk is full"}')
+            else:
+                route.continue_()
+        self.page.route(lambda url: "/api/jobs?" in url, second_fails)
+        self.page.click("#startBtn")
+        self.page.wait_for_selector(".toast.error")
+        self.assertIn("Lecture 2 - Signals.wav couldn't be uploaded (the disk is full). The 1 recording before it was added; "
+                      "Start adds the rest to the same course", self.page.inner_text(".toast.error"))
+        self.errors = [e for e in self.errors if "status of 500" not in e]
+        self.page.unroute_all()
+        self.page.wait_for_function("() => !LOCAL.adding && !document.querySelector('#startBtn').disabled")
+        self.assertEqual(self.texts(".yt-list .n"), ["1", "2", "3"], "the one added keeps its number, the rest follow")
+        self.assertEqual(self.texts(".yt-list .why"), ["Added to the course"])
+        self.assertEqual([self.page.is_disabled(f".yt-list li:nth-child({n}) input") for n in (1, 2, 3)],
+                         [True, False, False], "the one added can't be picked again; the rest can")
+        self.assertEqual(self.page.inner_text(".yt-list-head span"), "2 of 3 picked")
+        self.assertTrue(self.page.is_disabled("#courseName"), "the course has its name")
+        self.assertEqual(self.page.input_value("#courseName"), "Retried week")
+        self.page.click("#localAll")
+        self.assertEqual(self.page.inner_text(".yt-list-head span"), "2 of 3 picked", "All leaves out the one added")
+        self.assertEqual(self.page.inner_text("#startBtn"), "Start 2 transcriptions")
+        self.page.click("#startBtn")
+        self.page.wait_for_selector(".course-bar")
+        jobs = self.course_jobs("Retried week", 3)
+        self.assertEqual([(j["course"]["index"], j["title"], j["status"]) for j in jobs],
+                         [(1, "Lecture 1 - Welcome", "done"), (2, "Lecture 2 - Signals", "done"),
+                          (3, "Lecture 10 - Filters", "done")], "each once, numbered in order")
+        self.assertEqual(len({j["course"]["id"] for j in jobs}), 1, "one course")
+        self.assertEqual({j["course"]["count"] for j in jobs}, {3})
 
 
 if __name__ == "__main__":

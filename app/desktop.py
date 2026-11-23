@@ -222,7 +222,8 @@ class Api:
 
 class SessionApi:
     """The bridge of a window that a second start opens on a copy that is already running: the secret, so that its
-    page can be let in, and links. It has no pick_file or save_export, so the page uses the browser's ways."""
+    page can be let in, and links. It has no pick_files, pick_folder or save_export, so the page uses the browser's
+    ways."""
 
     def __init__(self, secret):
         self._secret, self._window = secret, None

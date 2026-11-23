@@ -309,6 +309,9 @@ details.path .hint { margin: 8px 0 0; }
 .local-pick { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 12px; }
 .local-pick .hint { margin: 0; }
 .local-found .yt-list label { grid-template-columns: auto 2.2em minmax(0, 1fr) auto 5.2em; }
+@media (max-width: 560px) {  /* as youtube.css's narrow list: no numbers, the size beside the name */
+  .local-found .yt-list label { grid-template-columns: auto minmax(0, 1fr) auto; }
+}
 
 /* ---------- model cards ---------- */
 .model-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }

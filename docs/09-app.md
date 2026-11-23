@@ -318,13 +318,16 @@ subfolders and 3 other files skipped". Subfolders aren't read: each can be added
 path. Hidden files, whose names start with a dot (such as the `._` files macOS leaves on other disks), count as other
 files. A symbolic link counts as what it leads to: a link to a subfolder is a subfolder, a link to a file in the same
 folder is that file (listed once), and a link to a file anywhere else is skipped and counted, for example "1 link to a
-file outside the folder". The list holds the first 300 recordings, and says so when there were more.
+file outside the folder". A link that leads to nothing counts as another file. The list holds the first 300
+recordings, and says so when there were more.
 
 Any of the recordings can be left out, and *Start* adds one transcription for each one picked, named after its file
 without the extension. A folder's course is named after the folder, and its lectures keep the folder's numbers (a
 recording left out keeps its number free), as a Drive folder's do. Adding the same folder again, by the same real path,
 adds to the same course. Files added together get the name typed in *Course name*, which starts as "Files added on"
 and the day; they are numbered 1, 2, 3 among the ones picked, and each time they are added they make a new course.
+When one of them fails to upload, the ones before it stay in the course and are marked as added in the list, and
+*Start* adds the rest to the same course.
 
 The course works as a Drive folder's: shown once in the sidebar with its lectures, the lectures before and after it on
 each lecture's page, *Export course*, and the button that hides the course from assistants. It has no files in the

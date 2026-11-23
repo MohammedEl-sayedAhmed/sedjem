@@ -55,9 +55,11 @@ listing rules and uploads for a browser's files; the agent chose the rest:
   recording when its extension is in `RECORDING_TYPES` and its name doesn't start with a dot, so the `._` files that
   macOS leaves on other disks, and other hidden files, are counted among the other files. A symbolic link counts as
   what it leads to: a link to a folder is a subfolder, and a link to a file is that file only when the file is itself
-  directly in the folder, then listed once under its own name. A link to a file anywhere else, or to nothing, is
-  skipped and counted on its own line ("1 link to a file outside the folder"), as `app/assistants.py` refuses a path
-  that leads out of an allowed folder. Each lecture's `source_path` is the file's real path.
+  directly in the folder, then listed once under its own name. A link to a file anywhere else is skipped and counted
+  on its own line ("1 link to a file outside the folder"), as `app/assistants.py` refuses a path that leads out of an
+  allowed folder. A link that leads to nothing counts among the other files, wherever it would lead. Only links are
+  followed one by one: the folder's other entries are already in its real path, so a folder of 100,000 entries is
+  listed in about a third of a second. Each lecture's `source_path` is the file's real path.
 - One path field takes a file or a folder (`POST /api/local/inspect` with `{"path"}`): a file is read on its own, as
   before, and a folder is listed. The path must be absolute, with `~` for the home folder. A folder that isn't there,
   can't be read, is empty or has no recordings says so; `POST /api/local` with a file's path, and `POST /api/jobs` or
@@ -81,7 +83,8 @@ listing rules and uploads for a browser's files; the agent chose the rest:
 - A browser's files are uploaded one after another to `POST /api/jobs`, each with `course_title`, `course_index` and
   `course_count`; the server makes the course's id for the first, and the page sends it with the rest (`course`). A
   `files-` id only is taken there, so an upload can't join a folder's course. If an upload fails, the ones before it
-  stay in the course and the page says how many were added.
+  stay in the course, marked as added in the list, and *Start* adds the rest to the same course with the next numbers,
+  so none is added twice.
 - Each lecture is a job like a single file's: read in place (or uploaded), prepared here, and sent to a paired
   computer when `run_on` names one, with the consent asked once for that computer. A local course has no files in the
   courses folder and adds no usage count; the library's count of courses counts YouTube playlists only, as before.
