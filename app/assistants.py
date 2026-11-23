@@ -1,8 +1,8 @@
 """What assistants connected over MCP (app/mcp.py) may see and do, the log of what they asked, and how to connect them.
 
 The settings, saved like the others in <storage>/settings.json and changed in Settings → Assistants:
-  mcp_courses     courses (YouTube playlists and Google Drive folders) and YouTube videos added on their own are
-                  visible (default on)
+  mcp_courses     courses (YouTube playlists, Google Drive folders, and folders or files on the computer added as
+                  a course) and YouTube videos added on their own are visible (default on)
   mcp_recordings  every other transcription (meetings, calls, files) is visible (default on)
   mcp_hidden      transcriptions and courses hidden one by one: "job:<id>" and "course:<course id>"
   mcp_write       assistants may save new versions of transcripts (save_version; default off). Transcript text is
@@ -36,12 +36,14 @@ from pathlib import Path
 from .config import FROZEN, ROOT, home_dir
 
 ID = r"\d{8}-\d{6}-[0-9a-f]{4}"                 # a transcription (app/jobs.py ID_RE)
-COURSE_ID = r"[A-Za-z0-9_-]{2,100}"  # a YouTube playlist (app/youtube.py LIST_ID) or a Drive folder (app/drive.py DRIVE_ID)
+COURSE_ID = r"[A-Za-z0-9_-]{2,100}"  # a YouTube playlist (app/youtube.py LIST_ID), a Drive folder (app/drive.py
+# DRIVE_ID), or recordings on the computer (app/local.py COURSE_ID)
 HIDDEN_KEY = re.compile(rf"^(job:{ID}|course:{COURSE_ID})$")
 MAX_HIDDEN = 5000
 MAX_FOLDERS, MAX_FOLDER_CHARS = 50, 1000  # mcp_folders: how many, and how long each path may be
-# The recordings an assistant may transcribe from a folder, by extension: the desktop app's file picker's list
-# (app/desktop.py RECORDINGS) and .3gp, which the page's file field takes too
+# The recordings the app takes by extension: what an assistant may transcribe from a folder, the desktop app's file
+# picker's filter (app/desktop.py RECORDINGS), and the recordings listed in a folder or among files picked together
+# (app/local.py, and the page's local.js through GET /api/status)
 RECORDING_TYPES = (".mp3", ".m4a", ".wav", ".ogg", ".opus", ".flac", ".aac", ".amr", ".wma", ".mp4", ".mkv", ".mov",
                    ".webm", ".avi", ".3gp")
 LOG_KEEP, LOG_TRIM_AT = 2000, 2500
@@ -51,8 +53,8 @@ _log_lock = threading.Lock()
 # ---- what assistants may see ----------------------------------------------------------------------
 
 def kind(job):
-    """"course" for a course lecture (of a YouTube playlist or a Google Drive folder) or a YouTube video added on its
-    own, else "recording"."""
+    """"course" for a course lecture (of a YouTube playlist, a Google Drive folder, or recordings on the computer added
+    as a course) or a YouTube video added on its own, else "recording"."""
     return "course" if job.get("youtube_id") or job.get("course") else "recording"
 
 

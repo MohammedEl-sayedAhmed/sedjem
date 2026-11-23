@@ -28,8 +28,9 @@ Sedjem picks the first of these that works:
 
 1. A native window (pywebview) using the system's web engine: Edge WebView2 on Windows (part of
    Windows 10 and 11), WebKit on macOS, GTK WebKit or Qt on Linux. It adds native *Open* and *Save*
-   dialogs: a recording picked with *choose a file* is read in place rather than copied, and exports
-   are saved where you choose. On Windows, Sedjem first checks that the WebView2 runtime is
+   dialogs: recordings picked with *choose files* are read in place rather than copied (several become a course),
+   *Choose folder* adds a folder's recordings as a course, read in place too, and exports are saved where you
+   choose. On Windows, Sedjem first checks that the WebView2 runtime is
    installed, because without it pywebview would quietly fall back to the old Internet Explorer
    engine, which can't run the app.
 2. An app-mode browser window: Edge, Chrome, Chromium or Brave with `--app` (no tabs or address bar)
