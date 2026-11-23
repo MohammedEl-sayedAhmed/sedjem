@@ -1,22 +1,28 @@
 /* Sedjem: assistants over MCP (the server side is app/assistants.py; app/mcp.py is the server an assistant
-   starts). Settings → Assistants has what assistants can see (two switches, and what is hidden one by one),
-   whether they may save new versions of transcripts (off until turned on), the setting that connects each
-   assistant, and what they asked, with the versions they saved standing out. A transcription's page says whether
-   assistants can read it and hides it or shows it again; a lecture's course bar does the same for its whole
-   course. Loaded before app.js: it only defines things, and uses app.js's helpers (S, SET, api, $, $$, esc,
-   when, toast, ICON, brandTile, renderSettings) and youtube.js's YT_ICON when they run. */
+   starts). Settings → Assistants has what assistants can see (two switches, and what is hidden one by one), what
+   they can do (save new versions of transcripts, start transcriptions from links or from files in the folders
+   listed, and use hosted models: each off until turned on), the setting that connects each assistant, and what
+   they asked, with the versions they saved standing out. A transcription's page says whether assistants can read
+   it and hides it or shows it again, and says when an assistant started it; a lecture's course bar does the same
+   for its whole course. Loaded before app.js: it only defines things, and uses app.js's helpers (S, SET, api, $,
+   $$, esc, when, toast, ICON, brandTile, renderSettings, desktopApi) and youtube.js's YT_ICON when they run. */
 "use strict";
 
 const AI_ICON = {
   eye: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
   eyeOff: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.6 5.1A10 10 0 0 1 12 5c6.4 0 10 7 10 7a17 17 0 0 1-2.4 3.2M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.6 9.6 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2M3 3l18 18"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',
+  folder: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2.5h8.5A1.5 1.5 0 0 1 21 9v9.5a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5z"/></svg>',
 };
-// The two switches: a transcription follows one of them by its kind (app/assistants.py kind); and saving
+// The two switches: a transcription follows one of them by its kind (app/assistants.py kind); saving; and starting
+// transcriptions from links, from files in the folders listed, and with hosted models
 const AI_SWITCH = { mcp_courses: "Courses and YouTube videos", mcp_recordings: "Meetings and other recordings",
-  mcp_write: "Let assistants save new versions of transcripts" };
+  mcp_write: "Let assistants save new versions of transcripts", mcp_links: "Start jobs from YouTube and Google Drive links",
+  mcp_files: "Transcribe files in these folders", mcp_hosted: "Use hosted models (uploads the recording)" };
 const AI_SAVE_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
-// What GET /api/assistants answered: {settings, hidden, log, snippets}. Fetched each time the tab opens.
-const AI = { data: null, error: "", loading: false };
+// What GET /api/assistants answered: {settings, folders, hidden, log, snippets}. Fetched each time the tab opens.
+// draft: the folder being typed in the browser, kept while Settings is drawn again
+const AI = { data: null, error: "", loading: false, draft: "" };
 
 // ---------------------------------------------------------------------------------------------
 // Settings → Assistants
@@ -31,13 +37,38 @@ function assistantsPanel() {
   return `<h3>Assistants</h3>
     <p class="hint ai-intro">Assistants such as Claude Desktop, Claude Code, Cursor and VS Code can read and search these
       transcripts through MCP, also while Sedjem is closed. What an assistant reads goes to its model, like anything
-      else shared in a chat with it. Assistants only read, unless saving is turned on below; starting transcriptions comes later.</p>
+      else shared in a chat with it. Assistants only read, unless you let them do more below.</p>
     <section class="ai-sec" aria-labelledby="ai-see"><h4 id="ai-see">What assistants can see</h4>
-      <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists, and YouTube videos added on their own.")}
+      <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists, Google Drive folders and courses of files on this computer, and YouTube videos added on their own.")}
         ${sw("mcp_recordings", "Every other transcription: meetings, calls and other files.")}</div></section>
-    <section class="ai-sec" aria-labelledby="ai-change"><h4 id="ai-change">What assistants can change</h4>
-      <div class="set-list">${sw("mcp_write", "Off unless you turn it on. An assistant then saves a corrected version when you ask it to. A save never deletes anything: it is a new version, and History can undo it.", set.mcp_write === true)}</div></section>
+    <section class="ai-sec" aria-labelledby="ai-do"><h4 id="ai-do">What assistants can do</h4>
+      <p class="hint ai-lead">Each is off unless you turn it on. Words in a transcript or on a web page can try to steer an
+        assistant, so it acts only where you allow it here. Starting jobs needs Sedjem to be open.</p>
+      <div class="set-list">${sw("mcp_write", "An assistant saves a corrected version when you ask it to. A save never deletes anything: it is a new version, and History can undo it.", set.mcp_write === true)}
+        ${sw("mcp_links", "An assistant starts transcriptions of the YouTube videos and playlists and Google Drive files and folders you ask it to.", set.mcp_links === true)}
+        ${sw("mcp_files", "An assistant transcribes a recording you ask it to, when the file is inside one of these folders.", set.mcp_files === true)}
+        ${aiFolders(set)}
+        ${sw("mcp_hosted", "An assistant may choose a hosted model, which uploads the recording to its service. Without this, assistants use the models on this computer only.", set.mcp_hosted === true)}</div></section>
     ${rest}`;
+}
+
+// The folders assistants may transcribe files from (mcp_folders), under their switch: each with Remove, and a way to
+// add one: the folder picker in the desktop window, a text field in a browser
+function aiFolders(set) {
+  const saved = Array.isArray(set.mcp_folders) ? set.mcp_folders : [];
+  const found = new Map((AI.data?.folders || []).map((f) => [f.path, f.found]));
+  const rows = saved.map((f, i) => `<li><span class="ai-folder-path">${AI_ICON.folder}<bdi>${esc(f)}</bdi></span>
+      ${found.get(f) === false ? '<span class="pill ai-missing">Not found</span>' : ""}
+      <button type="button" class="btn btn-sm btn-ghost btn-danger" data-ai-folder-remove="${i}" aria-label="Remove the folder ${esc(f)}">Remove</button></li>`).join("");
+  const add = desktopApi()?.pick_folder
+    ? '<button type="button" class="btn btn-sm" id="aiFolderPick">Add a folder…</button>'
+    : `<form class="ai-folder-add" id="aiFolderAdd" autocomplete="off"><label class="ai-folder-field"><span>Add a folder by its full path</span>
+        <input type="text" id="aiFolderPath" value="${esc(AI.draft)}" spellcheck="false" placeholder="The folder's full path"></label>
+        <button type="submit" class="btn btn-sm">Add</button></form>`;
+  return `<div class="set-sub ai-folders" role="group" aria-labelledby="ai-folders-label">
+      <span class="ai-folders-label" id="ai-folders-label">Folders assistants may transcribe files from</span>
+      ${rows ? `<ul class="ai-folder-list">${rows}</ul>` : '<p class="hint ai-no-folder">No folder yet. Without one, assistants can\'t transcribe any file.</p>'}
+      ${add}</div>`;
 }
 
 function aiHiddenSection(hidden) {
@@ -60,7 +91,8 @@ function aiConnectSection(snippets) {
       <pre class="ai-code" tabindex="0" aria-label="The setting for ${esc(s.client)}"><code>${esc(s.text)}</code></pre></div>`).join("");
   return `<section class="ai-sec" aria-labelledby="ai-connect"><h4 id="ai-connect">Connect an assistant</h4>
     <p class="hint ai-lead">Add the setting for your assistant, then restart it; where a file already lists other servers,
-      sedjem goes next to them. Sedjem doesn't need to be running for assistants to read.</p>
+      sedjem goes next to them. Sedjem doesn't need to be running for assistants to read; to start, follow or cancel
+      transcriptions, it must be open.</p>
     <div class="ai-snippets">${blocks}</div></section>`;
 }
 
@@ -98,6 +130,51 @@ function bindAssistants() {
   $$("#settings [data-ai-copy]").forEach((b) => (b.onclick = () => aiCopy(AI.data?.snippets[+b.dataset.aiCopy])));
   const clear = $("#aiClear");
   if (clear) clear.onclick = aiClearLog;
+  $$("#settings [data-ai-folder-remove]").forEach((b) => (b.onclick = () => aiRemoveFolder(+b.dataset.aiFolderRemove)));
+  const pick = $("#aiFolderPick"), form = $("#aiFolderAdd"), field = $("#aiFolderPath");
+  if (pick) pick.onclick = aiPickFolder;
+  if (form) form.onsubmit = (e) => { e.preventDefault(); aiAddFolder(field.value.trim()); };
+  if (field) {
+    field.oninput = () => (AI.draft = field.value);
+    if (document.activeElement === field) field.setSelectionRange(field.value.length, field.value.length);
+  }
+}
+
+// The folders as saved now, and a new list of them saved with the other settings (POST /api/settings checks each).
+// Returns whether it was saved.
+const aiFolderList = () => (Array.isArray(S.status?.settings?.mcp_folders) ? S.status.settings.mcp_folders : []);
+async function aiSaveFolders(folders, said) {
+  try { S.status = await api.post("/api/settings", { mcp_folders: folders }); }
+  catch (e) { toast(e.message, "error"); return false; }
+  toast(said);
+  await loadAssistants();  // whether each one is a folder now; draws Settings again
+  return true;
+}
+
+async function aiAddFolder(path) {
+  if (!path) { toast("Type the folder's full path first", "error"); return; }
+  if (aiFolderList().includes(path)) { toast("That folder is already listed"); return; }
+  if (await aiSaveFolders([...aiFolderList(), path], "Folder added")) {
+    AI.draft = "";
+    renderSettings();
+    $("#aiFolderPath")?.focus();
+  }
+}
+
+async function aiPickFolder() {
+  let path = null;
+  try { path = await desktopApi().pick_folder(); } catch (e) { toast(e.message, "error"); return; }
+  if (!path) return;
+  if (aiFolderList().includes(path)) { toast("That folder is already listed"); return; }
+  if (await aiSaveFolders([...aiFolderList(), path], "Folder added")) $("#aiFolderPick")?.focus();
+}
+
+async function aiRemoveFolder(i) {
+  const list = aiFolderList();
+  if (!(i >= 0 && i < list.length)) return;
+  if (!(await aiSaveFolders(list.filter((_, k) => k !== i), "Folder removed"))) return;
+  const left = $$("#settings [data-ai-folder-remove]");  // the focus goes on to the next one, or to the way to add one
+  (left[Math.min(i, left.length - 1)] || $("#aiFolderPick") || $("#aiFolderPath"))?.focus();
 }
 
 // The switches, what is hidden and what assistants asked, as they are now; each time the tab opens
@@ -143,7 +220,7 @@ async function aiClearLog() {
   } catch (e) { toast(e.message, "error"); }
 }
 
-// Hides a transcription ("job:<id>") or a course ("course:<playlist id>") from assistants, or shows it again.
+// Hides a transcription ("job:<id>") or a course ("course:<course id>") from assistants, or shows it again.
 // Settings and the job page follow at once. Returns whether it was saved.
 async function aiSetHidden(key, hide) {
   try { AI.data = await api.post("/api/assistants/hide", { key, hidden: hide }); }

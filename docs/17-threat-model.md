@@ -3,7 +3,8 @@
 This page weighs, for each part of Sedjem that holds secrets or talks to other programs, what could go wrong, what
 already stops it, and what is left. It was made on 18 November 2026 from the code at 2585786, with STRIDE (spoofing,
 tampering, repudiation, information disclosure, denial of service, elevation of privilege) applied to each place where
-data crosses from one side to another. [How Sedjem fits together](16-architecture.md) shows the parts.
+data crosses from one side to another. [How Sedjem fits together](16-architecture.md) shows the parts. The part on
+assistants was brought up to date on 20 November 2026, when they could start transcriptions.
 
 Three changes would make Sedjem harder to attack, and each has an issue:
 [#125](https://github.com/MohammedEl-sayedAhmed/sedjem/issues/125) (the page and the local server),
@@ -29,8 +30,14 @@ The app's page and its API are served by a local server, which asks for no passw
   program can't know where Sedjem will be; the app opens its page with a browser profile of its own when it finds a
   Chromium-family browser, and offers no installed web app. A port fixed with `--port` or `[server] port` gives that
   up. On Windows the port is opened for the app alone, so no other account can bind it too.
-- A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
-  they are for, and only the user's own window can send them.
+- A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. A path typed
+  in the page, or picked in the desktop app, for a folder of recordings (`POST /api/local/inspect` and
+  `POST /api/local`) lists any folder the user can read, and reads the recordings picked in it. That is what they are
+  for, and only the user's own window can send them. The folder is read by its real path and only its direct entries,
+  and a symbolic link in it that leads to a file anywhere else is skipped, so a lecture is always a file in the folder
+  ([AgDR 24](agdr/AgDR-0024-folders-and-files-on-the-computer-as-courses.md)). A request that names an assistant
+  reads only a file inside the folders the user chose for assistants, and can't list or add a folder
+  ([assistants over MCP](#assistants-over-mcp)).
 - Text from outside (YouTube titles and captions, Google Drive file names, the hosted services'
   transcripts, paired computers, Hugging Face, assistants, release notes) could carry script into the page. Every
   such text is escaped or set as plain text, and links built from data are `https://` only. A one-off review of
@@ -84,11 +91,29 @@ were checked when they were downloaded, or models already in the Hugging Face ca
 An assistant starts the [MCP server](11-assistants.md) itself and talks to it over standard input and output, so
 only programs the user runs can reach it.
 
-- An assistant sees only what the visibility switches allow, and its provider sees what it reads.
+- An assistant sees only what the visibility switches allow, and its provider sees what it reads. Of a course made
+  from a folder or from files on the computer, it sees the course's name and each lecture's title, never a path.
 - A transcript could hold words that try to steer the assistant. Assistants may change transcripts only when that is
   switched on (it is off at first), each change is a new version that can be restored, and every tool call, read
   and prompt is logged.
   The server tells the assistant that transcript text is quoted data, not instructions.
+- Assistants can also start transcriptions, which download from YouTube or Google Drive, read a file on the
+  computer, or upload a recording to a hosted service, and words in a transcript, a video's title or a web page could
+  steer an assistant into starting one. Each kind is off until the user turns it on: links, files in the folders the
+  user chose, and hosted models. The tool descriptions and the server's description say to start a transcription
+  only when the user asks for it, and every look at a link, start and cancel is logged with the transcriptions' ids;
+  each transcription an assistant started says so on its page. A file is taken only when it is a recording inside
+  one of the chosen folders, with every symbolic link followed in its path and in the folder's, so neither `..` nor a
+  link can reach outside them. An assistant never uploads a file of its own, never sends a job to a paired computer,
+  and may cancel only a transcription that an assistant started. Left: within what the user allowed, a steered
+  assistant can still start transcriptions the user didn't ask for; the log and the pages show them.
+- For these tools the MCP server uses the running app's own API, with the app's secret. It sends the secret only
+  after the server on the port noted in the data folder proves that it knows it, so a program that took the port
+  gets nothing but that check; the requests go to 127.0.0.1 through no proxy and follow no redirect, and the secret is
+  never in an answer or in the log. The app's server checks the assistant rules again itself, with the settings as
+  they are then, for every request that names an assistant
+  ([AgDR 22](agdr/AgDR-0022-assistants-start-jobs-through-the-running-app.md)). Left: a program that already has the
+  secret can name an assistant or not, as it likes; it can use the whole API anyway.
 
 ## YouTube links
 
@@ -101,10 +126,20 @@ only programs the user runs can reach it.
 
 ## Google Drive links
 
-- Only links to Drive files on `drive.google.com` and `docs.google.com` are accepted, rebuilt from the file id
-  before yt-dlp sees them, and only yt-dlp's GoogleDrive extractor runs, so its generic one never reads another page
-  and its folder one doesn't run either. A folder's link is refused before yt-dlp sees it; folders are planned. Drive
-  is a new outside host: its playback service and its download hosts are listed in the privacy policy.
+- Only links to Drive files and folders on `drive.google.com` and `docs.google.com` are accepted, rebuilt from the id
+  before anything is asked, and only yt-dlp's GoogleDrive extractor runs, so its generic one never reads another page
+  and its folder one doesn't run either. Drive is an outside host: its playback service, its download hosts and its
+  folder view are listed in the privacy policy.
+- A folder's link is never given to yt-dlp. The app asks `https://drive.google.com/embeddedfolderview` for the
+  folder's page, with the folder's id and a `resourcekey` checked against a short list of characters, follows no
+  redirect (one to Google's sign-in reads as a folder that isn't shared, any other as a refusal), reads at most 8 MB
+  of an HTML answer and refuses anything else. The page is parsed with the standard library's `html.parser`, not
+  with regular expressions over it. Each entry's link is read as a pasted link is, so only a Drive file's id can
+  become a lecture; its name and type are text from the web, shown escaped and never followed. The files picked are
+  then read and downloaded by the file path above, with its hosts, limits and messages, one job each. Left: Google
+  can change the page without notice; the app then says the answer wasn't a folder's list of files, and the tests,
+  which use a copy of the real page's markup, can't see the change
+  ([AgDR 23](agdr/AgDR-0023-google-drive-folders-from-the-embedded-folder-view.md)).
 - A file is downloaded only as itself (yt-dlp's `source` format) and only from `drive.google.com`,
   `docs.google.com`, `drive.usercontent.google.com` or a `*.googleusercontent.com` host. The address yt-dlp read the
   link from is checked, after the redirects of that reading, and so is the answer to the download itself: yt-dlp's
@@ -116,8 +151,8 @@ only programs the user runs can reach it.
   space is checked against the stated size at the first block, and as the bytes come every 32 MB (from the start
   when there is no size), with the same 1 GB margin. The file is then read as an uploaded file is, by the same code. Left: a write error's message can
   name the file's path on the computer in the job's error, as it can for YouTube.
-- Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file that isn't shared with
-  anyone who has the link can't be read.
+- Nothing signs in to Google, so no account, cookie or key of the user's is sent, and a file or folder that isn't
+  shared with anyone who has the link can't be read.
 - The tests run yt-dlp's own Drive extractor, the virus-scan page included, against a stand-in for Google's
   servers ([AgDR 21](agdr/AgDR-0021-google-drive-links-through-yt-dlp.md)).
 
@@ -138,5 +173,5 @@ Aptabase, still sees the address they come from and the operating system and its
 
 ## Who changed what
 
-Each saved version of a transcript records whether the user or an assistant made it, and the MCP log records what
-assistants asked for.
+Each saved version of a transcript records whether the user or an assistant made it, each transcription an assistant
+started is marked with the assistant's name, and the MCP log records what assistants asked for.

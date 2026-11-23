@@ -418,6 +418,8 @@ class SettingsTests(unittest.TestCase):
                                                "speaker_model": "titanet-small", "default_model": None,  # [defaults] model
                                                "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [],
                                                "mcp_write": False,  # assistants only read until the user says
+                                               "mcp_links": False, "mcp_files": False, "mcp_folders": [],  # and start
+                                               "mcp_hosted": False,  # nothing, with no hosted model, until then
                                                "update_check": None, "update_channel": "stable", "update_skip": None,
                                                "usage_counts": None,
                                                "remote_serve": False})  # no port open for other computers until asked
@@ -428,6 +430,7 @@ class SettingsTests(unittest.TestCase):
         self.assertEqual(again.settings(), {"performance_while_running": True, "device": "cpu", "threads": 2,
                                             "speaker_model": "titanet-small", "default_model": None,
                                             "mcp_courses": True, "mcp_recordings": True, "mcp_hidden": [], "mcp_write": False,
+                                            "mcp_links": False, "mcp_files": False, "mcp_folders": [], "mcp_hosted": False,
                                             "update_check": None, "update_channel": "stable", "update_skip": None,
                                             "usage_counts": None, "remote_serve": False})
 

@@ -24,6 +24,7 @@ import webbrowser
 from pathlib import Path
 
 from . import engines, exports, report, updates
+from .assistants import RECORDING_TYPES
 from . import transcript as T
 from . import session
 from .session import Session
@@ -83,8 +84,8 @@ def install_launcher():
         return None
     return dest
 
-RECORDINGS = ("Recordings (*.mp3;*.m4a;*.wav;*.ogg;*.opus;*.flac;*.aac;*.amr;*.wma;*.mp4;*.mkv;*.mov;*.webm;*.avi)",
-              "All files (*.*)")
+# The file picker's filter: the recordings the app takes (app/assistants.py RECORDING_TYPES), or any file
+RECORDINGS = (f"Recordings ({';'.join('*' + t for t in RECORDING_TYPES)})", "All files (*.*)")
 
 
 def running_port(cfg, preferred):
@@ -135,9 +136,19 @@ class Api:
             return getattr(webview.FileDialog, kind)
         return getattr(webview, f"{kind}_DIALOG")
 
-    def pick_file(self):
-        result = self._window.create_file_dialog(self._dialog("OPEN"), allow_multiple=False, file_types=RECORDINGS)
-        return str(result[0]) if result else None
+    def pick_files(self):
+        """Recordings picked here, one or several at once: their paths, or [] when none was picked. The page reads one
+        in place as a file on its own, and several as a course (app/local.py)."""
+        result = self._window.create_file_dialog(self._dialog("OPEN"), allow_multiple=True, file_types=RECORDINGS)
+        return [str(p) for p in result if p] if isinstance(result, (list, tuple)) else [str(result)] if result else []
+
+    def pick_folder(self):
+        """A folder picked here: its path, or None. Settings → Assistants saves it with the other settings (the folders
+        assistants may transcribe files from), and the new transcription page lists its recordings as a course
+        (app/local.py)."""
+        result = self._window.create_file_dialog(self._dialog("FOLDER"))
+        folder = (result[0] if result else None) if isinstance(result, (list, tuple)) else result
+        return str(folder) if folder else None
 
     def save_export(self, job_id, fmt, version=None):
         store = self._app.store
@@ -211,7 +222,8 @@ class Api:
 
 class SessionApi:
     """The bridge of a window that a second start opens on a copy that is already running: the secret, so that its
-    page can be let in, and links. It has no pick_file or save_export, so the page uses the browser's ways."""
+    page can be let in, and links. It has no pick_files, pick_folder or save_export, so the page uses the browser's
+    ways."""
 
     def __init__(self, secret):
         self._secret, self._window = secret, None

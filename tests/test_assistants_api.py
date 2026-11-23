@@ -1,7 +1,10 @@
-"""Tests of Settings → Assistants through the app's HTTP API (app/server.py, over app/assistants.py): the two
-switches, saved with the other settings; what is hidden one by one, with titles (and the key of one deleted
-since); the log of what assistants asked, with the titles it names and in words, and clearing it; the
-connection snippets; and what a transcription's page is told about it. Every change needs the X-Sedjem header.
+"""Tests of Settings → Assistants through the app's HTTP API (app/server.py, over app/assistants.py): the
+switches, saved with the other settings; the folders assistants may transcribe files from; what is hidden one by
+one, with titles (and the key of one deleted since); the log of what assistants asked, with the titles it names and
+in words, and clearing it; the connection snippets; and what a transcription's page is told about it. Every change
+needs the X-Sedjem header. A request that names an assistant (as app/mcp.py sends them) is held to the assistant
+rules by the server itself: the switches, a file only inside an allowed folder, hosted models only when allowed,
+never another computer, and a cancel only of a job an assistant started.
 Run: .venv/bin/python -m unittest discover -s tests -p "test_assistants_api.py" -v
 """
 import json
@@ -11,13 +14,16 @@ import tempfile
 import threading
 import unittest
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from app import assistants, engines  # noqa: E402
+import os  # noqa: E402
+
+from app import assistants, engines, youtube  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.server import make_server  # noqa: E402
 
@@ -57,8 +63,9 @@ class AssistantsApi(unittest.TestCase):
         cls.gpu.stop()
         shutil.rmtree(cls.home, ignore_errors=True)
 
-    def setUp(self):  # each test starts with everything visible, saving off and nothing in the log
-        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[], mcp_write=False)
+    def setUp(self):  # each test starts with everything visible, saving and jobs off and nothing in the log
+        self.cfg.save_settings(mcp_courses=True, mcp_recordings=True, mcp_hidden=[], mcp_write=False, mcp_links=False,
+                               mcp_files=False, mcp_folders=[], mcp_hosted=False)
         assistants.clear_log(self.cfg)
 
     def call(self, method, path, body=None, headers=None):
@@ -80,9 +87,10 @@ class AssistantsApi(unittest.TestCase):
     def test_what_settings_shows(self):
         status, body = self.call("GET", "/api/assistants")
         self.assertEqual(status, 200)
-        self.assertEqual(set(body), {"settings", "hidden", "log", "snippets"})
-        self.assertEqual(body["settings"], {"mcp_courses": True, "mcp_recordings": True, "mcp_write": False})
-        self.assertEqual((body["hidden"], body["log"]), ([], []))
+        self.assertEqual(set(body), {"settings", "folders", "hidden", "log", "snippets"})
+        self.assertEqual(body["settings"], {"mcp_courses": True, "mcp_recordings": True, "mcp_write": False,
+                                            "mcp_links": False, "mcp_files": False, "mcp_hosted": False})
+        self.assertEqual((body["folders"], body["hidden"], body["log"]), ([], [], []))
         self.assertEqual(body["snippets"], assistants.snippets(self.cfg))
         self.assertEqual([s["client"] for s in body["snippets"]], ["Claude Desktop", "Claude Code", "Cursor", "VS Code"])
 
@@ -199,7 +207,8 @@ class AssistantsApi(unittest.TestCase):
         status, st = self.call("POST", "/api/settings", {"mcp_recordings": False})
         self.assertEqual((status, st["settings"]["mcp_recordings"], st["settings"]["mcp_courses"]), (200, False, True))
         self.assertEqual(self.call("GET", "/api/assistants")[1]["settings"],
-                         {"mcp_courses": True, "mcp_recordings": False, "mcp_write": False}, "saving is off at first")
+                         {"mcp_courses": True, "mcp_recordings": False, "mcp_write": False, "mcp_links": False,
+                          "mcp_files": False, "mcp_hosted": False}, "saving and starting jobs are off at first")
         status, st = self.call("GET", "/api/status")
         self.assertEqual(status, 200)
         self.assertEqual({k: st["settings"][k] for k in ("mcp_courses", "mcp_recordings", "mcp_hidden")},
@@ -215,6 +224,100 @@ class AssistantsApi(unittest.TestCase):
             self.assertEqual(self.call("POST", "/api/settings", {"mcp_write": bad})[0], 400, bad)
         self.assertTrue(self.cfg.settings()["mcp_write"])
         self.assertEqual(self.call("POST", "/api/settings", {"mcp_write": False})[1]["settings"]["mcp_write"], False)
+
+    def test_the_job_switches_and_the_folders_are_saved(self):
+        folder = self.home / "recordings"
+        folder.mkdir(exist_ok=True)
+        status, st = self.call("POST", "/api/settings", {"mcp_links": True, "mcp_files": True, "mcp_hosted": True,
+                                                         "mcp_folders": [str(folder), str(self.home / "gone")]})
+        self.assertEqual(status, 200, st)
+        self.assertEqual(st["settings"]["mcp_folders"], [str(folder), str(self.home / "gone")])
+        body = self.call("GET", "/api/assistants")[1]
+        self.assertEqual({k: body["settings"][k] for k in ("mcp_links", "mcp_files", "mcp_hosted")},
+                         {"mcp_links": True, "mcp_files": True, "mcp_hosted": True})
+        self.assertEqual(body["folders"], [{"path": str(folder), "found": True}, {"path": str(self.home / "gone"), "found": False}])
+        self.assertEqual(Config(home=self.home).settings()["mcp_folders"], [str(folder), str(self.home / "gone")],
+                         "kept for the next start")
+        for bad in ({"mcp_links": "true"}, {"mcp_files": 1}, {"mcp_hosted": None}, {"mcp_folders": "recordings"},
+                    {"mcp_folders": ["recordings"]}, {"mcp_folders": [str(folder), str(folder)]},
+                    {"mcp_folders": [f" {folder}"]}, {"mcp_folders": [3]}, {"mcp_folders": [""]},
+                    {"mcp_folders": [str(self.home / "x\0y")]}, {"mcp_folders": [str(self.home / ("x" * 1001))]},
+                    {"mcp_folders": [str(self.home / f"f{i}") for i in range(51)]}):
+            self.assertEqual(self.call("POST", "/api/settings", bad)[0], 400, bad)
+        self.assertEqual(self.cfg.settings()["mcp_folders"], [str(folder), str(self.home / "gone")], "unchanged")
+
+    def test_an_assistants_requests_are_held_to_the_rules_by_the_app_itself(self):
+        """What app/mcp.py checks first is checked again here, for any request that names an assistant."""
+        self.addCleanup(self.forget_new_jobs)
+        folder, outside = self.home / "recordings", self.home / "elsewhere.m4a"
+        folder.mkdir(exist_ok=True)
+        (folder / "standup.m4a").write_bytes(b"(a recording)")
+        outside.write_bytes(b"(a recording outside the folder)")
+        playlist = {"site": "youtube", "kind": "playlist", "id": "PLabcdefghij", "title": "A course", "count": 1,
+                    "url": "https://www.youtube.com/playlist?list=PLabcdefghij",
+                    "entries": [{"id": "dQw4w9WgXcQ", "title": "One", "index": 1, "available": True}]}
+        mine = {"path": str(folder / "standup.m4a"), "model": "cohere", "assistant": "Rogue 1.0"}
+        link = {"url": playlist["url"], "model": "cohere", "assistant": "Rogue 1.0"}
+        with mock.patch.object(Config, "availability", lambda cfg, model: (True, None)), \
+                mock.patch.object(self.app.runner, "submit"), mock.patch.object(youtube, "inspect", return_value=playlist):
+            def refused(method, path, body, status=403):
+                got = self.call(method, path, body)
+                self.assertEqual(got[0], status, (path, body, got))
+                return got[1]["error"]
+            self.assertIn("may not transcribe files", refused("POST", "/api/jobs", mine))
+            self.assertIn("may not start transcriptions from links", refused("POST", "/api/link/inspect", link))
+            self.assertIn("may not start transcriptions from links", refused("POST", "/api/link", link))
+            self.cfg.save_settings(mcp_files=True, mcp_folders=[str(folder)], mcp_links=True)
+            self.assertIn("is not inside a folder", refused("POST", "/api/jobs", {**mine, "path": str(outside)}))
+            self.assertIn("is not inside a folder", refused("POST", "/api/jobs", {**mine, "path": str(folder / ".." / outside.name)}))
+            self.assertIn("another computer", refused("POST", "/api/jobs", {**mine, "run_on": "0" * 12}))
+            self.assertEqual(refused("POST", "/api/jobs", {**mine, "assistant": 3}, 400), "assistant must be the assistant's name")
+            hosted = {**mine, "model": "elevenlabs", "confirm_upload": True}
+            self.assertIn("hosted models are off for assistants", refused("POST", "/api/jobs", hosted))
+            self.assertIn("hosted models are off for assistants", refused("POST", "/api/link", {**link, "model": "elevenlabs",
+                                                                                                "confirm_upload": True}))
+            odd = {"id": "odd", "kind": "satellite", "title": "A kind added later", "prompt": False}
+            with mock.patch.dict(self.app.cfg.models, {"odd": odd}):
+                self.assertIn("hosted models are off for assistants", refused("POST", "/api/jobs", {**mine, "model": "odd"}),
+                              "any kind but local counts as hosted")
+            query = urllib.parse.urlencode({"model": "cohere", "name": "x.m4a", "assistant": "Rogue",
+                                            "path": str(folder / "standup.m4a")})  # (a path that would pass)
+            req = urllib.request.Request(self.base + f"/api/jobs?{query}", data=b"(sound)",
+                                         method="POST", headers={"X-Sedjem": "1", "X-Sedjem-Token": self.app.session.secret,
+                                                                 "Content-Type": "audio/mp4"})
+            with self.assertRaises(urllib.error.HTTPError) as upload:
+                urllib.request.urlopen(req, timeout=30)
+            self.assertEqual(upload.exception.code, 403, "an assistant never uploads")
+            self.assertEqual(sum(1 for j in self.app.store.list() if j.get("assistant")), 0, "nothing was started")
+
+            status, job = self.call("POST", "/api/jobs", mine)
+            self.assertEqual((status, job["assistant"]), (201, {"client": "Rogue 1.0"}))
+            self.assertEqual(self.app.store.get(job["id"])["source_path"], os.path.realpath(folder / "standup.m4a"))
+            self.cfg.save_settings(mcp_hosted=True)
+            self.assertEqual(self.call("POST", "/api/jobs", hosted)[0], 201)
+            status, found = self.call("POST", "/api/link", link)
+            self.assertEqual((status, [j["assistant"] for j in found["jobs"]]), (201, [{"client": "Rogue 1.0"}]))
+            status, own = self.call("POST", "/api/jobs", {"path": str(outside), "model": "cohere"})
+            self.assertEqual((status, own["assistant"]), (201, None), "the user's own window isn't held to them")
+
+            self.assertEqual(refused("POST", f"/api/jobs/{own['id']}/cancel", {"assistant": "Rogue 1.0"}),
+                             "an assistant may cancel only a transcription that an assistant started")
+            self.assertEqual(self.app.store.get(own["id"])["status"], "preparing")
+            self.hide(f"job:{job['id']}")
+            self.assertEqual(refused("POST", f"/api/jobs/{job['id']}/cancel", {"assistant": "Rogue 1.0"}, 404),
+                             "no such transcription")
+            self.hide(f"job:{job['id']}", False)
+            self.cfg.save_settings(mcp_files=False, mcp_links=False)
+            self.assertIn("may not start transcriptions", refused("POST", f"/api/jobs/{job['id']}/cancel", {"assistant": "Rogue 1.0"}))
+            self.cfg.save_settings(mcp_files=True)
+            status, now = self.call("POST", f"/api/jobs/{job['id']}/cancel", {"assistant": "Rogue 1.0"})
+            self.assertEqual((status, now["status"]), (200, "cancelled"))
+
+    def forget_new_jobs(self):
+        """The other tests count on the four transcriptions of setUpClass."""
+        for j in self.app.store.list():
+            if j["id"] not in {jid for jid, _, _ in JOBS}:
+                self.app.store.delete(j["id"])
 
     def test_a_saved_version_stands_out_in_the_log(self):
         assistants.log(self.cfg, "Claude Desktop 1.2", "save_version", "Saved version 3 of Sprint planning", [MEETING], 3)

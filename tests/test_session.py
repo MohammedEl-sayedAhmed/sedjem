@@ -25,7 +25,7 @@ from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
-from app import desktop, server, session as sessions  # noqa: E402
+from app import assistants, desktop, server, session as sessions  # noqa: E402
 from app import __main__ as cli  # noqa: E402
 from app.config import Config  # noqa: E402
 from app.session import HEADER, LOGIN_FILE, STORAGE_KEY, Session, write_private  # noqa: E402
@@ -394,7 +394,38 @@ class Desktop(unittest.TestCase):
         api = desktop.SessionApi("s" * 64)
         self.assertEqual(api.session(), "s" * 64)
         self.assertTrue(callable(api.open_url))
-        self.assertFalse(hasattr(api, "pick_file") or hasattr(api, "save_export"))  # the page uses the browser's
+        self.assertFalse(hasattr(api, "pick_files") or hasattr(api, "save_export") or hasattr(api, "pick_folder"))  # the page uses the browser's
+
+    def test_the_desktop_window_picks_a_folder_for_assistants(self):
+        """Settings → Assistants in the desktop window adds a folder with the system's folder picker."""
+        api = desktop.Api(mock.Mock())
+        api._window, api._dialog = mock.Mock(), lambda kind: kind
+        api._window.create_file_dialog.return_value = ["/home/you/Recordings"]
+        self.assertEqual(api.pick_folder(), "/home/you/Recordings")
+        self.assertEqual(api._window.create_file_dialog.call_args.args, ("FOLDER",))
+        for nothing in (None, [], ""):
+            api._window.create_file_dialog.return_value = nothing
+            self.assertIsNone(api.pick_folder(), "none picked")
+
+    def test_the_desktop_window_picks_one_recording_or_several(self):
+        """The new transcription page's file picker: one recording, or several at once to make a course
+        (app/local.py), each by its path, with the recordings the app takes as its filter."""
+        api = desktop.Api(mock.Mock())
+        api._window, api._dialog = mock.Mock(), lambda kind: kind
+        api._window.create_file_dialog.return_value = ("/home/you/Lectures/Lecture 1.mp3", "/home/you/Lectures/Lecture 2.mp3")
+        self.assertEqual(api.pick_files(), ["/home/you/Lectures/Lecture 1.mp3", "/home/you/Lectures/Lecture 2.mp3"])
+        call = api._window.create_file_dialog.call_args
+        self.assertEqual((call.args, call.kwargs["allow_multiple"]), (("OPEN",), True))
+        self.assertEqual(call.kwargs["file_types"], desktop.RECORDINGS)
+        self.assertEqual(desktop.RECORDINGS[0], "Recordings (" + ";".join(f"*{t}" for t in assistants.RECORDING_TYPES) + ")",
+                         "the one list of the recordings the app takes")
+        api._window.create_file_dialog.return_value = ["/home/you/call.m4a"]
+        self.assertEqual(api.pick_files(), ["/home/you/call.m4a"])
+        api._window.create_file_dialog.return_value = "/home/you/call.m4a"  # (a dialog that gives one path as text)
+        self.assertEqual(api.pick_files(), ["/home/you/call.m4a"])
+        for nothing in (None, [], (), ""):
+            api._window.create_file_dialog.return_value = nothing
+            self.assertEqual(api.pick_files(), [], "none picked")
 
     def test_the_address_shown_names_the_login_page(self):
         with mock.patch("sys.stdout", new_callable=io.StringIO) as out:

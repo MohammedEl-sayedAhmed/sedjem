@@ -1,5 +1,5 @@
 """Google Drive links: a file shared with anyone who has the link, downloaded with yt-dlp and transcribed like a file
-on the computer.
+on the computer, or a shared folder, whose audio and video files become a course.
 
 inspect() reads a link to a file: its name and length. download() fetches it for a job: the file itself as Drive
 keeps it (yt-dlp's "source" format, never a copy Drive made to play a video), as source.<ext>. The job then goes on
@@ -8,21 +8,31 @@ transcript (app/video.py). Drive links have no streaming and no captions. Before
 page saying it can't scan the file for viruses; yt-dlp's GoogleDrive extractor submits that page's form and
 downloads the file.
 
-A link to a Drive folder is recognised and refused (FOLDERS_LATER), before yt-dlp sees it: yt-dlp's folder extractor
-fails on Drive as it is now (yt-dlp issue 10484), so folders wait until it works again.
+inspect() also reads a link to a folder, without yt-dlp: its folder extractor fails on Drive as it is now (yt-dlp
+issue 10484). Sedjem asks Drive's embedded view of the folder (LISTING), a plain HTML page that Drive serves for a
+folder shared with anyone who has the link, and reads it with html.parser: the folder's name, and each entry's link,
+type and name. Its audio and video files are listed in natural name order ("Lecture 2" before "Lecture 10"), and its
+subfolders and other files are counted and skipped. The files picked become one course, each a lecture that is then
+downloaded as a Drive file on its own. The view has no sizes or lengths, and Google can change it without notice.
 
 yt-dlp is used as for YouTube links (app/youtube.py's _ydl and _extract), with lists of Drive's own: the links it
 takes (HOSTS), its GoogleDrive extractor and no other, so its generic one never runs (EXTRACTORS), and the hosts a
 file may come from (DOWNLOAD_HOSTS and DOWNLOAD_DOMAINS), checked on the address yt-dlp read the link from and again
-on the answer to the download itself, after any redirect. Nothing signs in to Google, so a file that isn't shared
-with anyone who has the link is refused, and so is one that was removed (PRIVATE).
+on the answer to the download itself, after any redirect. A folder's page is asked of drive.google.com alone, and a
+redirect is never followed. Nothing signs in to Google, so a file or folder that isn't shared with anyone who has the
+link is refused, and so is one that was removed (PRIVATE, PRIVATE_FOLDER).
 """
+import http.client
 import re
 import shutil
+import urllib.error
 import urllib.parse
+import urllib.request
+from html.parser import HTMLParser
 from pathlib import Path
 
 from . import youtube
+from .assistants import RECORDING_TYPES
 from .engines import Cancelled
 
 HOSTS = {"drive.google.com", "docs.google.com"}  # the links it takes
@@ -31,10 +41,14 @@ EXTRACTOR_KEYS = {"GoogleDrive"}
 DOWNLOAD_HOSTS = {"drive.google.com", "docs.google.com", "drive.usercontent.google.com"}  # where a file comes from,
 DOWNLOAD_DOMAINS = (".googleusercontent.com",)  # or where Drive sends its download on to
 DRIVE_ID = re.compile(r"[A-Za-z0-9_-]{28,100}")  # a file's or a folder's id (yt-dlp's take 28 or more)
-NOT_DRIVE = "paste the link of a Google Drive file"
-FOLDERS_LATER = "Google Drive folders can't be read yet. Add the files one by one, each with its own link."
+NOT_DRIVE = "paste the link of a Google Drive file or folder"
+NOT_A_FILE = "this is the link of a Google Drive folder, not of a file"
 PRIVATE = "This file isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet."
+PRIVATE_FOLDER = "This folder isn't shared with anyone who has the link. Sedjem can't sign in to Google Drive yet."
 BUSY = "Google Drive is limiting this file for now, as it does when many people open it. Try again later."
+BUSY_FOLDER = "Google Drive is limiting this folder for now, as it does when many people open it. Try again later."
+NOT_LISTED = "Google Drive answered with a page that isn't the folder's list of files, so the folder couldn't be read"
+TOO_LONG = "this folder's list of files is too long to read; add its files, or its subfolders, on their own"
 NO_DOWNLOAD = "Google Drive doesn't offer this file for download; its owner may have turned downloading off"
 NOT_MEDIA = "this file isn't audio or video"
 ELSEWHERE = "Google Drive sent the download to another site ({}), so nothing of it was kept"
@@ -44,6 +58,15 @@ OTHER_FILES = {  # the extensions of files that are clearly not audio or video: 
     "numbers", "epub", "mobi", "html", "htm", "xml", "json", "srt", "vtt", "ass", "jpg", "jpeg", "png", "gif", "bmp",
     "webp", "heic", "svg", "tif", "tiff", "psd", "ai", "eps", "zip", "rar", "7z", "gz", "tar", "exe", "msi", "dmg",
     "apk", "iso", "py", "js", "ipynb"}
+LISTING = "https://drive.google.com/embeddedfolderview"  # Drive's embedded view of a folder: plain HTML, no sign-in
+LISTING_HOSTS = {"drive.google.com"}  # where a folder's page may come from (no redirect is followed)
+ICON_HOST = "drive-thirdparty.googleusercontent.com"  # a file's icon there names its type: /16/type/<MIME type>
+MIME = re.compile(r"[a-z0-9][a-z0-9.+-]{0,126}/[a-z0-9][a-z0-9.+-]{0,126}")
+RESOURCE_KEY = re.compile(r"[A-Za-z0-9_-]{1,128}")  # a folder link's resourcekey=, passed on to the listing
+GENERIC = ("", "application/octet-stream")  # no type, or none Drive knew: the file's extension decides
+FOLDER_TIMEOUT = 30         # seconds to wait for a folder's page
+MAX_PAGE = 8 * 1024 ** 2    # a folder's page is read up to this many bytes (about 6,000 entries)
+MAX_FILES = youtube.MAX_ENTRIES  # a folder's audio and video files are listed up to this many, as a playlist's videos
 MARGIN = 1e9                # bytes kept free on the disk, beyond the file and the sound made from it
 SOUND_SHARE = 0.2           # the sound made from a file takes up to this share of its size again
 CHECK_EVERY = 32 * 1024 ** 2  # without a size from Drive, the free space is checked each time this much has come
@@ -101,10 +124,10 @@ def parse(url):
 
 def check_url(url):
     """A Drive file's link rebuilt from its id, …/file/d/<id>/view, so nothing else of it reaches yt-dlp. A folder's
-    link is refused with FOLDERS_LATER."""
+    link is refused: yt-dlp never reads folders (list_folder does)."""
     kind, fid = parse(url)
     if kind == "folder":
-        raise DriveError(FOLDERS_LATER)
+        raise DriveError(NOT_A_FILE)
     return file_url(fid)
 
 
@@ -158,11 +181,19 @@ def _extract(ydl, url):
 
 # ---- reading a link ---------------------------------------------------------------------------------
 
+def title_of(name):
+    """A file's name without its extension, as an uploaded file's title is."""
+    return (name[:-len(extension(name)) - 1].strip() if extension(name) else name) or name
+
+
 def inspect(cfg, url):
     """A link's file, in the shape of a YouTube video's (app/youtube.py's inspect), for the same form: {"site"
     ("drive"), "kind" ("file"), "id", "title" (its name without the extension, as an uploaded file's), "name", "url",
-    "count", "duration", "entries" (the file, as the one entry)}."""
-    check_url(url)  # a folder's link is refused before anything is asked of Drive
+    "count", "duration", "entries" (the file, as the one entry)}. A folder's link gives its files instead
+    (inspect_folder), and yt-dlp isn't asked."""
+    if parse(url)[0] == "folder":
+        return inspect_folder(url)
+    check_url(url)
     with _ydl(cfg) as ydl:
         info = _extract(ydl, url)
     fid = str(info.get("id") or "")
@@ -174,11 +205,197 @@ def inspect(cfg, url):
     if not pick_source(info.get("formats")):
         raise DriveError(NO_DOWNLOAD)
     duration = info.get("duration") if isinstance(info.get("duration"), (int, float)) else None
-    title = (name[:-len(extension(name)) - 1].strip() if extension(name) else name) or name
-    entry = {"id": fid, "name": name, "title": title, "index": 1,
+    entry = {"id": fid, "name": name, "title": title_of(name), "index": 1,
              "duration": duration, "url": file_url(fid), "available": True, "live": False, "captions": None, "use": None}
     return {"site": "drive", "kind": "file", "id": fid, "title": entry["title"], "name": name, "url": entry["url"],
             "count": 1, "duration": duration, "entries": [entry]}
+
+
+# ---- folders ---------------------------------------------------------------------------------------
+
+def folder_url(fid):
+    return f"https://drive.google.com/drive/folders/{fid}"
+
+
+def folder_link(url):
+    """(id, resource key or None) of a link to a Drive folder; DriveError for anything else. The resource key is the
+    link's resourcekey=, which Drive puts in the links of some folders shared before 2021."""
+    kind, fid = parse(url)
+    if kind != "folder":
+        raise DriveError(NOT_DRIVE)
+    query = urllib.parse.parse_qs(urllib.parse.urlsplit(youtube.with_scheme(str(url).strip())).query)
+    key = (query.get("resourcekey") or [None])[0]
+    if key is not None and not RESOURCE_KEY.fullmatch(key):
+        raise DriveError(NOT_DRIVE)
+    return fid, key
+
+
+def listing_url(fid, key=None):
+    return LISTING + "?" + urllib.parse.urlencode({"id": fid, **({"resourcekey": key} if key else {})})
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """A folder's page comes from the address asked for or not at all: a redirect is an answer, never followed."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+OPENER = urllib.request.build_opener(_NoRedirect)
+
+
+def _folder_page(fid, key=None):
+    """The HTML of Drive's embedded view of a folder, from drive.google.com. Drive answers a folder it won't show to
+    someone who isn't signed in as it answers one that doesn't exist (404), or sends them to sign in: either is
+    PRIVATE_FOLDER. Too many requests (429) is BUSY_FOLDER."""
+    request = urllib.request.Request(listing_url(fid, key), headers={"User-Agent": "Sedjem", "Accept": "text/html"})
+    try:
+        with OPENER.open(request, timeout=FOLDER_TIMEOUT) as answer:
+            if answer.status != 200 or not youtube.on_hosts(answer.url, LISTING_HOSTS) \
+                    or answer.headers.get_content_type() != "text/html":
+                raise DriveError(NOT_LISTED)
+            body = answer.read(MAX_PAGE + 1)
+    except urllib.error.HTTPError as e:
+        to = e.headers.get("Location") if e.headers else None
+        e.close()
+        if e.code in (400, 401, 403, 404) or 300 <= e.code < 400 and youtube.link_host(to) == "accounts.google.com":
+            raise DriveError(PRIVATE_FOLDER)
+        if e.code == 429:
+            raise DriveError(BUSY_FOLDER)
+        raise DriveError(f"Google Drive didn't list the folder: it answered {e.code}")
+    except (OSError, ValueError, http.client.HTTPException) as e:  # no connection, a timeout, an answer cut short
+        raise DriveError(f"Google Drive couldn't be reached: {getattr(e, 'reason', None) or e}")
+    if len(body) > MAX_PAGE:
+        raise DriveError(TOO_LONG)
+    return body.decode("utf-8", errors="replace")
+
+
+def icon_type(src):
+    """The MIME type a file's icon names (…googleusercontent.com/16/type/video/mp4 is video/mp4), or ""."""
+    try:
+        p = urllib.parse.urlsplit(str(src or ""))
+    except ValueError:
+        return ""
+    parts = p.path.split("/")
+    if p.scheme != "https" or (p.hostname or "").lower() != ICON_HOST or len(parts) < 5 or parts[2] != "type":
+        return ""
+    mime = urllib.parse.unquote("/".join(parts[3:])).lower()
+    return mime if MIME.fullmatch(mime) else ""
+
+
+class FolderPage(HTMLParser):
+    """Drive's embedded view of a folder, read tag by tag: the folder's name (the page's title), whether the page has
+    the list of entries at all (listed), and its entries in the page's order, each {"href" (its link), "type" (the
+    MIME type its icon names, "" without one), "folder" (its icon says Folder), "name"}. Each entry is a div of class
+    flip-entry, with a link, an icon and a div of class flip-entry-title."""
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.title, self.listed, self.entries = "", False, []
+        self._text = None  # what the text being read belongs to: "title", "name", or None
+        self._entry = None
+
+    def handle_starttag(self, tag, attrs):
+        a = {k: v or "" for k, v in attrs}
+        classes = a.get("class", "").split()
+        if tag == "title" and not self.title and self._entry is None:
+            self._text = "title"
+        elif tag == "div" and "flip-entries" in classes:
+            self.listed = True
+        elif tag == "div" and "flip-entry" in classes:
+            self._entry = {"href": "", "type": "", "folder": False, "name": ""}
+            self.entries.append(self._entry)
+        elif self._entry is None:
+            return
+        elif tag == "a" and not self._entry["href"]:
+            self._entry["href"] = a.get("href", "")
+        elif tag == "img":
+            self._entry["type"] = icon_type(a.get("src")) or self._entry["type"]
+        elif tag == "div" and "flip-entry-title" in classes:
+            self._entry["name"], self._text = "", "name"
+        elif a.get("aria-label") == "Folder":
+            self._entry["folder"] = True
+
+    def handle_endtag(self, tag):
+        if tag in ("title", "div"):
+            self._text = None
+
+    def handle_data(self, data):
+        if self._text == "title":
+            self.title += data
+        elif self._text == "name":
+            self._entry["name"] += data
+
+
+def is_media(name, mime):
+    """Whether a file in a folder is audio or video: by the MIME type Drive gives it, or, when Drive gives none or
+    only a generic one, by its name's extension, one of the recordings the app takes (app/assistants.py)."""
+    if mime.startswith(("audio/", "video/")):
+        return True
+    return mime in GENERIC and f".{extension(name)}" in RECORDING_TYPES
+
+
+def natural_key(name):
+    """A name's place in natural order: its runs of digits compared as numbers, so "Lecture 2" comes before
+    "Lecture 10", and the rest without regard to case."""
+    parts = re.split(r"(\d+)", str(name)[:500].casefold())
+    return [int(p) if i % 2 else p for i, p in enumerate(parts)]
+
+
+def list_folder(fid, key=None):
+    """A shared folder's contents, from its page (_folder_page, FolderPage): {"name", "files" ([(name, id, MIME
+    type)] of its audio and video files, in natural name order), "folders" (how many subfolders), "others" (how many
+    other files)}. A subfolder is known by its link (…/drive/folders/<id>) or its icon; a file by its link
+    (…/file/d/<id>/view), and anything else, a Google Docs file among them, is another file."""
+    page = FolderPage()
+    page.feed(_folder_page(fid, key))
+    page.close()
+    if not page.listed:
+        raise DriveError(NOT_LISTED)
+    files, folders, others, seen = [], 0, 0, set()
+    for e in page.entries:
+        try:
+            kind, eid = parse(e["href"])
+        except DriveError:
+            kind, eid = None, ""
+        name = " ".join(e["name"].split()) or eid
+        if kind == "folder" or e["folder"]:
+            folders += 1
+        elif kind == "file" and is_media(name, e["type"]):
+            if eid not in seen:  # (the same file twice is listed once)
+                seen.add(eid)
+                files.append((name, eid, e["type"]))
+        else:
+            others += 1
+    files.sort(key=lambda f: (natural_key(f[0]), f[0]))
+    return {"name": " ".join(page.title.split()), "files": files, "folders": folders, "others": others}
+
+
+def skipped_words(skipped):
+    """What a folder's listing left out, in words: "2 subfolders and 1 other file", or ""."""
+    n, m = skipped.get("folders") or 0, skipped.get("files") or 0
+    parts = [f"{n} subfolder{'' if n == 1 else 's'}" if n else "", f"{m} other file{'' if m == 1 else 's'}" if m else ""]
+    return " and ".join(p for p in parts if p)
+
+
+def inspect_folder(url):
+    """A folder link's audio and video files, in the shape of a YouTube playlist's (app/youtube.py's inspect): {"site"
+    ("drive"), "kind" ("folder"), "id", "title" (the folder's name), "url", "count", "duration" (None: the view has
+    no lengths), "entries" (each file numbered in natural name order, titled after its name without the extension),
+    "skipped" ({"folders", "files"}: the subfolders and the other files), "cut" (more than MAX_FILES were found)}."""
+    fid, key = folder_link(url)
+    found = list_folder(fid, key)
+    skipped = {"folders": found["folders"], "files": found["others"]}
+    if not found["files"]:
+        words = skipped_words(skipped)
+        raise DriveError(f"this folder has no audio or video files ({words} skipped)" if words else "this folder is empty")
+    files = found["files"][:MAX_FILES]
+    entries = [{"id": eid, "name": name, "title": title_of(name), "index": i, "duration": None, "url": file_url(eid),
+                "available": True, "live": False, "captions": None, "use": None, "type": mime}
+               for i, (name, eid, mime) in enumerate(files, 1)]
+    return {"site": "drive", "kind": "folder", "id": fid, "title": found["name"] or "Google Drive folder",
+            "name": found["name"], "url": folder_url(fid), "count": len(entries), "duration": None, "entries": entries,
+            "skipped": skipped, "cut": len(found["files"]) > MAX_FILES}
 
 
 # ---- downloading -----------------------------------------------------------------------------------

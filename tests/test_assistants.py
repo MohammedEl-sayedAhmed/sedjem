@@ -1,8 +1,11 @@
-"""Tests for what assistants may see over MCP (app/assistants.py): the two switches and hiding one by one, the
-settings' checks, the access log (kept short, never failing a request), and the connection snippets.
+"""Tests for what assistants may see and do over MCP (app/assistants.py): the two switches and hiding one by one,
+the switches that let them act (off until turned on, and only a real true turns one on), the folders they may
+transcribe files from and the check of a file's path, the settings' checks, the access log (kept short, never failing
+a request), and the connection snippets.
 Run: .venv/bin/python -m unittest discover -s tests -v
 """
 import json
+import os
 import shutil
 import sys
 import tempfile
@@ -87,11 +90,56 @@ class Visibility(unittest.TestCase):
         for value in ("job:20261019-100000-aaaa", ["job:x"], [1], {"job": 1}):
             with self.assertRaises(ValueError):
                 self.cfg.save_settings(mcp_hidden=value)
-        for key in ("mcp_courses", "mcp_recordings", "mcp_write"):
+        for key in ("mcp_courses", "mcp_recordings", "mcp_write", "mcp_links", "mcp_files", "mcp_hosted"):
             for value in ("yes", 1, None):
                 with self.assertRaises(ValueError, msg=(key, value)):
                     self.cfg.save_settings(**{key: value})
         self.assertEqual(self.cfg.settings()["mcp_hidden"], [])
+
+    def test_acting_is_off_until_turned_on(self):
+        s = self.cfg.settings()
+        self.assertEqual([f(self.cfg) for f in (assistants.links, assistants.files, assistants.hosted, assistants.starts_jobs)],
+                         [False] * 4)
+        self.assertEqual(s["mcp_folders"], [])
+        self.cfg.save_settings(mcp_files=True)
+        self.assertEqual((assistants.files(self.cfg), assistants.starts_jobs(self.cfg), assistants.links(self.cfg)),
+                         (True, True, False))
+        self.cfg.save_settings(mcp_files=False, mcp_hosted=True)
+        self.assertFalse(assistants.starts_jobs(self.cfg), "hosted models alone start nothing")
+        self.cfg.settings_path.write_text(json.dumps({"mcp_links": "yes", "mcp_files": 1, "mcp_hosted": "true"}),
+                                          encoding="utf-8")  # changed by hand
+        self.assertEqual([f(self.cfg) for f in (assistants.links, assistants.files, assistants.hosted)], [False] * 3,
+                         "only a real true turns one on")
+
+    def test_the_path_of_a_file_an_assistant_asks_for(self):
+        allowed, other = self.home / "music", self.home / "music-other"
+        for folder in (allowed, other):
+            folder.mkdir()
+            (folder / "talk.mp3").write_bytes(b"(a recording)")
+        (allowed / "TALK.WAV").write_bytes(b"(a recording)")
+        settings = {"mcp_folders": [str(allowed), "relative/folder", 5, str(self.home / "gone")]}
+        self.assertEqual(assistants.folders(settings), [os.path.realpath(allowed)], "only folders that are there")
+        self.assertEqual(assistants.recording_path(str(allowed / "talk.mp3"), settings), os.path.realpath(allowed / "talk.mp3"))
+        self.assertEqual(assistants.recording_path(str(allowed / "TALK.WAV"), settings), os.path.realpath(allowed / "TALK.WAV"),
+                         "an extension in capitals")
+        for path in (other / "talk.mp3", allowed / ".." / "music-other" / "talk.mp3", allowed, self.home):
+            with self.assertRaises(assistants.Refused, msg=str(path)):
+                assistants.recording_path(str(path), settings)
+        for bad in (None, "", "talk.mp3", str(allowed / "a\0b.mp3"), 7):
+            with self.assertRaises(assistants.Refused, msg=repr(bad)):
+                assistants.recording_path(bad, settings)
+        with self.assertRaises(assistants.Refused):
+            assistants.recording_path(str(allowed / "talk.mp3"), {"mcp_folders": "not a list"})
+
+    def test_the_folders_setting_is_checked(self):
+        folder = str(self.home / "music")
+        self.assertEqual(self.cfg.save_settings(mcp_folders=[folder])["mcp_folders"], [folder],
+                         "a folder that isn't there yet can be saved: it allows nothing until it is")
+        for value in ("music", [folder, folder], ["music"], [None], [""], [folder + " "], [folder + "\0"],
+                      [str(self.home / ("x" * 1000))], [str(self.home / f"f{i}") for i in range(assistants.MAX_FOLDERS + 1)]):
+            with self.assertRaises(ValueError, msg=repr(value)[:80]):
+                self.cfg.save_settings(mcp_folders=value)
+        self.assertEqual(self.cfg.settings()["mcp_folders"], [folder])
 
     def test_an_entry_changed_by_hand_does_not_block_hiding(self):
         for bad in (["job:../../etc", 5, f"job:{MEETING['id']}"], "job:x", 7):

@@ -8,7 +8,8 @@ Sedjem, [the privacy policy](privacy.md) lists everything it contacts, and
 ## What Sedjem talks to
 
 You work in Sedjem's window. Each arrow gives the main reason for a connection, and the privacy policy gives the
-details. An assistant reaches the transcripts through MCP, and a paired computer of yours can run jobs for this one.
+details. An assistant reaches the transcripts through MCP, and starts transcriptions there when you allow it, and a
+paired computer of yours can run jobs for this one.
 
 ```mermaid
 flowchart LR
@@ -20,17 +21,17 @@ flowchart LR
   models["Model hosts<br/>Hugging Face, GitHub releases<br/>and PyPI's file host"]
   github["GitHub<br/>releases and the tested main branch"]
   youtube["YouTube<br/>videos and captions from links"]
-  gdrive["Google Drive<br/>shared files from links"]
+  gdrive["Google Drive<br/>shared files and folders from links"]
   aptabase["Aptabase<br/>anonymous usage counts"]
 
   you -->|"adds recordings,<br/>reads transcripts"| sedjem
-  assistant -->|"reads transcripts<br/>(MCP over stdio)"| sedjem
+  assistant -->|"reads transcripts, starts jobs<br/>when you allow it (MCP over stdio)"| sedjem
   sedjem -->|"sends audio, gets the transcript<br/>(HTTPS, TLS 1.3)"| other
   sedjem -->|"uploads a recording<br/>after you allow it"| hosted
   sedjem -->|"downloads the models and<br/>libraries you choose"| models
   sedjem -->|"checks for updates if you agreed,<br/>downloads one when you ask"| github
   sedjem -->|"fetches a linked video"| youtube
-  sedjem -->|"fetches a linked file"| gdrive
+  sedjem -->|"lists a linked folder,<br/>fetches a linked file"| gdrive
   sedjem -->|"sends the counts<br/>when allowed"| aptabase
 
   classDef person fill:#08427b,stroke:#052e56,color:#fff
@@ -46,7 +47,9 @@ flowchart LR
 Sedjem runs as one Python process: the local server, the job runner's threads, and the threads for model downloads,
 updates and usage counts. Each local transcription gets a short-lived worker process, so the models never run in the
 app itself, and cancelling a job ends that process. The MCP server is a separate process that the
-assistant starts; it reads the data folder directly, so it works while the app is closed.
+assistant starts; it reads the data folder directly, so reading works while the app is closed. When the user lets
+assistants start transcriptions, the MCP server asks the running app for them through its local API, after the app
+has proved that it knows the secret ([AgDR 22](agdr/AgDR-0022-assistants-start-jobs-through-the-running-app.md)).
 
 ```mermaid
 flowchart TB
@@ -54,6 +57,7 @@ flowchart TB
   assistant["AI assistant<br/>an MCP client"]
   other["Another computer with Sedjem<br/>paired with this one"]
   internet["Internet services<br/>hosted services, model hosts,<br/>GitHub, YouTube, Google Drive and Aptabase"]
+  files[("Your files<br/>recordings and folders<br/>on this computer")]
 
   subgraph sedjem["Sedjem"]
     window["Window<br/>pywebview, or a browser in app mode"]
@@ -74,6 +78,8 @@ flowchart TB
   worker -->|"progress and the lines"| data
   runner -->|"job.json and transcript.json"| data
   server -->|"reads and writes"| data
+  server -->|"lists a folder you name"| files
+  runner -->|"reads a recording in place"| files
   server -->|"model downloads, update checks and downloads,<br/>link checks, usage counts (HTTPS)"| internet
   runner -->|"hosted uploads, YouTube and<br/>Google Drive (HTTPS)"| internet
   ui -->|"YouTube's player, only to play<br/>a streamed video (HTTPS)"| internet
@@ -82,20 +88,24 @@ flowchart TB
   remote -->|"queues their jobs"| runner
   assistant -->|"asks (stdio)"| mcp
   mcp -->|"reads transcripts, writes its log"| data
+  mcp -->|"starts, follows and cancels jobs,<br/>when allowed (HTTP)"| server
 
   classDef person fill:#08427b,stroke:#052e56,color:#fff
   classDef part fill:#438dd5,stroke:#2e6295,color:#fff
   classDef external fill:#8a8a8a,stroke:#5e5e5e,color:#fff
   class you person
   class window,ui,server,runner,worker,remote,mcp,data part
-  class assistant,other,internet external
+  class assistant,other,internet,files external
 ```
 
 ## One local transcription, step by step
 
 The page sends the recording, and the server answers at once. Threads then prepare the audio and run the worker,
 while the page polls for progress; there is no WebSocket. Each step writes its state into the job's folder, so after a
-restart, waiting jobs go back on the queue and a job that was running is marked as interrupted.
+restart, waiting jobs go back on the queue and a job that was running is marked as interrupted. A folder's recordings,
+or several files added together, are a course: the page sends them with `POST /api/local` (read in place) or as one
+upload each, and each recording becomes a job of its own that follows these steps
+([AgDR 24](agdr/AgDR-0024-folders-and-files-on-the-computer-as-courses.md)).
 
 ```mermaid
 sequenceDiagram

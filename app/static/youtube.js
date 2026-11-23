@@ -1,11 +1,12 @@
 /* Sedjem: YouTube links (the server side is app/youtube.py and app/courses.py). On the new transcription
    page, the Link tab checks a link to a video or a playlist, shows its videos with the ones that have captions
    made by people, and Start adds one transcription per video, with the video downloaded or streamed from YouTube.
-   The same tab takes a Google Drive file, which drive.js shows.
-   A playlist is a course: the sidebar shows it once with its lectures, and a lecture's page has the link, the
-   lectures before and after it, and its course folder. A streamed video's page plays it in YouTube's own
-   player (YouTubeMedia). Loaded before app.js: it only defines things, and uses app.js's helpers (S, api, $,
-   esc, clock, human, mixDir, toast, prefPut) when they run. */
+   The same tab takes a Google Drive file or folder, which drive.js shows.
+   A playlist is a course, and so are a Drive folder and recordings on this computer added together (local.js): the
+   sidebar shows it once with its lectures, and a lecture's page has the link, the lectures before and after it, and
+   a YouTube lecture its course folder. A streamed video's page plays it in YouTube's own player (YouTubeMedia).
+   Loaded before app.js: it only defines things, and uses app.js's helpers (S, api, $, esc, clock, human, mixDir,
+   toast, prefPut) when they run. */
 "use strict";
 
 const YT_ICON = {
@@ -50,7 +51,7 @@ function ytCard() {
       <button class="btn" type="submit" ${y.busy || y.adding ? "disabled" : ""}>${y.busy ? "Checking…" : "Check"}</button></form>`;
   // a refused link's reason, right under the field; then what to paste, and the rules apart
   const error = y.error ? `<div class="yt-error" role="alert">${esc(y.error)}</div>` : "";
-  const intro = `<p class="hint" id="ytIntro">A YouTube video or playlist, or a Google Drive file shared with anyone who has the link.</p>
+  const intro = `<p class="hint" id="ytIntro">A YouTube video or playlist, or a Google Drive file or folder shared with anyone who has the link.</p>
     <p class="hint yt-rules">Download only what YouTube's terms and the file's owner allow you to.</p>`;
   // a Drive file has no streaming choice and needs no JavaScript runtime: those are YouTube's
   return `${y.found ? (drive ? driveFound(y.found) : ytFound(y.found)) : form + error + intro}
@@ -165,7 +166,8 @@ async function ytCheck() {
   if (S.route.name === "new") renderNew();
 }
 
-// Start: one transcription per picked video, in playlist order, or one for a Drive file. Opens the first.
+// Start: one transcription per picked video, in playlist order, one for a Drive file, or one per picked file of a
+// Drive folder, in its order. Opens the first.
 async function ytStart(params) {
   const picked = ytPicked(), drive = YT.found?.site === "drive";  // (a Drive file: no captions or streaming)
   YT.adding = true;
@@ -175,7 +177,7 @@ async function ytStart(params) {
       ...(drive ? {} : { captions: YT.captions, stream: ytStream() }) });
     Object.assign(YT, { url: "", checked: "", tried: "", found: null, picked: new Set(), adding: false });
     S.form.confirm = false;  // the upload is confirmed again for the next one
-    toast(r.jobs.length === 1 ? "Added: it downloads first, then it is transcribed" : `${r.jobs.length} videos added: they download and are transcribed in turn`);
+    toast(r.jobs.length === 1 ? "Added: it downloads first, then it is transcribed" : `${r.jobs.length} ${drive ? "files" : "videos"} added: they download and are transcribed in turn`);
     await refreshJobs();
     location.hash = `#/job/${r.jobs[0].id}`;
   } catch (e) {
@@ -245,11 +247,12 @@ function bindCourses() {
 }
 
 // The job page of a YouTube video: its course, the lectures before and after it, the folder of its files, and
-// a lecture's button that hides its whole course from assistants (assistants.js). A Drive file is like an uploaded
-// file, and has none.
+// a lecture's button that hides its whole course from assistants (assistants.js). A lecture of a Drive folder, or of
+// recordings on this computer (local.js), has the same, but no folder: its files aren't written to the courses
+// folder. A Drive file on its own is like an uploaded file, and has none.
 function courseBar(j) {
-  if (!j.youtube_id) return "";
-  const folder = `<button type="button" class="btn btn-sm" id="openCourse">${ICON.folder} ${j.course ? "Open course folder" : "Open folder"}</button>`;
+  if (!j.youtube_id && !j.course) return "";
+  const folder = j.youtube_id ? `<button type="button" class="btn btn-sm" id="openCourse">${ICON.folder} ${j.course ? "Open course folder" : "Open folder"}</button>` : "";
   if (!j.course) return `<nav class="course-bar" aria-label="YouTube video"><span class="course-label">${YT_ICON.video} A video on its own, saved with the others in the Videos folder</span>${folder}</nav>`;
   const g = courseGroups(S.jobs).find((x) => x.id === j.course.id);
   const lectures = g ? g.lectures : [];

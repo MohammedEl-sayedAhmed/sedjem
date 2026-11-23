@@ -37,11 +37,12 @@ recording on your machine unless you choose a hosted service.
 
 ## What it does
 
-- Transcribes recordings, videos, YouTube links and shared Google Drive files (folders are planned) with three local
-  models chosen for Egyptian Arabic–English.
+- Transcribes recordings, videos, folders of recordings on your computer, YouTube links and shared Google Drive
+  files and folders with three local models chosen for Egyptian Arabic–English.
 - Labels each speaker by voice, and plays the audio in step with the text.
 - Combines two models' transcripts line by line, and keeps every version (below).
-- Exports text, SRT, WebVTT, Markdown or JSON, and lets assistants such as Claude read your transcripts over MCP.
+- Exports text, SRT, WebVTT, Markdown or JSON, and lets assistants such as Claude read your transcripts over MCP,
+  and start transcriptions when you allow it.
 - Can use one of nine hosted services with your own API key, only after you allow each upload.
 
 <p align="center">

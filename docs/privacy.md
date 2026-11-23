@@ -19,6 +19,10 @@ nothing from the internet, except YouTube's player when you play a video that yo
 ([below](#what-sedjem-contacts-and-when)). It listens on the network only if you let it run jobs for
 [another computer of yours](#another-computer-of-yours). Uninstalling keeps the data folder; deleting the folder removes everything.
 
+A file or a folder whose path you give, or pick in the desktop app, is read where it is: Sedjem reads the folder's
+list of files, and then the recordings you pick, and copies none of them. As for any recording, their sound is
+converted into the data folder for the models and the player.
+
 ## What Sedjem contacts, and when
 
 Sedjem goes online only for the following, and only when the reason given applies. Each of these services sees the
@@ -57,8 +61,12 @@ here.
   (`drive.usercontent.google.com`, which may send it on to a `*.googleusercontent.com` host) for the file itself,
   answering the page Drive shows before a file too large to scan for viruses. Google sees the computer's IP address
   and which file is asked for. Sedjem doesn't sign in, so it sends no account or cookie of yours, and it reads only
-  files shared with anyone who has the link. A link to a Drive folder is refused before anything is asked of Google;
-  folders are planned.
+  files shared with anyone who has the link. For a link to a Drive folder, Sedjem asks `drive.google.com` for the
+  folder's embedded view (`/embeddedfolderview`), a page with the folder's name and each file's name, type and id,
+  sending the folder's id (and the link's `resourcekey`, if it has one) and nothing else of the link; Google sees the
+  computer's IP address and which folder is asked for, and Sedjem keeps no cookie it sets. Sedjem follows no
+  redirect from that page and asks for nothing else on it, such as its thumbnails. Each file you pick is then asked
+  for as a file's link is, above.
 - Aptabase ([privacy policy](https://aptabase.com/legal/privacy)), for anonymous usage counts, at `eu.aptabase.com`
   (a copy built with a key from Aptabase's US region uses `us.aptabase.com`). A few times a month Sedjem sends
   anonymous counts, so that the project knows how many installs use it and what they use: the version, the system
@@ -188,7 +196,12 @@ sent until the two computers are paired with a one-time code.
 
 An assistant connected over MCP, such as Claude Desktop, Cursor or VS Code, reads the transcripts that
 *Settings → Assistants* allows, on the computer. What it reads then goes to the assistant's own model and service,
-under that service's terms. It never gets the audio, the keys or the settings ([assistants](11-assistants.md)).
+under that service's terms. It never gets the audio, the keys, the settings or the paths of files and folders on the
+computer ([assistants](11-assistants.md)).
+When you turn it on, an assistant can also start transcriptions in the app: of YouTube and Google Drive links, of
+recordings in the folders you chose, and with a hosted model only if you allow that too. Such a transcription is
+like one you start yourself: a link is downloaded from YouTube or Google Drive, and a hosted model gets the
+recording, as described above.
 
 ## Changes and contact
 
