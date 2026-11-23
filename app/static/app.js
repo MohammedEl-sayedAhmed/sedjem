@@ -411,8 +411,8 @@ function formDefaults() {
 }
 
 // The length the model will transcribe: the recording's, or that of a link's picked videos or files (without
-// the YouTube videos whose captions are used).
-const formSeconds = () => (S.form.source === "link" ? ytSeconds() : S.form.seconds);
+// the YouTube videos whose captions are used). The recordings listed from this computer have no lengths (local.js).
+const formSeconds = () => (S.form.source === "link" ? ytSeconds() : LOCAL.found ? null : S.form.seconds);
 
 function estimateText(m, seconds, short = false) {
   if (!m) return "";
@@ -487,21 +487,22 @@ function renderNew() {
   const hosted = m && m.kind === "hosted";
   const yt = f.source === "link", picked = yt ? ytPicked().length : 0;  // a link: youtube.js and drive.js
   const onDrive = yt && YT.found?.site === "drive";
+  const local = !yt && !!LOCAL.found, many = local ? localPicked().length : 0;  // a folder, or several files (local.js)
   const rc = yt ? null : rmChoice();  // a paired computer it runs on (remote.js); links run here
-  const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : src && !S.uploading) && m && m.ready && (!hosted || f.confirm)
-    && (!rc || rc.consented || f.confirm);
+  const ok = (yt ? picked > 0 && !YT.busy && !YT.adding : local ? many > 0 && !LOCAL.adding : src && !S.uploading)
+    && m && m.ready && (!hosted || f.confirm) && (!rc || rc.consented || f.confirm);
   const startLabel = yt ? (YT.adding ? "Adding…" : picked > 1 ? `Start ${picked} transcriptions` : "Start transcription")
-    : S.uploading ? "Uploading…" : "Start transcription";
+    : S.uploading ? "Uploading…" : local && LOCAL.adding ? "Adding…" : many > 1 ? `Start ${many} transcriptions` : "Start transcription";
   view.innerHTML = `
   <h1>New transcription</h1>
-  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, or a link to a YouTube video or playlist or a Google Drive file or folder. Local models keep everything on this computer.</p>
+  <p class="lead">Audio or video recordings of meetings and calls, in Egyptian Arabic with English terms, a folder of recordings, or a link to a YouTube video or playlist or a Google Drive file or folder. Local models keep everything on this computer.</p>
 
   <div class="card">
     <div class="step-head src-head"><span class="step-num">1</span> ${yt ? "Link" : "Recording"}
       <div class="segmented src-kind" role="group" aria-label="Where the recording comes from">
-        <button type="button" data-src="file" aria-pressed="${!yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.upload} A file</button>
-        <button type="button" data-src="link" aria-pressed="${yt}" ${S.uploading || YT.adding ? "disabled" : ""}>${ICON.link} Link</button></div></div>
-    ${yt ? ytCard() : src ? `
+        <button type="button" data-src="file" aria-pressed="${!yt}" ${S.uploading || YT.adding || LOCAL.adding ? "disabled" : ""}>${ICON.upload} A file</button>
+        <button type="button" data-src="link" aria-pressed="${yt}" ${S.uploading || YT.adding || LOCAL.adding ? "disabled" : ""}>${ICON.link} Link</button></div></div>
+    ${yt ? ytCard() : local ? localFound(LOCAL.found) : src ? `
       <div class="chosen">
         <div class="ico">${ICON.wave}</div>
         <div class="grow">
@@ -511,16 +512,19 @@ function renderNew() {
         </div>
         <button class="btn btn-sm" id="changeFile" ${S.uploading ? "disabled" : ""}>Change</button>
       </div>` : `
-      <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="Choose a recording">
+      <div class="dropzone" id="drop" tabindex="0" role="button" aria-label="Choose recordings">
         ${ICON.upload}
-        <div class="big">Drop a recording here</div>
-        <div class="small">or <span class="linkish">choose a file</span> — mp3, m4a, wav, ogg, mp4, mkv, webm… up to ${st ? "4" : ""} GB</div>
+        <div class="big">Drop recordings here</div>
+        <div class="small">or <span class="linkish">choose files</span> — mp3, m4a, wav, ogg, mp4, mkv, webm… up to ${st ? "4" : ""} GB each. Several become a course.</div>
       </div>
+      ${desktopApi()?.pick_folder ? `<div class="local-pick"><button type="button" class="btn" id="pickFolder">${ICON.folder} Choose folder</button>
+        <span class="hint">Its recordings become a course, read where they are.</span></div>` : ""}
       <details class="path">
-        <summary>Or use a file already on this computer (no upload, no copy)</summary>
-        <div class="row"><input type="text" id="pathInput" placeholder="/home/you/Videos/meeting.mp4" spellcheck="false"><button class="btn" id="pathBtn">Use file</button></div>
+        <summary>Or use a file or folder already on this computer (no upload, no copy)</summary>
+        <div class="row"><input type="text" id="pathInput" placeholder="/home/you/Videos/meeting.mp4 or /home/you/Lectures" spellcheck="false" aria-label="The full path of a file or folder"><button class="btn" id="pathBtn">Use</button></div>
+        <p class="hint">A folder's recordings become a course; its subfolders aren't read.</p>
       </details>`}
-    <input type="file" id="fileInput" accept="audio/*,video/*,.mkv,.opus,.flac,.amr,.3gp" hidden>
+    <input type="file" id="fileInput" accept="audio/*,video/*,.mkv,.opus,.flac,.amr,.3gp" multiple hidden>
   </div>
 
   <div class="card">
@@ -542,7 +546,7 @@ function renderNew() {
         <div class="segmented" id="lang">${LANGUAGES.map(([v, t]) => `<button type="button" data-v="${v}" aria-pressed="${f.language === v}">${t}</button>`).join("")}</div>
         <p class="hint">${languageHint(m, f.language)}</p>
       </div>
-      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">${onDrive ? (YT.found.kind === "folder" ? "Each transcription is named after its file" : "The transcription is named after the file") : "Each transcription is named after its video"}; you can rename it later.</p></div>` : `<div class="field">
+      ${yt ? `<div class="field"><span class="field-label">Titles</span><p class="hint">${onDrive ? (YT.found.kind === "folder" ? "Each transcription is named after its file" : "The transcription is named after the file") : "Each transcription is named after its video"}; you can rename it later.</p></div>` : local ? localNameField() : `<div class="field">
         <label for="titleInput">Title</label>
         <input type="text" id="titleInput" dir="${mixDir(f.title)}" data-mixdir value="${esc(f.title)}" placeholder="${esc(src ? src.name.replace(/\.[^.]+$/, "") : "Meeting title")}">
       </div>`}
@@ -557,8 +561,8 @@ function renderNew() {
   ${hosted && m.ready ? `<div class="card consent">
     ${ICON.cloud}
     <div>
-      <p><b>This model uploads ${onDrive ? (YT.found.kind === "folder" ? "the sound of each file it transcribes" : "the sound of the file") : yt ? "the sound of each video it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
-      <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : "this recording"} to ${esc(m.service)}</label>
+      <p><b>This model uploads ${onDrive ? (YT.found.kind === "folder" ? "the sound of each file it transcribes" : "the sound of the file") : yt ? "the sound of each video it transcribes" : local ? "each recording it transcribes" : "the recording"} to ${esc(m.service)}.</b> It leaves this computer and is processed on their servers under their terms. ${esc(m.privacy) || (m.id === "elevenlabs" ? "ElevenLabs may use it for training unless you opted out (Profile → Data use)." : "Speechmatics does not train on it unless you opted in; the app deletes the job there after fetching the transcript.")}</p>
+      <label><input type="checkbox" id="confirmUpload" ${f.confirm ? "checked" : ""}> Upload ${yt ? "the sound" : local ? "the recordings" : "this recording"} to ${esc(m.service)}</label>
     </div>
   </div>` : ""}
   ${rc && m ? rmConsent(rc) : ""}
@@ -567,7 +571,7 @@ function renderNew() {
     <div class="estimate">${m?.ready ? (yt && picked && !ytForModel().length ? "No model needs to run: every picked video has captions made by people" : estimateText(m, formSeconds())) : ""}</div>
     <button class="btn btn-primary btn-lg" id="startBtn" ${ok ? "" : "disabled"}>${startLabel}</button>
   </div>
-  ${S.uploading ? `<div class="card" style="margin-top:14px"><div class="row" style="display:flex;justify-content:space-between;margin-bottom:8px"><b>Uploading to the app</b><span class="hint" id="uploadText" style="margin:0">${bytes(S.uploading.loaded)} of ${bytes(S.uploading.total)}</span></div><div class="progress"><i style="width:${(S.uploading.loaded / S.uploading.total * 100).toFixed(1)}%"></i></div><p class="hint">Copying the file into the app's folder on this computer — nothing is sent anywhere else yet.</p></div>` : ""}
+  ${S.uploading ? `<div class="card" style="margin-top:14px"><div class="row" style="display:flex;justify-content:space-between;margin-bottom:8px"><b>Uploading to the app${S.uploading.of > 1 ? ` (${S.uploading.n} of ${S.uploading.of})` : ""}</b><span class="hint" id="uploadText" style="margin:0">${bytes(S.uploading.loaded)} of ${bytes(S.uploading.total)}</span></div><div class="progress"><i style="width:${(S.uploading.loaded / S.uploading.total * 100).toFixed(1)}%"></i></div><p class="hint">Copying the file into the app's folder on this computer — nothing is sent anywhere else yet.</p></div>` : ""}
   `;
   bindNew();
 }
@@ -593,9 +597,12 @@ function bindModelCards() {
   });
 }
 
+// A path typed or picked: a file is read in place on its own; a folder's recordings are listed as a course (local.js).
 async function usePath(p) {
   try {
-    const info = await api.post("/api/probe", { path: p });
+    const info = await api.post("/api/local/inspect", { path: p });
+    if (info.kind !== "file") return localShow(info);
+    localClear();
     Object.assign(S.form, { file: null, path: info, seconds: info.seconds, previewUrl: null });
     renderNew();
   } catch (e) { toast(e.message, "error"); }
@@ -603,15 +610,34 @@ async function usePath(p) {
 
 async function chooseFile(input) {
   const d = desktopApi();
-  if (d && d.pick_file) {  // native dialog: the file is read in place, not copied
-    try { const p = await d.pick_file(); if (p) await usePath(p); } catch (e) { toast(e.message, "error"); }
+  if (d && d.pick_files) {  // native dialog: the files are read in place, not copied; several make a course
+    try {
+      const paths = await d.pick_files();
+      if (paths.length === 1) await usePath(paths[0]); else if (paths.length) await localPaths(paths);
+    } catch (e) { toast(e.message, "error"); }
     return;
   }
   input.click();
 }
 
+// Files from the field or a drop: one is uploaded on its own, as before; several are listed, to make a course
+// (local.js). folders: how many folders were dropped with them, which can't be uploaded.
+function useFiles(files, folders = 0) {
+  if (files.length === 1 && !folders) setFile(files[0]);
+  else if (files.length || folders) localUploads(files, folders);
+}
+
+// How far an upload has come, without drawing the page again.
+function showUpload(loaded, total) {
+  S.uploading = { ...S.uploading, loaded, total };
+  const bar = $(".progress i"), text = $("#uploadText");
+  if (bar) bar.style.width = `${(loaded / total * 100).toFixed(1)}%`;
+  if (text) text.textContent = `${bytes(loaded)} of ${bytes(total)}`;
+}
+
 function setFile(file) {
   const f = S.form;
+  localClear();
   if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);
   Object.assign(f, { file, path: null, seconds: null, previewUrl: URL.createObjectURL(file) });
   const a = new Audio();
@@ -624,14 +650,22 @@ function setFile(file) {
 function bindNew() {
   const f = S.form;
   const input = $("#fileInput");
-  input.onchange = () => input.files[0] && setFile(input.files[0]);
+  input.onchange = () => { useFiles([...input.files]); input.value = ""; };
   const drop = $("#drop");
   if (drop) {
     drop.onclick = () => chooseFile(input);
     drop.onkeydown = (e) => (e.key === "Enter" || e.key === " ") && chooseFile(input);
     drop.ondragover = (e) => { e.preventDefault(); drop.classList.add("over"); };
     drop.ondragleave = () => drop.classList.remove("over");
-    drop.ondrop = (e) => { e.preventDefault(); drop.classList.remove("over"); e.dataTransfer.files[0] && setFile(e.dataTransfer.files[0]); };
+    drop.ondrop = (e) => {
+      e.preventDefault();
+      drop.classList.remove("over");
+      // a folder dropped comes as a file that can't be read: its entry says it is a folder
+      const items = [...(e.dataTransfer.items || [])].filter((it) => it.kind === "file");
+      const folder = (i) => !!items[i]?.webkitGetAsEntry?.()?.isDirectory;
+      const all = [...e.dataTransfer.files];
+      useFiles(all.filter((_, i) => !folder(i)), all.filter((_, i) => folder(i)).length);
+    };
   }
   const change = $("#changeFile");
   if (change) change.onclick = () => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); Object.assign(f, { file: null, path: null, seconds: null, previewUrl: null }); renderNew(); };
@@ -662,6 +696,7 @@ function bindNew() {
     if (f.source === "link") $("#ytUrl")?.focus();
   }));
   bindYoutube();
+  bindLocal();  // a folder's recordings, or several files (local.js)
   const pr = $("#promptInput");
   if (pr) pr.oninput = (e) => (f.prompt = e.target.value);
   const cu = $("#confirmUpload");
@@ -676,6 +711,7 @@ async function start() {
     title: f.title.trim(), confirm_upload: m.kind === "hosted" && f.confirm ? "1" : "0" };
   if (f.source === "link") return ytStart(params);  // youtube.js
   if (m.kind === "remote") Object.assign(params, { run_on: m.computer.id, confirm_send: f.confirm ? "1" : "0" });
+  if (LOCAL.found) return localStart(params);  // a folder's recordings, or several files: a course (local.js)
   try {
     let job;
     if (f.path) {
@@ -684,12 +720,7 @@ async function start() {
       S.uploading = { loaded: 0, total: f.file.size };
       renderNew();
       // its modified time is the recording's date when the file's tags have none (sysinfo.recording)
-      job = await api.upload(f.file, { ...params, name: f.file.name, modified: f.file.lastModified }, (loaded, total) => {
-        S.uploading = { loaded, total };
-        const bar = $(".progress i"), text = $("#uploadText");
-        if (bar) bar.style.width = `${(loaded / total * 100).toFixed(1)}%`;
-        if (text) text.textContent = `${bytes(loaded)} of ${bytes(total)}`;
-      });
+      job = await api.upload(f.file, { ...params, name: f.file.name, modified: f.file.lastModified }, showUpload);
     }
     S.uploading = null;
     if (f.previewUrl) URL.revokeObjectURL(f.previewUrl);

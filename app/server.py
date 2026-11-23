@@ -30,7 +30,8 @@ from datetime import datetime
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-from . import assistants, compare, courses, drive, engines, exports, hub, remote, report, session, updates, usage, video
+from . import assistants, compare, courses, drive, engines, exports, hub, local, remote, report, session, updates, usage
+from . import video
 from . import youtube
 from . import transcript as T
 from . import history
@@ -682,6 +683,15 @@ class Handler(BaseHTTPRequestHandler):
         return computer, model, {"remote": {"id": computer["id"], "name": computer["name"]}, "kind": "remote",
                                  "model_title": model["title"]}
 
+    def job_model(self, p, mark=None):
+        """(the paired computer or None, the model, the job's fields that say so) for a request that may name a paired
+        computer (run_on, as remote_choice) or else a model here that is ready, and that an assistant may use."""
+        if p.get("run_on"):  # on a paired computer
+            return self.remote_choice(p)
+        model = self.ready_model(p)
+        self.assistant_model(mark, model)
+        return None, model, {"assistant": mark} if mark else {}
+
     def create_job(self, params):
         cfg, runner = self.app.cfg, self.app.runner
         ctype = self.headers.get("Content-Type", "")
@@ -695,15 +705,12 @@ class Handler(BaseHTTPRequestHandler):
                 p = {**p, "path": assistants.recording_path(p.get("path"), self.app.cfg.settings())}
             except assistants.Refused as e:
                 raise ApiError(403, str(e))
-        computer, extra = None, {"assistant": mark} if mark else {}
-        if p.get("run_on"):  # on a paired computer
-            computer, model, extra = self.remote_choice(p)
-        else:
-            model = self.ready_model(p)
-            self.assistant_model(mark, model)
+        computer, model, extra = self.job_model(p, mark)
         options = parse_options(p, cfg, model)
         if is_json:  # a file already on this computer: read it in place, no copy
             source = Path(str(p.get("path") or "")).expanduser()
+            if source.is_dir():
+                raise ApiError(400, f"{source} is a folder, not a file: a folder's recordings are added as a course")
             if not source.is_file():
                 raise ApiError(400, f"file not found: {source}")
             job = runner.new_job(title=p.get("title") or source.stem, source_name=source.name,
@@ -719,6 +726,12 @@ class Handler(BaseHTTPRequestHandler):
             cfg.storage.mkdir(parents=True, exist_ok=True)
             if shutil.disk_usage(cfg.storage).free < n * 1.2 + 1e9:
                 raise ApiError(507, "not enough free disk space for this file")
+            try:  # one of several files added together, which make a course (app/local.py)
+                course = local.upload_course(p)
+            except local.LocalError as e:
+                raise ApiError(400, str(e))
+            if course:
+                extra = {**extra, "course": course}
             job = runner.new_job(title=p.get("title") or Path(name).stem, source_name=name,
                                  model_id=model["id"], options=options, **extra)
             dest = self.app.store.dir(job["id"]) / f"source{ext.lower()}"
@@ -1235,10 +1248,66 @@ class Handler(BaseHTTPRequestHandler):
 
     def probe(self, _params):
         path = Path(str(self.body_json().get("path") or "")).expanduser()
+        if path.is_dir():
+            raise ApiError(400, f"{path} is a folder, not a file")
         if not path.is_file():
             raise ApiError(404, f"file not found: {path}")
-        self.json({"path": str(path.resolve()), "name": path.name, "size": path.stat().st_size,
-                   "seconds": probe_seconds(path)})
+        self.json(probed(path))
+
+    # Recordings on this computer as a course (app/local.py): a folder's, or several files picked together, each read
+    # in place. Only the user's own page adds them: an assistant transcribes one file at a time (POST /api/jobs).
+    def not_for_assistants(self, p):
+        if isinstance(p, dict) and "assistant" in p:
+            raise ApiError(403, "assistants can't add a folder or files as a course; they transcribe one file at a time")
+
+    def local_inspect(self, _params):
+        """{path}: a file on its own, as POST /api/probe gives it with "kind": "file", or a folder's recordings in
+        natural name order with what was skipped ("kind": "folder"); {paths}: files picked together ("kind": "files");
+        {names, folders}: the names of files from the browser, and how many folders came with them, listed in the
+        same way ("upload": true)."""
+        p = self.body_json()
+        self.not_for_assistants(p)
+        try:
+            found = local.inspect(p.get("path"), p.get("paths"), p.get("names"), p.get("folders", 0))
+        except local.LocalError as e:
+            raise ApiError(400, str(e))
+        self.json({**probed(Path(found["path"])), "kind": "file"} if found["kind"] == "file" else found)
+
+    def local_add(self, _params):
+        """{path (a folder), entries (the real paths of its recordings to transcribe; default all)} or {paths (files
+        picked together), title (the course's name)}, with model, speakers, language, prompt, confirm_upload, and
+        run_on and confirm_send for a paired computer: one job per recording, read in place, queued in the order of
+        the list, with the folder, or the files, as their course. Answers {"jobs": [...]}."""
+        runner, store = self.app.runner, self.app.store
+        p = self.body_json()
+        self.not_for_assistants(p)
+        computer, model, extra = self.job_model(p)
+        options = parse_options(p, self.app.cfg, model)
+        wanted = p.get("entries")
+        if wanted is not None and not isinstance(wanted, list):
+            raise ApiError(400, "entries must be a list of the recordings' paths")
+        try:
+            if p.get("paths") is not None:
+                found = local.inspect_files(p["paths"])
+                course = local.files_course(p.get("title"), found["count"])
+            else:
+                found = local.inspect_folder(p.get("path"))
+                course = local.folder_course(store, found)
+        except local.LocalError as e:
+            raise ApiError(400, str(e))
+        picked = None if wanted is None else {str(x) for x in wanted}
+        entries = [e for e in found["entries"] if picked is None or e["id"] in picked]
+        if not entries:
+            raise ApiError(400, "choose at least one recording")
+        jobs = []
+        for e in entries:
+            jobs.append(runner.new_job(title=e["title"], source_name=e["name"], model_id=model["id"], options=options,
+                                       source_path=e["id"], course={**course, "index": e["index"]}, **extra))
+        if computer and not computer.get("consented"):  # the tick was given: not asked again for this computer
+            self.app.remote.consent(computer["id"])
+        for job in jobs:  # in the order of the list
+            runner.submit(job["id"])
+        self.json({"jobs": [summary(store.get(j["id"])) for j in jobs]}, 201)
 
     def settings(self, _params):
         p = self.body_json()
@@ -1465,6 +1534,11 @@ class Handler(BaseHTTPRequestHandler):
         self.app.quit()
 
 
+def probed(path):
+    """A file on this computer, as POST /api/probe gives it: its real path, name, size and length."""
+    return {"path": str(path.resolve()), "name": path.name, "size": path.stat().st_size, "seconds": probe_seconds(path)}
+
+
 def show_folder(folder):
     """Open one of the app's own folders in the file manager."""
     if os.name == "nt":
@@ -1535,6 +1609,8 @@ ROUTES = [
     ("DELETE", r"/api/remote/computers/([0-9a-f]{12})", Handler.remote_forget),
     ("POST", r"/api/open-folder", Handler.open_folder),
     ("POST", r"/api/probe", Handler.probe),
+    ("POST", r"/api/local/inspect", Handler.local_inspect),
+    ("POST", r"/api/local", Handler.local_add),
     ("POST", r"/api/downloads/([\w-]+)", Handler.download),
     ("POST", r"/api/downloads/([\w-]+)/cancel", Handler.cancel_download),
     ("DELETE", r"/api/downloads/([\w-]+)", Handler.remove_download),

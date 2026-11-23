@@ -526,6 +526,30 @@ class TwoComputers(unittest.TestCase):
         self.assertEqual(self.job(rerun["id"])["job"]["remote"]["name"], "GPU laptop")
         self.assertEqual(self.stand_in.calls[-1]["model"], "large-v3")
 
+    def test_a_folders_recordings_go_as_files_read_in_place_do(self):
+        """A folder's recordings added as a course (app/local.py) are each sent as a file read in place is: prepared
+        here, then run on the paired computer, with the consent asked once for that computer."""
+        computer = self.computer()
+        self.a.app.remote.save_computers([{**computer, "consented": False}])
+        folder = self.a.home / "Lectures"
+        folder.mkdir()
+        t = np.arange(int(16000 * 1.5)) / 16000
+        for n, name in enumerate(("Lecture 10.wav", "Lecture 2.wav")):
+            sf.write(folder / name, (0.2 * np.sin(2 * np.pi * (300 + 60 * n) * t)).astype(np.float32), 16000)
+        body = {"path": str(folder), "model": "cohere", "run_on": computer["id"], "speakers": "2", "language": "en"}
+        status, refused = self.a.call("POST", "/api/local", body)
+        self.assertEqual((status, refused["error"]), (400, "confirm that the recording may be sent to GPU laptop on your network"))
+        status, r = self.a.call("POST", "/api/local", {**body, "confirm_send": "1"})
+        self.assertEqual(status, 201, r)
+        self.assertEqual([(j["kind"], j["remote"]["name"], j["course"]["index"], j["title"]) for j in r["jobs"]],
+                         [("remote", "GPU laptop", 1, "Lecture 2"), ("remote", "GPU laptop", 2, "Lecture 10")])
+        self.assertTrue(self.computer()["consented"], "asked once for each computer")
+        for j in r["jobs"]:
+            done = self.job(j["id"])
+            self.assertEqual(done["job"]["status"], "done", done["job"].get("error"))
+            self.assertEqual(done["lines"], LINES)
+        self.assertEqual([c["home"] for c in self.stand_in.calls], [self.b.home] * 2, "both ran on the GPU laptop")
+
     def test_models_that_arent_there(self):
         status, body = self.send(model="whisper-medium")
         self.assertEqual(status, 400)
