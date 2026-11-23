@@ -369,8 +369,8 @@ class Assistants(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp(prefix="sedjem-local-mcp-"))
         self.addCleanup(shutil.rmtree, self.home, ignore_errors=True)
-        self.secret = "/home/you/Private/Signals and systems"
-        course = {"id": self.FOLDER, "title": "Signals and systems", "count": 3, "local": "folder", "path": self.secret}
+        self.folder_path = "/home/you/Private/Signals and systems"
+        course = {"id": self.FOLDER, "title": "Signals and systems", "count": 3, "local": "folder", "path": self.folder_path}
         self.lecture("20261020-090000-f101", "Lecture 1 - Welcome", {**course, "index": 1})
         self.lecture("20261020-090000-f103", "Lecture 10 - Filters", {**course, "index": 3})
         files = {"id": self.FILES, "title": "Week 1", "count": 2, "local": "files"}
@@ -383,7 +383,7 @@ class Assistants(unittest.TestCase):
         job = {"id": jid, "title": title, "source_name": f"{title}.wav", "created": f"2026-10-20T09:00:0{course['index']}+03:00",
                "model": "cohere", "model_title": "Cohere Transcribe Arabic", "kind": "local", "status": "done",
                "audio_s": 30.0, "speaker_names": {}, "finished": "2026-10-20T09:10:00+03:00",
-               "source_path": f"{self.secret}/{title}.wav", "course": course, **fields}
+               "source_path": f"{self.folder_path}/{title}.wav", "course": course, **fields}
         (folder / "job.json").write_text(json.dumps(job), encoding="utf-8")
         (folder / "transcript.json").write_text(json.dumps({"lines": [{**LINE[0], "text": f"Words of {title}"}]}),
                                                 encoding="utf-8")
