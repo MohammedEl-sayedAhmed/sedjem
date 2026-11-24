@@ -117,18 +117,29 @@ def paragraphs(job, lines, longest=60.0, gap=3.0):
 def course_md(course, lectures):
     """All finished lectures of a course in playlist order, for pasting into a chat assistant: a heading per
     lecture, then its text in paragraphs. lectures: [(job, lines)]. A Google Drive folder's course (app/drive.py)
-    names its folder and files instead of a playlist and videos."""
+    names its folder and files instead of a playlist and videos. A course of recordings on the computer
+    (app/local.py: "local" is "folder" or "files") names no path and has no links."""
     count = course.get("count") or len(lectures)
     done = "all" if len(lectures) >= count else f"{len(lectures)} of {count}"
     drive = any(job.get("drive_id") for job, _ in lectures)
-    where, item, order = ("Folder", "File", "the folder's order") if drive else ("Playlist", "Video", "playlist order")
-    out = [f"# {course.get('title')}", "", f"{where}: {course.get('url')}  ",
-           f"Transcripts of {done} lectures, in {order}. Times in brackets are minutes:seconds into each "
-           f"{item.lower()}.", ""]
+    here = course.get("local") or next(((job.get("course") or {}).get("local") for job, _ in lectures), None)
+    if here in ("folder", "files"):
+        source = "a folder" if here == "folder" else "files picked together"
+        out = [f"# {course.get('title')}", "", f"Recordings from {source} on the user's computer.  ",
+               f"Transcripts of {done} lectures, in the order of the files' names. Times in brackets are "
+               "minutes:seconds into each recording.", ""]
+        item = None
+    else:
+        where, item, order = ("Folder", "File", "the folder's order") if drive else \
+            ("Playlist", "Video", "playlist order")
+        out = [f"# {course.get('title')}", "", f"{where}: {course.get('url')}  ",
+               f"Transcripts of {done} lectures, in {order}. Times in brackets are minutes:seconds into each "
+               f"{item.lower()}.", ""]
     for job, lines in lectures:
         c = job["course"]
-        out += [f"## Lecture {c['index']}: {job.get('title') or 'Untitled'} ({T.clock(job.get('audio_s') or 0)})", "",
-                f"{item}: {job.get('source_url')}", ""]
+        out += [f"## Lecture {c['index']}: {job.get('title') or 'Untitled'} ({T.clock(job.get('audio_s') or 0)})", ""]
+        if item:
+            out += [f"{item}: {job.get('source_url')}", ""]
         for p in paragraphs(job, lines):
             out += [p, ""]
     return "\n".join(out)

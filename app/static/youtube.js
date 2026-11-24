@@ -2,10 +2,11 @@
    page, the Link tab checks a link to a video or a playlist, shows its videos with the ones that have captions
    made by people, and Start adds one transcription per video, with the video downloaded or streamed from YouTube.
    The same tab takes a Google Drive file or folder, which drive.js shows.
-   A playlist is a course, and so is a Drive folder: the sidebar shows it once with its lectures, and a lecture's
-   page has the link, the lectures before and after it, and a YouTube lecture its course folder. A streamed video's page plays it in YouTube's own
-   player (YouTubeMedia). Loaded before app.js: it only defines things, and uses app.js's helpers (S, api, $,
-   esc, clock, human, mixDir, toast, prefPut) when they run. */
+   A playlist is a course, and so are a Drive folder and recordings on this computer added together (local.js): the
+   sidebar shows it once with its lectures, and a lecture's page has the link, the lectures before and after it, and
+   a YouTube lecture its course folder. A streamed video's page plays it in YouTube's own player (YouTubeMedia).
+   Loaded before app.js: it only defines things, and uses app.js's helpers (S, api, $, esc, clock, human, mixDir,
+   toast, prefPut) when they run. */
 "use strict";
 
 const YT_ICON = {
@@ -246,11 +247,11 @@ function bindCourses() {
 }
 
 // The job page of a YouTube video: its course, the lectures before and after it, the folder of its files, and
-// a lecture's button that hides its whole course from assistants (assistants.js). A lecture of a Drive folder has the
-// same, but no folder: its files aren't written to the courses folder. A Drive file on its own is like an uploaded
-// file, and has none.
+// a lecture's button that hides its whole course from assistants (assistants.js). A lecture of a Drive folder, or of
+// recordings on this computer (local.js), has the same, but no folder: its files aren't written to the courses
+// folder. A Drive file on its own is like an uploaded file, and has none.
 function courseBar(j) {
-  if (!j.youtube_id && !(j.drive_id && j.course)) return "";
+  if (!j.youtube_id && !j.course) return "";
   const folder = j.youtube_id ? `<button type="button" class="btn btn-sm" id="openCourse">${ICON.folder} ${j.course ? "Open course folder" : "Open folder"}</button>` : "";
   if (!j.course) return `<nav class="course-bar" aria-label="YouTube video"><span class="course-label">${YT_ICON.video} A video on its own, saved with the others in the Videos folder</span>${folder}</nav>`;
   const g = courseGroups(S.jobs).find((x) => x.id === j.course.id);
