@@ -301,41 +301,42 @@
  },
  "so_far": {
   "month": "2026-11",
-  "through": "2026-11-19",
+  "through": "2026-11-24",
   "app": {
    "month": "2026-11",
-   "exported": "2026-11-19",
+   "exported": "2026-11-24",
    "installs": {
-    "active": 15,
-    "new": 13,
+    "active": 20,
+    "new": 18,
     "countries": {
-     "count": 4
+     "count": 5
     }
    },
    "runs": {
-    "transcriptions": 55,
-    "hours": 32.2
+    "transcriptions": 97,
+    "hours": 78.0
    }
   },
   "website": {
    "month": "2026-11",
-   "exported": "2026-11-19",
-   "page_views": 65,
-   "visitors": 49,
+   "exported": "2026-11-24",
+   "page_views": 73,
+   "visitors": 54,
    "countries": {
-    "count": 6
+    "count": 7
    },
    "downloads": {
-    "clicks": 8
+    "clicks": 10
    },
    "visits": {
-    "total": 64,
+    "total": 72,
     "countries": {
-     "EG": 29,
+     "EG": 34,
      "US": 19,
      "SA": 8,
-     "QA": 5,
+     "QA": 7,
      "SG": 2,
+     "CN": 1,
      "FR": 1
     },
     "days": {
@@ -357,7 +358,12 @@
      "2026-11-16": 4,
      "2026-11-17": 4,
      "2026-11-18": 1,
-     "2026-11-19": 0
+     "2026-11-19": 0,
+     "2026-11-20": 3,
+     "2026-11-21": 1,
+     "2026-11-22": 3,
+     "2026-11-23": 0,
+     "2026-11-24": 1
     }
    }
   }
