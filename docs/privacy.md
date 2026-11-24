@@ -19,6 +19,10 @@ nothing from the internet, except YouTube's player when you play a video that yo
 ([below](#what-sedjem-contacts-and-when)). It listens on the network only if you let it run jobs for
 [another computer of yours](#another-computer-of-yours). Uninstalling keeps the data folder; deleting the folder removes everything.
 
+A file or a folder whose path you give, or pick in the desktop app, is read where it is: Sedjem reads the folder's
+list of files, and then the recordings you pick, and copies none of them. As for any recording, their sound is
+converted into the data folder for the models and the player.
+
 ## What Sedjem contacts, and when
 
 Sedjem goes online only for the following, and only when the reason given applies. Each of these services sees the
@@ -192,7 +196,8 @@ sent until the two computers are paired with a one-time code.
 
 An assistant connected over MCP, such as Claude Desktop, Cursor or VS Code, reads the transcripts that
 *Settings → Assistants* allows, on the computer. What it reads then goes to the assistant's own model and service,
-under that service's terms. It never gets the audio, the keys or the settings ([assistants](11-assistants.md)).
+under that service's terms. It never gets the audio, the keys, the settings or the paths of files and folders on the
+computer ([assistants](11-assistants.md)).
 When you turn it on, an assistant can also start transcriptions in the app: of YouTube and Google Drive links, of
 recordings in the folders you chose, and with a hosted model only if you allow that too. Such a transcription is
 like one you start yourself: a link is downloaded from YouTube or Google Drive, and a hosted model gets the

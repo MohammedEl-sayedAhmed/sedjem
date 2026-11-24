@@ -30,9 +30,14 @@ The app's page and its API are served by a local server, which asks for no passw
   program can't know where Sedjem will be; the app opens its page with a browser profile of its own when it finds a
   Chromium-family browser, and offers no installed web app. A port fixed with `--port` or `[server] port` gives that
   up. On Windows the port is opened for the app alone, so no other account can bind it too.
-- A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. That is what
-  they are for, and only the user's own window can send them. A request that names an assistant reads only a file
-  inside the folders the user chose for assistants ([assistants over MCP](#assistants-over-mcp)).
+- A request to transcribe a file by its path, and `POST /api/probe`, read any file the user can read. A path typed
+  in the page, or picked in the desktop app, for a folder of recordings (`POST /api/local/inspect` and
+  `POST /api/local`) lists any folder the user can read, and reads the recordings picked in it. That is what they are
+  for, and only the user's own window can send them. The folder is read by its real path and only its direct entries,
+  and a symbolic link in it that leads to a file anywhere else is skipped, so a lecture is always a file in the folder
+  ([AgDR 24](agdr/AgDR-0024-folders-and-files-on-the-computer-as-courses.md)). A request that names an assistant
+  reads only a file inside the folders the user chose for assistants, and can't list or add a folder
+  ([assistants over MCP](#assistants-over-mcp)).
 - Text from outside (YouTube titles and captions, Google Drive file names, the hosted services'
   transcripts, paired computers, Hugging Face, assistants, release notes) could carry script into the page. Every
   such text is escaped or set as plain text, and links built from data are `https://` only. A one-off review of
@@ -86,7 +91,8 @@ were checked when they were downloaded, or models already in the Hugging Face ca
 An assistant starts the [MCP server](11-assistants.md) itself and talks to it over standard input and output, so
 only programs the user runs can reach it.
 
-- An assistant sees only what the visibility switches allow, and its provider sees what it reads.
+- An assistant sees only what the visibility switches allow, and its provider sees what it reads. Of a course made
+  from a folder or from files on the computer, it sees the course's name and each lecture's title, never a path.
 - A transcript could hold words that try to steer the assistant. Assistants may change transcripts only when that is
   switched on (it is off at first), each change is a new version that can be restored, and every tool call, read
   and prompt is logged.

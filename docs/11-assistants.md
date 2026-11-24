@@ -123,11 +123,11 @@ can reach it.
 | Tool | What it gives |
 |---|---|
 | `list_transcriptions` | The transcriptions, newest first: id, date, length, model, status, speakers, and for a lecture its course, number ("lecture 4 of 38") and its YouTube or Google Drive link. A recording transcribed more than once is listed once: its main transcript when one is chosen in the app, then its branches, each with its label, model, id and latest version. Filters: words in the title, a branch's name or the speaker names, a course, the kind (courses or recordings) and the status, in pages of recordings. |
-| `list_courses` | The courses (YouTube playlists and Google Drive folders): course id (the playlist's or the folder's) and link, how many lectures are transcribed, and their total length. |
+| `list_courses` | The courses (YouTube playlists, Google Drive folders, and folders or files on the computer added as a course): course id (the playlist's or the Drive folder's, or the one Sedjem gave a course on the computer) and link, how many lectures are transcribed, and their total length. A course on the computer has no link: it says "a folder on the user's computer" or "files on the user's computer" instead, and never a path. |
 | `course_outline` | A course's lectures in order, each with its number, id, title, length, status, link and the first words of its transcript, so an assistant can find the right lecture without reading everything. |
 | `get_transcript` | A transcript by id, or by course and lecture number, as lines of `[mm:ss] Speaker: text`, for a time range or from a line on, and an earlier version of it with `version`. Each answer says which version it gives, of how many, and whether it is the recording's main transcript or a branch. |
 | `search` | Where something was said, across everything or in one course or transcription: each match with its lecture, time, the lines around it, and for a YouTube video a link that opens it at that moment. Of a recording with a main transcript, only that one is searched unless `include_branches` is true; without one, its transcripts that aren't branches made in the app. |
-| `get_course_text` | A whole course as one text, the same as its `course.md` file, in pieces (a Google Drive folder's course has the same text, though no file). |
+| `get_course_text` | A whole course as one text, the same as its `course.md` file, in pieces (a Google Drive folder's course has the same text, though no file, and a course on the computer has it without links). |
 | `save_version` | A corrected version of a transcript, saved as its newest version, from line edits or from all its lines, on top of the version it was made on. Offered only while saving is turned on. See [saving a version](#saving-a-version). |
 | `list_models` | The models that are ready, each with its id, title, and whether it runs on this computer or uploads the recording to a hosted service, and the default model. Hosted models only when the user allows them. |
 | `inspect_link` | What is at a link: a YouTube playlist's videos in order with their numbers, ids and lengths, whether each can be transcribed and which have captions made by people; a YouTube video; a Google Drive file; or a Google Drive folder's audio and video files in natural name order with their numbers and ids, and how many subfolders and other files were skipped. |
@@ -144,7 +144,7 @@ most, and an answer that is cut ends with the exact call that continues it, by t
 course (Prompt Engineering is about 49,000 words) is read the same way, lecture by lecture, so an
 assistant with a small context can still go through all of it.
 
-A course is named by its course id (its playlist's or its Drive folder's id) or by its title, in any case, and a part of the title is enough
+A course is named by its course id (its playlist's or its Drive folder's id, or the one Sedjem gave a course of recordings on the computer) or by its title, in any case, and a part of the title is enough
 when only one course has it. For a lecture transcribed more than once, assistants get its main
 transcript when one is chosen, else the transcription that finished last, the same one the course
 files follow.
@@ -285,8 +285,9 @@ picks one.
 
 *Settings → Assistants* has two switches for what they may see:
 
-- *Courses and YouTube videos*: every course lecture (of a YouTube playlist or a Google Drive folder), and every
-  YouTube video added on its own.
+- *Courses and YouTube videos*: every course lecture (of a YouTube playlist, a Google Drive folder, or a folder or
+  files on the computer added as a course), and every YouTube video added on its own. Of a course on the computer,
+  assistants see its name and its lectures' titles, never a path.
 - *Meetings and other recordings*: everything else.
 
 Under *What assistants can do*, four more switches, each off by default, let them save new versions of transcripts
