@@ -27,7 +27,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 from app import assistants, desktop, server, session as sessions  # noqa: E402
 from app import __main__ as cli  # noqa: E402
-from app.config import Config  # noqa: E402
+from app.config import Config, _read_json  # noqa: E402
 from app.session import HEADER, LOGIN_FILE, STORAGE_KEY, Session, write_private  # noqa: E402
 
 POSIX = os.name != "nt"  # file modes are ignored on Windows, where the data folder is in the user's own profile
@@ -170,6 +170,27 @@ class KeyFile(unittest.TestCase):
         self.assertIn(f"sessionStorage.setItem({json.dumps(STORAGE_KEY)}, {json.dumps(s.secret)})", text)
         self.assertNotIn("localStorage", text)  # a port that another program takes later would read it
         self.assertIn('location.replace("/")', text)
+
+    def test_a_read_while_windows_replaces_the_file_is_tried_again(self):
+        """On Windows, reading page.json while write_private replaces it fails with PermissionError. The server's
+        reads and the browser tests' (#157) go through _read_json, which tries again and gives {} only when the
+        file stays locked."""
+        path = self.dir / "page.json"
+        write_private(path, json.dumps({"sedjem-sort": "title"}))
+        real, calls = Path.read_text, []
+
+        def locked_twice(p, *args, **kwargs):
+            calls.append(p)
+            if len(calls) <= 2:
+                raise PermissionError(13, "Permission denied", str(p))
+            return real(p, *args, **kwargs)
+
+        with mock.patch("app.config.time.sleep"):
+            with mock.patch.object(Path, "read_text", locked_twice):
+                self.assertEqual(_read_json(path), {"sedjem-sort": "title"})
+            self.assertEqual(len(calls), 3)
+            with mock.patch.object(Path, "read_text", side_effect=PermissionError(13, "Permission denied")):
+                self.assertEqual(_read_json(path), {})  # locked on every try: unreadable, as a missing file is
 
 
 class Server(unittest.TestCase):
