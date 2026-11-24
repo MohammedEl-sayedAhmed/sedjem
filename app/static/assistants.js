@@ -39,7 +39,7 @@ function assistantsPanel() {
       transcripts through MCP, also while Sedjem is closed. What an assistant reads goes to its model, like anything
       else shared in a chat with it. Assistants only read, unless you let them do more below.</p>
     <section class="ai-sec" aria-labelledby="ai-see"><h4 id="ai-see">What assistants can see</h4>
-      <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists and Google Drive folders, and YouTube videos added on their own.")}
+      <div class="set-list">${sw("mcp_courses", "Lectures of YouTube playlists, Google Drive folders and courses of files on this computer, and YouTube videos added on their own.")}
         ${sw("mcp_recordings", "Every other transcription: meetings, calls and other files.")}</div></section>
     <section class="ai-sec" aria-labelledby="ai-do"><h4 id="ai-do">What assistants can do</h4>
       <p class="hint ai-lead">Each is off unless you turn it on. Words in a transcript or on a web page can try to steer an

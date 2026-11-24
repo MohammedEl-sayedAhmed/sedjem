@@ -57,6 +57,7 @@ flowchart TB
   assistant["AI assistant<br/>an MCP client"]
   other["Another computer with Sedjem<br/>paired with this one"]
   internet["Internet services<br/>hosted services, model hosts,<br/>GitHub, YouTube, Google Drive and Aptabase"]
+  files[("Your files<br/>recordings and folders<br/>on this computer")]
 
   subgraph sedjem["Sedjem"]
     window["Window<br/>pywebview, or a browser in app mode"]
@@ -77,6 +78,8 @@ flowchart TB
   worker -->|"progress and the lines"| data
   runner -->|"job.json and transcript.json"| data
   server -->|"reads and writes"| data
+  server -->|"lists a folder you name"| files
+  runner -->|"reads a recording in place"| files
   server -->|"model downloads, update checks and downloads,<br/>link checks, usage counts (HTTPS)"| internet
   runner -->|"hosted uploads, YouTube and<br/>Google Drive (HTTPS)"| internet
   ui -->|"YouTube's player, only to play<br/>a streamed video (HTTPS)"| internet
@@ -92,14 +95,17 @@ flowchart TB
   classDef external fill:#8a8a8a,stroke:#5e5e5e,color:#fff
   class you person
   class window,ui,server,runner,worker,remote,mcp,data part
-  class assistant,other,internet external
+  class assistant,other,internet,files external
 ```
 
 ## One local transcription, step by step
 
 The page sends the recording, and the server answers at once. Threads then prepare the audio and run the worker,
 while the page polls for progress; there is no WebSocket. Each step writes its state into the job's folder, so after a
-restart, waiting jobs go back on the queue and a job that was running is marked as interrupted.
+restart, waiting jobs go back on the queue and a job that was running is marked as interrupted. A folder's recordings,
+or several files added together, are a course: the page sends them with `POST /api/local` (read in place) or as one
+upload each, and each recording becomes a job of its own that follows these steps
+([AgDR 24](agdr/AgDR-0024-folders-and-files-on-the-computer-as-courses.md)).
 
 ```mermaid
 sequenceDiagram
