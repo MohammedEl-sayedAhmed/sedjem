@@ -4,7 +4,7 @@ sherpa-onnx==2.0.1
 transcribe-cpp==0.4.2
 jiwer==4.0.0
 soundfile==0.14.0
-numpy==2.5.4
+numpy==2.5.5
 threadpoolctl==3.8.0  # caps NumPy's BLAS threads for Nemotron-3-Diarization (nemotron.py)
 requests==2.34.2
 cryptography==50.0.2  # the certificate for running jobs for other computers (app/remote.py)
