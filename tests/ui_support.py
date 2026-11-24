@@ -30,7 +30,7 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from app import engines  # noqa: E402
-from app.config import Config  # noqa: E402
+from app.config import Config, _read_json  # noqa: E402
 from app.server import make_server  # noqa: E402
 from media import make_clip  # noqa: E402
 
@@ -226,11 +226,10 @@ class UiTestCase(unittest.TestCase):
         self.page.wait_for_function("() => typeof S !== 'undefined' && S.status", timeout=30_000)
 
     def prefs(self):
-        """The page's preferences as the server keeps them, in the data folder (app/server.py)."""
-        try:
-            return json.loads((self.app.cfg.storage / "page.json").read_text(encoding="utf-8"))
-        except FileNotFoundError:
-            return {}
+        """The page's preferences as the server keeps them, in the data folder (app/server.py). Read as the server
+        reads them (app/config.py, _read_json): on Windows a read while the server replaces the file fails, so it
+        is tried again (#157)."""
+        return _read_json(self.app.cfg.storage / "page.json")
 
     def set_prefs(self, **changes):
         """Change the page's preferences as the page would (/api/prefs); names with _ for -, None to forget one."""
