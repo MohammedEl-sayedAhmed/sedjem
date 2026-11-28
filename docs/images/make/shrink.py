@@ -2,8 +2,8 @@
 256 colours, no dithering, which keeps the text sharp and the files small. Needs Pillow:
     python docs/images/make/shrink.py
     python docs/images/make/shrink.py site    # the website's captures, from out/site/ into site/captures/
-The website's captures are shown at their own size, so they keep every pixel and colour: each becomes a lossless
-WebP (method 6, the smallest) and an optimised PNG for a browser without WebP."""
+The website's captures are shown at their own size or up to 1.3 times it, never smaller, so they keep every pixel
+and colour: each becomes a lossless WebP (method 6, the smallest) and an optimised PNG for a browser without WebP."""
 import sys
 from pathlib import Path
 

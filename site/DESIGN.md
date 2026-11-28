@@ -395,9 +395,14 @@ each window as narrow as the app allows for the region to fit: no wider than 656
 phone, which is what a 320 px phone's column holds inside the frame. It refuses a region that is wider. shrink.py
 then keeps every pixel and colour: each becomes a lossless WebP (method 6) and an optimised PNG, in site/captures/.
 
-The page shows each at its own size, which is the app's: one css pixel of the picture to one of the page, never
-smaller, as shrinking is what made the app's 11 to 13 px text hard to read. A picture element offers the WebP and
-then the PNG for a browser without WebP; the phone form below 750 px, where the desktop form with its frame no
+The page never shows one smaller than its own size, which is the app's (one css pixel of the picture to one of the
+page), as shrinking is what made the app's 11 to 13 px text hard to read. It may show one bigger: each fills its
+column, so its edges line up with the rule above it and with what is under it, up to 1.3 times its own size; in a
+wider column it stays at 1.3 times, centred. At its own size it once left 17 to 30 px of a 681 to 690 px column
+empty, too little to look chosen, and up to 424 px where the section stacks. At 1.3 times a picture still has 1.5
+or more of its pixels to each of the page's, and more would look like a zoomed screenshot (#160). build.py puts
+each picture's own widths on its figure for the stylesheet. A picture element offers the WebP and then the PNG for
+a browser without WebP; the phone form below 750 px, where the desktop form with its frame no
 longer fits the column, a scroll bar included; and the theme tokens show the light or dark pair. From 1000 to
 1279 px the seven columns are narrower than the desktop form, so there a section with a picture stacks, its claim
 over the picture, as below 1000. Where a region wouldn't fit, the crop is tighter rather than the picture smaller.

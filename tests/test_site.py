@@ -484,6 +484,17 @@ class SiteTest(unittest.TestCase):
                     self.assertEqual(img.attrs["src"], img.attrs["srcset"].split()[0])
                     self.assertEqual([n.attrs["srcset"].split()[0].rsplit(".", 1)[1] for n in sources + [img]],
                                      ["webp", "png", "webp", "png"])
+        # each picture's figure carries its own width, desktop and phone form, for the stylesheet's 1.3 times limit
+        for lang, home in self.homes.items():
+            figures = home.find(lambda n: n.tag == "figure" and "shot" in n.attrs.get("class", "").split())
+            self.assertEqual(len(figures), len(build.SHOTS), lang)
+            for figure in figures:
+                img = figure.find(lambda n: n.tag == "img")[0]
+                name = img.attrs["src"].rsplit("/", 1)[1].split("-wide-")[0]
+                with self.subTest(lang, figure=name):
+                    wide = image_size(build.CAPTURES / f"{name}-wide-light.png")[0] // build.DENSITY["wide"]
+                    narrow = image_size(build.CAPTURES / f"{name}-narrow-light.png")[0] // build.DENSITY["narrow"]
+                    self.assertEqual(figure.attrs.get("style"), f"--shot-w: {wide}px; --shot-w-narrow: {narrow}px")
         # and the phone form is used just below the width where the desktop form fits: the widest desktop form
         # with its frame inside the column of a 750 px window with a scroll bar
         widest = max(image_size(p)[0] // 2 for p in build.CAPTURES.glob("*-wide-*.png"))
@@ -2498,6 +2509,23 @@ class ReleaseTest(unittest.TestCase):
         # the general wording is today's: the installer's size and SmartScreen
         with open(ROOT / "site" / "copy" / "en.toml", "rb") as f:
             self.assertIn("The installer is about 90&nbsp;MB", tomllib.load(f)["get"]["windows_text"])
+
+
+
+class ShotSizeTest(unittest.TestCase):
+    def test_a_picture_s_own_widths_and_a_light_and_dark_pair_of_different_sizes(self):
+        """shot_size() gives a picture's own widths, its pixels over the density of each form, and stops the build
+        when its light and dark captures differ in size."""
+        def png(path, width, height):  # only the header that png_size reads
+            path.write_bytes(b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR" + struct.pack(">II", width, height))
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(build, "CAPTURES", Path(tmp)):
+            for form, size in {"wide": (1312, 514), "narrow": (834, 771)}.items():
+                for theme in ("light", "dark"):
+                    png(Path(tmp) / f"x-{form}-{theme}.png", *size)
+            self.assertEqual(build.shot_size("x"), 'style="--shot-w: 656px; --shot-w-narrow: 278px"')
+            png(Path(tmp) / "x-narrow-dark.png", 837, 771)
+            with self.assertRaises(SystemExit):
+                build.shot_size("x")
 
 
 if __name__ == "__main__":
