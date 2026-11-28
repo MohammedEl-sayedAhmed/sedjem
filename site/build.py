@@ -341,6 +341,19 @@ def shot(name, alt, root):
     return "\n".join(out)
 
 
+def shot_size(name):
+    """The style attribute of a picture's figure: the picture's own width, desktop and phone form, as --shot-w and
+    --shot-w-narrow, so the stylesheet can let it grow to its column, up to 1.3 times that (--shot-growth), and no further.
+    The light and dark captures of a form are the same size."""
+    widths = {}
+    for form, density in DENSITY.items():
+        light, dark = (png_size(CAPTURES / f"{name}-{form}-{theme}.png") for theme in ("light", "dark"))
+        if light != dark:
+            raise SystemExit(f"{name}-{form}: the light capture is {light}, the dark one {dark}")
+        widths[form] = light[0] // density
+    return f'style="--shot-w: {widths["wide"]}px; --shot-w-narrow: {widths["narrow"]}px"'
+
+
 def shares(m):
     """Each speaker's share of the talking in the whole made-up meeting, in per cent, worked out as the app's
     sidebar does (app/static/app.js speakerStats): the sum of their lines' lengths over everyone's."""
@@ -1574,6 +1587,7 @@ def build(out=ROOT / "_site", counts_key=COUNTS_KEY, counts_host=COUNTS_HOST, st
                       file_windows=release_file(rel, "windows", words[lang], lang),
                       file_linux=release_file(rel, "linux", words[lang], lang))
         values.update({f"shot_{name}": shot(name, words[lang][alt], root) for name, alt in SHOTS.items()})
+        values.update({f"shot_{name}_size": shot_size(name) for name in SHOTS})
         (out / page["folder"]).mkdir(parents=True, exist_ok=True)
         (out / page["folder"] / "index.html").write_text(fill(template, values), encoding="utf-8", newline="\n")
     not_found = {"base": BASE, "icon": icon(), "counts": counts(BASE + COUNTER, "404", counts_key, counts_host, offered)}

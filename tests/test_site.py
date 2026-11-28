@@ -484,6 +484,17 @@ class SiteTest(unittest.TestCase):
                     self.assertEqual(img.attrs["src"], img.attrs["srcset"].split()[0])
                     self.assertEqual([n.attrs["srcset"].split()[0].rsplit(".", 1)[1] for n in sources + [img]],
                                      ["webp", "png", "webp", "png"])
+        # each picture's figure carries its own width, desktop and phone form, for the stylesheet's 1.3 times limit
+        for lang, home in self.homes.items():
+            figures = home.find(lambda n: n.tag == "figure" and "shot" in n.attrs.get("class", "").split())
+            self.assertEqual(len(figures), len(build.SHOTS), lang)
+            for figure in figures:
+                img = figure.find(lambda n: n.tag == "img")[0]
+                name = img.attrs["src"].rsplit("/", 1)[1].split("-wide-")[0]
+                with self.subTest(lang, figure=name):
+                    wide = image_size(build.CAPTURES / f"{name}-wide-light.png")[0] // build.DENSITY["wide"]
+                    narrow = image_size(build.CAPTURES / f"{name}-narrow-light.png")[0] // build.DENSITY["narrow"]
+                    self.assertEqual(figure.attrs.get("style"), f"--shot-w: {wide}px; --shot-w-narrow: {narrow}px")
         # and the phone form is used just below the width where the desktop form fits: the widest desktop form
         # with its frame inside the column of a 750 px window with a scroll bar
         widest = max(image_size(p)[0] // 2 for p in build.CAPTURES.glob("*-wide-*.png"))

@@ -473,11 +473,18 @@ mark {
   text-decoration: underline wavy var(--wrong) 1.5px; text-underline-offset: 0.36em;
 }
 
-/* the pictures of the app, at their own size, which is the app's: taken at two or three times it, and never drawn
-   smaller, so no line of the app is shown smaller than the app draws it. The desktop form is up to 656 px wide and
-   the phone form, below 750 px, up to 280, which a 320 px phone holds. The width and height in the markup (the phone
+/* the pictures of the app, never smaller than their own size, which is the app's, so no line of the app is shown
+   smaller than the app draws it. The desktop form is up to 656 px wide and the phone form, below 750 px, up to 280,
+   which a 320 px phone holds. Each fills its column, so its edges line up with the rule above it and whatever is
+   under it, but grows to no more than 1.3 times its own size (--shot-w, from build.py, plus the frame's 4 px on each
+   side); in a column wider than that it stays at 1.3 times and is centred. Taken at two or three times its size, it
+   keeps 1.5 or more of its pixels to each of the page's at 1.3 times. The width and height in the markup (the phone
    form's on its sources) hold the place before a picture arrives, so nothing moves when it does. */
-.shot .frame { width: fit-content; max-width: 100%; }
+.shot { --shot-growth: 1.3; width: min(100%, calc(var(--shot-w) * var(--shot-growth) + 8px)); margin-inline: auto; }
+.shot .frame img { width: 100%; }
+@media (max-width: 749px) {
+  .shot { width: min(100%, calc(var(--shot-w-narrow) * var(--shot-growth) + 8px)); }
+}
 /* where seven columns are narrower than the desktop form, its section stacks, the claim over the picture, so the
    picture keeps its size */
 @media (min-width: 1000px) and (max-width: 1279px) {

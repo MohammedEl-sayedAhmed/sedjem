@@ -5,7 +5,7 @@ or without scripts. The theme on the page's attribute wins over the system's, th
 page before it is drawn, the theme button switches to the other theme, its icon the one on show, the pictures of the
 app follow the pick and only the ones on show are fetched, and without scripts the page follows the system, the
 phone's menu still opens and the download is Windows'. The pictures of the app are never drawn smaller than their
-own size, from a 320 px phone to a desktop; the speakers' names are in their colours, which read on the card in both
+own size, from a 320 px phone to a desktop, and fill their column up to 1.3 times it, centred beyond; the speakers' names are in their colours, which read on the card in both
 themes; the commands fade at the edge where more of them is to the side, and the subtitles are left out on a phone.
 The grid of numbers, built from tests/site_support.py's made-up stats and totals and again without any, fits every
 width from a phone's to a desktop's on both pages, its dates never touching and never smaller, and is whole without
@@ -467,6 +467,39 @@ class SiteInBrowserTest(unittest.TestCase):
                             self.assertGreaterEqual(w, pixels[0] / density[form] - 0.01, name)
                             self.assertGreaterEqual(h, pixels[1] / density[form] - 0.01, name)
                         self.assert_no_sideways_scroll(page, width)
+
+    def test_the_pictures_fill_their_column_up_to_1_3_times_their_size(self):
+        """Each picture of the app on show fills its column, its frame's edges on the column's, while that needs no more
+        than 1.3 times its own size; in a wider column it is 1.3 times its size, centred. Never more, on both pages,
+        from a 320 px phone to a desktop. The column is measured as the figure's width with its own width taken off."""
+        boxes = """() => Array.from(document.querySelectorAll('figure.shot')).map(f => {
+            const img = Array.from(f.querySelectorAll('img')).find(i => i.getClientRects().length);
+            const own = parseFloat(getComputedStyle(f).getPropertyValue(innerWidth < 750 ? '--shot-w-narrow' : '--shot-w'));
+            const frame = f.querySelector('.frame').getBoundingClientRect(), css = f.style.cssText;
+            f.style.setProperty('width', 'auto', 'important');
+            f.style.setProperty('margin-inline', '0', 'important');
+            const column = f.getBoundingClientRect();
+            f.style.cssText = css;
+            return [img.currentSrc.split('/').pop(), own, img.getBoundingClientRect().width,
+                    frame.left - column.left, column.right - frame.right, column.width];
+        })"""
+        for path in PAGES:
+            for width in (320, 390, 420, 699, 749, 750, 999, 1000, 1180, 1279, 1280, 1440, 1920):
+                with self.subTest(path, width=width):
+                    page = self.open(path, width)
+                    for img in page.locator(".frame img").all():
+                        if img.is_visible():
+                            img.scroll_into_view_if_needed()
+                    shown = page.evaluate(boxes)
+                    self.assertEqual(len(shown), 5)
+                    for name, own, drawn, start, end, column in shown:
+                        self.assertLessEqual(drawn, own * 1.3 + 0.5, name)
+                        self.assertAlmostEqual(start, end, delta=0.5, msg=name)
+                        if column - 8 <= own * 1.3:  # the column needs no more than 1.3 times: filled
+                            self.assertLessEqual(start, 0.5, name)
+                        else:  # a wider column: 1.3 times, centred
+                            self.assertAlmostEqual(drawn, own * 1.3, delta=0.5, msg=name)
+                    self.assert_no_sideways_scroll(page, width)
 
     def test_the_speakers_names_read_in_both_themes(self):
         """The hero's names are drawn in their speakers' colours, bold, with nothing before them, and each colour is
