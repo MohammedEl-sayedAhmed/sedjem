@@ -2511,5 +2511,22 @@ class ReleaseTest(unittest.TestCase):
             self.assertIn("The installer is about 90&nbsp;MB", tomllib.load(f)["get"]["windows_text"])
 
 
+
+class ShotSizeTest(unittest.TestCase):
+    def test_a_picture_s_own_widths_and_a_light_and_dark_pair_of_different_sizes(self):
+        """shot_size() gives a picture's own widths, its pixels over the density of each form, and stops the build
+        when its light and dark captures differ in size."""
+        def png(path, width, height):  # only the header that png_size reads
+            path.write_bytes(b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR" + struct.pack(">II", width, height))
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(build, "CAPTURES", Path(tmp)):
+            for form, size in {"wide": (1312, 514), "narrow": (834, 771)}.items():
+                for theme in ("light", "dark"):
+                    png(Path(tmp) / f"x-{form}-{theme}.png", *size)
+            self.assertEqual(build.shot_size("x"), 'style="--shot-w: 656px; --shot-w-narrow: 278px"')
+            png(Path(tmp) / "x-narrow-dark.png", 837, 771)
+            with self.assertRaises(SystemExit):
+                build.shot_size("x")
+
+
 if __name__ == "__main__":
     unittest.main()

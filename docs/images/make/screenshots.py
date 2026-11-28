@@ -313,8 +313,8 @@ with sync_playwright() as pw:
         shoot(page, "live-progress")
         page.context.close()
     if want("site"):
-        # The website's captures: each the region of the app that proves one claim, at the app's own size, which is
-        # the size the page shows it at and never smaller. So each is cut from a window narrow enough for the region
+        # The website's captures: each the region of the app that proves one claim, at the app's own size, which the
+        # page shows at up to 1.3 times and never smaller. So each is cut from a window narrow enough for the region
         # to fit: no wider than WIDE css px from a desktop's window, at twice the pixels, to sit whole in the page's
         # evidence column, and no wider than NARROW from a phone's, at three times, to sit whole on a 320 px phone.
         # Saved as they are, in PNG, in out/site/; shrink.py site makes the lossless files in site/captures/.

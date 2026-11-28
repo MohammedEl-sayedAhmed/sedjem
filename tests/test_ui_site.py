@@ -5,8 +5,9 @@ or without scripts. The theme on the page's attribute wins over the system's, th
 page before it is drawn, the theme button switches to the other theme, its icon the one on show, the pictures of the
 app follow the pick and only the ones on show are fetched, and without scripts the page follows the system, the
 phone's menu still opens and the download is Windows'. The pictures of the app are never drawn smaller than their
-own size, from a 320 px phone to a desktop, and fill their column up to 1.3 times it, centred beyond; the speakers' names are in their colours, which read on the card in both
-themes; the commands fade at the edge where more of them is to the side, and the subtitles are left out on a phone.
+own size, from a 320 px phone to a desktop, and fill their column up to 1.3 times it, centred beyond; the speakers'
+names are in their colours, which read on the card in both themes; the commands fade at the edge where more of them
+is to the side, and the subtitles are left out on a phone.
 The grid of numbers, built from tests/site_support.py's made-up stats and totals and again without any, fits every
 width from a phone's to a desktop's on both pages, its dates never touching and never smaller, and is whole without
 scripts; with them, a chart tells its points on hover and from the keyboard. The downloads are the made-up latest
@@ -496,7 +497,7 @@ class SiteInBrowserTest(unittest.TestCase):
                         self.assertLessEqual(drawn, own * 1.3 + 0.5, name)
                         self.assertAlmostEqual(start, end, delta=0.5, msg=name)
                         if column - 8 <= own * 1.3:  # the column needs no more than 1.3 times: filled
-                            self.assertLessEqual(start, 0.5, name)
+                            self.assertAlmostEqual(start, 0, delta=0.5, msg=name)
                         else:  # a wider column: 1.3 times, centred
                             self.assertAlmostEqual(drawn, own * 1.3, delta=0.5, msg=name)
                     self.assert_no_sideways_scroll(page, width)
