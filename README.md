@@ -1,6 +1,6 @@
 # Sedjem statistics
 
-Updated on 2026-11-27 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
+Updated on 2026-11-28 by the Repository stats workflow on main (`.github/workflows/stats.yml`), from GitHub's API. GitHub itself only shows the last 14 days of clones and views; this branch keeps every day since 2026-10-05.
 
 <a href="charts/activity-light.svg#gh-light-mode-only"><img src="charts/activity-light.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
 <a href="charts/activity-dark.svg#gh-dark-mode-only"><img src="charts/activity-dark.svg" width="800" alt="Charts of the downloads of the app, the stars and forks over time, and the clones and page views per day"></a>
@@ -10,7 +10,7 @@ Updated on 2026-11-27 by the Repository stats workflow on main (`.github/workflo
 | | |
 |---|---|
 | Downloads of the app, all releases | 185 |
-| Clones since 2026-10-05 | 5,204 (1,073 unique per day, added up) |
+| Clones since 2026-10-05 | 5,216 (1,083 unique per day, added up) |
 | Page views since 2026-10-05 | 861 (187 unique per day, added up) |
 | Stars, forks, watchers | 11, 0, 1 |
 
@@ -60,6 +60,7 @@ Updated on 2026-11-27 by the Repository stats workflow on main (`.github/workflo
 
 | Day | Clones | Unique cloners | Views | Unique visitors |
 |---|---|---|---|---|
+| 2026-11-27 | 12 | 10 | 0 | 0 |
 | 2026-11-26 | 112 | 7 | 2 | 2 |
 | 2026-11-25 | 126 | 42 | 12 | 6 |
 | 2026-11-24 | 287 | 26 | 75 | 3 |
@@ -89,18 +90,17 @@ Updated on 2026-11-27 by the Repository stats workflow on main (`.github/workflo
 | 2026-10-31 | 78 | 29 | 14 | 7 |
 | 2026-10-30 | 627 | 76 | 101 | 4 |
 | 2026-10-29 | 107 | 17 | 51 | 11 |
-| 2026-10-28 | 28 | 8 | 50 | 12 |
 
-## Where visitors came from (the 14 days to 2026-11-27)
+## Where visitors came from (the 14 days to 2026-11-28)
 
 | Site | Views | Unique visitors |
 |---|---|---|
-| Google | 14 | 8 |
+| Google | 13 | 8 |
 | github.com | 9 | 5 |
 | mohammedel-sayedahmed.github.io | 5 | 3 |
-| m.facebook.com | 2 | 2 |
 | com.linkedin.android | 1 | 1 |
 | linkedin.com | 1 | 1 |
+| m.facebook.com | 1 | 1 |
 
 ## Reading the numbers
 
